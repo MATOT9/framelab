@@ -1,0 +1,2281 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="User, developer, and reference documentation for the FrameLab application.">
+      
+      
+      
+      
+        <link rel="prev" href="plugin-selector.html">
+      
+      
+        <link rel="next" href="data/session-manager.html">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/branding/app-icon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.4">
+    
+    
+      
+        <title>Overview - FrameLab Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#data-workflow" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../index.html" title="FrameLab Documentation" class="md-header__button md-logo" aria-label="FrameLab Documentation" data-md-component="logo">
+      
+  <img src="../assets/images/branding/app-icon.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            FrameLab Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Overview
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="blue-grey" data-md-color-accent="light-blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m3.55 19.09 1.41 1.41 1.8-1.79-1.42-1.42M12 6c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6c0-3.32-2.69-6-6-6m8 7h3v-2h-3m-2.76 7.71 1.8 1.79 1.41-1.41-1.79-1.8M20.45 5l-1.41-1.4-1.8 1.79 1.42 1.42M13 1h-2v3h2M6.76 5.39 4.96 3.6 3.55 5l1.79 1.81zM1 13h3v-2H1m12 9h-2v3h2"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../index.html" title="FrameLab Documentation" class="md-nav__button md-logo" aria-label="FrameLab Documentation" data-md-component="logo">
+      
+  <img src="../assets/images/branding/app-icon.png" alt="logo">
+
+    </a>
+    FrameLab Documentation
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="index.html" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="concepts-and-limits.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts and Limits
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="quick-start.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="plugins.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="plugin-selector.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Selector
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2_6" id="__nav_2_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Workflow
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Data Workflow
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="data-workflow.html" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#recommended-operating-sequence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recommended operating sequence
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dataset-input" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dataset input
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-scanning-actually-does" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What scanning actually does
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#skip-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Skip rules
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Skip rules">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#main-page-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Main-page behavior
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pattern-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pattern types
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#metadata-source-selection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Metadata source selection
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Metadata source selection">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#path-metadata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Path metadata
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#acquisition-json-metadata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Acquisition JSON metadata
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#selection-rule" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Selection rule
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ebus-status-line" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        eBUS status line
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#metadata-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Metadata table
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#grouping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Grouping
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#session-level-preparation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Session-level preparation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-to-verify-before-leaving-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What to verify before leaving Data
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#common-failure-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Common failure modes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Common failure modes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#correct-files-wrong-metadata-source" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Correct files, wrong metadata source
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#valid-metadata-source-incomplete-json-hierarchy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Valid metadata source, incomplete JSON hierarchy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ebus-status-line-is-missing-when-a-snapshot-is-expected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        eBUS status line is missing when a snapshot is expected
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#unwanted-files-inflate-the-dataset" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Unwanted files inflate the dataset
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#recommended-next-pages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recommended next pages
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="data/session-manager.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Session Manager
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="data/datacard-wizard.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datacard Wizard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="data/ebus-config-tools.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    eBUS Config Tools
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="measure-workflow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Measure Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_8" id="__nav_2_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Analysis Workflow
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Analysis Workflow
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="analysis-workflow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="analysis/intensity-trend-explorer.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Intensity Trend Explorer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="troubleshooting.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../developer-guide/index.html" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer Guide
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Developer Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer-guide/architecture.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer-guide/plugin-system.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin System
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer-guide/datacard-system.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datacard System
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer-guide/ebus-config-integration.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    eBUS Config Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer-guide/ui-structure.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    UI Structure
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer-guide/packaging.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Packaging
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../reference/index.html" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/config-files.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Config Files
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/plugin-manifests.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Manifests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/acquisition-mapping.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Acquisition Mapping
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/ebus-parameter-catalog.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    eBUS Parameter Catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/keyboard-shortcuts.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Keyboard Shortcuts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../troubleshooting/index.html" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Troubleshooting
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#recommended-operating-sequence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recommended operating sequence
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dataset-input" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dataset input
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-scanning-actually-does" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What scanning actually does
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#skip-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Skip rules
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Skip rules">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#main-page-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Main-page behavior
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pattern-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pattern types
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#metadata-source-selection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Metadata source selection
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Metadata source selection">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#path-metadata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Path metadata
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#acquisition-json-metadata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Acquisition JSON metadata
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#selection-rule" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Selection rule
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ebus-status-line" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        eBUS status line
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#metadata-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Metadata table
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#grouping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Grouping
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#session-level-preparation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Session-level preparation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-to-verify-before-leaving-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What to verify before leaving Data
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#common-failure-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Common failure modes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Common failure modes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#correct-files-wrong-metadata-source" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Correct files, wrong metadata source
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#valid-metadata-source-incomplete-json-hierarchy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Valid metadata source, incomplete JSON hierarchy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ebus-status-line-is-missing-when-a-snapshot-is-expected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        eBUS status line is missing when a snapshot is expected
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#unwanted-files-inflate-the-dataset" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Unwanted files inflate the dataset
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#recommended-next-pages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recommended next pages
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="data-workflow">Data Workflow<a class="headerlink" href="#data-workflow" title="Permanent link">&para;</a></h1>
+<p>The <strong>Data</strong> tab is the intake and verification stage for the entire app.</p>
+<p>Use it to:</p>
+<ul>
+<li>choose the dataset root</li>
+<li>control scan exclusions</li>
+<li>resolve metadata for each image</li>
+<li>verify that the table reflects the acquisition you actually intend to measure and analyze</li>
+</ul>
+<p>If the Data tab is wrong, later measurements and plots can still look mathematically clean while being physically wrong.</p>
+<h2 id="recommended-operating-sequence">Recommended operating sequence<a class="headerlink" href="#recommended-operating-sequence" title="Permanent link">&para;</a></h2>
+<ol>
+<li>Select the dataset folder.</li>
+<li>Scan the folder.</li>
+<li>Adjust skip rules if unwanted files were included.</li>
+<li>Inspect the metadata table.</li>
+<li>Choose the correct metadata source.</li>
+<li>If the dataset belongs to a session that still needs acquisition management, use <strong>Session Manager</strong> before continuing deeper.</li>
+<li>If an eBUS status line appears, decide whether snapshot inspection or compare is required before continuing.</li>
+<li>Confirm grouping and row content before moving to <strong>Measure</strong> or <strong>Analyze</strong>.</li>
+</ol>
+<h2 id="dataset-input">Dataset input<a class="headerlink" href="#dataset-input" title="Permanent link">&para;</a></h2>
+<p>The dataset input controls define the root path used for TIFF discovery.</p>
+<table>
+<thead>
+<tr>
+<th>Control</th>
+<th>Function</th>
+<th>Typical use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Dataset Folder</strong></td>
+<td>Holds the folder path that will be scanned recursively.</td>
+<td>Type or paste a known path directly.</td>
+</tr>
+<tr>
+<td><strong>Browse Folder...</strong></td>
+<td>Opens the system folder picker and writes the selected path into the input field.</td>
+<td>Use when you prefer filesystem navigation over manual typing.</td>
+</tr>
+<tr>
+<td><strong>Scan Folder</strong></td>
+<td>Starts recursive TIFF discovery, skip-rule filtering, metadata extraction, and table refresh.</td>
+<td>Use after changing the dataset root or skip rules.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="what-scanning-actually-does">What scanning actually does<a class="headerlink" href="#what-scanning-actually-does" title="Permanent link">&para;</a></h2>
+<p>A scan is not only file listing. It is the dataset intake pass used by the rest of the app.</p>
+<p>During scan, the app:</p>
+<ul>
+<li>recursively discovers supported <code>.tif</code> and <code>.tiff</code> files</li>
+<li>applies the current skip rules before loading</li>
+<li>reads each remaining file as a 2D image and skips unreadable items</li>
+<li>caches loaded images for preview and later measurement use</li>
+<li>computes initial static quick-look values such as max pixel and minimum non-zero</li>
+<li>determines whether hierarchical JSON metadata is available anywhere in the selected dataset tree</li>
+<li>rebuilds metadata for every loaded row using the active metadata-source mode</li>
+<li>refreshes the Data table, Measure state, and downstream analysis context</li>
+</ul>
+<p>Treat a scan as a dataset-state reset, not as a cosmetic refresh.</p>
+<h2 id="skip-rules">Skip rules<a class="headerlink" href="#skip-rules" title="Permanent link">&para;</a></h2>
+<p>Skip rules exclude files or folders from dataset intake.</p>
+<p>Use them to keep temporary exports, cache folders, thumbnails, or unrelated TIFFs out of the working dataset.</p>
+<h3 id="main-page-behavior">Main-page behavior<a class="headerlink" href="#main-page-behavior" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Edit Skip Rules...</strong> opens the dedicated editor.</li>
+<li>The muted status line summarizes how many patterns are active and where the rules are stored.</li>
+<li>Rule edits persist under local config; after changing them, rescan the dataset.</li>
+</ul>
+<h3 id="pattern-types">Pattern types<a class="headerlink" href="#pattern-types" title="Permanent link">&para;</a></h3>
+<p>Supported matching styles include common practical cases such as:</p>
+<ul>
+<li>exact names, for example <code>temp</code></li>
+<li>wildcard patterns, for example <code>*.bak</code></li>
+<li>relative path fragments, for example <code>*/cache/*</code></li>
+<li>parent-folder matches when a directory name itself should be skipped</li>
+</ul>
+<p>Skip rules are exact string/wildcard filters, not semantic dataset selectors.</p>
+<h2 id="metadata-source-selection">Metadata source selection<a class="headerlink" href="#metadata-source-selection" title="Permanent link">&para;</a></h2>
+<p>The chosen metadata source directly affects grouping, exposure-dependent metrics, and analysis-plugin inputs.</p>
+<h3 id="path-metadata">Path metadata<a class="headerlink" href="#path-metadata" title="Permanent link">&para;</a></h3>
+<p>Use <strong>Path</strong> when file names and folder structure already encode the experiment correctly.</p>
+<p>Typical examples include exposure or iris values embedded in:</p>
+<ul>
+<li>the file name</li>
+<li>the parent folder</li>
+<li>the grandparent folder</li>
+</ul>
+<h3 id="acquisition-json-metadata">Acquisition JSON metadata<a class="headerlink" href="#acquisition-json-metadata" title="Permanent link">&para;</a></h3>
+<p>Use <strong>Acquisition JSON</strong> when the acquisition-root JSON hierarchy is the authoritative source.</p>
+<p>In the current implementation, that source can combine:</p>
+<ul>
+<li>acquisition defaults and frame-targeted overrides from <code>acquisition_datacard.json</code></li>
+<li>inherited session defaults from <code>session_datacard.json</code></li>
+<li>inherited campaign defaults and instrument defaults from <code>campaign_datacard.json</code></li>
+<li>effective acquisition-wide eBUS-backed baseline values for canonical mapped fields when the acquisition carries one readable root-level <code>.pvcfg</code> snapshot and the field mapping marks the fields as eBUS-managed</li>
+</ul>
+<p>When the hierarchical JSON stack does not provide exposure or iris values, the app can still fall back to path-derived values for those specific fields. Treat that fallback as a mixed-source convenience, not as proof that the authored metadata is complete.</p>
+<h3 id="selection-rule">Selection rule<a class="headerlink" href="#selection-rule" title="Permanent link">&para;</a></h3>
+<p>Choose the source that best represents the true acquisition, then keep that source fixed for one interpretation pass.</p>
+<p>Do not switch metadata source mid-analysis unless you are intentionally comparing metadata strategies.</p>
+<h2 id="ebus-status-line">eBUS status line<a class="headerlink" href="#ebus-status-line" title="Permanent link">&para;</a></h2>
+<p>When the selected dataset folder contains exactly one readable root-level <code>.pvcfg</code> file, the Data page shows a compact eBUS status line.</p>
+<p>Use that status line as a cue that:</p>
+<ul>
+<li>the acquisition carries an immutable raw eBUS baseline snapshot</li>
+<li>some canonical acquisition-wide metadata may now be driven by effective eBUS values if the datacard and field mapping declare them as eBUS-managed</li>
+<li>detailed inspection and compare workflows belong in <strong>eBUS Config Tools</strong>, not in the main Data page layout</li>
+</ul>
+<p>The status line does <strong>not</strong> mean the app will compare or modify the snapshot automatically. It only indicates that a discoverable acquisition-local snapshot exists.</p>
+<h2 id="metadata-table">Metadata table<a class="headerlink" href="#metadata-table" title="Permanent link">&para;</a></h2>
+<p>The Data table is the pre-flight check for the rest of the app.</p>
+<p>Inspect it for:</p>
+<ul>
+<li>the expected number of image rows</li>
+<li>correct file identity and folder context</li>
+<li>correct exposure and iris values</li>
+<li>sensible exposure/iris source fields</li>
+<li>sensible grouping values</li>
+<li>obvious missing or suspicious metadata before moving on</li>
+</ul>
+<p>If the table is wrong here, downstream plots inherit the error.</p>
+<h2 id="grouping">Grouping<a class="headerlink" href="#grouping" title="Permanent link">&para;</a></h2>
+<p>Grouping clusters rows by one selected field for table organization and operator review.</p>
+<p>Current behavior is fixed by the UI, not free-form:</p>
+<ul>
+<li>base choices are <strong>None</strong>, <strong>Parent Folder</strong>, and <strong>Grandparent Folder</strong></li>
+<li>plugins may expose additional grouping fields such as <strong>Iris Position</strong> and <strong>Exposure [ms]</strong></li>
+<li>grouping is by exact string token</li>
+<li>missing values become group <code>0</code></li>
+<li><strong>None</strong> places every row in group <code>1</code></li>
+<li>non-empty values are sorted and assigned group ids starting at <code>1</code></li>
+</ul>
+<p>Grouping is useful for visually checking sweep structure before measurement or analysis. It does not change row metadata.</p>
+<h2 id="session-level-preparation">Session-level preparation<a class="headerlink" href="#session-level-preparation" title="Permanent link">&para;</a></h2>
+<p>The Data tab assumes you already know which acquisition should be loaded. When that assumption is still false, use <strong>Session Manager</strong> before trying to interpret the metadata table.</p>
+<p>Typical reasons to leave the Data tab briefly and use <strong>Session Manager</strong> are:</p>
+<ul>
+<li>session numbering is invalid and acquisitions need reindexing</li>
+<li>the intended acquisition folder does not exist yet</li>
+<li>you need to copy one acquisition datacard to another acquisition</li>
+<li>acquisition-local eBUS enable state should be changed before loading the dataset</li>
+</ul>
+<h2 id="what-to-verify-before-leaving-data">What to verify before leaving Data<a class="headerlink" href="#what-to-verify-before-leaving-data" title="Permanent link">&para;</a></h2>
+<p>Before moving to <strong>Measure</strong>, confirm all of the following:</p>
+<ul>
+<li>the intended dataset root was scanned</li>
+<li>skip rules did not exclude valid images</li>
+<li>unreadable files, if any, were intentionally skipped or understood</li>
+<li>the metadata source reflects the true acquisition record</li>
+<li>exposure and iris values are present where required</li>
+<li>grouping matches the intended sweep or comparison logic</li>
+<li>any detected eBUS snapshot has been either accepted as baseline or explicitly reviewed through the eBUS tools when needed</li>
+<li>no obvious metadata inconsistency remains in the table</li>
+</ul>
+<h2 id="common-failure-modes">Common failure modes<a class="headerlink" href="#common-failure-modes" title="Permanent link">&para;</a></h2>
+<h3 id="correct-files-wrong-metadata-source">Correct files, wrong metadata source<a class="headerlink" href="#correct-files-wrong-metadata-source" title="Permanent link">&para;</a></h3>
+<p>Symptom:</p>
+<ul>
+<li>TIFF rows look valid, but exposure or iris values are missing or wrong</li>
+</ul>
+<p>Action:</p>
+<ul>
+<li>switch metadata source and re-check the table</li>
+</ul>
+<h3 id="valid-metadata-source-incomplete-json-hierarchy">Valid metadata source, incomplete JSON hierarchy<a class="headerlink" href="#valid-metadata-source-incomplete-json-hierarchy" title="Permanent link">&para;</a></h3>
+<p>Symptom:</p>
+<ul>
+<li>some rows still lack exposure or iris values even though JSON metadata is expected</li>
+</ul>
+<p>Action:</p>
+<ul>
+<li>inspect the acquisition datacard</li>
+<li>inspect session and campaign datacards if those layers are expected to contribute inherited defaults</li>
+<li>inspect source fields to see whether you are actually seeing <code>path_fallback</code></li>
+<li>correct the dataset-side metadata before trusting later workflows</li>
+</ul>
+<h3 id="ebus-status-line-is-missing-when-a-snapshot-is-expected">eBUS status line is missing when a snapshot is expected<a class="headerlink" href="#ebus-status-line-is-missing-when-a-snapshot-is-expected" title="Permanent link">&para;</a></h3>
+<p>Symptom:</p>
+<ul>
+<li>the selected dataset should have an acquisition-local snapshot, but the status line is blank</li>
+</ul>
+<p>Action:</p>
+<ul>
+<li>verify that the selected dataset folder itself is the acquisition root</li>
+<li>verify that exactly one root-level <code>.pvcfg</code> file exists there</li>
+<li>move or remove extra root-level <code>.pvcfg</code> files before expecting automatic discovery</li>
+</ul>
+<h3 id="unwanted-files-inflate-the-dataset">Unwanted files inflate the dataset<a class="headerlink" href="#unwanted-files-inflate-the-dataset" title="Permanent link">&para;</a></h3>
+<p>Symptom:</p>
+<ul>
+<li>unexpected extra rows appear after scan</li>
+</ul>
+<p>Action:</p>
+<ul>
+<li>add skip rules and rescan</li>
+</ul>
+<h2 id="recommended-next-pages">Recommended next pages<a class="headerlink" href="#recommended-next-pages" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="data/session-manager.html">Session Manager</a></li>
+<li><a href="data/datacard-wizard.html">Datacard Wizard</a></li>
+<li><a href="data/ebus-config-tools.html">eBUS Config Tools</a></li>
+<li><a href="measure-workflow.html">Measure Workflow</a></li>
+<li><a href="analysis-workflow.html">Analysis Workflow</a></li>
+</ul>
+<figure class="placeholder-figure">
+  <img src="../assets/images/placeholders/screenshot-placeholder-16x9.svg" alt="Placeholder screenshot for the Data page">
+  <figcaption>
+    Placeholder — Add screenshot: Data page with metadata source controls, eBUS status line, and populated dataset table visible. Target:
+    <code>docs/assets/images/user-guide/data/data-page-overview.png</code>.
+    Theme: dark. Type: screenshot. State: scanned dataset with grouping and metadata source controls visible.
+  </figcaption>
+</figure>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="plugin-selector.html" class="md-footer__link md-footer__link--prev" aria-label="Previous: Plugin Selector">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Plugin Selector
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="data/session-manager.html" class="md-footer__link md-footer__link--next" aria-label="Next: Session Manager">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Session Manager
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.indexes", "navigation.top", "navigation.footer", "content.code.copy", "content.tabs.link", "search.highlight", "search.share", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../assets/javascripts/mathjax-config.js"></script>
+      
+        <script src="../assets/vendor/mathjax/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

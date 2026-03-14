@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900" viewBox="0 0 1200 900" role="img" aria-labelledby="title desc">
+  <title id="title">Figure placeholder</title>
+  <desc id="desc">Use this placeholder where an explanatory diagram or architecture figure will be added later.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#202a38"/>
+      <stop offset="100%" stop-color="#16212e"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="900" rx="34" fill="url(#bg)"/>
+  <rect x="60" y="60" width="1080" height="780" rx="24" fill="none" stroke="#6ab8ff" stroke-width="5" stroke-dasharray="16 16"/>
+  <circle cx="290" cy="300" r="80" fill="#294b73" stroke="#8bc9ff" stroke-width="4"/>
+  <circle cx="600" cy="220" r="80" fill="#294b73" stroke="#8bc9ff" stroke-width="4"/>
+  <circle cx="910" cy="300" r="80" fill="#294b73" stroke="#8bc9ff" stroke-width="4"/>
+  <rect x="440" y="520" width="320" height="150" rx="20" fill="#294b73" stroke="#8bc9ff" stroke-width="4"/>
+  <path d="M360 300 L520 245" stroke="#8bc9ff" stroke-width="6"/>
+  <path d="M680 245 L840 300" stroke="#8bc9ff" stroke-width="6"/>
+  <path d="M600 300 L600 520" stroke="#8bc9ff" stroke-width="6"/>
+  <text x="600" y="740" font-family="Segoe UI, Arial, sans-serif" font-size="50" text-anchor="middle" fill="#eef6ff">Figure Placeholder</text>
+  <text x="600" y="800" font-family="Segoe UI, Arial, sans-serif" font-size="28" text-anchor="middle" fill="#cfe2ff">Replace with a workflow, architecture, or state diagram.</text>
+</svg>

@@ -1,0 +1,2788 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="User, developer, and reference documentation for the FrameLab application.">
+      
+      
+      
+      
+        <link rel="prev" href="analysis/intensity-trend-explorer.html">
+      
+      
+        <link rel="next" href="../developer-guide/index.html">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/branding/app-icon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.4">
+    
+    
+      
+        <title>User Troubleshooting - FrameLab Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#troubleshooting" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../index.html" title="FrameLab Documentation" class="md-header__button md-logo" aria-label="FrameLab Documentation" data-md-component="logo">
+      
+  <img src="../assets/images/branding/app-icon.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            FrameLab Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              User Troubleshooting
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="blue-grey" data-md-color-accent="light-blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m3.55 19.09 1.41 1.41 1.8-1.79-1.42-1.42M12 6c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6c0-3.32-2.69-6-6-6m8 7h3v-2h-3m-2.76 7.71 1.8 1.79 1.41-1.41-1.79-1.8M20.45 5l-1.41-1.4-1.8 1.79 1.42 1.42M13 1h-2v3h2M6.76 5.39 4.96 3.6 3.55 5l1.79 1.81zM1 13h3v-2H1m12 9h-2v3h2"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../index.html" title="FrameLab Documentation" class="md-nav__button md-logo" aria-label="FrameLab Documentation" data-md-component="logo">
+      
+  <img src="../assets/images/branding/app-icon.png" alt="logo">
+
+    </a>
+    FrameLab Documentation
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="index.html" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="concepts-and-limits.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts and Limits
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="quick-start.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="plugins.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="plugin-selector.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Selector
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_6" id="__nav_2_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Workflow
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Data Workflow
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="data-workflow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="data/session-manager.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Session Manager
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="data/datacard-wizard.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datacard Wizard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="data/ebus-config-tools.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    eBUS Config Tools
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="measure-workflow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Measure Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_8" id="__nav_2_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Analysis Workflow
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Analysis Workflow
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="analysis-workflow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="analysis/intensity-trend-explorer.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Intensity Trend Explorer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="troubleshooting.html" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-app-and-startup-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. App and startup issues
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. App and startup issues">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-analyze-tab-is-missing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Analyze tab is missing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-plugin-action-is-missing-from-the-plugins-menu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A plugin action is missing from the Plugins menu
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#help-opens-the-wrong-page-or-a-directory-listing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Help opens the wrong page or a directory listing
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-data-and-metadata-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Data and metadata issues
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Data and metadata issues">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#no-tiff-files-were-found" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        No TIFF files were found
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-table-contains-unexpected-extra-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The table contains unexpected extra files
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#exposure-or-iris-values-are-missing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exposure or iris values are missing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#grouping-looks-wrong" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Grouping looks wrong
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-ebus-status-line-is-missing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The eBUS status line is missing
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-session-management-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Session management issues
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Session management issues">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#add-or-delete-is-disabled-in-session-manager" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Add or delete is disabled in Session Manager
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#paste-datacard-is-disabled-in-session-manager" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Paste Datacard is disabled in Session Manager
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#toggle-ebus-is-unavailable-in-session-manager" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Toggle eBUS is unavailable in Session Manager
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-ebus-inspection-and-compare-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. eBUS inspection and compare issues
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. eBUS inspection and compare issues">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-compare-dialog-opens-but-does-not-preload-the-current-acquisition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The compare dialog opens but does not preload the current acquisition
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#raw-and-effective-compare-show-the-same-result" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Raw and effective compare show the same result
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-field-is-read-only-in-the-wizard-even-though-it-appears-ebus-related" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A field is read-only in the wizard even though it appears eBUS-related
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-measurement-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Measurement issues
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Measurement issues">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#dnms-is-blank-or-unavailable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DN/ms is blank or unavailable
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#roi-metrics-are-blank-or-nan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ROI metrics are blank or NaN
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#top-k-results-look-unstable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Top-K results look unstable
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#background-subtraction-does-not-seem-to-apply-consistently" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Background subtraction does not seem to apply consistently
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#normalized-values-look-inconsistent-across-different-scans" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Normalized values look inconsistent across different scans
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#preview-and-table-disagree" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Preview and table disagree
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#exported-table-does-not-match-what-you-expected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exported table does not match what you expected
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-analysis-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Analysis issues
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Analysis issues">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#no-curves-appear-in-the-plot" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        No curves appear in the plot
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-plot-looks-correct-but-the-interpretation-seems-wrong" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The plot looks correct, but the interpretation seems wrong
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gain-jumps-sharply-or-behaves-unexpectedly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Gain jumps sharply or behaves unexpectedly
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-plot-and-result-table-disagree-with-the-preview-or-measure-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The plot and result table disagree with the preview or Measure table
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-datacard-authoring-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Datacard authoring issues
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. Datacard authoring issues">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#defaults-do-not-behave-as-expected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Defaults do not behave as expected
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#an-override-did-not-clear-an-inherited-value" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        An override did not clear an inherited value
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#validation-fails-before-save" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Validation fails before save
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-when-to-escalate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. When to escalate
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../developer-guide/index.html" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer Guide
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Developer Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer-guide/architecture.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer-guide/plugin-system.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin System
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer-guide/datacard-system.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datacard System
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer-guide/ebus-config-integration.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    eBUS Config Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer-guide/ui-structure.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    UI Structure
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer-guide/packaging.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Packaging
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../reference/index.html" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/config-files.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Config Files
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/plugin-manifests.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Manifests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/acquisition-mapping.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Acquisition Mapping
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/ebus-parameter-catalog.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    eBUS Parameter Catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/keyboard-shortcuts.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Keyboard Shortcuts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../troubleshooting/index.html" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Troubleshooting
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-app-and-startup-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. App and startup issues
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. App and startup issues">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-analyze-tab-is-missing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Analyze tab is missing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-plugin-action-is-missing-from-the-plugins-menu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A plugin action is missing from the Plugins menu
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#help-opens-the-wrong-page-or-a-directory-listing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Help opens the wrong page or a directory listing
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-data-and-metadata-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Data and metadata issues
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Data and metadata issues">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#no-tiff-files-were-found" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        No TIFF files were found
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-table-contains-unexpected-extra-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The table contains unexpected extra files
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#exposure-or-iris-values-are-missing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exposure or iris values are missing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#grouping-looks-wrong" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Grouping looks wrong
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-ebus-status-line-is-missing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The eBUS status line is missing
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-session-management-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Session management issues
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Session management issues">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#add-or-delete-is-disabled-in-session-manager" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Add or delete is disabled in Session Manager
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#paste-datacard-is-disabled-in-session-manager" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Paste Datacard is disabled in Session Manager
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#toggle-ebus-is-unavailable-in-session-manager" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Toggle eBUS is unavailable in Session Manager
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-ebus-inspection-and-compare-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. eBUS inspection and compare issues
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. eBUS inspection and compare issues">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-compare-dialog-opens-but-does-not-preload-the-current-acquisition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The compare dialog opens but does not preload the current acquisition
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#raw-and-effective-compare-show-the-same-result" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Raw and effective compare show the same result
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-field-is-read-only-in-the-wizard-even-though-it-appears-ebus-related" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A field is read-only in the wizard even though it appears eBUS-related
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-measurement-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Measurement issues
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Measurement issues">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#dnms-is-blank-or-unavailable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DN/ms is blank or unavailable
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#roi-metrics-are-blank-or-nan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ROI metrics are blank or NaN
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#top-k-results-look-unstable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Top-K results look unstable
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#background-subtraction-does-not-seem-to-apply-consistently" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Background subtraction does not seem to apply consistently
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#normalized-values-look-inconsistent-across-different-scans" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Normalized values look inconsistent across different scans
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#preview-and-table-disagree" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Preview and table disagree
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#exported-table-does-not-match-what-you-expected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exported table does not match what you expected
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-analysis-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Analysis issues
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Analysis issues">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#no-curves-appear-in-the-plot" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        No curves appear in the plot
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-plot-looks-correct-but-the-interpretation-seems-wrong" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The plot looks correct, but the interpretation seems wrong
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gain-jumps-sharply-or-behaves-unexpectedly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Gain jumps sharply or behaves unexpectedly
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-plot-and-result-table-disagree-with-the-preview-or-measure-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The plot and result table disagree with the preview or Measure table
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-datacard-authoring-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Datacard authoring issues
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. Datacard authoring issues">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#defaults-do-not-behave-as-expected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Defaults do not behave as expected
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#an-override-did-not-clear-an-inherited-value" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        An override did not clear an inherited value
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#validation-fails-before-save" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Validation fails before save
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-when-to-escalate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. When to escalate
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h1>
+<p>Use this page for operational issues encountered during normal use of the app.</p>
+<p>This page is organized by workflow stage so you can isolate whether the problem is in startup, dataset intake, session tools, eBUS inspection, measurement, or analysis.</p>
+<h2 id="1-app-and-startup-issues">1. App and startup issues<a class="headerlink" href="#1-app-and-startup-issues" title="Permanent link">&para;</a></h2>
+<h3 id="the-analyze-tab-is-missing">The Analyze tab is missing<a class="headerlink" href="#the-analyze-tab-is-missing" title="Permanent link">&para;</a></h3>
+<p>Cause:</p>
+<ul>
+<li>no analysis plugin was enabled at startup</li>
+</ul>
+<p>Action:</p>
+<ul>
+<li>close the app</li>
+<li>relaunch it</li>
+<li>enable at least one analysis plugin in the startup selector</li>
+</ul>
+<h3 id="a-plugin-action-is-missing-from-the-plugins-menu">A plugin action is missing from the Plugins menu<a class="headerlink" href="#a-plugin-action-is-missing-from-the-plugins-menu" title="Permanent link">&para;</a></h3>
+<p>Cause:</p>
+<ul>
+<li>the plugin was not enabled before launch</li>
+<li>or the current plugin does not expose a runtime action for the task you expected</li>
+<li>or a plugin such as Session Manager, Background Correction, or eBUS Config Tools was not enabled at startup</li>
+</ul>
+<p>Action:</p>
+<ul>
+<li>verify the plugin was enabled in the startup selector</li>
+<li>relaunch with the required plugin enabled</li>
+</ul>
+<h3 id="help-opens-the-wrong-page-or-a-directory-listing">Help opens the wrong page or a directory listing<a class="headerlink" href="#help-opens-the-wrong-page-or-a-directory-listing" title="Permanent link">&para;</a></h3>
+<p>Cause:</p>
+<ul>
+<li>the bundled offline help content is stale or was not rebuilt correctly</li>
+</ul>
+<p>Action:</p>
+<ul>
+<li>rebuild the bundled documentation</li>
+<li>verify the packaged help files were refreshed after the latest documentation edits</li>
+</ul>
+<h2 id="2-data-and-metadata-issues">2. Data and metadata issues<a class="headerlink" href="#2-data-and-metadata-issues" title="Permanent link">&para;</a></h2>
+<h3 id="no-tiff-files-were-found">No TIFF files were found<a class="headerlink" href="#no-tiff-files-were-found" title="Permanent link">&para;</a></h3>
+<p>Possible causes:</p>
+<ul>
+<li>the selected folder does not contain supported <code>.tif</code> or <code>.tiff</code> files</li>
+<li>skip rules are excluding the intended files</li>
+<li>the wrong dataset root was selected</li>
+</ul>
+<p>Action:</p>
+<ul>
+<li>verify the selected folder</li>
+<li>review skip rules</li>
+<li>rescan after correcting the rule set or folder choice</li>
+</ul>
+<h3 id="the-table-contains-unexpected-extra-files">The table contains unexpected extra files<a class="headerlink" href="#the-table-contains-unexpected-extra-files" title="Permanent link">&para;</a></h3>
+<p>Cause:</p>
+<ul>
+<li>the dataset root includes exports, cache folders, previews, or other unrelated TIFFs</li>
+</ul>
+<p>Action:</p>
+<ul>
+<li>add or refine skip rules</li>
+<li>rescan the dataset</li>
+</ul>
+<h3 id="exposure-or-iris-values-are-missing">Exposure or iris values are missing<a class="headerlink" href="#exposure-or-iris-values-are-missing" title="Permanent link">&para;</a></h3>
+<p>Possible causes:</p>
+<ul>
+<li>the wrong metadata source is selected</li>
+<li>the file naming pattern does not encode the expected values</li>
+<li>the acquisition datacard is missing, incomplete, or inconsistent</li>
+<li>the field you expected is eBUS-managed but not actually mapped or discoverable for this acquisition</li>
+<li>the Data table is showing <code>path_fallback</code> where you expected authored JSON values</li>
+</ul>
+<p>Action:</p>
+<ul>
+<li>switch metadata source and compare the table</li>
+<li>inspect the acquisition datacard if JSON metadata is expected</li>
+<li>inspect the eBUS status line and mapping-backed field behavior if the acquisition relies on an eBUS snapshot</li>
+<li>inspect source fields, not just the numeric value columns</li>
+<li>correct the acquisition metadata before trusting later results</li>
+</ul>
+<h3 id="grouping-looks-wrong">Grouping looks wrong<a class="headerlink" href="#grouping-looks-wrong" title="Permanent link">&para;</a></h3>
+<p>Cause:</p>
+<ul>
+<li>the grouping field does not match the intended experiment structure</li>
+<li>the required metadata field is missing or inconsistent across rows</li>
+<li>some rows are empty for the chosen grouping key and therefore fall into group <code>0</code></li>
+</ul>
+<p>Action:</p>
+<ul>
+<li>choose the grouping field that corresponds to the sweep variable or folder structure</li>
+<li>inspect the raw grouping values in the Data table</li>
+<li>correct metadata inconsistencies before moving on</li>
+</ul>
+<h3 id="the-ebus-status-line-is-missing">The eBUS status line is missing<a class="headerlink" href="#the-ebus-status-line-is-missing" title="Permanent link">&para;</a></h3>
+<p>Possible causes:</p>
+<ul>
+<li>the selected dataset folder is not the actual acquisition root</li>
+<li>there is no readable root-level <code>.pvcfg</code> file</li>
+<li>more than one root-level <code>.pvcfg</code> file exists, so the app refuses to guess</li>
+</ul>
+<p>Action:</p>
+<ul>
+<li>verify the acquisition root</li>
+<li>verify that exactly one root-level <code>.pvcfg</code> file exists</li>
+<li>remove ambiguity before expecting automatic discovery</li>
+</ul>
+<h2 id="3-session-management-issues">3. Session management issues<a class="headerlink" href="#3-session-management-issues" title="Permanent link">&para;</a></h2>
+<h3 id="add-or-delete-is-disabled-in-session-manager">Add or delete is disabled in Session Manager<a class="headerlink" href="#add-or-delete-is-disabled-in-session-manager" title="Permanent link">&para;</a></h3>
+<p>Cause:</p>
+<ul>
+<li>session numbering is not contiguous</li>
+</ul>
+<p>Action:</p>
+<ul>
+<li>use <strong>Normalize/Reindex</strong> first</li>
+<li>then repeat the structural edit once numbering is valid</li>
+</ul>
+<h3 id="paste-datacard-is-disabled-in-session-manager">Paste Datacard is disabled in Session Manager<a class="headerlink" href="#paste-datacard-is-disabled-in-session-manager" title="Permanent link">&para;</a></h3>
+<p>Cause:</p>
+<ul>
+<li>the in-memory datacard clipboard is empty</li>
+</ul>
+<p>Action:</p>
+<ul>
+<li>copy a source acquisition datacard first</li>
+<li>then return to the destination acquisition and paste the normalized payload</li>
+</ul>
+<h3 id="toggle-ebus-is-unavailable-in-session-manager">Toggle eBUS is unavailable in Session Manager<a class="headerlink" href="#toggle-ebus-is-unavailable-in-session-manager" title="Permanent link">&para;</a></h3>
+<p>Cause:</p>
+<ul>
+<li>the <strong>eBUS Config Tools</strong> plugin was not enabled at startup</li>
+<li>or no acquisition row is currently selected</li>
+</ul>
+<p>Action:</p>
+<ul>
+<li>relaunch with the eBUS plugin enabled if needed</li>
+<li>then reopen Session Manager and select the intended acquisition</li>
+</ul>
+<h2 id="4-ebus-inspection-and-compare-issues">4. eBUS inspection and compare issues<a class="headerlink" href="#4-ebus-inspection-and-compare-issues" title="Permanent link">&para;</a></h2>
+<h3 id="the-compare-dialog-opens-but-does-not-preload-the-current-acquisition">The compare dialog opens but does not preload the current acquisition<a class="headerlink" href="#the-compare-dialog-opens-but-does-not-preload-the-current-acquisition" title="Permanent link">&para;</a></h3>
+<p>Cause:</p>
+<ul>
+<li>the selected dataset folder is not a readable acquisition source under the current discovery rules</li>
+</ul>
+<p>Action:</p>
+<ul>
+<li>verify the selected dataset root</li>
+<li>verify that the folder has one readable root-level <code>.pvcfg</code></li>
+<li>reopen the compare dialog after correcting the acquisition root</li>
+</ul>
+<h3 id="raw-and-effective-compare-show-the-same-result">Raw and effective compare show the same result<a class="headerlink" href="#raw-and-effective-compare-show-the-same-result" title="Permanent link">&para;</a></h3>
+<p>Possible causes:</p>
+<ul>
+<li>no app-side eBUS overrides exist for the loaded acquisition source</li>
+<li>only standalone <code>.pvcfg</code> files were added</li>
+<li>the changed parameters are not catalog-overridable and therefore remain raw-baseline values</li>
+</ul>
+<p>Action:</p>
+<ul>
+<li>verify whether the source list contains an acquisition-root source or only standalone files</li>
+<li>inspect <code>external_sources.ebus.overrides</code> if you expected effective differences</li>
+<li>use raw mode when the goal is forensic comparison of saved snapshots only</li>
+</ul>
+<h3 id="a-field-is-read-only-in-the-wizard-even-though-it-appears-ebus-related">A field is read-only in the wizard even though it appears eBUS-related<a class="headerlink" href="#a-field-is-read-only-in-the-wizard-even-though-it-appears-ebus-related" title="Permanent link">&para;</a></h3>
+<p>Cause:</p>
+<ul>
+<li>the field is eBUS-managed and the catalog marks the corresponding key as non-overridable</li>
+</ul>
+<p>Action:</p>
+<ul>
+<li>treat the eBUS snapshot as authoritative for that acquisition-wide field</li>
+<li>only use the wizard to override fields whose eBUS catalog entry explicitly allows app-side override</li>
+</ul>
+<h2 id="5-measurement-issues">5. Measurement issues<a class="headerlink" href="#5-measurement-issues" title="Permanent link">&para;</a></h2>
+<h3 id="dnms-is-blank-or-unavailable"><code>DN/ms</code> is blank or unavailable<a class="headerlink" href="#dnms-is-blank-or-unavailable" title="Permanent link">&para;</a></h3>
+<p>Cause:</p>
+<ul>
+<li>valid exposure metadata is missing, non-numeric, or zero</li>
+<li>or the current average mode is <strong>Disabled</strong>, so no mean-based quantity exists to normalize by exposure</li>
+</ul>
+<p>Action:</p>
+<ul>
+<li>return to <strong>Data</strong></li>
+<li>verify the selected metadata source</li>
+<li>confirm exposure values are present and valid</li>
+<li>confirm the active average mode is <strong>Top-K Mean</strong> or <strong>ROI Mean</strong></li>
+</ul>
+<h3 id="roi-metrics-are-blank-or-nan">ROI metrics are blank or <code>NaN</code><a class="headerlink" href="#roi-metrics-are-blank-or-nan" title="Permanent link">&para;</a></h3>
+<p>Possible causes:</p>
+<ul>
+<li>no ROI was drawn or loaded</li>
+<li>the ROI is empty</li>
+<li>the loaded ROI is incompatible with the image dimensions</li>
+<li>ROI batch apply was never run for the current dataset</li>
+</ul>
+<p>Action:</p>
+<ul>
+<li>draw a valid ROI or load the correct saved ROI</li>
+<li>verify the ROI covers a real image region</li>
+<li>apply ROI to all images for dataset-wide ROI metrics</li>
+</ul>
+<h3 id="top-k-results-look-unstable">Top-K results look unstable<a class="headerlink" href="#top-k-results-look-unstable" title="Permanent link">&para;</a></h3>
+<p>Possible causes:</p>
+<ul>
+<li><code>K</code> is too small for the signal morphology</li>
+<li>hot pixels or clipping dominate the selected brightest set</li>
+<li>the threshold and measurement mode are not aligned with the intended signal definition</li>
+</ul>
+<p>Action:</p>
+<ul>
+<li>increase <code>K</code></li>
+<li>inspect saturation count and peak behavior</li>
+<li>confirm that Top-K is the right metric for the study</li>
+</ul>
+<h3 id="background-subtraction-does-not-seem-to-apply-consistently">Background subtraction does not seem to apply consistently<a class="headerlink" href="#background-subtraction-does-not-seem-to-apply-consistently" title="Permanent link">&para;</a></h3>
+<p>Possible causes:</p>
+<ul>
+<li>no compatible reference exists for some files</li>
+<li>exposure-keyed matching cannot find a valid background for every image</li>
+<li>reference and image dimensions are incompatible</li>
+<li>folder-library references do not cover every exposure used by the dataset</li>
+</ul>
+<p>Action:</p>
+<ul>
+<li>verify the background source and exposure coverage</li>
+<li>verify reference-image dimensions</li>
+<li>treat <code>raw_fallback</code> or partial-match status as a real measurement condition, not a cosmetic message</li>
+</ul>
+<h3 id="normalized-values-look-inconsistent-across-different-scans">Normalized values look inconsistent across different scans<a class="headerlink" href="#normalized-values-look-inconsistent-across-different-scans" title="Permanent link">&para;</a></h3>
+<p>Cause:</p>
+<ul>
+<li>normalization is dataset-relative and depends on the current dataset maximum pixel value under the current measurement state</li>
+</ul>
+<p>Action:</p>
+<ul>
+<li>compare normalized values only when the dataset context is intentionally the same</li>
+<li>switch back to raw values for cross-dataset engineering comparison when appropriate</li>
+</ul>
+<h3 id="preview-and-table-disagree">Preview and table disagree<a class="headerlink" href="#preview-and-table-disagree" title="Permanent link">&para;</a></h3>
+<p>Possible causes:</p>
+<ul>
+<li>the preview is showing a different selected row than the one you think you are reading</li>
+<li>the table is showing normalized values while you are visually reasoning in raw DN</li>
+<li>background subtraction changed the metric image even though the raw TIFF looks different</li>
+</ul>
+<p>Action:</p>
+<ul>
+<li>reselect the row explicitly</li>
+<li>verify raw versus normalized display state</li>
+<li>verify whether background subtraction is active</li>
+</ul>
+<h3 id="exported-table-does-not-match-what-you-expected">Exported table does not match what you expected<a class="headerlink" href="#exported-table-does-not-match-what-you-expected" title="Permanent link">&para;</a></h3>
+<p>Possible causes:</p>
+<ul>
+<li>you exported the currently visible table, not a hypothetical full schema view</li>
+<li>column visibility, sorting, or active measure mode changed what was visible at export time</li>
+</ul>
+<p>Action:</p>
+<ul>
+<li>verify the current visible table state before exporting again</li>
+<li>re-export after setting the intended columns and mode</li>
+</ul>
+<h2 id="6-analysis-issues">6. Analysis issues<a class="headerlink" href="#6-analysis-issues" title="Permanent link">&para;</a></h2>
+<h3 id="no-curves-appear-in-the-plot">No curves appear in the plot<a class="headerlink" href="#no-curves-appear-in-the-plot" title="Permanent link">&para;</a></h3>
+<p>Possible causes:</p>
+<ul>
+<li>the selected X or Y variable has insufficient valid data</li>
+<li>required metadata is missing</li>
+<li>the active measurement mode did not produce the quantity needed by the plugin</li>
+</ul>
+<p>Action:</p>
+<ul>
+<li>verify measurement-stage values first</li>
+<li>check metadata completeness on <strong>Data</strong></li>
+<li>confirm the selected Y mode is compatible with the available measurements</li>
+</ul>
+<h3 id="the-plot-looks-correct-but-the-interpretation-seems-wrong">The plot looks correct, but the interpretation seems wrong<a class="headerlink" href="#the-plot-looks-correct-but-the-interpretation-seems-wrong" title="Permanent link">&para;</a></h3>
+<p>Cause:</p>
+<ul>
+<li>upstream metadata source, normalization state, background handling, or measurement mode is not the intended one</li>
+</ul>
+<p>Action:</p>
+<ul>
+<li>return to <strong>Data</strong> and <strong>Measure</strong></li>
+<li>verify the full upstream state before drawing conclusions from the plot</li>
+</ul>
+<h3 id="gain-jumps-sharply-or-behaves-unexpectedly">Gain jumps sharply or behaves unexpectedly<a class="headerlink" href="#gain-jumps-sharply-or-behaves-unexpectedly" title="Permanent link">&para;</a></h3>
+<p>Possible causes:</p>
+<ul>
+<li>the reference point is not the one you intended</li>
+<li>the underlying signal is noisy or partially invalid</li>
+<li>exposure-dependent inputs to <code>DN/ms</code> are incorrect</li>
+<li>you are in the iris-position gain special case, which is built from aggregated <code>DN/ms</code></li>
+</ul>
+<p>Action:</p>
+<ul>
+<li>verify the gain reference mode</li>
+<li>inspect the table values behind the curve</li>
+<li>confirm exposure metadata and measurement stability</li>
+</ul>
+<h3 id="the-plot-and-result-table-disagree-with-the-preview-or-measure-table">The plot and result table disagree with the preview or Measure table<a class="headerlink" href="#the-plot-and-result-table-disagree-with-the-preview-or-measure-table" title="Permanent link">&para;</a></h3>
+<p>Possible causes:</p>
+<ul>
+<li>normalization changed the plugin input values</li>
+<li>background subtraction changed the metric image used upstream</li>
+<li>the plugin is aggregating repeated operating points, so one plotted point is not one original row</li>
+</ul>
+<p>Action:</p>
+<ul>
+<li>inspect the Measure table first</li>
+<li>then inspect the plugin result table</li>
+<li>only then interpret the plot</li>
+</ul>
+<h2 id="7-datacard-authoring-issues">7. Datacard authoring issues<a class="headerlink" href="#7-datacard-authoring-issues" title="Permanent link">&para;</a></h2>
+<h3 id="defaults-do-not-behave-as-expected">Defaults do not behave as expected<a class="headerlink" href="#defaults-do-not-behave-as-expected" title="Permanent link">&para;</a></h3>
+<p>Check whether the authored value belongs in <strong>Defaults</strong> or <strong>Frame Mapping</strong>.</p>
+<p>Use <strong>Defaults</strong> only for values that should apply acquisition-wide unless specifically replaced.</p>
+<h3 id="an-override-did-not-clear-an-inherited-value">An override did not clear an inherited value<a class="headerlink" href="#an-override-did-not-clear-an-inherited-value" title="Permanent link">&para;</a></h3>
+<p>Cause:</p>
+<ul>
+<li>blank override fields do not erase inherited defaults</li>
+</ul>
+<p>Action:</p>
+<ul>
+<li>enter the explicit replacement value you want</li>
+<li>do not rely on blank fields to clear inherited metadata</li>
+</ul>
+<h3 id="validation-fails-before-save">Validation fails before save<a class="headerlink" href="#validation-fails-before-save" title="Permanent link">&para;</a></h3>
+<p>Possible causes:</p>
+<ul>
+<li>a field name is unknown</li>
+<li>a value type is incompatible with the mapped field definition</li>
+<li>frame targeting is inconsistent</li>
+</ul>
+<p>Action:</p>
+<ul>
+<li>reload the field mapping if needed</li>
+<li>inspect the offending row and value type</li>
+<li>correct the structure before saving</li>
+</ul>
+<h2 id="8-when-to-escalate">8. When to escalate<a class="headerlink" href="#8-when-to-escalate" title="Permanent link">&para;</a></h2>
+<p>Escalate beyond normal user troubleshooting when:</p>
+<ul>
+<li>repeated rescans produce inconsistent row populations without any dataset change</li>
+<li>correct metadata still produces obviously invalid analysis behavior</li>
+<li>background application appears inconsistent despite valid matching conditions</li>
+<li>eBUS effective compare appears inconsistent with the stored datacard override block</li>
+<li>the app fails during launch or scan instead of producing a recoverable workflow-state issue</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="analysis/intensity-trend-explorer.html" class="md-footer__link md-footer__link--prev" aria-label="Previous: Intensity Trend Explorer">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Intensity Trend Explorer
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../developer-guide/index.html" class="md-footer__link md-footer__link--next" aria-label="Next: Overview">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Overview
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.indexes", "navigation.top", "navigation.footer", "content.code.copy", "content.tabs.link", "search.highlight", "search.share", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../assets/javascripts/mathjax-config.js"></script>
+      
+        <script src="../assets/vendor/mathjax/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

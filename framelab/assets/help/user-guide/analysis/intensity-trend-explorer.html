@@ -1,0 +1,2462 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="User, developer, and reference documentation for the FrameLab application.">
+      
+      
+      
+      
+        <link rel="prev" href="../analysis-workflow.html">
+      
+      
+        <link rel="next" href="../troubleshooting.html">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/branding/app-icon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.4">
+    
+    
+      
+        <title>Intensity Trend Explorer - FrameLab Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#intensity-trend-explorer" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../index.html" title="FrameLab Documentation" class="md-header__button md-logo" aria-label="FrameLab Documentation" data-md-component="logo">
+      
+  <img src="../../assets/images/branding/app-icon.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            FrameLab Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Intensity Trend Explorer
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="blue-grey" data-md-color-accent="light-blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m3.55 19.09 1.41 1.41 1.8-1.79-1.42-1.42M12 6c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6c0-3.32-2.69-6-6-6m8 7h3v-2h-3m-2.76 7.71 1.8 1.79 1.41-1.41-1.79-1.8M20.45 5l-1.41-1.4-1.8 1.79 1.42 1.42M13 1h-2v3h2M6.76 5.39 4.96 3.6 3.55 5l1.79 1.81zM1 13h3v-2H1m12 9h-2v3h2"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../index.html" title="FrameLab Documentation" class="md-nav__button md-logo" aria-label="FrameLab Documentation" data-md-component="logo">
+      
+  <img src="../../assets/images/branding/app-icon.png" alt="logo">
+
+    </a>
+    FrameLab Documentation
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../index.html" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../concepts-and-limits.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts and Limits
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../quick-start.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plugins.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plugin-selector.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Selector
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_6" id="__nav_2_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Workflow
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Data Workflow
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data-workflow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data/session-manager.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Session Manager
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data/datacard-wizard.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datacard Wizard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data/ebus-config-tools.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    eBUS Config Tools
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../measure-workflow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Measure Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_8" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2_8" id="__nav_2_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Analysis Workflow
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_8_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Analysis Workflow
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../analysis-workflow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Intensity Trend Explorer
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="intensity-trend-explorer.html" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Intensity Trend Explorer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#before-using-this-plugin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Before using this plugin
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#control-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Control summary
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Control summary">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#x-axis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        X Axis
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#y-axis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Y Axis
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#error-bars" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Error Bars
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#trend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Trend
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#display-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Display options
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-is-actually-plotted" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is actually plotted
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What is actually plotted">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#series-construction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Series construction
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#point-aggregation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Point aggregation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gain-interpretation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Gain interpretation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#special-cases-that-matter-operationally" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Special cases that matter operationally
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Special cases that matter operationally">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#iris-position-gain-uses-dnms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Iris-position gain uses DN/ms
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#exposure-axis-gain-uses-the-active-mean-metric" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exposure-axis gain uses the active mean metric
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iris-position-gain-locks-the-overlay-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Iris-position gain locks the overlay model
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mean-by-x-overlay" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mean-by-X overlay
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#linear-fit-overlay" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Linear fit overlay
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#plot-and-result-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Plot and result table
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#runtime-actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Runtime actions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#interpretation-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Interpretation checklist
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mathematical-appendix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mathematical appendix
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Mathematical appendix">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#aggregated-uncertainty-from-existing-per-record-uncertainties" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Aggregated uncertainty from existing per-record uncertainties
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gain-uncertainty-propagation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Gain uncertainty propagation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#linear-fit-goodness-of-fit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Linear-fit goodness of fit
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related-pages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related pages
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../troubleshooting.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../developer-guide/index.html" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer Guide
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Developer Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../developer-guide/architecture.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../developer-guide/plugin-system.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin System
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../developer-guide/datacard-system.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datacard System
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../developer-guide/ebus-config-integration.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    eBUS Config Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../developer-guide/ui-structure.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    UI Structure
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../developer-guide/packaging.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Packaging
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../reference/index.html" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/config-files.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Config Files
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/plugin-manifests.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Manifests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/acquisition-mapping.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Acquisition Mapping
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/ebus-parameter-catalog.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    eBUS Parameter Catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/keyboard-shortcuts.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Keyboard Shortcuts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../troubleshooting/index.html" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Troubleshooting
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#before-using-this-plugin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Before using this plugin
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#control-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Control summary
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Control summary">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#x-axis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        X Axis
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#y-axis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Y Axis
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#error-bars" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Error Bars
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#trend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Trend
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#display-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Display options
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-is-actually-plotted" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is actually plotted
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What is actually plotted">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#series-construction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Series construction
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#point-aggregation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Point aggregation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gain-interpretation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Gain interpretation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#special-cases-that-matter-operationally" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Special cases that matter operationally
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Special cases that matter operationally">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#iris-position-gain-uses-dnms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Iris-position gain uses DN/ms
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#exposure-axis-gain-uses-the-active-mean-metric" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exposure-axis gain uses the active mean metric
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iris-position-gain-locks-the-overlay-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Iris-position gain locks the overlay model
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mean-by-x-overlay" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mean-by-X overlay
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#linear-fit-overlay" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Linear fit overlay
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#plot-and-result-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Plot and result table
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#runtime-actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Runtime actions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#interpretation-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Interpretation checklist
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mathematical-appendix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mathematical appendix
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Mathematical appendix">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#aggregated-uncertainty-from-existing-per-record-uncertainties" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Aggregated uncertainty from existing per-record uncertainties
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gain-uncertainty-propagation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Gain uncertainty propagation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#linear-fit-goodness-of-fit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Linear-fit goodness of fit
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related-pages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related pages
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="intensity-trend-explorer">Intensity Trend Explorer<a class="headerlink" href="#intensity-trend-explorer" title="Permanent link">&para;</a></h1>
+<p><strong>Intensity Trend Explorer</strong> is the built-in analysis plugin for plotting measurement-stage quantities against exposure or iris position.</p>
+<p>Use it to answer questions such as:</p>
+<ul>
+<li>how does the measured signal vary with exposure?</li>
+<li>how does the measured signal vary with iris position?</li>
+<li>how stable is the trend across repeated records at the same operating point?</li>
+<li>what relative gain is obtained with respect to a chosen reference condition?</li>
+</ul>
+<p>The plugin does not create new raw measurements. It reorganizes and summarizes values that were already produced by the <strong>Measure</strong> workflow.</p>
+<h2 id="before-using-this-plugin">Before using this plugin<a class="headerlink" href="#before-using-this-plugin" title="Permanent link">&para;</a></h2>
+<p>Verify all of the following first:</p>
+<ul>
+<li>the correct dataset was scanned</li>
+<li>the correct metadata source was selected</li>
+<li>the measurement mode reflects the intended physical comparison</li>
+<li>the intended normalization and background-subtraction state were already chosen</li>
+<li>the required metadata fields, especially exposure and iris position, are populated</li>
+</ul>
+<p>A clean plot does not compensate for incorrect upstream metadata or incorrect measurement choices.</p>
+<h2 id="control-summary">Control summary<a class="headerlink" href="#control-summary" title="Permanent link">&para;</a></h2>
+<h3 id="x-axis">X Axis<a class="headerlink" href="#x-axis" title="Permanent link">&para;</a></h3>
+<p>Choose the acquisition variable placed on the horizontal axis.</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Iris Position</strong></td>
+<td>Plot against iris position.</td>
+</tr>
+<tr>
+<td><strong>Exposure</strong></td>
+<td>Plot against exposure time.</td>
+</tr>
+</tbody>
+</table>
+<p>Use the X axis that matches the variable intentionally changed during the experiment.</p>
+<h3 id="y-axis">Y Axis<a class="headerlink" href="#y-axis" title="Permanent link">&para;</a></h3>
+<p>Choose the measurement-stage quantity to visualize.</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Meaning</th>
+<th>Typical use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Intensity Gain (first ref)</strong></td>
+<td>Converts the selected underlying signal to gain using the first valid point as reference.</td>
+<td>Relative trend from the start of a sweep.</td>
+</tr>
+<tr>
+<td><strong>Intensity Gain (last ref)</strong></td>
+<td>Converts the selected underlying signal to gain using the last valid point as reference.</td>
+<td>Relative trend from the end of a sweep.</td>
+</tr>
+<tr>
+<td><strong>Mean Intensity</strong></td>
+<td>Uses the active measurement-stage mean.</td>
+<td>Direct comparison of Top-K or ROI mean.</td>
+</tr>
+<tr>
+<td><strong>Intensity Rate</strong></td>
+<td>Uses <code>DN/ms</code> when exposure metadata is valid.</td>
+<td>First-order exposure-normalized comparison.</td>
+</tr>
+<tr>
+<td><strong>Peak Intensity</strong></td>
+<td>Uses the peak pixel metric.</td>
+<td>Saturation and bright-point inspection.</td>
+</tr>
+</tbody>
+</table>
+<p>Current restriction:</p>
+<ul>
+<li>when <strong>X Axis = Exposure</strong>, <strong>Intensity Rate</strong> is intentionally unavailable</li>
+</ul>
+<h3 id="error-bars">Error Bars<a class="headerlink" href="#error-bars" title="Permanent link">&para;</a></h3>
+<p>Choose how uncertainty is displayed.</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Off</strong></td>
+<td>Do not display uncertainty bars.</td>
+</tr>
+<tr>
+<td><strong>Std</strong></td>
+<td>Display standard deviation.</td>
+</tr>
+<tr>
+<td><strong>Std Err</strong></td>
+<td>Display standard error of the mean.</td>
+</tr>
+</tbody>
+</table>
+<p>Use <strong>Std</strong> when you want to show spread. Use <strong>Std Err</strong> when you want uncertainty on the estimated mean.</p>
+<p>Practical note:</p>
+<ul>
+<li>uncertainty bars are meaningful for mean-based and <code>DN/ms</code>-based quantities</li>
+<li><strong>Peak Intensity</strong> does not carry a dedicated uncertainty source in the current plugin, so error bars are not the main readout for that mode</li>
+</ul>
+<h3 id="trend">Trend<a class="headerlink" href="#trend" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Off</strong></td>
+<td>Show only the raw series.</td>
+</tr>
+<tr>
+<td><strong>Linear fit</strong></td>
+<td>Add one first-order fit across the visible raw points.</td>
+</tr>
+<tr>
+<td><strong>Mean by X</strong></td>
+<td>Collapse visible raw series into one weighted summary line at each X value.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="display-options">Display options<a class="headerlink" href="#display-options" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Control</th>
+<th>Function</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Round Display to 1 s.d.</strong></td>
+<td>Round displayed values and uncertainties to one significant digit based on the active uncertainty source.</td>
+</tr>
+<tr>
+<td><strong>Align First Point to 1</strong></td>
+<td>In last-reference gain mode, apply a constant scale factor so the first finite displayed point becomes exactly <code>1</code>.</td>
+</tr>
+<tr>
+<td><strong>Show Series Lines</strong></td>
+<td>Toggle connecting lines between visible raw points when the raw-series view is active.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="what-is-actually-plotted">What is actually plotted<a class="headerlink" href="#what-is-actually-plotted" title="Permanent link">&para;</a></h2>
+<p>The plugin first assigns records to series, then aggregates records that share the same X value inside each series.</p>
+<h3 id="series-construction">Series construction<a class="headerlink" href="#series-construction" title="Permanent link">&para;</a></h3>
+<p>Current series rules are:</p>
+<ul>
+<li>with <strong>X Axis = Iris Position</strong>, separate series are formed by exposure</li>
+<li>with <strong>X Axis = Exposure</strong>, separate series are formed by iris position</li>
+<li>when X is exposure and no numeric iris value is available, the plugin falls back to the iris label or parent-folder label for series naming</li>
+</ul>
+<h3 id="point-aggregation">Point aggregation<a class="headerlink" href="#point-aggregation" title="Permanent link">&para;</a></h3>
+<p>When several records contribute to one plotted operating point, the plugin computes a summary point from those records.</p>
+<p>For values <span class="arithmatex">\(y_1, \dots, y_N\)</span>:</p>
+<div class="arithmatex">\[
+y_{ ext{point}} = rac{1}{N}\sum_{i=1}^{N} y_i
+\]</div>
+<div class="arithmatex">\[
+\sigma_{    ext{point}} = \mathrm{std}(y_1, \dots, y_N)
+\]</div>
+<div class="arithmatex">\[
+\mathrm{SEM}_{  ext{point}} = rac{\sigma_{ ext{point}}}{\sqrt{N}}
+\]</div>
+<p>Use the plotted point as a summary of the contributing records, not as the value of one individual row.</p>
+<h2 id="gain-interpretation">Gain interpretation<a class="headerlink" href="#gain-interpretation" title="Permanent link">&para;</a></h2>
+<p>In gain modes, the plotted value is relative to a reference point on the same series:</p>
+<div class="arithmatex">\[
+g_i = rac{y_i}{y_{ ext{ref}}}
+\]</div>
+<p>where:</p>
+<ul>
+<li><span class="arithmatex">\(g_i\)</span> is the gain at point <span class="arithmatex">\(i\)</span></li>
+<li><span class="arithmatex">\(y_i\)</span> is the point value before gain conversion</li>
+<li><span class="arithmatex">\(y_{ ext{ref}}\)</span> is the selected reference value on the same series</li>
+</ul>
+<p>Gain is therefore a relative quantity. It indicates how the signal changed with respect to one operating condition; it does not report absolute radiometric magnitude.</p>
+<h2 id="special-cases-that-matter-operationally">Special cases that matter operationally<a class="headerlink" href="#special-cases-that-matter-operationally" title="Permanent link">&para;</a></h2>
+<h3 id="iris-position-gain-uses-dnms">Iris-position gain uses <code>DN/ms</code><a class="headerlink" href="#iris-position-gain-uses-dnms" title="Permanent link">&para;</a></h3>
+<p>When <strong>X Axis = Iris Position</strong> and a gain mode is selected, the plugin builds gain from mean <code>DN/ms</code> at each iris position before applying the reference conversion.</p>
+<p>That means:</p>
+<ul>
+<li>exposure metadata must be valid upstream</li>
+<li>the result is sensitive to correct <code>DN/ms</code> computation upstream</li>
+<li>the interpretation is relative optical-response change, not direct proof of constant throughput</li>
+</ul>
+<h3 id="exposure-axis-gain-uses-the-active-mean-metric">Exposure-axis gain uses the active mean metric<a class="headerlink" href="#exposure-axis-gain-uses-the-active-mean-metric" title="Permanent link">&para;</a></h3>
+<p>When <strong>X Axis = Exposure</strong> and a gain mode is selected, the plugin builds gain directly from the active mean metric rather than from <code>DN/ms</code>.</p>
+<p>That is why <strong>Intensity Rate</strong> is not offered as a separate Y mode when X is already exposure.</p>
+<h3 id="iris-position-gain-locks-the-overlay-model">Iris-position gain locks the overlay model<a class="headerlink" href="#iris-position-gain-locks-the-overlay-model" title="Permanent link">&para;</a></h3>
+<p>When <strong>X Axis = Iris Position</strong> and gain is selected, the plugin forces the trend overlay to <strong>Mean by X</strong> and hides the raw series view.</p>
+<p>This is intentional. In that mode the plugin is emphasizing the aggregated gain-versus-iris result rather than exposure-separated raw series.</p>
+<h2 id="mean-by-x-overlay">Mean-by-X overlay<a class="headerlink" href="#mean-by-x-overlay" title="Permanent link">&para;</a></h2>
+<p>The <strong>Mean by X</strong> overlay collapses visible raw series into one weighted summary line.</p>
+<p>At each X value, visible raw points are combined using sample-count weighting:</p>
+<div class="arithmatex">\[
+ar{y}_w = rac{\sum_i w_i y_i}{\sum_i w_i}
+\]</div>
+<p>where <span class="arithmatex">\(w_i\)</span> is the sample count associated with visible point <span class="arithmatex">\(i\)</span>.</p>
+<p>Use this overlay when you want one summary trend across the visible operating population instead of several separate raw series.</p>
+<h2 id="linear-fit-overlay">Linear fit overlay<a class="headerlink" href="#linear-fit-overlay" title="Permanent link">&para;</a></h2>
+<p>The <strong>Linear fit</strong> overlay applies a first-order model across all visible raw series points:</p>
+<div class="arithmatex">\[
+y = m x + b
+\]</div>
+<p>The plugin also reports <span class="arithmatex">\(R^2\)</span> as a compact goodness-of-fit descriptor.</p>
+<p>Use the fit as a descriptive trend aid, not as proof that the system is physically linear over the explored range.</p>
+<h2 id="plot-and-result-table">Plot and result table<a class="headerlink" href="#plot-and-result-table" title="Permanent link">&para;</a></h2>
+<p>The plugin page combines:</p>
+<ul>
+<li>a plot for trend inspection</li>
+<li>a table for exact values, uncertainty values, and contributing sample counts</li>
+</ul>
+<p>Use the plot to identify structure. Use the table to verify exact numbers before drawing conclusions.</p>
+<p>Read the table particularly carefully when:</p>
+<ul>
+<li>a curve looks flatter or noisier than expected</li>
+<li>a gain jump seems too large</li>
+<li>some X positions combine more repeated records than others</li>
+<li>you are trying to distinguish spread from uncertainty on the aggregated mean</li>
+</ul>
+<h2 id="runtime-actions">Runtime actions<a class="headerlink" href="#runtime-actions" title="Permanent link">&para;</a></h2>
+<p>The plugin exposes runtime helpers through the <strong>Plugins</strong> menu, including actions such as:</p>
+<ul>
+<li>updating results</li>
+<li>resetting the plot view</li>
+<li>showing all curves</li>
+<li>copying selected table content</li>
+<li>copying the plot image</li>
+</ul>
+<h2 id="interpretation-checklist">Interpretation checklist<a class="headerlink" href="#interpretation-checklist" title="Permanent link">&para;</a></h2>
+<p>Before trusting a reported trend, verify:</p>
+<ul>
+<li>X matches the variable intentionally swept during acquisition</li>
+<li>Y matches the quantity you actually want to compare</li>
+<li>the uncertainty mode reflects the intended interpretation</li>
+<li>the gain reference choice matches the intended baseline</li>
+<li>the visible series correspond to the intended operating subsets</li>
+<li>upstream metadata and measurement values were already valid</li>
+<li>the result table supports the visual impression from the plot</li>
+</ul>
+<h2 id="mathematical-appendix">Mathematical appendix<a class="headerlink" href="#mathematical-appendix" title="Permanent link">&para;</a></h2>
+<p>This appendix keeps the defining equations close to the operational guidance.</p>
+<h3 id="aggregated-uncertainty-from-existing-per-record-uncertainties">Aggregated uncertainty from existing per-record uncertainties<a class="headerlink" href="#aggregated-uncertainty-from-existing-per-record-uncertainties" title="Permanent link">&para;</a></h3>
+<p>When the plugin receives one uncertainty value per contributing record, it combines them as:</p>
+<div class="arithmatex">\[
+\sigma_{ar{y}} = rac{\sqrt{\sum_{i=1}^{N} e_i^2}}{N}
+\]</div>
+<p>where <span class="arithmatex">\(e_i\)</span> is the uncertainty associated with record <span class="arithmatex">\(i\)</span>.</p>
+<h3 id="gain-uncertainty-propagation">Gain uncertainty propagation<a class="headerlink" href="#gain-uncertainty-propagation" title="Permanent link">&para;</a></h3>
+<p>When gain uncertainty is enabled, the plugin uses first-order propagation:</p>
+<div class="arithmatex">\[
+\sigma_{g_i}
+=
+\left|g_i
+ight|
+\sqrt{
+\left(rac{\sigma_i}{y_i}
+ight)^2
++
+\left(rac{\sigma_{ ext{ref}}}{y_{  ext{ref}}}
+ight)^2
+}
+\]</div>
+<h3 id="linear-fit-goodness-of-fit">Linear-fit goodness of fit<a class="headerlink" href="#linear-fit-goodness-of-fit" title="Permanent link">&para;</a></h3>
+<p>For the fit overlay, the coefficient of determination is reported as:</p>
+<div class="arithmatex">\[
+R^2 = 1 - rac{SS_{ ext{res}}}{SS_{ ext{tot}}}
+\]</div>
+<p>with:</p>
+<ul>
+<li><span class="arithmatex">\(SS_{    ext{res}} = \sum_i (y_i - \hat{y}_i)^2\)</span></li>
+<li><span class="arithmatex">\(SS_{    ext{tot}} = \sum_i (y_i - ar{y})^2\)</span></li>
+</ul>
+<h2 id="related-pages">Related pages<a class="headerlink" href="#related-pages" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="../analysis-workflow.html">Analysis Workflow</a></li>
+<li><a href="../measure-workflow.html">Measure Workflow</a></li>
+<li><a href="../concepts-and-limits.html">Concepts and Limits</a></li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../analysis-workflow.html" class="md-footer__link md-footer__link--prev" aria-label="Previous: Overview">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Overview
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../troubleshooting.html" class="md-footer__link md-footer__link--next" aria-label="Next: User Troubleshooting">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                User Troubleshooting
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.indexes", "navigation.top", "navigation.footer", "content.code.copy", "content.tabs.link", "search.highlight", "search.share", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../assets/javascripts/mathjax-config.js"></script>
+      
+        <script src="../../assets/vendor/mathjax/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

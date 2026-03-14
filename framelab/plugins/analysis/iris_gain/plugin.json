@@ -1,0 +1,8 @@
+{
+  "plugin_id": "iris_gain_vs_exposure",
+  "display_name": "Intensity Trend Explorer",
+  "page": "analysis",
+  "entrypoint_module": "framelab.plugins.analysis.iris_gain.plugin",
+  "dependencies": [],
+  "description": "Plot intensity trends against iris position or exposure."
+}

@@ -1,0 +1,683 @@
+DOCUMENTATION CONTEXT HANDOFF
+==============================
+
+Purpose
+-------
+This handoff is meant to be pasted into a future conversation so another model can quickly recover the documentation-review context for the TIFF viewer / camera-calibration app. The goal is to let the future model do the same kind of work that was done in this conversation:
+1. critically review the docs against the actual source code,
+2. identify mismatches, missing behavior details, weak terminology, and insufficient operator guidance,
+3. then generate replacement documentation files that match current code behavior.
+
+This handoff is intentionally long and explicit. It captures both the user's expectations and the review methodology that worked well.
+
+----------------------------------------------------------------------
+1. USER EXPECTATIONS AND DOCUMENTATION PHILOSOPHY
+----------------------------------------------------------------------
+
+The user wants documentation that is:
+- professional-grade,
+- technically meaningful,
+- concise enough to remain usable,
+- but complete enough that an engineer can operate and maintain the app without guesswork.
+
+The user explicitly does NOT want:
+- fluffy language,
+- casual phrasing,
+- beginner-style simplifications that sound non-technical,
+- vague statements like "it kind of helps" or "partially factors out" when more precise wording is possible.
+
+The preferred tone is:
+- engineering-oriented,
+- explicit about assumptions and limits,
+- operationally useful,
+- mathematically honest,
+- behavior-level rather than marketing-level.
+
+Examples of wording preferences:
+- Prefer "normalizes the result by integration duration, allowing first-order comparison across images acquired with different exposure settings"
+  over
+  "partially factors out exposure duration".
+- Prefer exact behavioral descriptions over generic claims.
+- Prefer "analysis plugin" over "analysis profile" unless true saved profiles exist.
+- Prefer "defaults are inherited baseline values; overrides replace targeted values; blank fields do not erase inherited values"
+  over vague datacard descriptions.
+
+The user also wants deliverables packaged as files, not just pasted chat content.
+Ideal workflow:
+- analyze the code,
+- analyze the existing markdown docs,
+- provide findings and critique,
+- then produce drop-in replacement markdown files,
+- then provide zip bundles containing the replacement docs tree when requested.
+
+The user may ask for:
+- single-page replacements,
+- whole-folder replacements,
+- complete docs-folder substitutes,
+- top-level maintenance file updates such as mkdocs.yml or scripts/docs/check.py.
+
+----------------------------------------------------------------------
+2. REVIEW METHOD THAT WORKED WELL
+----------------------------------------------------------------------
+
+The most successful review approach in the earlier conversation was this:
+
+A. Read the source code first enough to verify actual behavior.
+B. Read the markdown docs against the implementation.
+C. Identify:
+   - terminology mismatches,
+   - behavioral mismatches,
+   - missing exact rules,
+   - edge cases,
+   - places where docs stop too early and do not tell the user how to choose settings,
+   - places where docs describe UI but not interpretation limits.
+
+D. Give an opinionated but precise review:
+   - what is already strong,
+   - what is structurally good,
+   - what is weak,
+   - what is risky,
+   - what must be fixed before polish,
+   - what needs precision versus full rewrite.
+
+E. Then rewrite page-by-page.
+
+The user responded well when the review was framed like:
+- "The structure is good, but the docs behave more like a strong draft than a finished operator manual."
+- "The problem is not architecture anymore; it is precision, interpretation guidance, and consistency."
+- "The main gap is that the docs describe the app at a feature level instead of a behavior level."
+
+That framing is useful and should be reused when appropriate.
+
+----------------------------------------------------------------------
+3. IMPORTANT HISTORICAL FINDINGS FROM THE EARLIER REVIEW
+----------------------------------------------------------------------
+
+These were the major findings that mattered in the earlier pass. A future model should re-check them against the new codebase rather than blindly assume they still hold.
+
+3.1 Datacard defaults vs overrides was previously the biggest concern
+--------------------------------------------------------------------
+A critical early finding was that the original docs said:
+- defaults apply acquisition-wide,
+- frame-specific overrides are only needed where defaults are not enough.
+
+But the then-current implementation appeared to resolve metadata in a way that did NOT always inherit defaults automatically for frames lacking overrides.
+
+That was flagged as the highest-priority doc/code mismatch.
+
+Later, the user provided a patched metadata.py, and the concern was re-checked. After the patch, the interpretation was:
+
+- defaults are inherited baseline metadata,
+- overrides are applied as patches on top of the inherited base context,
+- if no override matches, defaults still remain available,
+- blank values mean "do not set anything here", not "erase inherited value",
+- explicit clearing via null is not part of normal supported semantics.
+
+This became the accepted semantic model for the app:
+- defaults = inherited baseline,
+- overrides = concrete replacements for targeted frames/ranges,
+- blank fields = leave inherited value alone,
+- no supported inheritance-plus-clearing model in normal wizard usage.
+
+A future model MUST re-check the new source code to confirm whether this still holds.
+
+3.2 "Analysis Profile" was misleading terminology
+-------------------------------------------------
+A key documentation issue was that "analysis profile" was being used in the docs, but in code the selector was actually choosing between loaded analysis plugins, not saved user profiles.
+
+Recommended terminology became:
+- analysis plugin
+- active analysis plugin
+- plugin selector
+
+A future model should verify whether the app now truly supports saved analysis profiles. If not, keep the plugin wording.
+
+3.3 Normalization affected more than display
+--------------------------------------------
+A critical nuance found in code:
+- normalization did not rewrite TIFF source data,
+- but it DID affect displayed intensity-derived values,
+- and it also propagated into analysis-context values such as mean/std/sem and dn_per_ms-related fields.
+
+Therefore the preferred documentation statement became:
+"Normalization does not rewrite the source TIFF pixels, but it does affect displayed measurement values and the intensity-derived values passed to analysis plugins."
+
+A future model should verify the current behavior in:
+- measurement-stage context building,
+- analysis-context construction,
+- plugin input preparation.
+
+3.4 Grouping rules were more exact than the docs implied
+--------------------------------------------------------
+Earlier docs described grouping in a more open-ended way, but the code implemented a fixed menu with exact-token grouping behavior.
+
+Previously observed fixed options included:
+- None
+- Parent Folder
+- Grandparent Folder
+- Iris Position
+- Exposure [ms]
+
+And earlier exact grouping behavior included:
+- grouping by exact string token,
+- empty or missing values becoming group 0,
+- grouping None making everything group 1,
+- non-empty values stringified, sorted, and assigned IDs from 1.
+
+A future model must re-check whether grouping options have expanded in the new app version.
+
+3.5 Background correction needed exact operational wording
+----------------------------------------------------------
+Earlier code inspection found that folder-library background matching behaved more precisely than the docs said. Previously observed behavior:
+- exposure-keyed matching,
+- exact rounded exposure matching such as round(exposure_ms, 9),
+- exact shape match required,
+- multiple references per exposure merged via median stack,
+- no nearest-neighbor matching,
+- no interpolation,
+- unmatched images falling back to raw image values.
+
+This level of exactness mattered to the user because the app is used for calibration work. A future model should verify the current background matching rules in code and document them exactly.
+
+3.6 ROI file contract was important and underdocumented
+-------------------------------------------------------
+Earlier code review identified that ROI persistence needed contract-style documentation. Earlier observed contract:
+- JSON fields: x0, y0, x1, y1, image_width, image_height
+- full-resolution image coordinates
+- top-left origin
+- applied as image[y0:y1, x0:x1]
+- x1 and y1 exclusive
+- out-of-bounds ROI files rejected on load
+
+This belongs in the docs because users may save, share, or externally generate ROI files.
+
+3.7 Measure page needed more decision guidance, not more formulas
+-----------------------------------------------------------------
+The user appreciated when it was explicitly stated that the formulas were already mostly fine, but the docs still needed to explain:
+- when Top-K is preferable to ROI,
+- how to choose K,
+- how threshold affects saturation counts,
+- when background subtraction improves comparability,
+- when clipping negatives biases the result,
+- when DN/ms is useful,
+- when DN/ms is not physically meaningful enough to compare directly.
+
+This remains a central documentation principle for future rewrites.
+
+3.8 Intensity Trend Explorer was mathematically strong but still needed operational emphasis
+--------------------------------------------------------------------------------------------
+The plugin docs already had strong math, but needed clearer explanations of what was ACTUALLY plotted in each mode.
+
+Earlier examples that needed clarification:
+- special-case Iris Position + Gain behavior,
+- peak intensity normalization wording,
+- what curves are built from,
+- when aggregation occurs,
+- what error bars actually reflect,
+- that a good-looking plot can still be wrong if upstream metadata/measurement choices were wrong.
+
+A future model should preserve the strong math but split the page into:
+- practical operator interpretation,
+- mathematical appendix.
+
+3.9 Troubleshooting needed result-quality sections, not only UI issues
+----------------------------------------------------------------------
+Earlier troubleshooting docs were too focused on:
+- no TIFF files found,
+- missing metadata,
+- Analyze tab missing,
+- datacard wizard issues,
+- help link/browser issues.
+
+The user agreed that troubleshooting should also cover:
+- DN/ms blank or missing,
+- ROI metrics NaN,
+- suspiciously flat or discontinuous gain curves,
+- wrong grouping,
+- background library partially unmatched,
+- plot disagreeing with preview/table,
+- raw vs normalized confusion,
+- datacard values not appearing as expected.
+
+This "result-quality troubleshooting" concept should be preserved.
+
+3.10 Some practical features had been undocumented
+--------------------------------------------------
+One earlier example was exporting the image metrics table via File -> Export.
+A future model should actively look for user-facing features that are easy to miss in docs:
+- export commands,
+- menu actions,
+- plugin-specific tools,
+- help or reload behaviors,
+- config utilities,
+- new data tools added in newer versions.
+
+----------------------------------------------------------------------
+4. DOCUMENTATION DESIGN PRINCIPLES THAT EMERGED
+----------------------------------------------------------------------
+
+These became the effective style guide for the rewritten docs.
+
+4.1 Structure
+-------------
+The docs architecture was considered fundamentally sound when it used:
+- User Guide
+- Reference
+- Developer Guide
+- Troubleshooting
+
+Within the User Guide, the workflow split:
+- Data -> Measure -> Analyze
+was considered the correct backbone.
+
+The docs usually benefited from:
+- adding a "Concepts and Limits" page early,
+- keeping workflow pages consistent,
+- separating operator guidance from schema/reference material.
+
+4.2 Page responsibilities
+-------------------------
+User Guide pages should answer:
+- what the user does,
+- how to choose settings,
+- what the outputs mean,
+- what limits and assumptions apply,
+- what failures or warnings matter operationally.
+
+Reference pages should answer:
+- exact schema keys,
+- file locations,
+- config contracts,
+- shortcut scope,
+- manifest fields,
+- mapping definitions,
+- payload validity expectations.
+
+Developer Guide pages should answer:
+- lifecycle,
+- state ownership,
+- subsystem boundaries,
+- extension contracts,
+- invariants,
+- packaging/build realities,
+- what to change for a given type of modification.
+
+Troubleshooting should answer:
+- where the failure likely originates,
+- what to verify next,
+- whether the problem is intake, metadata, measure, analysis, plugin, or docs packaging.
+
+4.3 Behavior-level documentation
+--------------------------------
+A repeated theme: documentation should describe the app at a behavior level, not merely at a feature level.
+
+Needed categories:
+- exact rules,
+- assumptions,
+- limits,
+- edge cases,
+- interpretation guidance,
+- failure modes.
+
+4.4 Engineering tone
+--------------------
+Preferred characteristics:
+- precise,
+- technical,
+- compact but not cryptic,
+- no marketing tone,
+- no patronizing simplifications,
+- no overstatement of certainty.
+
+----------------------------------------------------------------------
+5. OUTPUT PREFERENCES
+----------------------------------------------------------------------
+
+The user strongly preferred file-based deliverables.
+
+Best output modes:
+- direct replacement markdown files,
+- whole-folder zip bundles,
+- complete docs folder substitute zip,
+- updated build/check scripts if the docs tree changes.
+
+When rewriting pages:
+- provide actual drop-in files,
+- preserve folder structure expected by the repo,
+- copy unchanged support assets if needed in folder-substitute bundles.
+
+When asked for an updated docs folder:
+- provide a zip containing the full docs/ tree,
+- include updated markdown,
+- include existing unchanged assets/scripts only when requested or when needed for a direct substitute.
+
+When asked about build/check scripts:
+- verify whether changes are actually needed,
+- do not modify build.py if the build model did not change,
+- update check.py when new required docs pages or expected HTML outputs were added.
+
+----------------------------------------------------------------------
+6. KNOWN PAST WORK PRODUCTS AND THEIR INTENDED CONTENT
+----------------------------------------------------------------------
+
+Earlier in the conversation, complete rewritten bundles were produced for:
+- user guide pages,
+- reference pages,
+- developer guide pages,
+- top-level troubleshooting index,
+- top-level docs index,
+- docs_layout.md,
+- and later a full docs-folder substitute for a newer version of the app.
+
+The future model should not assume these earlier files still match the newest code.
+Instead, treat their philosophy as guidance:
+- precise operator wording,
+- stronger contracts,
+- better troubleshooting,
+- developer-guide expansion,
+- reference pages written as actual schema/file contracts.
+
+----------------------------------------------------------------------
+7. SPECIFIC PAGE-LEVEL PHILOSOPHY FROM EARLIER REWRITES
+----------------------------------------------------------------------
+
+7.1 Concepts and Limits page
+----------------------------
+This page was added as a technical orientation page before Quick Start.
+It was meant to define:
+- what the app is for,
+- what it is not for,
+- dataset/row/group concepts,
+- metadata source concepts,
+- DN and DN/ms,
+- normalization,
+- background subtraction,
+- curves/gain/error bars,
+- operator mindset and verification order.
+
+This was a useful addition and should usually be kept unless the new docs structure already includes an equivalent page.
+
+7.2 Quick Start
+---------------
+Quick Start should stay short but should use correct terminology and avoid misleading phrasing.
+It should not overpromise what Analyze does.
+It should warn that Analyze is downstream of Data and Measure correctness.
+
+7.3 Data Workflow
+-----------------
+This page should explicitly document:
+- scan behavior,
+- skip rules,
+- supported TIFF assumptions,
+- metadata source choice,
+- grouping rules,
+- table meaning,
+- what must be correct before leaving the tab.
+
+7.4 Datacard Wizard
+-------------------
+This page should be treated as a real operator reference, not just a UI tour.
+It should document:
+- defaults vs overrides,
+- blank values and inheritance,
+- frame indexing conventions,
+- field glossary,
+- minimal JSON example,
+- sweep example,
+- validation/save behavior,
+- common authoring mistakes.
+
+7.5 Measure Workflow
+--------------------
+This page was identified as the highest-leverage user-guide page to strengthen.
+It should include:
+- choosing average mode,
+- choosing K,
+- threshold interpretation,
+- background correction behavior,
+- ROI tools and ROI file contract,
+- normalization semantics,
+- edge cases and blank values,
+- what to verify before analysis.
+
+7.6 Analysis Workflow
+---------------------
+This page should focus on:
+- role of the Analyze tab,
+- plugin terminology,
+- dependencies on upstream stages,
+- what Analyze assumes to already be correct.
+
+7.7 Intensity Trend Explorer
+----------------------------
+This page should keep strong math, but split:
+- how to use and interpret results,
+- mathematical appendix.
+
+It should explain:
+- what each axis actually means,
+- how curves are formed,
+- how aggregation works,
+- how gain is computed,
+- what error bars represent,
+- which settings affect what is passed into the plugin.
+
+7.8 Troubleshooting
+-------------------
+There should be a split between:
+- app/UI problems,
+- result-quality or interpretation problems.
+
+7.9 Reference
+-------------
+Reference pages should stay short and exact.
+They are not workflow tutorials.
+
+Examples of useful reference topics:
+- config files,
+- plugin manifests,
+- acquisition mapping,
+- keyboard shortcuts,
+- eBUS parameter catalog, if applicable in the newer app,
+- other plugin/config contracts.
+
+7.10 Developer Guide
+--------------------
+Earlier conclusion: the original developer guide was too weak and had to become a real maintenance guide.
+
+Desired developer-guide characteristics:
+- startup lifecycle,
+- runtime data flow,
+- host state ownership,
+- main-window module boundaries,
+- plugin discovery/validation/import contract,
+- datacard system semantics,
+- UI host/plugin boundary,
+- packaging/build realities,
+- repo inconsistencies called out honestly.
+
+----------------------------------------------------------------------
+8. ADDITIONAL NEWER-APP CONTEXT FROM LATER IN THE CONVERSATION
+----------------------------------------------------------------------
+
+In a later pass, the user supplied a newer app version and requested a full docs-folder substitute.
+Important context from that later phase:
+
+8.1 New feature areas appeared
+------------------------------
+The newer app version included documentation around areas such as:
+- eBUS config tools
+- eBUS parameter catalog
+- eBUS config integration in the developer guide
+- likely expanded data plugin tooling
+
+A future model should inspect the new code and docs tree for:
+- new plugins,
+- new data tools,
+- new config/editing workflows,
+- new reference pages,
+- new developer-guide integration points.
+
+8.2 Full docs-folder substitute was the desired delivery format
+---------------------------------------------------------------
+The user wanted:
+- a zip containing the docs folder,
+- updated md files,
+- unchanged assets kept in place if no changes were needed.
+
+So when repeating that workflow in the future:
+- create a full replacement docs/ tree,
+- keep CSS/JS/assets/mathjax support as needed,
+- preserve original relative paths.
+
+8.3 Build/check script review mattered
+--------------------------------------
+After generating a docs substitute, the user asked whether build/check scripts also needed updates.
+The appropriate workflow was:
+- inspect mkdocs.yml,
+- inspect scripts/docs/build.py,
+- inspect scripts/docs/check.py,
+- determine whether new pages require changes to REQUIRED_FILES / EXPECTED_BUILD_OUTPUTS or nav.
+
+Important lesson:
+- do not assume scripts need changes,
+- verify them against the actual docs tree and build expectations.
+
+There was also a later correction:
+- an earlier perceived mismatch between docs paths and maintenance scripts turned out to be mostly a mismatch between generated replacement files and the repo's nested docs layout.
+This means future models should verify the real tree carefully before claiming maintenance drift.
+
+----------------------------------------------------------------------
+9. WHAT A FUTURE MODEL SHOULD DO WHEN REPEATING THIS TASK
+----------------------------------------------------------------------
+
+When given a new source-code zip and existing docs, the future model should do the following:
+
+Step 1: inspect the repo structure
+- identify docs tree structure,
+- identify plugin folders,
+- identify main_window modules,
+- identify metadata and datacard code,
+- identify measurement pipeline,
+- identify analysis plugins,
+- identify config/reference assets,
+- identify scripts/docs build/check pipeline.
+
+Step 2: inspect markdown docs
+- compare current docs tree against actual repo features,
+- identify weak/obsolete/misaligned pages,
+- detect terminology drift,
+- detect missing pages for new features/plugins.
+
+Step 3: perform a critique before rewriting
+The critique should cover:
+- what is already good,
+- what needs only precision,
+- what needs real expansion,
+- what is risky,
+- what is missing entirely,
+- what should remain reference-only vs user-guide vs dev-guide.
+
+Step 4: verify critical implementation contracts
+At minimum, re-check:
+- datacard metadata resolution semantics,
+- normalization propagation into analysis,
+- exact grouping rules,
+- background matching logic,
+- ROI save/load contract,
+- analysis-plugin selection model,
+- plugin discovery/manifest behavior,
+- config file ownership/location/creation behavior,
+- any new eBUS or related tool contracts.
+
+Step 5: rewrite docs folder in one coherent pass
+Preferred output:
+- either page-by-page drop-ins,
+- or a full docs-folder substitute zip.
+
+Step 6: verify docs maintenance files if needed
+Check:
+- mkdocs.yml
+- scripts/docs/build.py
+- scripts/docs/check.py
+- docs_layout.md
+Only update them when the docs tree/build contract truly changed.
+
+----------------------------------------------------------------------
+10. IMPORTANT CAUTIONS FOR A FUTURE MODEL
+----------------------------------------------------------------------
+
+Do NOT:
+- assume earlier code behavior is still current,
+- assume earlier docs bundles are still valid,
+- assume path layout is unchanged,
+- assume build/check scripts need updates without verifying,
+- over-document beginner material at the expense of precise behavior,
+- conflate workflow docs with reference docs,
+- use "analysis profile" unless the code really supports profiles,
+- describe normalization as purely cosmetic unless code confirms that,
+- describe datacard defaults as inherited unless current metadata resolution still does that.
+
+Do:
+- re-check implementation every time,
+- prefer exact language,
+- document engineering limits explicitly,
+- distinguish raw/normalized/corrected contexts carefully,
+- treat developer guide as a maintenance manual, not a summary brochure,
+- preserve strong mathematical sections but front-load practical interpretation.
+
+----------------------------------------------------------------------
+11. FUTURE PROMPT TEMPLATE
+----------------------------------------------------------------------
+
+The following prompt template can be reused in a future conversation:
+
+BEGIN PROMPT TEMPLATE
+
+I am sharing the current source code and documentation for my TIFF-viewer / camera-calibration app.
+I want you to:
+1. inspect the codebase and actual docs tree,
+2. critically review the docs against current code behavior,
+3. identify terminology issues, behavior mismatches, missing operator guidance, weak troubleshooting, and missing developer/reference contracts,
+4. then generate updated replacement documentation files.
+
+Documentation expectations:
+- professional-grade and engineering-oriented,
+- concise but complete,
+- behavior-level rather than feature-level,
+- explicit about assumptions, exact rules, limits, and edge cases,
+- no vague wording when more precise wording is possible.
+
+Important philosophy from earlier reviews:
+- Data -> Measure -> Analyze is the correct user-guide backbone.
+- The docs should explain how to choose settings, not just what buttons exist.
+- Normalization, grouping, ROI persistence, background correction, and datacard inheritance must be documented according to actual code behavior.
+- "analysis plugin" is preferred over "analysis profile" unless the code truly supports saved profiles.
+- Troubleshooting must include result-quality problems, not just UI issues.
+- The developer guide should be a maintenance guide covering lifecycle, state ownership, subsystem boundaries, extension contracts, and packaging/build realities.
+- Reference pages should be exact and contract-oriented, not mini-tutorials.
+
+Please verify, rather than assume, these critical implementation behaviors:
+- datacard defaults vs overrides semantics,
+- normalization propagation into analysis,
+- exact grouping rules,
+- background reference matching rules,
+- ROI JSON contract,
+- plugin selection/discovery behavior,
+- config file ownership and creation behavior,
+- any new plugin/tool-specific contracts.
+
+Output preference:
+- first provide a critique of the current docs against the code,
+- then provide either drop-in replacement files or a full docs-folder substitute zip,
+- and update mkdocs/build/check files only if actually needed.
+
+END PROMPT TEMPLATE
+
+----------------------------------------------------------------------
+12. SHORT SUMMARY
+----------------------------------------------------------------------
+
+In one sentence:
+
+The user wants documentation that matches the source code exactly, uses precise engineering language, explains operational choices and limits rather than only UI features, and can be delivered as drop-in replacement files or a full docs-folder substitute after a code-aware critical review.

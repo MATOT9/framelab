@@ -1,0 +1,7 @@
+{
+  "plugin_id": "background_correction",
+  "display_name": "Background Correction",
+  "page": "measure",
+  "entrypoint_module": "framelab.plugins.measure.background_correction",
+  "description": "Configure background subtraction from a dedicated Measure-page tool instead of the embedded control panel."
+}

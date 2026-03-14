@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
+  <title id="title">Screenshot placeholder</title>
+  <desc id="desc">Use this placeholder where a dark-theme application screenshot will be added later.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#1a2842"/>
+      <stop offset="100%" stop-color="#0f1728"/>
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="900" rx="40" fill="url(#bg)"/>
+  <rect x="60" y="60" width="1480" height="780" rx="28" fill="none" stroke="#76a8ff" stroke-width="6" stroke-dasharray="18 18"/>
+  <text x="800" y="360" font-family="Segoe UI, Arial, sans-serif" font-size="74" text-anchor="middle" fill="#eef4ff">Screenshot Placeholder</text>
+  <text x="800" y="440" font-family="Segoe UI, Arial, sans-serif" font-size="38" text-anchor="middle" fill="#c6d8ff">Replace this image with the final UI capture.</text>
+  <text x="800" y="510" font-family="Segoe UI, Arial, sans-serif" font-size="30" text-anchor="middle" fill="#8eb5ff">Use the caption under the figure for the expected target path and capture state.</text>
+</svg>

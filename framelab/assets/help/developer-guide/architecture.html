@@ -1,0 +1,2503 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="User, developer, and reference documentation for the FrameLab application.">
+      
+      
+      
+      
+        <link rel="prev" href="index.html">
+      
+      
+        <link rel="next" href="plugin-system.html">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/branding/app-icon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.4">
+    
+    
+      
+        <title>Architecture - FrameLab Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#architecture" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../index.html" title="FrameLab Documentation" class="md-header__button md-logo" aria-label="FrameLab Documentation" data-md-component="logo">
+      
+  <img src="../assets/images/branding/app-icon.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            FrameLab Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Architecture
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="blue-grey" data-md-color-accent="light-blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m3.55 19.09 1.41 1.41 1.8-1.79-1.42-1.42M12 6c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6c0-3.32-2.69-6-6-6m8 7h3v-2h-3m-2.76 7.71 1.8 1.79 1.41-1.41-1.79-1.8M20.45 5l-1.41-1.4-1.8 1.79 1.42 1.42M13 1h-2v3h2M6.76 5.39 4.96 3.6 3.55 5l1.79 1.81zM1 13h3v-2H1m12 9h-2v3h2"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../index.html" title="FrameLab Documentation" class="md-nav__button md-logo" aria-label="FrameLab Documentation" data-md-component="logo">
+      
+  <img src="../assets/images/branding/app-icon.png" alt="logo">
+
+    </a>
+    FrameLab Documentation
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../user-guide/index.html" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/concepts-and-limits.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts and Limits
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/quick-start.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/plugins.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/plugin-selector.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Selector
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_6" id="__nav_2_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Workflow
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Data Workflow
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/data-workflow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/data/session-manager.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Session Manager
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/data/datacard-wizard.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datacard Wizard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/data/ebus-config-tools.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    eBUS Config Tools
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/measure-workflow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Measure Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_8" id="__nav_2_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Analysis Workflow
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Analysis Workflow
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/analysis-workflow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/analysis/intensity-trend-explorer.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Intensity Trend Explorer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/troubleshooting.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="index.html" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer Guide
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Developer Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="architecture.html" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#architectural-overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architectural overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#startup-lifecycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Startup lifecycle
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Startup lifecycle">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-process-identity-and-qt-application" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Process identity and Qt application
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-manifest-discovery-before-runtime-import" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Manifest discovery before runtime import
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-persisted-selection-and-startup-dialog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Persisted selection and startup dialog
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-main-window-construction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Main window construction
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#runtime-data-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Runtime data flow
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Runtime data flow">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#stage-1-dataset-discovery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 1: dataset discovery
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stage-2-metadata-resolution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 2: metadata resolution
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stage-3-measurement-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 3: measurement metrics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stage-4-analysis-context-build" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 4: analysis context build
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#state-ownership" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        State ownership
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="State ownership">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#state-owned-by-framelabwindow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        State owned by FrameLabWindow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#state-owned-by-datasetstatecontroller" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        State owned by DatasetStateController
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#state-owned-by-metricspipelinecontroller" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        State owned by MetricsPipelineController
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#state-owned-by-worker-objects" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        State owned by worker objects
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#state-owned-by-plugins" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        State owned by plugins
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mixins-and-subsystem-boundaries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mixins and subsystem boundaries
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Mixins and subsystem boundaries">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#current-host-composition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Current host composition
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#workers-threads-and-ui-thread-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Workers, threads, and UI-thread rules
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Workers, threads, and UI-thread rules">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#current-asynchronous-jobs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Current asynchronous jobs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#architectural-rule" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architectural rule
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#plugin-architecture-in-context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Plugin architecture in context
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Plugin architecture in context">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#phase-1-metadata-only-discovery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 1: metadata-only discovery
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-2-enabled-only-runtime-import" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 2: enabled-only runtime import
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#help-and-documentation-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Help and documentation architecture
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#change-safe-boundaries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Change-safe boundaries
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#architecture-invariants-worth-preserving" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture invariants worth preserving
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="plugin-system.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin System
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="datacard-system.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datacard System
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="ebus-config-integration.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    eBUS Config Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="ui-structure.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    UI Structure
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="packaging.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Packaging
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../reference/index.html" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/config-files.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Config Files
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/plugin-manifests.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Manifests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/acquisition-mapping.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Acquisition Mapping
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/ebus-parameter-catalog.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    eBUS Parameter Catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/keyboard-shortcuts.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Keyboard Shortcuts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../troubleshooting/index.html" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Troubleshooting
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#architectural-overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architectural overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#startup-lifecycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Startup lifecycle
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Startup lifecycle">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-process-identity-and-qt-application" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Process identity and Qt application
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-manifest-discovery-before-runtime-import" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Manifest discovery before runtime import
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-persisted-selection-and-startup-dialog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Persisted selection and startup dialog
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-main-window-construction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Main window construction
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#runtime-data-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Runtime data flow
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Runtime data flow">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#stage-1-dataset-discovery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 1: dataset discovery
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stage-2-metadata-resolution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 2: metadata resolution
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stage-3-measurement-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 3: measurement metrics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stage-4-analysis-context-build" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 4: analysis context build
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#state-ownership" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        State ownership
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="State ownership">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#state-owned-by-framelabwindow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        State owned by FrameLabWindow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#state-owned-by-datasetstatecontroller" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        State owned by DatasetStateController
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#state-owned-by-metricspipelinecontroller" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        State owned by MetricsPipelineController
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#state-owned-by-worker-objects" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        State owned by worker objects
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#state-owned-by-plugins" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        State owned by plugins
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mixins-and-subsystem-boundaries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mixins and subsystem boundaries
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Mixins and subsystem boundaries">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#current-host-composition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Current host composition
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#workers-threads-and-ui-thread-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Workers, threads, and UI-thread rules
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Workers, threads, and UI-thread rules">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#current-asynchronous-jobs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Current asynchronous jobs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#architectural-rule" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architectural rule
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#plugin-architecture-in-context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Plugin architecture in context
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Plugin architecture in context">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#phase-1-metadata-only-discovery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 1: metadata-only discovery
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-2-enabled-only-runtime-import" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 2: enabled-only runtime import
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#help-and-documentation-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Help and documentation architecture
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#change-safe-boundaries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Change-safe boundaries
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#architecture-invariants-worth-preserving" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture invariants worth preserving
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="architecture">Architecture<a class="headerlink" href="#architecture" title="Permanent link">&para;</a></h1>
+<p>FrameLab is a Qt desktop application organized around a workflow host window and a manifest-driven plugin system. The architecture is designed so that plugin choice happens before runtime imports, dataset work is staged in a predictable pipeline, and page-specific logic stays grouped by responsibility rather than collapsing into one large window module.</p>
+<h2 id="architectural-overview">Architectural overview<a class="headerlink" href="#architectural-overview" title="Permanent link">&para;</a></h2>
+<p>At a high level, the application has six major layers:</p>
+<ol>
+<li><strong>Process and Qt bootstrap</strong></li>
+<li><strong>Plugin manifest discovery and startup selection</strong></li>
+<li><strong>Main window host construction</strong></li>
+<li><strong>Dataset and measurement runtime</strong></li>
+<li><strong>Analysis plugin orchestration</strong></li>
+<li><strong>Offline help and packaged assets</strong></li>
+</ol>
+<p>A useful mental model is:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>process start
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>  -&gt; QApplication + app identity
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>  -&gt; discover plugin manifests
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>  -&gt; restore persisted selection
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>  -&gt; startup selector dialog
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>  -&gt; resolve enabled plugin set
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>  -&gt; construct main window
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>  -&gt; load enabled plugin classes
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>  -&gt; scan dataset
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>  -&gt; resolve metadata
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>  -&gt; compute metrics
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>  -&gt; build analysis context
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>  -&gt; push context to loaded analysis plugins
+</code></pre></div>
+<h2 id="startup-lifecycle">Startup lifecycle<a class="headerlink" href="#startup-lifecycle" title="Permanent link">&para;</a></h2>
+<p>Startup behavior is split between <code>framelab/app.py</code>, <code>framelab/plugins/*</code>, and <code>framelab/window.py</code>.</p>
+<h3 id="1-process-identity-and-qt-application">1. Process identity and Qt application<a class="headerlink" href="#1-process-identity-and-qt-application" title="Permanent link">&para;</a></h3>
+<p><code>main()</code> in <code>framelab/app.py</code> does the following before any workflow UI is built:</p>
+<ul>
+<li>prepares process identity for desktop integration</li>
+<li>creates <code>QApplication</code></li>
+<li>applies app identity and icon</li>
+<li>applies the default stylesheet</li>
+</ul>
+<p>This stage should remain lightweight. Do not import heavy plugin UI or dataset logic here.</p>
+<h3 id="2-manifest-discovery-before-runtime-import">2. Manifest discovery before runtime import<a class="headerlink" href="#2-manifest-discovery-before-runtime-import" title="Permanent link">&para;</a></h3>
+<p>The app discovers plugin manifests before importing plugin implementation modules. This is a deliberate design choice.</p>
+<p>Why it matters:</p>
+<ul>
+<li>the startup selector can list plugins without importing them</li>
+<li>dependency closure can be resolved before the main window is created</li>
+<li>disabled plugins do not incur import or widget-instantiation cost</li>
+</ul>
+<p>Manifest discovery and validation live in <code>framelab/plugins/registry.py</code>.</p>
+<h3 id="3-persisted-selection-and-startup-dialog">3. Persisted selection and startup dialog<a class="headerlink" href="#3-persisted-selection-and-startup-dialog" title="Permanent link">&para;</a></h3>
+<p>The selection layer in <code>framelab/plugins/selection.py</code>:</p>
+<ul>
+<li>loads persisted enabled plugin ids from local config</li>
+<li>defaults to all discovered plugins when no selection file exists</li>
+<li>resolves transitive dependencies</li>
+<li>presents a startup dialog that enforces dependency-consistent checkbox state</li>
+<li>writes the final enabled set back to local config</li>
+</ul>
+<p>At this point the app still has not built the main workflow window.</p>
+<h3 id="4-main-window-construction">4. Main window construction<a class="headerlink" href="#4-main-window-construction" title="Permanent link">&para;</a></h3>
+<p>The enabled plugin set can include both page-embedded plugins and dialog-style tools such as Session Manager, eBUS compare/inspect helpers, or Background Correction. The host window must therefore support both permanent page contributions and transient runtime actions from the same plugin system.</p>
+<p><code>FrameLabWindow</code> in <code>framelab/window.py</code> is then constructed with the enabled plugin ids.</p>
+<p>During initialization it:</p>
+<ul>
+<li>resolves the enabled plugin set again for safety</li>
+<li>groups enabled manifests by page</li>
+<li>imports enabled plugin entrypoints and collects registered plugin classes</li>
+<li>constructs the shared state controllers:</li>
+<li><code>DatasetStateController</code></li>
+<li><code>MetricsPipelineController</code></li>
+<li><code>AnalysisContextController</code></li>
+<li>initializes caches, runtime flags, worker references, and plugin registries</li>
+<li>builds the workflow shell through mixins in <code>framelab/main_window/*</code></li>
+</ul>
+<p><code>FrameLabWindow</code> remains the long-lived workflow host, but dataset, metric, and
+analysis-context state are no longer stored only as raw attributes on the window.</p>
+<h2 id="runtime-data-flow">Runtime data flow<a class="headerlink" href="#runtime-data-flow" title="Permanent link">&para;</a></h2>
+<p>The core runtime pipeline is more important than the module list. Most maintenance work eventually touches one or more stages in this flow:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>supported image discovery
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>  -&gt; path + datacard metadata resolution
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>  -&gt; controller-owned runtime state + caches
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>  -&gt; measurement metrics
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>  -&gt; analysis context build
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>  -&gt; plugin update
+</code></pre></div>
+<h3 id="stage-1-dataset-discovery">Stage 1: dataset discovery<a class="headerlink" href="#stage-1-dataset-discovery" title="Permanent link">&para;</a></h3>
+<p>The Data workflow triggers folder scan and supported-image discovery.
+<code>DatasetStateController</code> stores:</p>
+<ul>
+<li>loaded dataset root</li>
+<li>discovered row paths</li>
+<li>cached metadata per path</li>
+<li>metadata-source selection and availability</li>
+<li>metadata-table visible row ordering</li>
+<li>current selected row index</li>
+</ul>
+<p>Dataset discovery and image loading helpers live primarily in <code>framelab/main_window/dataset_loading.py</code>.</p>
+<h3 id="stage-2-metadata-resolution">Stage 2: metadata resolution<a class="headerlink" href="#stage-2-metadata-resolution" title="Permanent link">&para;</a></h3>
+<p>For each discovered image, metadata is resolved through <code>framelab/metadata.py</code>.</p>
+<p>This stage can combine:</p>
+<ul>
+<li>path-derived metadata</li>
+<li>acquisition, session, and campaign datacard layers</li>
+<li>eBUS-backed acquisition-wide baseline values for mapped canonical fields</li>
+<li>frame-index-derived override context</li>
+</ul>
+<p>This is the authoritative path for turning files into structured per-row metadata. Do not reimplement metadata resolution inside UI code or analysis plugins.</p>
+<h3 id="stage-3-measurement-metrics">Stage 3: measurement metrics<a class="headerlink" href="#stage-3-measurement-metrics" title="Permanent link">&para;</a></h3>
+<p>The Measure workflow computes per-image metrics such as:</p>
+<ul>
+<li>max pixel</li>
+<li>minimum non-zero pixel</li>
+<li>saturated-pixel count</li>
+<li>Top-K mean/std/SEM</li>
+<li>ROI mean/std/SEM</li>
+<li><code>DN/ms</code></li>
+<li>background-match status</li>
+</ul>
+<p>These results are stored as NumPy arrays on the host window. Dynamic metric computation is delegated to worker classes in <code>framelab/workers.py</code> and orchestrated by <code>MetricsRuntimeMixin</code>.
+These results and their settings now live in <code>MetricsPipelineController</code>. Dynamic
+metric computation is still delegated to worker classes in <code>framelab/workers.py</code>
+and orchestrated by <code>MetricsRuntimeMixin</code>, but the mixin now applies worker
+results back into controller-owned state.</p>
+<h3 id="stage-4-analysis-context-build">Stage 4: analysis context build<a class="headerlink" href="#stage-4-analysis-context-build" title="Permanent link">&para;</a></h3>
+<p>The Analyze workflow does not re-measure images. It packages the current
+dataset and metric controller state into an <code>AnalysisContext</code> through
+<code>framelab/analysis_context.py</code>.</p>
+<p>That context is built from:</p>
+<ul>
+<li>measurement-mode-dependent mean/std/SEM values</li>
+<li>per-row metadata</li>
+<li>normalized intensity-derived fields when normalization is enabled</li>
+<li>background state flags and reference labels</li>
+</ul>
+<p>The analysis plugin interface should be treated as a consumer of this prebuilt context, not as a place to reach back into raw host state ad hoc.</p>
+<h2 id="state-ownership">State ownership<a class="headerlink" href="#state-ownership" title="Permanent link">&para;</a></h2>
+<p>A maintainer should treat state ownership as a first-class architectural rule.</p>
+<h3 id="state-owned-by-framelabwindow">State owned by <code>FrameLabWindow</code><a class="headerlink" href="#state-owned-by-framelabwindow" title="Permanent link">&para;</a></h3>
+<p>The host window owns UI-shell and runtime-integration state, including:</p>
+<ul>
+<li>image and corrected-image caches</li>
+<li>active worker and thread references</li>
+<li>plugin instances and currently enabled plugin ids</li>
+<li>column-visibility overrides and theme state</li>
+<li>processing-failure banners and status text</li>
+</ul>
+<p>The window should not be treated as the only source of truth for dataset rows or
+measurement arrays anymore.</p>
+<h3 id="state-owned-by-datasetstatecontroller">State owned by <code>DatasetStateController</code><a class="headerlink" href="#state-owned-by-datasetstatecontroller" title="Permanent link">&para;</a></h3>
+<p>The dataset controller owns long-lived dataset/session selection state:</p>
+<ul>
+<li>scanned dataset root</li>
+<li>discovered paths</li>
+<li>per-path metadata cache</li>
+<li>active and preferred metadata-source mode</li>
+<li>JSON-metadata availability</li>
+<li>metadata-table visible row ordering</li>
+<li>currently selected dataset row</li>
+</ul>
+<h3 id="state-owned-by-metricspipelinecontroller">State owned by <code>MetricsPipelineController</code><a class="headerlink" href="#state-owned-by-metricspipelinecontroller" title="Permanent link">&para;</a></h3>
+<p>The metrics controller owns measurement settings and the latest measurement
+results:</p>
+<ul>
+<li>static and dynamic metric arrays</li>
+<li>ROI rectangle and ROI-derived arrays</li>
+<li>normalization and rounding settings</li>
+<li>background configuration, loaded references, and match bookkeeping</li>
+<li>threshold and Top-K settings</li>
+<li>in-flight metric-job and ROI-apply job lifecycle state</li>
+</ul>
+<p>If state affects more than one workflow page, it probably belongs on a shared
+controller or the host shell rather than inside one page widget.</p>
+<h3 id="state-owned-by-worker-objects">State owned by worker objects<a class="headerlink" href="#state-owned-by-worker-objects" title="Permanent link">&para;</a></h3>
+<p>Worker objects own temporary job-local computation only. They should not mutate long-lived host state directly. Results must return through signals and be applied in the host thread.</p>
+<h3 id="state-owned-by-plugins">State owned by plugins<a class="headerlink" href="#state-owned-by-plugins" title="Permanent link">&para;</a></h3>
+<p>Plugins should own plugin-local UI widgets and plugin-local interpretation state. They should not become hidden alternate sources of truth for dataset or measurement state already owned by the host.</p>
+<h2 id="mixins-and-subsystem-boundaries">Mixins and subsystem boundaries<a class="headerlink" href="#mixins-and-subsystem-boundaries" title="Permanent link">&para;</a></h2>
+<p>The window is composed from mixins under <code>framelab/main_window/</code>. This is a structural boundary, not just a style choice.</p>
+<h3 id="current-host-composition">Current host composition<a class="headerlink" href="#current-host-composition" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>WindowChromeMixin</code> -&gt; menus, toolbar, status bar, theme, help entry points</li>
+<li><code>DataPageMixin</code> -&gt; Data tab widgets and interactions</li>
+<li><code>DatasetLoadingMixin</code> -&gt; folder scan, image loading, cache management, background-aware image access</li>
+<li><code>InspectPageMixin</code> -&gt; Measure tab widgets, ROI controls, background controls, preview wiring</li>
+<li><code>MetricsRuntimeMixin</code> -&gt; asynchronous metric jobs and ROI apply jobs</li>
+<li><code>AnalysisPageMixin</code> -&gt; analysis plugin loading, stacked widget hosting, context delivery</li>
+<li><code>WindowActionsMixin</code> -&gt; file/menu actions that do not belong entirely to one page widget</li>
+</ul>
+<p>When adding behavior, put it in the mixin that owns the workflow or shell responsibility. Do not default to adding everything in <code>window.py</code>.</p>
+<p>Supporting controller modules currently live outside <code>main_window/</code>:</p>
+<ul>
+<li><code>framelab/dataset_state.py</code></li>
+<li><code>framelab/metrics_state.py</code></li>
+<li><code>framelab/analysis_context.py</code></li>
+</ul>
+<h2 id="workers-threads-and-ui-thread-rules">Workers, threads, and UI-thread rules<a class="headerlink" href="#workers-threads-and-ui-thread-rules" title="Permanent link">&para;</a></h2>
+<p>This repo already uses worker threads for expensive per-dataset operations.</p>
+<h3 id="current-asynchronous-jobs">Current asynchronous jobs<a class="headerlink" href="#current-asynchronous-jobs" title="Permanent link">&para;</a></h3>
+<ul>
+<li>dynamic metric computation via <code>DynamicStatsWorker</code></li>
+<li>dataset-wide ROI application via <code>RoiApplyWorker</code></li>
+</ul>
+<h3 id="architectural-rule">Architectural rule<a class="headerlink" href="#architectural-rule" title="Permanent link">&para;</a></h3>
+<p>UI widgets and long-lived host state are owned by the UI thread. Workers compute arrays and emit results back to the host. New long-running operations should follow the same pattern:</p>
+<ul>
+<li>prepare a snapshot of the required input state</li>
+<li>run computation in a worker</li>
+<li>apply results only after job id validation in the host</li>
+</ul>
+<p>Do not allow workers to read mutable host state repeatedly during execution.</p>
+<h2 id="plugin-architecture-in-context">Plugin architecture in context<a class="headerlink" href="#plugin-architecture-in-context" title="Permanent link">&para;</a></h2>
+<p>The plugin system is intentionally split into two phases:</p>
+<h3 id="phase-1-metadata-only-discovery">Phase 1: metadata-only discovery<a class="headerlink" href="#phase-1-metadata-only-discovery" title="Permanent link">&para;</a></h3>
+<p>Manifest scanning identifies what could be loaded.</p>
+<h3 id="phase-2-enabled-only-runtime-import">Phase 2: enabled-only runtime import<a class="headerlink" href="#phase-2-enabled-only-runtime-import" title="Permanent link">&para;</a></h3>
+<p>Only the enabled plugin entrypoints are imported. Those entrypoints self-register classes with the page registry.</p>
+<p>This separation is central to startup cost, dependency closure, and change safety. If a future refactor removes the separation between manifest discovery and runtime import, it should be treated as an architectural change, not a refactor detail.</p>
+<h2 id="help-and-documentation-architecture">Help and documentation architecture<a class="headerlink" href="#help-and-documentation-architecture" title="Permanent link">&para;</a></h2>
+<p>Offline help is intentionally external to the Qt widget tree.</p>
+<p>Source chain:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>docs/*.md
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>  -&gt; MkDocs build
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>  -&gt; static HTML bundle
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>  -&gt; framelab/assets/help/
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>  -&gt; Help menu opens local HTML pages in external viewer
+</code></pre></div>
+<p>This keeps runtime free of embedded browser dependencies such as <code>QtWebEngine</code>, and it preserves one documentation source format.</p>
+<h2 id="change-safe-boundaries">Change-safe boundaries<a class="headerlink" href="#change-safe-boundaries" title="Permanent link">&para;</a></h2>
+<p>Use these rules when deciding where to make modifications:</p>
+<ul>
+<li><strong>Change startup selection behavior</strong> -&gt; <code>framelab/plugins/selection.py</code></li>
+<li><strong>Change manifest parsing/validation</strong> -&gt; <code>framelab/plugins/registry.py</code></li>
+<li><strong>Change shared dataset state</strong> -&gt; <code>framelab/dataset_state.py</code></li>
+<li><strong>Change shared metric/background state</strong> -&gt; <code>framelab/metrics_state.py</code></li>
+<li><strong>Change analysis-context assembly</strong> -&gt; <code>framelab/analysis_context.py</code></li>
+<li><strong>Change workflow shell behavior</strong> -&gt; <code>framelab/window.py</code> and the appropriate <code>main_window/*</code> mixin</li>
+<li><strong>Change measurement computation</strong> -&gt; <code>framelab/workers.py</code>, <code>framelab/background.py</code>, and Measure-stage mixins</li>
+<li><strong>Change metadata semantics</strong> -&gt; <code>framelab/metadata.py</code>, <code>framelab/frame_indexing.py</code>, and datacard-authoring layers</li>
+<li><strong>Change analysis-plugin data contract</strong> -&gt; <code>framelab/plugins/analysis/_base.py</code> and <code>framelab/analysis_context.py</code></li>
+<li><strong>Change docs bundling or offline help behavior</strong> -&gt; <code>scripts/docs/*</code> and <code>framelab/help_docs.py</code></li>
+</ul>
+<h2 id="architecture-invariants-worth-preserving">Architecture invariants worth preserving<a class="headerlink" href="#architecture-invariants-worth-preserving" title="Permanent link">&para;</a></h2>
+<p>These are the current architectural invariants that future work should preserve unless there is a deliberate redesign:</p>
+<ol>
+<li>Plugin discovery must not require importing all plugin code.</li>
+<li>Disabled plugins should not be imported at runtime.</li>
+<li>Dataset rows must be formed through the central metadata path, not plugin-local ad hoc parsing.</li>
+<li>Analysis plugins must consume host-built context rather than silently re-reading raw files.</li>
+<li>Long-running dataset-wide operations should execute in workers, not in the UI thread.</li>
+<li>Offline docs remain Markdown-source -&gt; static HTML -&gt; bundled help assets.</li>
+</ol>
+<p>If a change crosses one of those boundaries, document it explicitly in the commit or design note.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="index.html" class="md-footer__link md-footer__link--prev" aria-label="Previous: Overview">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Overview
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="plugin-system.html" class="md-footer__link md-footer__link--next" aria-label="Next: Plugin System">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Plugin System
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.indexes", "navigation.top", "navigation.footer", "content.code.copy", "content.tabs.link", "search.highlight", "search.share", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../assets/javascripts/mathjax-config.js"></script>
+      
+        <script src="../assets/vendor/mathjax/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

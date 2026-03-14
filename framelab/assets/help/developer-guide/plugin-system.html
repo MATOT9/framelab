@@ -1,0 +1,2623 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="User, developer, and reference documentation for the FrameLab application.">
+      
+      
+      
+      
+        <link rel="prev" href="architecture.html">
+      
+      
+        <link rel="next" href="datacard-system.html">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/branding/app-icon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.4">
+    
+    
+      
+        <title>Plugin System - FrameLab Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#plugin-system" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../index.html" title="FrameLab Documentation" class="md-header__button md-logo" aria-label="FrameLab Documentation" data-md-component="logo">
+      
+  <img src="../assets/images/branding/app-icon.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            FrameLab Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Plugin System
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="blue-grey" data-md-color-accent="light-blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m3.55 19.09 1.41 1.41 1.8-1.79-1.42-1.42M12 6c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6c0-3.32-2.69-6-6-6m8 7h3v-2h-3m-2.76 7.71 1.8 1.79 1.41-1.41-1.79-1.8M20.45 5l-1.41-1.4-1.8 1.79 1.42 1.42M13 1h-2v3h2M6.76 5.39 4.96 3.6 3.55 5l1.79 1.81zM1 13h3v-2H1m12 9h-2v3h2"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../index.html" title="FrameLab Documentation" class="md-nav__button md-logo" aria-label="FrameLab Documentation" data-md-component="logo">
+      
+  <img src="../assets/images/branding/app-icon.png" alt="logo">
+
+    </a>
+    FrameLab Documentation
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../user-guide/index.html" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/concepts-and-limits.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts and Limits
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/quick-start.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/plugins.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/plugin-selector.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Selector
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_6" id="__nav_2_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Workflow
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Data Workflow
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/data-workflow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/data/session-manager.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Session Manager
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/data/datacard-wizard.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datacard Wizard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/data/ebus-config-tools.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    eBUS Config Tools
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/measure-workflow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Measure Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_8" id="__nav_2_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Analysis Workflow
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Analysis Workflow
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/analysis-workflow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/analysis/intensity-trend-explorer.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Intensity Trend Explorer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/troubleshooting.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="index.html" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer Guide
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Developer Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="architecture.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin System
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="plugin-system.html" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin System
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#why-the-plugin-system-is-structured-this-way" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why the plugin system is structured this way
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#terminology" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Terminology
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Terminology">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#manifest" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Manifest
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#entry-point" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Entry point
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#registered-plugin-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Registered plugin class
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#enabled-plugin-set" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enabled plugin set
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#discovery-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Discovery rules
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Discovery rules">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#plugin-pages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Plugin pages
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#manifest-file-discovery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Manifest file discovery
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#location-and-declared-page-must-agree" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Location and declared page must agree
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#manifest-validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Manifest validation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#startup-selection-and-dependency-closure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Startup selection and dependency closure
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Startup selection and dependency closure">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#persisted-selection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Persisted selection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dependency-closure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dependency closure
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#important-design-point" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Important design point
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#runtime-import-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Runtime import path
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#registration-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Registration contract
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Registration contract">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#generic-page-registration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Generic page registration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#analysis-helper-registration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Analysis helper registration
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#runtime-class-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Runtime class contract
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#generic-expectations-for-all-page-plugins" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Generic expectations for all page plugins
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#analysis-plugin-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Analysis plugin contract
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ui-capability-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UI capability contract
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="UI capability contract">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#important-boundary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Important boundary
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reload-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reload behavior
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#manifest-dependencies-versus-class-dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Manifest dependencies versus class dependencies
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Manifest dependencies versus class dependencies">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#manifest-dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Manifest dependencies
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#class-dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Class dependencies
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#authoring-checklist-for-new-plugins" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Authoring checklist for new plugins
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#failure-modes-worth-checking-first" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Failure modes worth checking first
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#change-guidance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Change guidance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#current-shipped-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Current shipped examples
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Current shipped examples">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#data-page-plugins" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data-page plugins
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#measure-page-plugins" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Measure-page plugins
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#analysis-page-plugins" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Analysis-page plugins
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="datacard-system.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datacard System
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="ebus-config-integration.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    eBUS Config Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="ui-structure.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    UI Structure
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="packaging.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Packaging
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../reference/index.html" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/config-files.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Config Files
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/plugin-manifests.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Manifests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/acquisition-mapping.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Acquisition Mapping
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/ebus-parameter-catalog.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    eBUS Parameter Catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/keyboard-shortcuts.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Keyboard Shortcuts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../troubleshooting/index.html" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Troubleshooting
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#why-the-plugin-system-is-structured-this-way" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why the plugin system is structured this way
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#terminology" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Terminology
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Terminology">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#manifest" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Manifest
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#entry-point" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Entry point
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#registered-plugin-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Registered plugin class
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#enabled-plugin-set" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enabled plugin set
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#discovery-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Discovery rules
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Discovery rules">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#plugin-pages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Plugin pages
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#manifest-file-discovery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Manifest file discovery
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#location-and-declared-page-must-agree" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Location and declared page must agree
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#manifest-validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Manifest validation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#startup-selection-and-dependency-closure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Startup selection and dependency closure
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Startup selection and dependency closure">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#persisted-selection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Persisted selection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dependency-closure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dependency closure
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#important-design-point" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Important design point
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#runtime-import-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Runtime import path
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#registration-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Registration contract
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Registration contract">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#generic-page-registration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Generic page registration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#analysis-helper-registration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Analysis helper registration
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#runtime-class-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Runtime class contract
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#generic-expectations-for-all-page-plugins" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Generic expectations for all page plugins
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#analysis-plugin-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Analysis plugin contract
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ui-capability-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UI capability contract
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="UI capability contract">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#important-boundary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Important boundary
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reload-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reload behavior
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#manifest-dependencies-versus-class-dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Manifest dependencies versus class dependencies
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Manifest dependencies versus class dependencies">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#manifest-dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Manifest dependencies
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#class-dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Class dependencies
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#authoring-checklist-for-new-plugins" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Authoring checklist for new plugins
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#failure-modes-worth-checking-first" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Failure modes worth checking first
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#change-guidance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Change guidance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#current-shipped-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Current shipped examples
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Current shipped examples">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#data-page-plugins" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data-page plugins
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#measure-page-plugins" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Measure-page plugins
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#analysis-page-plugins" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Analysis-page plugins
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="plugin-system">Plugin System<a class="headerlink" href="#plugin-system" title="Permanent link">&para;</a></h1>
+<p>The plugin system is the app's extension boundary. It is designed so that plugin metadata can be discovered without importing plugin code, startup enablement can be resolved before the main window exists, and only the enabled entrypoints are imported at runtime.</p>
+<p>This page documents the maintainer-facing contract: discovery, validation, enablement, import, reload, and runtime class expectations.</p>
+<h2 id="why-the-plugin-system-is-structured-this-way">Why the plugin system is structured this way<a class="headerlink" href="#why-the-plugin-system-is-structured-this-way" title="Permanent link">&para;</a></h2>
+<p>The current design supports four goals:</p>
+<ul>
+<li>startup plugin selection without importing all plugin modules</li>
+<li>dependency validation before the main window opens</li>
+<li>enabled-only runtime cost</li>
+<li>per-page UI extension without hard-coding every feature into the host shell</li>
+</ul>
+<h2 id="terminology">Terminology<a class="headerlink" href="#terminology" title="Permanent link">&para;</a></h2>
+<h3 id="manifest">Manifest<a class="headerlink" href="#manifest" title="Permanent link">&para;</a></h3>
+<p>A <strong>manifest</strong> is lightweight JSON metadata describing a plugin before code import.</p>
+<h3 id="entry-point">Entry point<a class="headerlink" href="#entry-point" title="Permanent link">&para;</a></h3>
+<p>An <strong>entry point</strong> is the Python module declared in the manifest. Importing that module is expected to register the plugin class with the page registry.</p>
+<h3 id="registered-plugin-class">Registered plugin class<a class="headerlink" href="#registered-plugin-class" title="Permanent link">&para;</a></h3>
+<p>A <strong>registered plugin class</strong> is the class the runtime loader expects to find after the entry point is imported.</p>
+<h3 id="enabled-plugin-set">Enabled plugin set<a class="headerlink" href="#enabled-plugin-set" title="Permanent link">&para;</a></h3>
+<p>The <strong>enabled plugin set</strong> is the startup selection closed over dependencies. Runtime imports are limited to this set.</p>
+<h2 id="discovery-rules">Discovery rules<a class="headerlink" href="#discovery-rules" title="Permanent link">&para;</a></h2>
+<p>Manifest discovery lives in <code>framelab/plugins/registry.py</code>.</p>
+<h3 id="plugin-pages">Plugin pages<a class="headerlink" href="#plugin-pages" title="Permanent link">&para;</a></h3>
+<p>The system currently supports three page scopes:</p>
+<ul>
+<li><code>data</code></li>
+<li><code>measure</code></li>
+<li><code>analysis</code></li>
+</ul>
+<p>These correspond to the page-specific plugin roots under <code>framelab/plugins/</code>.</p>
+<h3 id="manifest-file-discovery">Manifest file discovery<a class="headerlink" href="#manifest-file-discovery" title="Permanent link">&para;</a></h3>
+<p>For a given page, the loader searches recursively under the page directory and accepts:</p>
+<ul>
+<li><code>plugin.json</code></li>
+<li><code>*.plugin.json</code></li>
+</ul>
+<p>Files under <code>__pycache__</code> are ignored.</p>
+<h3 id="location-and-declared-page-must-agree">Location and declared page must agree<a class="headerlink" href="#location-and-declared-page-must-agree" title="Permanent link">&para;</a></h3>
+<p>The manifest's <code>page</code> value must match the page under which the manifest file was discovered. If a manifest declares <code>analysis</code> but is located under <code>framelab/plugins/data/</code>, validation fails.</p>
+<h2 id="manifest-validation">Manifest validation<a class="headerlink" href="#manifest-validation" title="Permanent link">&para;</a></h2>
+<p>Manifest parsing occurs before plugin import.</p>
+<p>Current validation guarantees:</p>
+<ul>
+<li>the manifest file must decode to a JSON object</li>
+<li><code>plugin_id</code> must be non-empty</li>
+<li><code>display_name</code> must be non-empty</li>
+<li><code>entrypoint_module</code> must be non-empty</li>
+<li><code>page</code> must be valid and consistent with file location</li>
+<li>dependency identifiers must be normalized to unique non-empty tokens</li>
+<li>duplicate <code>plugin_id</code> values across manifests are fatal</li>
+<li>dependencies pointing to unknown plugin ids are fatal</li>
+</ul>
+<p>This is intentionally strict. Manifest errors are startup errors, not runtime warnings.</p>
+<p>For field-level reference details, see <a href="../reference/plugin-manifests.html">Plugin Manifests</a>.</p>
+<h2 id="startup-selection-and-dependency-closure">Startup selection and dependency closure<a class="headerlink" href="#startup-selection-and-dependency-closure" title="Permanent link">&para;</a></h2>
+<p>Startup selection lives in <code>framelab/plugins/selection.py</code>.</p>
+<h3 id="persisted-selection">Persisted selection<a class="headerlink" href="#persisted-selection" title="Permanent link">&para;</a></h3>
+<p>The app stores enabled plugin ids in local config. When no saved selection exists, the default is the full discovered manifest set.</p>
+<h3 id="dependency-closure">Dependency closure<a class="headerlink" href="#dependency-closure" title="Permanent link">&para;</a></h3>
+<p>Selection is always resolved transitively:</p>
+<ul>
+<li>enabling a plugin also enables its dependencies</li>
+<li>disabling a plugin disables dependents that require it</li>
+</ul>
+<p>The startup dialog enforces this behavior at the checkbox layer so the final selection is always dependency-consistent.</p>
+<h3 id="important-design-point">Important design point<a class="headerlink" href="#important-design-point" title="Permanent link">&para;</a></h3>
+<p>Dependency closure is based on manifest metadata, not on importing plugin code and introspecting classes.</p>
+<h2 id="runtime-import-path">Runtime import path<a class="headerlink" href="#runtime-import-path" title="Permanent link">&para;</a></h2>
+<p>After the startup dialog is accepted, the host window resolves the enabled ids again and loads plugin classes page by page.</p>
+<p>Runtime loading sequence:</p>
+<ol>
+<li>group enabled manifests by page</li>
+<li>clear previously registered classes for the target page</li>
+<li>import or reload each enabled entrypoint module</li>
+<li>expect plugin classes to self-register during import</li>
+<li>verify that every enabled manifest produced a registered class</li>
+<li>return registered classes in manifest order</li>
+</ol>
+<p>If an entrypoint imports successfully but fails to register the expected plugin id, loading fails with a clear error.</p>
+<h2 id="registration-contract">Registration contract<a class="headerlink" href="#registration-contract" title="Permanent link">&para;</a></h2>
+<p>Registration is explicit.</p>
+<h3 id="generic-page-registration">Generic page registration<a class="headerlink" href="#generic-page-registration" title="Permanent link">&para;</a></h3>
+<p><code>register_page_plugin(plugin_cls, page=...)</code> in <code>framelab/plugins/registry.py</code>:</p>
+<ul>
+<li>normalizes page</li>
+<li>validates non-empty <code>plugin_id</code></li>
+<li>normalizes class-level dependency declaration</li>
+<li>normalizes optional UI capabilities</li>
+<li>stores the class under the page registry</li>
+</ul>
+<h3 id="analysis-helper-registration">Analysis helper registration<a class="headerlink" href="#analysis-helper-registration" title="Permanent link">&para;</a></h3>
+<p>Analysis plugins currently use <code>register_analysis_plugin(...)</code>, which delegates to page registration for the <code>analysis</code> page.</p>
+<h2 id="runtime-class-contract">Runtime class contract<a class="headerlink" href="#runtime-class-contract" title="Permanent link">&para;</a></h2>
+<p>The manifest tells the loader <strong>which module to import</strong>. The imported module must then register a class that matches the host's expectations.</p>
+<h2 id="generic-expectations-for-all-page-plugins">Generic expectations for all page plugins<a class="headerlink" href="#generic-expectations-for-all-page-plugins" title="Permanent link">&para;</a></h2>
+<p>A plugin class must define:</p>
+<ul>
+<li><code>plugin_id</code></li>
+<li>page-compatible registration</li>
+</ul>
+<p>Optional class-level declarations include:</p>
+<ul>
+<li><code>dependencies</code></li>
+<li><code>ui_capabilities</code></li>
+</ul>
+<p>Optional runtime menu integration may be provided through host/plugin menu hooks.</p>
+<h2 id="analysis-plugin-contract">Analysis plugin contract<a class="headerlink" href="#analysis-plugin-contract" title="Permanent link">&para;</a></h2>
+<p>Analysis plugins currently have the clearest formal interface in <code>framelab/plugins/analysis/_base.py</code>.</p>
+<p>An analysis plugin must implement:</p>
+<ul>
+<li><code>create_widget(parent)</code></li>
+<li><code>on_context_changed(context)</code></li>
+</ul>
+<p>Analysis plugins may also implement:</p>
+<ul>
+<li><code>set_theme(mode)</code></li>
+<li><code>populate_menu(menu)</code></li>
+</ul>
+<p>The host owns plugin instantiation and stacked-widget placement. The plugin owns the returned widget and its local rendering logic.</p>
+<h2 id="ui-capability-contract">UI capability contract<a class="headerlink" href="#ui-capability-contract" title="Permanent link">&para;</a></h2>
+<p>Plugins can expose lightweight UI-policy hints via <code>PluginUiCapabilities</code>.</p>
+<p>Current fields include:</p>
+<ul>
+<li><code>reveal_data_columns</code></li>
+<li><code>reveal_measure_columns</code></li>
+<li><code>show_metadata_controls</code></li>
+<li><code>metadata_group_fields</code></li>
+</ul>
+<p>These are hints to the host. They are not an alternate plugin-owned UI shell. The host still owns column visibility, metadata controls, and workflow tab structure.</p>
+<h3 id="important-boundary">Important boundary<a class="headerlink" href="#important-boundary" title="Permanent link">&para;</a></h3>
+<p>A plugin may request that certain controls or columns be revealed. It should not directly mutate host tables outside its supported integration surface unless the host explicitly delegates that responsibility.</p>
+<h2 id="reload-behavior">Reload behavior<a class="headerlink" href="#reload-behavior" title="Permanent link">&para;</a></h2>
+<p>The Analyze page currently exposes a <strong>Reload Plugins</strong> action.</p>
+<p>Reload behavior is intentionally limited:</p>
+<ul>
+<li>manifests are rediscovered through the registry path</li>
+<li>enabled entrypoint modules are re-imported or reloaded</li>
+<li>registered classes are rebuilt for the page</li>
+<li>plugin widgets are recreated by the host</li>
+</ul>
+<p>Reload should be treated as a development convenience, not a guarantee of complete hot-reload safety for arbitrary plugin-local global state.</p>
+<p>If a plugin caches external module state aggressively or depends on import-time side effects, a full app restart is still the safer path.</p>
+<h2 id="manifest-dependencies-versus-class-dependencies">Manifest dependencies versus class dependencies<a class="headerlink" href="#manifest-dependencies-versus-class-dependencies" title="Permanent link">&para;</a></h2>
+<p>Both manifests and classes may declare dependencies, but they serve different purposes.</p>
+<h3 id="manifest-dependencies">Manifest dependencies<a class="headerlink" href="#manifest-dependencies" title="Permanent link">&para;</a></h3>
+<p>These are used before runtime import for:</p>
+<ul>
+<li>validation</li>
+<li>startup dependency closure</li>
+<li>enabled-set resolution</li>
+</ul>
+<h3 id="class-dependencies">Class dependencies<a class="headerlink" href="#class-dependencies" title="Permanent link">&para;</a></h3>
+<p>These are normalized at registration time and can be useful as a runtime declaration, but they do not replace manifest dependencies for startup selection.</p>
+<p>If the two declarations disagree, the manifest must be treated as the startup source of truth.</p>
+<h2 id="authoring-checklist-for-new-plugins">Authoring checklist for new plugins<a class="headerlink" href="#authoring-checklist-for-new-plugins" title="Permanent link">&para;</a></h2>
+<p>When adding a plugin:</p>
+<ol>
+<li>place it under the correct page subtree in <code>framelab/plugins/</code></li>
+<li>add a manifest file using a unique <code>plugin_id</code></li>
+<li>ensure <code>entrypoint_module</code> imports cleanly</li>
+<li>register the plugin class during import</li>
+<li>keep manifest dependencies accurate</li>
+<li>expose <code>ui_capabilities</code> only when the host genuinely needs policy hints</li>
+<li>verify startup selection, enabled-only load, and reload behavior</li>
+</ol>
+<h2 id="failure-modes-worth-checking-first">Failure modes worth checking first<a class="headerlink" href="#failure-modes-worth-checking-first" title="Permanent link">&para;</a></h2>
+<p>If a plugin does not appear or load correctly, check in this order:</p>
+<ol>
+<li>manifest file discovered under the expected page directory</li>
+<li>manifest <code>page</code> matches location</li>
+<li><code>plugin_id</code> is unique</li>
+<li>dependencies reference valid plugin ids</li>
+<li>entrypoint module path is correct</li>
+<li>module import actually registers the plugin class</li>
+<li>the plugin is enabled after dependency closure</li>
+</ol>
+<h2 id="change-guidance">Change guidance<a class="headerlink" href="#change-guidance" title="Permanent link">&para;</a></h2>
+<p>Change these files depending on intent:</p>
+<ul>
+<li>manifest parsing or discovery rules -&gt; <code>framelab/plugins/registry.py</code></li>
+<li>selection persistence or startup dialog behavior -&gt; <code>framelab/plugins/selection.py</code></li>
+<li>analysis plugin base contract -&gt; <code>framelab/plugins/analysis/_base.py</code></li>
+<li>plugin authoring docs for manifest fields -&gt; <code>docs/reference/plugin-manifests.md</code></li>
+</ul>
+<p>Do not bury plugin-loader policy inside page-specific UI code. Plugin discovery and import behavior belong in the registry and selection layers.</p>
+<h2 id="current-shipped-examples">Current shipped examples<a class="headerlink" href="#current-shipped-examples" title="Permanent link">&para;</a></h2>
+<p>The shipped plugin set is a useful guide to intended plugin patterns.</p>
+<h3 id="data-page-plugins">Data-page plugins<a class="headerlink" href="#data-page-plugins" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>acquisition_datacard_wizard</strong> — modal authoring workflow around the datacard service layer</li>
+<li><strong>session_manager</strong> — non-modal dialog for session-level acquisition management; depends on the wizard plugin</li>
+<li><strong>ebus_config_tools</strong> — inspect/compare dialogs and hand-off back into canonical metadata authoring</li>
+</ul>
+<h3 id="measure-page-plugins">Measure-page plugins<a class="headerlink" href="#measure-page-plugins" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>background_correction</strong> — focused runtime dialog around host-owned background-reference state</li>
+</ul>
+<h3 id="analysis-page-plugins">Analysis-page plugins<a class="headerlink" href="#analysis-page-plugins" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>iris_gain</strong> / <strong>Intensity Trend Explorer</strong> — embedded analysis view with explicit <code>AnalysisContext</code> consumption and UI-capability hints</li>
+</ul>
+<p>These examples show that the plugin system must support both:
+- dialog-style runtime tools exposed from the <strong>Plugins</strong> menu
+- embedded analysis views hosted inside the workflow shell</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="architecture.html" class="md-footer__link md-footer__link--prev" aria-label="Previous: Architecture">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Architecture
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="datacard-system.html" class="md-footer__link md-footer__link--next" aria-label="Next: Datacard System">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Datacard System
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.indexes", "navigation.top", "navigation.footer", "content.code.copy", "content.tabs.link", "search.highlight", "search.share", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../assets/javascripts/mathjax-config.js"></script>
+      
+        <script src="../assets/vendor/mathjax/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

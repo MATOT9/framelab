@@ -1,0 +1,10 @@
+{
+  "plugin_id": "session_manager",
+  "display_name": "Session Manager",
+  "page": "data",
+  "entrypoint_module": "framelab.plugins.data.session_manager",
+  "dependencies": [
+    "acquisition_datacard_wizard"
+  ],
+  "description": "Manage acquisitions inside one session, including numbering, datacard copy/paste, and acquisition-local eBUS enable state."
+}

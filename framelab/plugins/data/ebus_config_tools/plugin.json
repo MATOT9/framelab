@@ -1,0 +1,8 @@
+{
+  "plugin_id": "ebus_config_tools",
+  "display_name": "eBUS Config Tools",
+  "page": "data",
+  "entrypoint_module": "framelab.plugins.data.ebus_config_tools.plugin",
+  "dependencies": [],
+  "description": "Inspect and compare eBUS camera snapshots, with optional datacard-wizard hand-off for overridable fields."
+}

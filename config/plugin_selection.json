@@ -1,0 +1,9 @@
+{
+  "schema_version": "1.0",
+  "enabled_plugin_ids": [
+    "acquisition_datacard_wizard",
+    "ebus_config_tools",
+    "iris_gain_vs_exposure",
+    "session_manager"
+  ]
+}

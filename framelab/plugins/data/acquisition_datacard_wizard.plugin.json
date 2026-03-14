@@ -1,0 +1,8 @@
+{
+  "plugin_id": "acquisition_datacard_wizard",
+  "display_name": "Acquisition Datacard Wizard",
+  "page": "data",
+  "entrypoint_module": "framelab.plugins.data.acquisition_datacard_wizard",
+  "dependencies": [],
+  "description": "Create and edit acquisition datacards for the selected folder."
+}

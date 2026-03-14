@@ -1,0 +1,5 @@
+# Documentation build toolchain for offline Help pages.
+mkdocs==1.6.1
+mathjax
+mkdocs-material==9.7.4
+pymdown-extensions>=10.0,<11

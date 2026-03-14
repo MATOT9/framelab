@@ -1,0 +1,100 @@
+site_name: FrameLab Documentation
+site_description: User, developer, and reference documentation for the FrameLab application.
+site_url: ""
+docs_dir: docs
+use_directory_urls: false
+
+theme:
+  name: material
+  logo: assets/images/branding/app-icon.png
+  favicon: assets/images/branding/app-icon.png
+  features:
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - navigation.footer
+    - content.code.copy
+    - content.tabs.link
+    - search.highlight
+    - search.share
+    - toc.follow
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: blue grey
+      accent: blue
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: blue grey
+      accent: light blue
+      toggle:
+        icon: material/white-balance-sunny
+        name: Switch to light mode
+
+plugins:
+  - search
+
+extra_css:
+  - stylesheets/extra.css
+
+extra_javascript:
+  - assets/javascripts/mathjax-config.js
+  - assets/vendor/mathjax/tex-mml-chtml.js
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.inlinehilite
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+
+nav:
+  - Home: index.md
+  - User Guide:
+      - Overview: user-guide/index.md
+      - Concepts and Limits: user-guide/concepts-and-limits.md
+      - Quick Start: user-guide/quick-start.md
+      - Plugin Guide: user-guide/plugins.md
+      - Plugin Selector: user-guide/plugin-selector.md
+      - Data Workflow:
+          - Overview: user-guide/data-workflow.md
+          - Session Manager: user-guide/data/session-manager.md
+          - Datacard Wizard: user-guide/data/datacard-wizard.md
+          - eBUS Config Tools: user-guide/data/ebus-config-tools.md
+      - Measure Workflow: user-guide/measure-workflow.md
+      - Analysis Workflow:
+          - Overview: user-guide/analysis-workflow.md
+          - Intensity Trend Explorer: user-guide/analysis/intensity-trend-explorer.md
+      - User Troubleshooting: user-guide/troubleshooting.md
+  - Developer Guide:
+      - Overview: developer-guide/index.md
+      - Architecture: developer-guide/architecture.md
+      - Plugin System: developer-guide/plugin-system.md
+      - Datacard System: developer-guide/datacard-system.md
+      - eBUS Config Integration: developer-guide/ebus-config-integration.md
+      - UI Structure: developer-guide/ui-structure.md
+      - Packaging: developer-guide/packaging.md
+  - Reference:
+      - Overview: reference/index.md
+      - Config Files: reference/config-files.md
+      - Plugin Manifests: reference/plugin-manifests.md
+      - Acquisition Mapping: reference/acquisition-mapping.md
+      - eBUS Parameter Catalog: reference/ebus-parameter-catalog.md
+      - Keyboard Shortcuts: reference/keyboard-shortcuts.md
+  - Troubleshooting:
+      - Overview: troubleshooting/index.md

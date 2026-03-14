@@ -1,0 +1,2406 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="User, developer, and reference documentation for the FrameLab application.">
+      
+      
+      
+      
+        <link rel="prev" href="../data-workflow.html">
+      
+      
+        <link rel="next" href="datacard-wizard.html">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/branding/app-icon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.4">
+    
+    
+      
+        <title>Session Manager - FrameLab Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#session-manager" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../index.html" title="FrameLab Documentation" class="md-header__button md-logo" aria-label="FrameLab Documentation" data-md-component="logo">
+      
+  <img src="../../assets/images/branding/app-icon.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            FrameLab Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Session Manager
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="blue-grey" data-md-color-accent="light-blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m3.55 19.09 1.41 1.41 1.8-1.79-1.42-1.42M12 6c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6c0-3.32-2.69-6-6-6m8 7h3v-2h-3m-2.76 7.71 1.8 1.79 1.41-1.41-1.79-1.8M20.45 5l-1.41-1.4-1.8 1.79 1.42 1.42M13 1h-2v3h2M6.76 5.39 4.96 3.6 3.55 5l1.79 1.81zM1 13h3v-2H1m12 9h-2v3h2"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../index.html" title="FrameLab Documentation" class="md-nav__button md-logo" aria-label="FrameLab Documentation" data-md-component="logo">
+      
+  <img src="../../assets/images/branding/app-icon.png" alt="logo">
+
+    </a>
+    FrameLab Documentation
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../index.html" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../concepts-and-limits.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts and Limits
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../quick-start.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plugins.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plugin-selector.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Selector
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2_6" id="__nav_2_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Workflow
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Data Workflow
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data-workflow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Session Manager
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="session-manager.html" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Session Manager
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-this-tool-is-for" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What this tool is for
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#session-structure-expected-by-the-tool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Session structure expected by the tool
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#main-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Main workflow
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#understanding-the-acquisition-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Understanding the acquisition table
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#numbering-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Numbering rules
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Numbering rules">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#valid-numbering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Valid numbering
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#invalid-numbering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Invalid numbering
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#actions-and-what-they-actually-do" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Actions and what they actually do
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Actions and what they actually do">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#load-selected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Load Selected
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#add-acquisition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Add Acquisition
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rename" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rename
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#delete-acquisition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Delete Acquisition
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#normalizereindex" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Normalize/Reindex
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#edit-datacard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Edit Datacard
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#copy-datacard-paste-datacard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Copy Datacard / Paste Datacard
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#toggle-ebus" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Toggle eBUS
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#relationship-to-the-rest-of-the-app" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Relationship to the rest of the app
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#common-situations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Common situations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Common situations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#i-need-a-new-acquisition-folder-before-i-can-load-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        I need a new acquisition folder before I can load data
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#i-copied-the-wrong-acquisition-metadata-to-the-new-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        I copied the wrong acquisition metadata to the new run
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#session-numbering-is-invalid-and-edits-are-blocked" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Session numbering is invalid and edits are blocked
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-selected-acquisition-should-stop-using-its-ebus-snapshot" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The selected acquisition should stop using its eBUS snapshot
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting-cues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting cues
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting cues">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#add-or-delete-is-disabled" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Add or delete is disabled
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#copy-works-but-paste-is-disabled" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Copy works but paste is disabled
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#toggle-ebus-is-disabled" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Toggle eBUS is disabled
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#load-selected-did-not-change-the-dataset" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Load Selected did not change the dataset
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related-pages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related pages
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="datacard-wizard.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datacard Wizard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="ebus-config-tools.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    eBUS Config Tools
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../measure-workflow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Measure Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_8" id="__nav_2_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Analysis Workflow
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Analysis Workflow
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../analysis-workflow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../analysis/intensity-trend-explorer.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Intensity Trend Explorer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../troubleshooting.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../developer-guide/index.html" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer Guide
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Developer Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../developer-guide/architecture.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../developer-guide/plugin-system.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin System
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../developer-guide/datacard-system.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datacard System
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../developer-guide/ebus-config-integration.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    eBUS Config Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../developer-guide/ui-structure.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    UI Structure
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../developer-guide/packaging.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Packaging
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../reference/index.html" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/config-files.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Config Files
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/plugin-manifests.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Manifests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/acquisition-mapping.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Acquisition Mapping
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/ebus-parameter-catalog.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    eBUS Parameter Catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/keyboard-shortcuts.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Keyboard Shortcuts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../troubleshooting/index.html" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Troubleshooting
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-this-tool-is-for" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What this tool is for
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#session-structure-expected-by-the-tool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Session structure expected by the tool
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#main-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Main workflow
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#understanding-the-acquisition-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Understanding the acquisition table
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#numbering-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Numbering rules
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Numbering rules">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#valid-numbering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Valid numbering
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#invalid-numbering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Invalid numbering
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#actions-and-what-they-actually-do" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Actions and what they actually do
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Actions and what they actually do">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#load-selected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Load Selected
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#add-acquisition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Add Acquisition
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rename" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rename
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#delete-acquisition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Delete Acquisition
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#normalizereindex" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Normalize/Reindex
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#edit-datacard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Edit Datacard
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#copy-datacard-paste-datacard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Copy Datacard / Paste Datacard
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#toggle-ebus" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Toggle eBUS
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#relationship-to-the-rest-of-the-app" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Relationship to the rest of the app
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#common-situations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Common situations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Common situations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#i-need-a-new-acquisition-folder-before-i-can-load-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        I need a new acquisition folder before I can load data
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#i-copied-the-wrong-acquisition-metadata-to-the-new-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        I copied the wrong acquisition metadata to the new run
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#session-numbering-is-invalid-and-edits-are-blocked" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Session numbering is invalid and edits are blocked
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-selected-acquisition-should-stop-using-its-ebus-snapshot" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The selected acquisition should stop using its eBUS snapshot
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting-cues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting cues
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting cues">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#add-or-delete-is-disabled" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Add or delete is disabled
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#copy-works-but-paste-is-disabled" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Copy works but paste is disabled
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#toggle-ebus-is-disabled" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Toggle eBUS is disabled
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#load-selected-did-not-change-the-dataset" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Load Selected did not change the dataset
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related-pages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related pages
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="session-manager">Session Manager<a class="headerlink" href="#session-manager" title="Permanent link">&para;</a></h1>
+<p>Use <strong>Session Manager</strong> when you need to manage acquisition folders inside one session before or alongside ordinary dataset analysis.</p>
+<p>This tool is a session-level organizer. It does not replace the <strong>Data</strong> tab, and it does not replace the <strong>Acquisition Datacard Wizard</strong>. Instead, it helps you prepare the acquisition tree that the rest of the app will later scan and interpret.</p>
+<h2 id="what-this-tool-is-for">What this tool is for<a class="headerlink" href="#what-this-tool-is-for" title="Permanent link">&para;</a></h2>
+<p>Use <strong>Session Manager</strong> to:</p>
+<ul>
+<li>load one session root and inspect all managed acquisitions under it</li>
+<li>create a new acquisition folder at the end of the numbering sequence</li>
+<li>rename the label suffix of an existing acquisition folder</li>
+<li>delete an acquisition and close the numbering gap behind it</li>
+<li>normalize or reindex acquisition numbering from a chosen starting number</li>
+<li>open the selected acquisition directly in the main window</li>
+<li>open the datacard wizard for the selected acquisition</li>
+<li>copy one acquisition datacard and paste a normalized copy onto another acquisition</li>
+<li>toggle the acquisition-local eBUS enabled state when the eBUS tools plugin is also enabled</li>
+</ul>
+<h2 id="session-structure-expected-by-the-tool">Session structure expected by the tool<a class="headerlink" href="#session-structure-expected-by-the-tool" title="Permanent link">&para;</a></h2>
+<p>The Session Manager looks for a <strong>session root</strong> and then resolves the <strong>acquisitions root</strong> from <code>session_datacard.json</code>.</p>
+<p>Current behavior:</p>
+<ul>
+<li>if <code>session_datacard.json.paths.acquisitions_root_rel</code> is present and non-empty, that relative path is used</li>
+<li>otherwise the default acquisitions root is <code>session_root/acquisitions</code></li>
+</ul>
+<p>Only folders whose names match the acquisition naming contract are managed:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>acq-#### 
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>acq-####__label
+</code></pre></div>
+<p>Folders that do not match that pattern are ignored by the acquisition list.</p>
+<h2 id="main-workflow">Main workflow<a class="headerlink" href="#main-workflow" title="Permanent link">&para;</a></h2>
+<p>A reliable operating sequence is:</p>
+<ol>
+<li>Open <strong>Plugins -&gt; Open Session Manager...</strong></li>
+<li>Choose the session folder and click <strong>Load Session</strong></li>
+<li>Inspect numbering state, clipboard state, and acquisition list</li>
+<li>Perform any structural edits needed for the session</li>
+<li>Use <strong>Load Selected</strong> to push the chosen acquisition into the main window</li>
+<li>Continue in <strong>Data</strong>, <strong>Measure</strong>, and <strong>Analyze</strong> as usual</li>
+</ol>
+<h2 id="understanding-the-acquisition-table">Understanding the acquisition table<a class="headerlink" href="#understanding-the-acquisition-table" title="Permanent link">&para;</a></h2>
+<p>The table summarizes one row per managed acquisition.</p>
+<p>Current columns are:</p>
+<ul>
+<li><strong>Number</strong> — parsed acquisition number from the folder name</li>
+<li><strong>Name</strong> — label suffix, if present</li>
+<li><strong>Folder</strong> — acquisition folder name</li>
+<li><strong>Datacard</strong> — whether <code>acquisition_datacard.json</code> exists</li>
+<li><strong>eBUS Snapshot</strong> — whether one readable root-level <code>.pvcfg</code> snapshot is discoverable</li>
+<li><strong>eBUS</strong> — whether acquisition-local eBUS usage is enabled in the datacard</li>
+<li><strong>Frames</strong> — discovered frame count when the configured frames directory can be indexed</li>
+</ul>
+<p>Use the table as a session-preparation surface, not as a substitute for the main dataset table.</p>
+<h2 id="numbering-rules">Numbering rules<a class="headerlink" href="#numbering-rules" title="Permanent link">&para;</a></h2>
+<p>The Session Manager is intentionally conservative about structural edits.</p>
+<h3 id="valid-numbering">Valid numbering<a class="headerlink" href="#valid-numbering" title="Permanent link">&para;</a></h3>
+<p>A session is considered numbering-valid when the managed acquisitions are contiguous from the detected starting number.</p>
+<p>Example of valid numbering:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>acq-0011__one
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>acq-0012__two
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>acq-0013__three
+</code></pre></div>
+<h3 id="invalid-numbering">Invalid numbering<a class="headerlink" href="#invalid-numbering" title="Permanent link">&para;</a></h3>
+<p>A session becomes numbering-invalid when there is a gap or other non-contiguous sequence.</p>
+<p>Example:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>acq-0011__one
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>acq-0013__three
+</code></pre></div>
+<p>When numbering is invalid:</p>
+<ul>
+<li>the dialog warns that reindexing is needed</li>
+<li><strong>Add Acquisition</strong> is blocked</li>
+<li><strong>Delete Acquisition</strong> is blocked</li>
+<li><strong>Normalize/Reindex</strong> remains available so the sequence can be repaired</li>
+</ul>
+<p>This is intentional. The tool does not silently guess how structural edits should behave when the sequence is already inconsistent.</p>
+<h2 id="actions-and-what-they-actually-do">Actions and what they actually do<a class="headerlink" href="#actions-and-what-they-actually-do" title="Permanent link">&para;</a></h2>
+<h3 id="load-selected">Load Selected<a class="headerlink" href="#load-selected" title="Permanent link">&para;</a></h3>
+<p>Loads the selected acquisition into the main window by writing its path into the host dataset field and triggering a full dataset load.</p>
+<p>Use this when you want Session Manager to act as the acquisition chooser for the rest of the app.</p>
+<h3 id="add-acquisition">Add Acquisition<a class="headerlink" href="#add-acquisition" title="Permanent link">&para;</a></h3>
+<p>Creates a new acquisition folder at the end of the current contiguous sequence.</p>
+<p>Current behavior:</p>
+<ul>
+<li>the new folder is named from the detected or requested starting number and label</li>
+<li>standard child folders <code>frames</code>, <code>notes</code>, and <code>thumbs</code> are created</li>
+<li>no acquisition datacard is forced immediately</li>
+</ul>
+<h3 id="rename">Rename<a class="headerlink" href="#rename" title="Permanent link">&para;</a></h3>
+<p>Changes only the label suffix of the selected acquisition folder while preserving its acquisition number.</p>
+<p>If the acquisition already has a datacard, the datacard is normalized so that identity and path fields remain consistent with the new folder name.</p>
+<h3 id="delete-acquisition">Delete Acquisition<a class="headerlink" href="#delete-acquisition" title="Permanent link">&para;</a></h3>
+<p>Deletes the selected acquisition folder and then renumbers later acquisitions contiguously to close the gap.</p>
+<p>Use this cautiously. It is a structural edit, not only a metadata edit.</p>
+<h3 id="normalizereindex">Normalize/Reindex<a class="headerlink" href="#normalizereindex" title="Permanent link">&para;</a></h3>
+<p>Renumbers all managed acquisitions contiguously from the chosen starting number.</p>
+<p>This is the recovery operation for sessions whose numbering is not contiguous.</p>
+<h3 id="edit-datacard">Edit Datacard<a class="headerlink" href="#edit-datacard" title="Permanent link">&para;</a></h3>
+<p>Opens the <strong>Acquisition Datacard Wizard</strong> directly on the selected acquisition.</p>
+<p>This works because <strong>Session Manager</strong> depends on the datacard wizard plugin.</p>
+<h3 id="copy-datacard-paste-datacard">Copy Datacard / Paste Datacard<a class="headerlink" href="#copy-datacard-paste-datacard" title="Permanent link">&para;</a></h3>
+<p>Copies one acquisition datacard into an in-memory clipboard and pastes a normalized version onto another acquisition.</p>
+<p>Important current behavior:</p>
+<ul>
+<li>the pasted payload is normalized for the destination acquisition folder name</li>
+<li>acquisition identity and path fields are rewritten for the target</li>
+<li>acquisition-side eBUS attachment bookkeeping is stripped during paste</li>
+<li>app-side eBUS override values remain part of the copied payload when present</li>
+</ul>
+<p>Treat paste as a controlled reuse tool, not as a blind file copy.</p>
+<h3 id="toggle-ebus">Toggle eBUS<a class="headerlink" href="#toggle-ebus" title="Permanent link">&para;</a></h3>
+<p>Toggles <code>external_sources.ebus.enabled</code> for the selected acquisition.</p>
+<p>This action is available only when the <strong>eBUS Config Tools</strong> plugin is also enabled.</p>
+<p>Use it when the acquisition should explicitly opt in or out of using the discoverable root-level eBUS snapshot as part of effective metadata resolution.</p>
+<h2 id="relationship-to-the-rest-of-the-app">Relationship to the rest of the app<a class="headerlink" href="#relationship-to-the-rest-of-the-app" title="Permanent link">&para;</a></h2>
+<p>Use <strong>Session Manager</strong> for session structure and acquisition selection.</p>
+<p>Use <strong>Data</strong> for:</p>
+<ul>
+<li>TIFF discovery</li>
+<li>skip rules</li>
+<li>metadata source choice</li>
+<li>row-level table verification</li>
+</ul>
+<p>Use <strong>Acquisition Datacard Wizard</strong> for:</p>
+<ul>
+<li>editing canonical acquisition metadata</li>
+<li>frame-targeted overrides</li>
+<li>approved app-side overrides of eBUS-managed canonical fields</li>
+</ul>
+<p>Use <strong>eBUS Config Tools</strong> for:</p>
+<ul>
+<li>raw snapshot inspection</li>
+<li>raw versus effective compare</li>
+<li>deciding whether a canonical override is justified</li>
+</ul>
+<h2 id="common-situations">Common situations<a class="headerlink" href="#common-situations" title="Permanent link">&para;</a></h2>
+<h3 id="i-need-a-new-acquisition-folder-before-i-can-load-data">I need a new acquisition folder before I can load data<a class="headerlink" href="#i-need-a-new-acquisition-folder-before-i-can-load-data" title="Permanent link">&para;</a></h3>
+<p>Use <strong>Add Acquisition</strong>, then <strong>Load Selected</strong>.</p>
+<h3 id="i-copied-the-wrong-acquisition-metadata-to-the-new-run">I copied the wrong acquisition metadata to the new run<a class="headerlink" href="#i-copied-the-wrong-acquisition-metadata-to-the-new-run" title="Permanent link">&para;</a></h3>
+<p>Select the destination acquisition and use <strong>Paste Datacard</strong> with the correct clipboard payload. The tool will normalize acquisition identity and path fields for the destination.</p>
+<h3 id="session-numbering-is-invalid-and-edits-are-blocked">Session numbering is invalid and edits are blocked<a class="headerlink" href="#session-numbering-is-invalid-and-edits-are-blocked" title="Permanent link">&para;</a></h3>
+<p>Use <strong>Normalize/Reindex</strong> first. Structural edits are intentionally blocked until numbering becomes contiguous again.</p>
+<h3 id="the-selected-acquisition-should-stop-using-its-ebus-snapshot">The selected acquisition should stop using its eBUS snapshot<a class="headerlink" href="#the-selected-acquisition-should-stop-using-its-ebus-snapshot" title="Permanent link">&para;</a></h3>
+<p>Use <strong>Toggle eBUS</strong>. This changes the acquisition-local enabled state in the datacard rather than editing the raw <code>.pvcfg</code> file.</p>
+<h2 id="troubleshooting-cues">Troubleshooting cues<a class="headerlink" href="#troubleshooting-cues" title="Permanent link">&para;</a></h2>
+<h3 id="add-or-delete-is-disabled">Add or delete is disabled<a class="headerlink" href="#add-or-delete-is-disabled" title="Permanent link">&para;</a></h3>
+<p>The most common reason is that session numbering is not contiguous. Reindex first.</p>
+<h3 id="copy-works-but-paste-is-disabled">Copy works but paste is disabled<a class="headerlink" href="#copy-works-but-paste-is-disabled" title="Permanent link">&para;</a></h3>
+<p>The datacard clipboard is empty. Copy a source acquisition datacard first.</p>
+<h3 id="toggle-ebus-is-disabled">Toggle eBUS is disabled<a class="headerlink" href="#toggle-ebus-is-disabled" title="Permanent link">&para;</a></h3>
+<p>The selected acquisition may be missing, or the <strong>eBUS Config Tools</strong> plugin was not enabled at startup.</p>
+<h3 id="load-selected-did-not-change-the-dataset">Load Selected did not change the dataset<a class="headerlink" href="#load-selected-did-not-change-the-dataset" title="Permanent link">&para;</a></h3>
+<p>Verify that the session row is selected and that the main window still exists behind the dialog.</p>
+<h2 id="related-pages">Related pages<a class="headerlink" href="#related-pages" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="../data-workflow.html">Data Workflow</a></li>
+<li><a href="datacard-wizard.html">Datacard Wizard</a></li>
+<li><a href="ebus-config-tools.html">eBUS Config Tools</a></li>
+<li><a href="../../reference/config-files.html">Reference: Config Files</a></li>
+</ul>
+<figure class="placeholder-figure">
+  <img src="../../assets/images/placeholders/screenshot-placeholder-16x9.svg" alt="Placeholder screenshot for the Session Manager dialog">
+  <figcaption>
+    Placeholder — Add screenshot: Session Manager dialog with a loaded session and several acquisitions listed. Target:
+    <code>docs/assets/images/user-guide/data/session-manager-overview.png</code>.
+    Theme: dark. Type: screenshot. State: session loaded, one row selected, summary strip visible.
+  </figcaption>
+</figure>
+
+<figure class="placeholder-figure">
+  <img src="../../assets/images/placeholders/screenshot-placeholder-16x9.svg" alt="Placeholder screenshot for a numbering warning in Session Manager">
+  <figcaption>
+    Placeholder — Add screenshot: Session Manager showing non-contiguous numbering and the Normalize/Reindex workflow. Target:
+    <code>docs/assets/images/user-guide/data/session-manager-reindex-warning.png</code>.
+    Theme: dark. Type: screenshot. State: numbering invalid warning visible, reindex controls emphasized.
+  </figcaption>
+</figure>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../data-workflow.html" class="md-footer__link md-footer__link--prev" aria-label="Previous: Overview">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Overview
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="datacard-wizard.html" class="md-footer__link md-footer__link--next" aria-label="Next: Datacard Wizard">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Datacard Wizard
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.indexes", "navigation.top", "navigation.footer", "content.code.copy", "content.tabs.link", "search.highlight", "search.share", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../assets/javascripts/mathjax-config.js"></script>
+      
+        <script src="../../assets/vendor/mathjax/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

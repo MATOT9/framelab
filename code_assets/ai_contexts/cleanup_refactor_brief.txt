@@ -1,0 +1,99 @@
+Work in `/home/maxime/Desktop/tiff-viewer`.
+
+Hard rule:
+- Never inspect, use, or consider the `archived` folder unless I explicitly ask.
+
+Goal:
+- Do a high-value cleanup/refactor pass on the target module(s)/area(s).
+- Focus on maintainability, removal of duplication, removal of dead-end/leftover code, simplification of bloated modules/classes, and small optimizations that clearly improve both code quality and performance.
+- Do not chase perfection or split files for no reason. Use common sense. Create folders/packages when it improves structure and avoids bloating the top-level package.
+- Preserve useful extension hooks and plugin architecture. Remove leftovers, not future-facing hooks.
+
+Important constraints:
+- Keep behavior unchanged unless I explicitly ask for behavior changes.
+- Respect packaging/bundling concerns: avoid adding unnecessary third-party dependencies.
+- Prefer fewer, cleaner modules over many tiny files.
+- PEP 8 everywhere.
+- Use NumPy-style docstrings where applicable.
+- Keep imports minimal and dependency boundaries clean.
+- If something is duplicated in multiple places, centralize it only if the shared abstraction is genuinely reusable and not business-logic overreach.
+
+What “do the same” means in this repo:
+1. Identify the obvious high-value cleanup candidates first.
+2. Consolidate low-level shared helpers that are duplicated across modules.
+3. Split monolithic modules/classes by coherent responsibility.
+4. Group related modules in subpackages when that improves maintainability.
+5. Remove dead code, stale bridges, obsolete compatibility layers, and duplicate constants/mappings.
+6. Keep plugin discovery/registration working after refactors.
+7. Verify with compile/import checks after each meaningful restructuring step.
+8. Stop when there are no more obvious high-value cleanups in that specific area.
+
+Patterns already applied successfully in this repo:
+- Shared payload/JSON/dot-path helpers were centralized in:
+  - `framelab/payload_utils.py`
+- Shared datacard path / selector / override normalization logic was centralized in:
+  - `framelab/acquisition_datacard.py`
+- Shared frame discovery/indexing logic was centralized in:
+  - `framelab/frame_indexing.py`
+- The old `framelab/analyses` area was migrated into the plugin tree and removed.
+- Main-window code was split out of `framelab/window.py` into:
+  - `framelab/main_window/chrome.py`
+  - `framelab/main_window/data_page.py`
+  - `framelab/main_window/inspect_page.py`
+  - `framelab/main_window/analysis.py`
+  - `framelab/main_window/dataset_loading.py`
+  - `framelab/main_window/metrics_runtime.py`
+  - `framelab/main_window/window_actions.py`
+- `framelab/window.py` is now meant to stay as the shell/orchestrator, constants, and shared state holder.
+- The `iris_gain` analysis plugin was converted from one big module into a package:
+  - `framelab/plugins/analysis/iris_gain/`
+  - `plugin.py`
+  - `_shared.py`
+  - `_ui.py`
+  - `_plotting.py`
+  - `_analysis.py`
+- Plugin packaging as a package is acceptable as long as discovery still works.
+- Plugin discovery currently works with package-based plugins via `pkgutil`.
+
+Current architectural preferences for future refactors:
+- If a large module represents one coherent page or feature, keep it intact unless there is still clear internal cross-cutting bloat.
+- If a module mixes unrelated responsibilities, split it by responsibility.
+- For plugins, package-per-plugin is acceptable and preferred once the plugin becomes large enough.
+- Use internal helper modules with leading underscore inside plugin packages for non-entrypoint code.
+- Keep the public/plugin entrypoint shallow and obvious.
+
+Cleanup principles to apply:
+- Remove duplicate constants if there is already a JSON/config-backed source of truth.
+- Remove dead state/unused widgets/unused parameters when they are clearly leftovers.
+- Tighten typing when there is a more specific local type available.
+- Avoid stale bridge modules once the real code has been relocated.
+- Avoid eager heavyweight imports at package import time when lazy boundaries are better.
+
+Repo-specific functional constraints already established:
+- Local config should live in the app folder (`config/`), not user home config dirs, because the app should be shareable.
+- Mapping-driven metadata/label/tooltip configuration should come from JSON where appropriate.
+- If a JSON mapping entry has an empty or missing tooltip, no tooltip should be shown.
+- Only group labels should use bold styling across the app.
+- Tooltip styling should be consistent app-wide.
+- Platform-specific styling fixes should prefer explicit widget styling over inherited native theme behavior.
+
+When refactoring, preserve these existing outcomes:
+- Main window remains modularized under `framelab/main_window`.
+- Analysis plugins live under `framelab/plugins/analysis`.
+- The `iris_gain` plugin remains a package, not a single monolithic file.
+- Shared utilities remain centralized instead of being re-copied into feature modules.
+
+Verification expectations:
+- Run `python3 -m py_compile` on touched modules.
+- If possible, run lightweight import/discovery checks using the project environment.
+- Report clearly if runtime checks are blocked by missing dependencies in the current shell.
+- Mention any warnings separately from actual failures.
+
+Output expectations:
+- Give a concise summary of what was changed.
+- Mention the main files/packages created, removed, or repurposed.
+- State what duplication/dead code was removed.
+- State what was intentionally left alone and why.
+- Call out any remaining high-value cleanup candidates only if they are still obvious.
+
+Apply this process to: [replace with target modules/area].

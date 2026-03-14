@@ -1,0 +1,44 @@
+# Figure parameters
+# figure.figsize:     10, 5    # figure size in inches
+# figure.subplot.left:   0.15     # the left side of the subplots of the figure
+# figure.subplot.bottom: 0.15     # the bottom of the subplots of the figure
+# figure.figsize: 5, 5
+# figure.autolayout: True
+
+# Ticks parameters
+xtick.minor.visible : True
+xtick.direction : in
+xtick.major.size : 10
+xtick.major.width : 1
+xtick.minor.size : 5
+xtick.minor.width : 0.5
+xtick.labelsize : large
+ytick.minor.visible : True
+ytick.major.size : 10
+ytick.major.width : 1
+ytick.minor.size: 5
+ytick.minor.width: 0.5
+ytick.direction : in
+ytick.labelsize : large
+
+# Lines parameters
+lines.linewidth : 1.5
+
+# Le texte pour les axes est trop petit par défaut: on l'augmente
+# et on ajoute un peu de padding pour qu'il ne soit pas par-dessus le texte
+# des valeurs numériques
+axes.labelsize : x-large
+axes.labelpad : 10
+axes.labelweight : bold
+
+# Errorbars parameters
+errorbar.capsize : 2
+
+# Legend parameters
+legend.edgecolor : 0
+legend.loc : best
+
+# Savefig parameters
+savefig.dpi : 1000
+savefig.format : pdf
+savefig.bbox : tight
