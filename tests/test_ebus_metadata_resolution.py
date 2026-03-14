@@ -5,8 +5,9 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
-import tempfile
-import unittest
+from collections.abc import Callable, Iterator
+
+import pytest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -26,6 +27,10 @@ if qtw is not None:
     )
 else:
     AcquisitionDatacardWizardDialog = None
+
+
+pytestmark = [pytest.mark.data, pytest.mark.core]
+_WIZARD_AVAILABLE = qtw is not None and AcquisitionDatacardWizardDialog is not None
 
 
 def _write_json(path: Path, payload: dict) -> None:
@@ -202,547 +207,601 @@ def _make_acquisition(
     return frame_paths
 
 
-class EbusMetadataResolutionTests(unittest.TestCase):
-    def setUp(self) -> None:
-        clear_metadata_cache()
-        self._tmpdir = tempfile.TemporaryDirectory()
-        self.addCleanup(self._tmpdir.cleanup)
-        self.root = Path(self._tmpdir.name) / "acquisition"
-        self.root.mkdir(parents=True, exist_ok=True)
-
-    def tearDown(self) -> None:
+@pytest.fixture(autouse=True)
+def metadata_cache_guard() -> Iterator[None]:
+    clear_metadata_cache()
+    try:
+        yield
+    finally:
         clear_metadata_cache()
 
-    def test_defaults_only_without_snapshot(self) -> None:
-        frames = _make_acquisition(
-            self.root,
-            defaults={
-                "camera_settings": {"exposure_us": 900},
-                "instrument": {},
-                "acquisition_settings": {},
-            },
-        )
-        payload = _base_datacard(
-            defaults={
-                "camera_settings": {"exposure_us": 900},
-                "instrument": {},
-                "acquisition_settings": {},
-            },
-        )
 
-        resolutions = resolve_ebus_canonical_fields(self.root, payload)
-        exposure = resolutions.by_key()["camera_settings.exposure_us"]
-        self.assertFalse(exposure.snapshot_present)
-
-        metadata = extract_path_metadata(str(frames[0]), metadata_source="json")
-        self.assertEqual(metadata.get("exposure_source"), "acquisition_default")
-        self.assertAlmostEqual(float(metadata["exposure_ms"]), 0.9)
-
-    def test_snapshot_baseline_overrides_legacy_default(self) -> None:
-        frames = _make_acquisition(
-            self.root,
-            defaults={
-                "camera_settings": {"exposure_us": 900},
-                "instrument": {},
-                "acquisition_settings": {},
-            },
-            snapshot_parameters={"Exposure": 500},
-        )
-        payload = _base_datacard(
-            defaults={
-                "camera_settings": {"exposure_us": 900},
-                "instrument": {},
-                "acquisition_settings": {},
-            },
-        )
-
-        resolutions = resolve_ebus_canonical_fields(self.root, payload)
-        exposure = resolutions.by_key()["camera_settings.exposure_us"]
-        self.assertTrue(exposure.snapshot_present)
-        self.assertEqual(exposure.snapshot_value, 500)
-        self.assertEqual(exposure.effective_value, 500)
-        self.assertEqual(exposure.provenance, "ebus_snapshot")
-
-        metadata = extract_path_metadata(str(frames[0]), metadata_source="json")
-        self.assertEqual(metadata.get("exposure_source"), "ebus_snapshot")
-        self.assertAlmostEqual(float(metadata["exposure_ms"]), 0.5)
-
-    def test_snapshot_missing_key_falls_back_to_default(self) -> None:
-        frames = _make_acquisition(
-            self.root,
-            defaults={
-                "camera_settings": {"exposure_us": 900},
-                "instrument": {},
-                "acquisition_settings": {},
-            },
-            snapshot_parameters={"Iris": 3},
-        )
-        payload = _base_datacard(
-            defaults={
-                "camera_settings": {"exposure_us": 900},
-                "instrument": {},
-                "acquisition_settings": {},
-            },
-        )
-
-        resolutions = resolve_ebus_canonical_fields(self.root, payload)
-        exposure = resolutions.by_key()["camera_settings.exposure_us"]
-        self.assertFalse(exposure.snapshot_present)
-
-        metadata = extract_path_metadata(str(frames[0]), metadata_source="json")
-        self.assertEqual(metadata.get("exposure_source"), "acquisition_default")
-        self.assertAlmostEqual(float(metadata["exposure_ms"]), 0.9)
-
-    def test_snapshot_coercion_failure_falls_back_to_default(self) -> None:
-        frames = _make_acquisition(
-            self.root,
-            defaults={
-                "camera_settings": {"exposure_us": 900},
-                "instrument": {},
-                "acquisition_settings": {},
-            },
-            snapshot_parameters={"Exposure": "not_an_int"},
-        )
-        payload = _base_datacard(
-            defaults={
-                "camera_settings": {"exposure_us": 900},
-                "instrument": {},
-                "acquisition_settings": {},
-            },
-        )
-
-        resolutions = resolve_ebus_canonical_fields(self.root, payload)
-        exposure = resolutions.by_key()["camera_settings.exposure_us"]
-        self.assertFalse(exposure.snapshot_present)
-
-        metadata = extract_path_metadata(str(frames[0]), metadata_source="json")
-        self.assertEqual(metadata.get("exposure_source"), "acquisition_default")
-        self.assertAlmostEqual(float(metadata["exposure_ms"]), 0.9)
-
-    def test_acquisition_wide_ebus_override_beats_snapshot(self) -> None:
-        frames = _make_acquisition(
-            self.root,
-            snapshot_parameters={"Iris": 2},
-            external_sources={
-                "ebus": {
-                    "overrides": {"device.Iris": 5},
-                },
-            },
-        )
-        payload = _base_datacard(
-            external_sources={
-                "ebus": {
-                    "overrides": {"device.Iris": 5},
-                },
-            },
-        )
-
-        resolutions = resolve_ebus_canonical_fields(self.root, payload)
-        iris = resolutions.by_key()["instrument.optics.iris.position"]
-        self.assertTrue(iris.snapshot_present)
-        self.assertEqual(iris.snapshot_value, 2)
-        self.assertEqual(iris.effective_value, 5)
-        self.assertEqual(iris.provenance, "ebus_override")
-
-        metadata = extract_path_metadata(str(frames[0]), metadata_source="json")
-        self.assertEqual(metadata.get("iris_source"), "ebus_override")
-        self.assertEqual(metadata.get("iris_position"), 5.0)
-
-    def test_overridable_acquisition_default_beats_snapshot_value(self) -> None:
-        frames = _make_acquisition(
-            self.root,
-            defaults={
-                "camera_settings": {},
-                "instrument": {
-                    "optics": {"iris": {"position": 4}},
-                },
-                "acquisition_settings": {},
-            },
-            snapshot_parameters={"Iris": 0},
-        )
-        payload = _base_datacard(
-            defaults={
-                "camera_settings": {},
-                "instrument": {
-                    "optics": {"iris": {"position": 4}},
-                },
-                "acquisition_settings": {},
-            },
-        )
-
-        resolutions = resolve_ebus_canonical_fields(self.root, payload)
-        iris = resolutions.by_key()["instrument.optics.iris.position"]
-        self.assertTrue(iris.snapshot_present)
-        self.assertEqual(iris.snapshot_value, 0)
-        self.assertEqual(iris.effective_value, 4)
-        self.assertEqual(iris.provenance, "acquisition_default")
-
-        metadata = extract_path_metadata(str(frames[0]), metadata_source="json")
-        self.assertEqual(metadata.get("iris_source"), "acquisition_default")
-        self.assertEqual(metadata.get("iris_position"), 4.0)
-
-    def test_frame_override_beats_snapshot(self) -> None:
-        frames = _make_acquisition(
-            self.root,
-            snapshot_parameters={"Exposure": 500},
-            overrides=[
-                {
-                    "selector": {"frame_range": [0, 0]},
-                    "changes": {"camera_settings": {"exposure_us": 2000}},
-                    "reason": "frame override",
-                },
-            ],
-        )
-
-        metadata = extract_path_metadata(str(frames[0]), metadata_source="json")
-        self.assertEqual(metadata.get("exposure_source"), "frame_override")
-        self.assertAlmostEqual(float(metadata["exposure_ms"]), 2.0)
-
-        metadata_other = extract_path_metadata(str(frames[1]), metadata_source="json")
-        self.assertEqual(metadata_other.get("exposure_source"), "ebus_snapshot")
-        self.assertAlmostEqual(float(metadata_other["exposure_ms"]), 0.5)
-
-    def test_frame_override_beats_acquisition_wide_ebus_override(self) -> None:
-        frames = _make_acquisition(
-            self.root,
-            snapshot_parameters={"Iris": 2},
-            external_sources={
-                "ebus": {
-                    "overrides": {"device.Iris": 5},
-                },
-            },
-            overrides=[
-                {
-                    "selector": {"frame_range": [0, 0]},
-                    "changes": {
-                        "instrument": {
-                            "optics": {"iris": {"position": 7}},
-                        },
-                    },
-                    "reason": "frame override",
-                },
-            ],
-        )
-
-        metadata = extract_path_metadata(str(frames[0]), metadata_source="json")
-        self.assertEqual(metadata.get("iris_source"), "frame_override")
-        self.assertEqual(metadata.get("iris_position"), 7.0)
-
-        metadata_other = extract_path_metadata(str(frames[1]), metadata_source="json")
-        self.assertEqual(metadata_other.get("iris_source"), "ebus_override")
-        self.assertEqual(metadata_other.get("iris_position"), 5.0)
-
-    def test_normalize_override_selectors_detects_zero_and_one_based_ranges(self) -> None:
-        zero_based, zero_base = normalize_override_selectors(
-            [{"selector": {"frame_range": [0, 1]}}],
-            [0, 1],
-        )
-        one_based, one_base = normalize_override_selectors(
-            [{"selector": {"frame_range": [1, 2]}}],
-            [0, 1],
-        )
-
-        self.assertEqual(zero_base, 0)
-        self.assertEqual(
-            zero_based[0]["selector"]["frame_range"],
-            [0, 1],
-        )
-        self.assertEqual(one_base, 1)
-        self.assertEqual(
-            one_based[0]["selector"]["frame_range"],
-            [0, 1],
-        )
-
-    def test_ambiguous_snapshot_discovery_falls_back_to_datacard(self) -> None:
-        frames = _make_acquisition(
-            self.root,
-            defaults={
-                "camera_settings": {"exposure_us": 900},
-                "instrument": {},
-                "acquisition_settings": {},
-            },
-            snapshot_parameters={"Exposure": 500},
-            extra_snapshot=True,
-        )
-        payload = _base_datacard(
-            defaults={
-                "camera_settings": {"exposure_us": 900},
-                "instrument": {},
-                "acquisition_settings": {},
-            },
-        )
-
-        resolutions = resolve_ebus_canonical_fields(self.root, payload)
-        self.assertFalse(resolutions.snapshot_loaded)
-        self.assertFalse(
-            resolutions.by_key()["camera_settings.exposure_us"].snapshot_present,
-        )
-
-        metadata = extract_path_metadata(str(frames[0]), metadata_source="json")
-        self.assertEqual(metadata.get("exposure_source"), "acquisition_default")
-        self.assertAlmostEqual(float(metadata["exposure_ms"]), 0.9)
-
-    def test_session_default_applies_when_acquisition_omits_field(self) -> None:
-        campaign_root = self.root / "campaign"
-        session_root = campaign_root / "01_sessions" / "2026-03-05__sess01"
-        acquisition_root = session_root / "acquisitions" / "acq-0011__session_default"
-        acquisition_root.mkdir(parents=True, exist_ok=True)
-        _write_campaign_datacard(campaign_root)
-        _write_session_datacard(
-            session_root,
-            session_defaults={
-                "instrument": {
-                    "optics": {
-                        "iris": {"position": 4},
-                    },
-                },
-            },
-        )
-        frames = _make_acquisition(
-            acquisition_root,
-            defaults={
-                "camera_settings": {},
-                "instrument": {},
-                "acquisition_settings": {},
-            },
-        )
-
-        metadata = extract_path_metadata(str(frames[0]), metadata_source="json")
-        self.assertTrue(bool(metadata.get("json_metadata_available")))
-        self.assertEqual(metadata.get("iris_source"), "session_default")
-        self.assertEqual(metadata.get("iris_position"), 4.0)
-
-    def test_campaign_default_applies_when_higher_layers_are_missing(self) -> None:
-        campaign_root = self.root / "campaign"
-        session_root = campaign_root / "01_sessions" / "2026-03-05__sess01"
-        acquisition_root = session_root / "acquisitions" / "acq-0011__campaign_default"
-        acquisition_root.mkdir(parents=True, exist_ok=True)
-        _write_campaign_datacard(
-            campaign_root,
-            campaign_defaults={
-                "camera_settings": {"exposure_us": 1500},
-            },
-        )
-        _write_session_datacard(session_root)
-        frames = _make_acquisition(
-            acquisition_root,
-            defaults={
-                "camera_settings": {},
-                "instrument": {},
-                "acquisition_settings": {},
-            },
-        )
-
-        metadata = extract_path_metadata(str(frames[0]), metadata_source="json")
-        self.assertEqual(metadata.get("exposure_source"), "campaign_default")
-        self.assertAlmostEqual(float(metadata["exposure_ms"]), 1.5)
-
-    def test_acquisition_default_beats_session_and_campaign_defaults(self) -> None:
-        campaign_root = self.root / "campaign"
-        session_root = campaign_root / "01_sessions" / "2026-03-05__sess01"
-        acquisition_root = session_root / "acquisitions" / "acq-0011__acquisition_default"
-        acquisition_root.mkdir(parents=True, exist_ok=True)
-        _write_campaign_datacard(
-            campaign_root,
-            campaign_defaults={
-                "camera_settings": {"exposure_us": 1500},
-            },
-        )
-        _write_session_datacard(
-            session_root,
-            session_defaults={
-                "camera_settings": {"exposure_us": 2000},
-            },
-        )
-        frames = _make_acquisition(
-            acquisition_root,
-            defaults={
-                "camera_settings": {"exposure_us": 2500},
-                "instrument": {},
-                "acquisition_settings": {},
-            },
-        )
-
-        metadata = extract_path_metadata(str(frames[0]), metadata_source="json")
-        self.assertEqual(metadata.get("exposure_source"), "acquisition_default")
-        self.assertAlmostEqual(float(metadata["exposure_ms"]), 2.5)
-
-    def test_ebus_disabled_falls_back_to_json_defaults(self) -> None:
-        frames = _make_acquisition(
-            self.root,
-            defaults={
-                "camera_settings": {"exposure_us": 900},
-                "instrument": {
-                    "optics": {"iris": {"position": 3}},
-                },
-                "acquisition_settings": {},
-            },
-            external_sources={
-                "ebus": {
-                    "enabled": False,
-                    "overrides": {"device.Iris": 5},
-                },
-            },
-            snapshot_parameters={"Exposure": 500, "Iris": 2},
-        )
-        payload = _base_datacard(
-            defaults={
-                "camera_settings": {"exposure_us": 900},
-                "instrument": {
-                    "optics": {"iris": {"position": 3}},
-                },
-                "acquisition_settings": {},
-            },
-            external_sources={
-                "ebus": {
-                    "enabled": False,
-                    "overrides": {"device.Iris": 5},
-                },
-            },
-        )
-
-        resolutions = resolve_ebus_canonical_fields(self.root, payload)
-        self.assertFalse(resolutions.snapshot_loaded)
-        metadata = extract_path_metadata(str(frames[0]), metadata_source="json")
-        self.assertEqual(metadata.get("exposure_source"), "acquisition_default")
-        self.assertAlmostEqual(float(metadata["exposure_ms"]), 0.9)
-        self.assertEqual(metadata.get("iris_source"), "acquisition_default")
-        self.assertEqual(metadata.get("iris_position"), 3.0)
+@pytest.fixture
+def acquisition_root(tmp_path: Path) -> Path:
+    root = tmp_path / "acquisition"
+    root.mkdir(parents=True, exist_ok=True)
+    return root
 
 
-@unittest.skipUnless(
-    qtw is not None and AcquisitionDatacardWizardDialog is not None,
-    "PySide6 is not available in this environment.",
-)
-class WizardSerializationTests(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls) -> None:
-        cls._app = qtw.QApplication.instance() or qtw.QApplication([])
+@pytest.fixture
+def dialog_factory(
+    qapp,
+    acquisition_root: Path,
+) -> Iterator[Callable[[], object]]:
+    dialogs: list[object] = []
 
-    def setUp(self) -> None:
-        clear_metadata_cache()
-        self._tmpdir = tempfile.TemporaryDirectory()
-        self.addCleanup(self._tmpdir.cleanup)
-        self.root = Path(self._tmpdir.name) / "acquisition"
-        self.root.mkdir(parents=True, exist_ok=True)
-
-    def tearDown(self) -> None:
-        clear_metadata_cache()
-
-    def _build_dialog(self) -> AcquisitionDatacardWizardDialog:
-        dialog = AcquisitionDatacardWizardDialog(None, str(self.root))
-        self.addCleanup(dialog.close)
-        self.addCleanup(dialog.deleteLater)
+    def _build_dialog():
+        dialog = AcquisitionDatacardWizardDialog(None, str(acquisition_root))
+        dialogs.append(dialog)
         return dialog
 
-    def test_non_overridable_snapshot_field_stays_out_of_defaults(self) -> None:
-        _make_acquisition(
-            self.root,
-            snapshot_parameters={"Exposure": 500},
-        )
-        dialog = self._build_dialog()
+    yield _build_dialog
 
-        editor = dialog._defaults_editors["camera_settings.exposure_us"]
-        self.assertFalse(editor.isEnabled())
+    for dialog in reversed(dialogs):
+        try:
+            dialog.close()
+        except Exception:
+            pass
+        try:
+            dialog.deleteLater()
+        except Exception:
+            pass
+    qapp.processEvents()
 
-        model = dialog._build_model_from_ui()
-        self.assertIsNotNone(model)
-        assert model is not None
-        self.assertIsNone(get_dot_path(model.defaults, "camera_settings.exposure_us"))
-        self.assertNotIn("ebus", model.external_sources)
 
-    def test_overridable_snapshot_field_persists_to_canonical_defaults(self) -> None:
-        _make_acquisition(
-            self.root,
-            snapshot_parameters={"Iris": 2},
-        )
-        dialog = self._build_dialog()
+def test_defaults_only_without_snapshot(acquisition_root: Path) -> None:
+    frames = _make_acquisition(
+        acquisition_root,
+        defaults={
+            "camera_settings": {"exposure_us": 900},
+            "instrument": {},
+            "acquisition_settings": {},
+        },
+    )
+    payload = _base_datacard(
+        defaults={
+            "camera_settings": {"exposure_us": 900},
+            "instrument": {},
+            "acquisition_settings": {},
+        },
+    )
 
-        key = "instrument.optics.iris.position"
-        spec = dialog._spec_for_key(key)
-        self.assertIsNotNone(spec)
-        assert spec is not None
-        editor = dialog._defaults_editors[key]
-        self.assertTrue(editor.isEnabled())
-        dialog._set_editor_value(editor, spec, 5)
+    resolutions = resolve_ebus_canonical_fields(acquisition_root, payload)
+    exposure = resolutions.by_key()["camera_settings.exposure_us"]
+    assert not exposure.snapshot_present
 
-        model = dialog._build_model_from_ui()
-        self.assertIsNotNone(model)
-        assert model is not None
-        self.assertEqual(
-            get_dot_path(model.defaults, key),
-            5,
-        )
-        self.assertFalse(
-            isinstance(model.external_sources.get("ebus"), dict)
-            and bool(model.external_sources["ebus"].get("overrides")),
-        )
+    metadata = extract_path_metadata(str(frames[0]), metadata_source="json")
+    assert metadata.get("exposure_source") == "acquisition_default"
+    assert float(metadata["exposure_ms"]) == pytest.approx(0.9)
 
-    def test_existing_overridable_default_beats_snapshot_in_editor_and_preview(self) -> None:
-        _make_acquisition(
-            self.root,
-            snapshot_parameters={"Iris": 0},
-            defaults={
-                "instrument": {
-                    "optics": {
-                        "iris": {
-                            "position": 1,
-                        },
+
+def test_snapshot_baseline_overrides_legacy_default(acquisition_root: Path) -> None:
+    frames = _make_acquisition(
+        acquisition_root,
+        defaults={
+            "camera_settings": {"exposure_us": 900},
+            "instrument": {},
+            "acquisition_settings": {},
+        },
+        snapshot_parameters={"Exposure": 500},
+    )
+    payload = _base_datacard(
+        defaults={
+            "camera_settings": {"exposure_us": 900},
+            "instrument": {},
+            "acquisition_settings": {},
+        },
+    )
+
+    resolutions = resolve_ebus_canonical_fields(acquisition_root, payload)
+    exposure = resolutions.by_key()["camera_settings.exposure_us"]
+    assert exposure.snapshot_present
+    assert exposure.snapshot_value == 500
+    assert exposure.effective_value == 500
+    assert exposure.provenance == "ebus_snapshot"
+
+    metadata = extract_path_metadata(str(frames[0]), metadata_source="json")
+    assert metadata.get("exposure_source") == "ebus_snapshot"
+    assert float(metadata["exposure_ms"]) == pytest.approx(0.5)
+
+
+def test_snapshot_missing_key_falls_back_to_default(acquisition_root: Path) -> None:
+    frames = _make_acquisition(
+        acquisition_root,
+        defaults={
+            "camera_settings": {"exposure_us": 900},
+            "instrument": {},
+            "acquisition_settings": {},
+        },
+        snapshot_parameters={"Iris": 3},
+    )
+    payload = _base_datacard(
+        defaults={
+            "camera_settings": {"exposure_us": 900},
+            "instrument": {},
+            "acquisition_settings": {},
+        },
+    )
+
+    resolutions = resolve_ebus_canonical_fields(acquisition_root, payload)
+    exposure = resolutions.by_key()["camera_settings.exposure_us"]
+    assert not exposure.snapshot_present
+
+    metadata = extract_path_metadata(str(frames[0]), metadata_source="json")
+    assert metadata.get("exposure_source") == "acquisition_default"
+    assert float(metadata["exposure_ms"]) == pytest.approx(0.9)
+
+
+def test_snapshot_coercion_failure_falls_back_to_default(
+    acquisition_root: Path,
+) -> None:
+    frames = _make_acquisition(
+        acquisition_root,
+        defaults={
+            "camera_settings": {"exposure_us": 900},
+            "instrument": {},
+            "acquisition_settings": {},
+        },
+        snapshot_parameters={"Exposure": "not_an_int"},
+    )
+    payload = _base_datacard(
+        defaults={
+            "camera_settings": {"exposure_us": 900},
+            "instrument": {},
+            "acquisition_settings": {},
+        },
+    )
+
+    resolutions = resolve_ebus_canonical_fields(acquisition_root, payload)
+    exposure = resolutions.by_key()["camera_settings.exposure_us"]
+    assert not exposure.snapshot_present
+
+    metadata = extract_path_metadata(str(frames[0]), metadata_source="json")
+    assert metadata.get("exposure_source") == "acquisition_default"
+    assert float(metadata["exposure_ms"]) == pytest.approx(0.9)
+
+
+def test_acquisition_wide_ebus_override_beats_snapshot(acquisition_root: Path) -> None:
+    frames = _make_acquisition(
+        acquisition_root,
+        snapshot_parameters={"Iris": 2},
+        external_sources={
+            "ebus": {
+                "overrides": {"device.Iris": 5},
+            },
+        },
+    )
+    payload = _base_datacard(
+        external_sources={
+            "ebus": {
+                "overrides": {"device.Iris": 5},
+            },
+        },
+    )
+
+    resolutions = resolve_ebus_canonical_fields(acquisition_root, payload)
+    iris = resolutions.by_key()["instrument.optics.iris.position"]
+    assert iris.snapshot_present
+    assert iris.snapshot_value == 2
+    assert iris.effective_value == 5
+    assert iris.provenance == "ebus_override"
+
+    metadata = extract_path_metadata(str(frames[0]), metadata_source="json")
+    assert metadata.get("iris_source") == "ebus_override"
+    assert metadata.get("iris_position") == 5.0
+
+
+def test_overridable_acquisition_default_beats_snapshot_value(
+    acquisition_root: Path,
+) -> None:
+    frames = _make_acquisition(
+        acquisition_root,
+        defaults={
+            "camera_settings": {},
+            "instrument": {
+                "optics": {"iris": {"position": 4}},
+            },
+            "acquisition_settings": {},
+        },
+        snapshot_parameters={"Iris": 0},
+    )
+    payload = _base_datacard(
+        defaults={
+            "camera_settings": {},
+            "instrument": {
+                "optics": {"iris": {"position": 4}},
+            },
+            "acquisition_settings": {},
+        },
+    )
+
+    resolutions = resolve_ebus_canonical_fields(acquisition_root, payload)
+    iris = resolutions.by_key()["instrument.optics.iris.position"]
+    assert iris.snapshot_present
+    assert iris.snapshot_value == 0
+    assert iris.effective_value == 4
+    assert iris.provenance == "acquisition_default"
+
+    metadata = extract_path_metadata(str(frames[0]), metadata_source="json")
+    assert metadata.get("iris_source") == "acquisition_default"
+    assert metadata.get("iris_position") == 4.0
+
+
+def test_frame_override_beats_snapshot(acquisition_root: Path) -> None:
+    frames = _make_acquisition(
+        acquisition_root,
+        snapshot_parameters={"Exposure": 500},
+        overrides=[
+            {
+                "selector": {"frame_range": [0, 0]},
+                "changes": {"camera_settings": {"exposure_us": 2000}},
+                "reason": "frame override",
+            },
+        ],
+    )
+
+    metadata = extract_path_metadata(str(frames[0]), metadata_source="json")
+    assert metadata.get("exposure_source") == "frame_override"
+    assert float(metadata["exposure_ms"]) == pytest.approx(2.0)
+
+    metadata_other = extract_path_metadata(str(frames[1]), metadata_source="json")
+    assert metadata_other.get("exposure_source") == "ebus_snapshot"
+    assert float(metadata_other["exposure_ms"]) == pytest.approx(0.5)
+
+
+def test_frame_override_beats_acquisition_wide_ebus_override(
+    acquisition_root: Path,
+) -> None:
+    frames = _make_acquisition(
+        acquisition_root,
+        snapshot_parameters={"Iris": 2},
+        external_sources={
+            "ebus": {
+                "overrides": {"device.Iris": 5},
+            },
+        },
+        overrides=[
+            {
+                "selector": {"frame_range": [0, 0]},
+                "changes": {
+                    "instrument": {
+                        "optics": {"iris": {"position": 7}},
+                    },
+                },
+                "reason": "frame override",
+            },
+        ],
+    )
+
+    metadata = extract_path_metadata(str(frames[0]), metadata_source="json")
+    assert metadata.get("iris_source") == "frame_override"
+    assert metadata.get("iris_position") == 7.0
+
+    metadata_other = extract_path_metadata(str(frames[1]), metadata_source="json")
+    assert metadata_other.get("iris_source") == "ebus_override"
+    assert metadata_other.get("iris_position") == 5.0
+
+
+def test_normalize_override_selectors_detects_zero_and_one_based_ranges() -> None:
+    zero_based, zero_base = normalize_override_selectors(
+        [{"selector": {"frame_range": [0, 1]}}],
+        [0, 1],
+    )
+    one_based, one_base = normalize_override_selectors(
+        [{"selector": {"frame_range": [1, 2]}}],
+        [0, 1],
+    )
+
+    assert zero_base == 0
+    assert zero_based[0]["selector"]["frame_range"] == [0, 1]
+    assert one_base == 1
+    assert one_based[0]["selector"]["frame_range"] == [0, 1]
+
+
+def test_ambiguous_snapshot_discovery_falls_back_to_datacard(
+    acquisition_root: Path,
+) -> None:
+    frames = _make_acquisition(
+        acquisition_root,
+        defaults={
+            "camera_settings": {"exposure_us": 900},
+            "instrument": {},
+            "acquisition_settings": {},
+        },
+        snapshot_parameters={"Exposure": 500},
+        extra_snapshot=True,
+    )
+    payload = _base_datacard(
+        defaults={
+            "camera_settings": {"exposure_us": 900},
+            "instrument": {},
+            "acquisition_settings": {},
+        },
+    )
+
+    resolutions = resolve_ebus_canonical_fields(acquisition_root, payload)
+    assert not resolutions.snapshot_loaded
+    assert not resolutions.by_key()["camera_settings.exposure_us"].snapshot_present
+
+    metadata = extract_path_metadata(str(frames[0]), metadata_source="json")
+    assert metadata.get("exposure_source") == "acquisition_default"
+    assert float(metadata["exposure_ms"]) == pytest.approx(0.9)
+
+
+def test_session_default_applies_when_acquisition_omits_field(
+    acquisition_root: Path,
+) -> None:
+    campaign_root = acquisition_root / "campaign"
+    session_root = campaign_root / "01_sessions" / "2026-03-05__sess01"
+    nested_root = session_root / "acquisitions" / "acq-0011__session_default"
+    nested_root.mkdir(parents=True, exist_ok=True)
+    _write_campaign_datacard(campaign_root)
+    _write_session_datacard(
+        session_root,
+        session_defaults={
+            "instrument": {
+                "optics": {
+                    "iris": {"position": 4},
+                },
+            },
+        },
+    )
+    frames = _make_acquisition(
+        nested_root,
+        defaults={
+            "camera_settings": {},
+            "instrument": {},
+            "acquisition_settings": {},
+        },
+    )
+
+    metadata = extract_path_metadata(str(frames[0]), metadata_source="json")
+    assert bool(metadata.get("json_metadata_available"))
+    assert metadata.get("iris_source") == "session_default"
+    assert metadata.get("iris_position") == 4.0
+
+
+def test_campaign_default_applies_when_higher_layers_are_missing(
+    acquisition_root: Path,
+) -> None:
+    campaign_root = acquisition_root / "campaign"
+    session_root = campaign_root / "01_sessions" / "2026-03-05__sess01"
+    nested_root = session_root / "acquisitions" / "acq-0011__campaign_default"
+    nested_root.mkdir(parents=True, exist_ok=True)
+    _write_campaign_datacard(
+        campaign_root,
+        campaign_defaults={
+            "camera_settings": {"exposure_us": 1500},
+        },
+    )
+    _write_session_datacard(session_root)
+    frames = _make_acquisition(
+        nested_root,
+        defaults={
+            "camera_settings": {},
+            "instrument": {},
+            "acquisition_settings": {},
+        },
+    )
+
+    metadata = extract_path_metadata(str(frames[0]), metadata_source="json")
+    assert metadata.get("exposure_source") == "campaign_default"
+    assert float(metadata["exposure_ms"]) == pytest.approx(1.5)
+
+
+def test_acquisition_default_beats_session_and_campaign_defaults(
+    acquisition_root: Path,
+) -> None:
+    campaign_root = acquisition_root / "campaign"
+    session_root = campaign_root / "01_sessions" / "2026-03-05__sess01"
+    nested_root = session_root / "acquisitions" / "acq-0011__acquisition_default"
+    nested_root.mkdir(parents=True, exist_ok=True)
+    _write_campaign_datacard(
+        campaign_root,
+        campaign_defaults={
+            "camera_settings": {"exposure_us": 1500},
+        },
+    )
+    _write_session_datacard(
+        session_root,
+        session_defaults={
+            "camera_settings": {"exposure_us": 2000},
+        },
+    )
+    frames = _make_acquisition(
+        nested_root,
+        defaults={
+            "camera_settings": {"exposure_us": 2500},
+            "instrument": {},
+            "acquisition_settings": {},
+        },
+    )
+
+    metadata = extract_path_metadata(str(frames[0]), metadata_source="json")
+    assert metadata.get("exposure_source") == "acquisition_default"
+    assert float(metadata["exposure_ms"]) == pytest.approx(2.5)
+
+
+def test_ebus_disabled_falls_back_to_json_defaults(acquisition_root: Path) -> None:
+    frames = _make_acquisition(
+        acquisition_root,
+        defaults={
+            "camera_settings": {"exposure_us": 900},
+            "instrument": {
+                "optics": {"iris": {"position": 3}},
+            },
+            "acquisition_settings": {},
+        },
+        external_sources={
+            "ebus": {
+                "enabled": False,
+                "overrides": {"device.Iris": 5},
+            },
+        },
+        snapshot_parameters={"Exposure": 500, "Iris": 2},
+    )
+    payload = _base_datacard(
+        defaults={
+            "camera_settings": {"exposure_us": 900},
+            "instrument": {
+                "optics": {"iris": {"position": 3}},
+            },
+            "acquisition_settings": {},
+        },
+        external_sources={
+            "ebus": {
+                "enabled": False,
+                "overrides": {"device.Iris": 5},
+            },
+        },
+    )
+
+    resolutions = resolve_ebus_canonical_fields(acquisition_root, payload)
+    assert not resolutions.snapshot_loaded
+    metadata = extract_path_metadata(str(frames[0]), metadata_source="json")
+    assert metadata.get("exposure_source") == "acquisition_default"
+    assert float(metadata["exposure_ms"]) == pytest.approx(0.9)
+    assert metadata.get("iris_source") == "acquisition_default"
+    assert metadata.get("iris_position") == 3.0
+
+
+@pytest.mark.ui
+@pytest.mark.skipif(
+    not _WIZARD_AVAILABLE,
+    reason="PySide6 is not available in this environment.",
+)
+def test_non_overridable_snapshot_field_stays_out_of_defaults(
+    acquisition_root: Path,
+    dialog_factory,
+) -> None:
+    _make_acquisition(
+        acquisition_root,
+        snapshot_parameters={"Exposure": 500},
+    )
+    dialog = dialog_factory()
+
+    editor = dialog._defaults_editors["camera_settings.exposure_us"]
+    assert not editor.isEnabled()
+
+    model = dialog._build_model_from_ui()
+    assert model is not None
+    assert get_dot_path(model.defaults, "camera_settings.exposure_us") is None
+    assert "ebus" not in model.external_sources
+
+
+@pytest.mark.ui
+@pytest.mark.skipif(
+    not _WIZARD_AVAILABLE,
+    reason="PySide6 is not available in this environment.",
+)
+def test_overridable_snapshot_field_persists_to_canonical_defaults(
+    acquisition_root: Path,
+    dialog_factory,
+) -> None:
+    _make_acquisition(
+        acquisition_root,
+        snapshot_parameters={"Iris": 2},
+    )
+    dialog = dialog_factory()
+
+    key = "instrument.optics.iris.position"
+    spec = dialog._spec_for_key(key)
+    assert spec is not None
+    editor = dialog._defaults_editors[key]
+    assert editor.isEnabled()
+    dialog._set_editor_value(editor, spec, 5)
+
+    model = dialog._build_model_from_ui()
+    assert model is not None
+    assert get_dot_path(model.defaults, key) == 5
+    assert not (
+        isinstance(model.external_sources.get("ebus"), dict)
+        and bool(model.external_sources["ebus"].get("overrides"))
+    )
+
+
+@pytest.mark.ui
+@pytest.mark.skipif(
+    not _WIZARD_AVAILABLE,
+    reason="PySide6 is not available in this environment.",
+)
+def test_existing_overridable_default_beats_snapshot_in_editor_and_preview(
+    acquisition_root: Path,
+    dialog_factory,
+) -> None:
+    _make_acquisition(
+        acquisition_root,
+        snapshot_parameters={"Iris": 0},
+        defaults={
+            "instrument": {
+                "optics": {
+                    "iris": {
+                        "position": 1,
                     },
                 },
             },
-        )
-        dialog = self._build_dialog()
+        },
+    )
+    dialog = dialog_factory()
 
-        key = "instrument.optics.iris.position"
-        spec = dialog._spec_for_key(key)
-        self.assertIsNotNone(spec)
-        assert spec is not None
-        editor = dialog._defaults_editors[key]
-        self.assertTrue(editor.isEnabled())
-        self.assertEqual(dialog._get_editor_value(editor, spec), 1)
+    key = "instrument.optics.iris.position"
+    spec = dialog._spec_for_key(key)
+    assert spec is not None
+    editor = dialog._defaults_editors[key]
+    assert editor.isEnabled()
+    assert dialog._get_editor_value(editor, spec) == 1
 
-        model = dialog._build_model_from_ui()
-        self.assertIsNotNone(model)
-        assert model is not None
-        self.assertEqual(get_dot_path(model.defaults, key), 1)
-
-    def test_existing_frame_override_for_snapshot_field_survives_round_trip(self) -> None:
-        _make_acquisition(
-            self.root,
-            snapshot_parameters={"Exposure": 500},
-            overrides=[
-                {
-                    "selector": {"frame_range": [0, 0]},
-                    "changes": {"camera_settings": {"exposure_us": 2000}},
-                    "reason": "frame override",
-                },
-            ],
-        )
-        dialog = self._build_dialog()
-
-        self.assertEqual(len(dialog._existing_rows), 1)
-        model = dialog._build_model_from_ui()
-        self.assertIsNotNone(model)
-        assert model is not None
-        self.assertTrue(
-            any(
-                row.changes.get("camera_settings.exposure_us") == 2000
-                for row in model.overrides
-            ),
-        )
-
-    def test_snapshot_backed_fields_remain_available_in_frame_mapping(self) -> None:
-        _make_acquisition(
-            self.root,
-            snapshot_parameters={"Exposure": 500, "Iris": 2},
-        )
-        dialog = self._build_dialog()
-
-        override_keys = {spec.key for spec in dialog._override_specs()}
-        self.assertIn("camera_settings.exposure_us", override_keys)
-        self.assertIn("instrument.optics.iris.position", override_keys)
+    model = dialog._build_model_from_ui()
+    assert model is not None
+    assert get_dot_path(model.defaults, key) == 1
 
 
-if __name__ == "__main__":
-    unittest.main()
+@pytest.mark.ui
+@pytest.mark.skipif(
+    not _WIZARD_AVAILABLE,
+    reason="PySide6 is not available in this environment.",
+)
+def test_existing_frame_override_for_snapshot_field_survives_round_trip(
+    acquisition_root: Path,
+    dialog_factory,
+) -> None:
+    _make_acquisition(
+        acquisition_root,
+        snapshot_parameters={"Exposure": 500},
+        overrides=[
+            {
+                "selector": {"frame_range": [0, 0]},
+                "changes": {"camera_settings": {"exposure_us": 2000}},
+                "reason": "frame override",
+            },
+        ],
+    )
+    dialog = dialog_factory()
+
+    assert len(dialog._existing_rows) == 1
+    model = dialog._build_model_from_ui()
+    assert model is not None
+    assert any(
+        row.changes.get("camera_settings.exposure_us") == 2000
+        for row in model.overrides
+    )
+
+
+@pytest.mark.ui
+@pytest.mark.skipif(
+    not _WIZARD_AVAILABLE,
+    reason="PySide6 is not available in this environment.",
+)
+def test_snapshot_backed_fields_remain_available_in_frame_mapping(
+    acquisition_root: Path,
+    dialog_factory,
+) -> None:
+    _make_acquisition(
+        acquisition_root,
+        snapshot_parameters={"Exposure": 500, "Iris": 2},
+    )
+    dialog = dialog_factory()
+
+    override_keys = {spec.key for spec in dialog._override_specs()}
+    assert "camera_settings.exposure_us" in override_keys
+    assert "instrument.optics.iris.position" in override_keys

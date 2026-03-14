@@ -1,4 +1,4 @@
-# FrameLab pip requirements
+# FrameLab conda / mamba requirements
 #
 # Install the whole file for a batteries-included local environment, or copy
 # just the block you need into your own install command.
@@ -6,7 +6,8 @@
 # Recommended Python: 3.11 or 3.12
 
 # Running toolchain
-PySide6>=6.6,<7
+python>=3.11,<3.13
+pyside6>=6.6,<7
 numpy>=1.26,<3
 tifffile>=2024.8
 # Used by built-in histogram and analysis plotting surfaces.

@@ -2,77 +2,68 @@
 
 from __future__ import annotations
 
-import os
-import unittest
-
-os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-
-from PySide6 import QtWidgets as qtw
+import pytest
 
 from framelab.window import FrameLabWindow
 
 
-class MeasurePageUiTests(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls) -> None:
-        cls._app = qtw.QApplication.instance() or qtw.QApplication([])
-
-    def _build_window(self) -> FrameLabWindow:
-        window = FrameLabWindow(enabled_plugin_ids=())
-        self.addCleanup(window.deleteLater)
-        window.ui_state_snapshot.splitter_sizes.clear()
-        return window
-
-    def test_measure_display_menu_updates_rounding_and_normalization(self) -> None:
-        window = self._build_window()
-
-        window.measure_normalize_action.setChecked(True)
-        self.assertTrue(window.metrics_state.normalize_intensity_values)
-
-        window._measure_rounding_actions["std"].trigger()
-        self.assertEqual(window.metrics_state.rounding_mode, "std")
-        self.assertIn("normalized", window.measure_display_button.toolTip())
-        self.assertIn("Std rounding", window.measure_display_button.toolTip())
-
-    def test_measure_help_visibility_respects_preview_flags(self) -> None:
-        window = self._build_window()
-
-        window.show_image_preview = True
-        window.show_histogram_preview = True
-        window._set_measure_help_visibility(False)
-        self.assertTrue(window.preview_help_label.isHidden())
-        self.assertTrue(window.histogram_help_label.isHidden())
-
-        window._set_measure_help_visibility(True)
-        self.assertFalse(window.preview_help_label.isHidden())
-        self.assertFalse(window.histogram_help_label.isHidden())
-
-        window.show_histogram_preview = False
-        window._set_measure_help_visibility(True)
-        self.assertFalse(window.preview_help_label.isHidden())
-        self.assertTrue(window.histogram_help_label.isHidden())
-
-    def test_measure_splitter_state_round_trip(self) -> None:
-        window = self._build_window()
-        splitter = window.measure_main_splitter
-        splitter.setSizes([720, 360])
-        stored_sizes = splitter.sizes()
-
-        window._persist_splitter_state("measure.main_splitter", splitter)
-
-        self.assertEqual(
-            window.ui_state_snapshot.splitter_sizes["measure.main_splitter"],
-            stored_sizes,
-        )
-
-        window.ui_state_snapshot.splitter_sizes["measure.main_splitter"] = [200, 800]
-        splitter.setSizes([600, 400])
-        window._restore_splitter_state("measure.main_splitter", splitter)
-        restored_sizes = splitter.sizes()
-
-        self.assertEqual(len(restored_sizes), 2)
-        self.assertGreater(restored_sizes[1], restored_sizes[0])
+pytestmark = [pytest.mark.ui, pytest.mark.core]
 
 
-if __name__ == "__main__":
-    unittest.main()
+@pytest.fixture
+def measure_window(framelab_window_factory) -> FrameLabWindow:
+    window = framelab_window_factory(enabled_plugin_ids=())
+    window.ui_state_snapshot.splitter_sizes.clear()
+    return window
+
+
+def test_measure_display_menu_updates_rounding_and_normalization(
+    measure_window: FrameLabWindow,
+) -> None:
+    measure_window.measure_normalize_action.setChecked(True)
+    assert measure_window.metrics_state.normalize_intensity_values
+
+    measure_window._measure_rounding_actions["std"].trigger()
+    assert measure_window.metrics_state.rounding_mode == "std"
+    assert "normalized" in measure_window.measure_display_button.toolTip()
+    assert "Std rounding" in measure_window.measure_display_button.toolTip()
+
+
+def test_measure_help_visibility_respects_preview_flags(
+    measure_window: FrameLabWindow,
+) -> None:
+    measure_window.show_image_preview = True
+    measure_window.show_histogram_preview = True
+    measure_window._set_measure_help_visibility(False)
+    assert measure_window.preview_help_label.isHidden()
+    assert measure_window.histogram_help_label.isHidden()
+
+    measure_window._set_measure_help_visibility(True)
+    assert not measure_window.preview_help_label.isHidden()
+    assert not measure_window.histogram_help_label.isHidden()
+
+    measure_window.show_histogram_preview = False
+    measure_window._set_measure_help_visibility(True)
+    assert not measure_window.preview_help_label.isHidden()
+    assert measure_window.histogram_help_label.isHidden()
+
+
+def test_measure_splitter_state_round_trip(measure_window: FrameLabWindow) -> None:
+    splitter = measure_window.measure_main_splitter
+    splitter.setSizes([720, 360])
+    stored_sizes = splitter.sizes()
+
+    measure_window._persist_splitter_state("measure.main_splitter", splitter)
+
+    assert (
+        measure_window.ui_state_snapshot.splitter_sizes["measure.main_splitter"]
+        == stored_sizes
+    )
+
+    measure_window.ui_state_snapshot.splitter_sizes["measure.main_splitter"] = [200, 800]
+    splitter.setSizes([600, 400])
+    measure_window._restore_splitter_state("measure.main_splitter", splitter)
+    restored_sizes = splitter.sizes()
+
+    assert len(restored_sizes) == 2
+    assert restored_sizes[1] > restored_sizes[0]

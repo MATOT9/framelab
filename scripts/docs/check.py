@@ -22,7 +22,6 @@ _CHECK_SITE_SUBDIR = _DOCS_BUILD_DIR / "check-site"
 
 REQUIRED_FILES = (
     "mkdocs.yml",
-    "docs_layout.md",
     "docs/index.md",
     "docs/user-guide/index.md",
     "docs/user-guide/concepts-and-limits.md",

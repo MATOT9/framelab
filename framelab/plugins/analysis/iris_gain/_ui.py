@@ -53,10 +53,7 @@ class IrisGainUiMixin:
         )
         controls_layout = qtw.QVBoxLayout(controls_panel)
         controls_layout.setContentsMargins(12, 10, 12, 10)
-        controls_layout.setSpacing(10)
-
-        axes_title = self._make_title_label("Axes")
-        controls_layout.addWidget(axes_title)
+        controls_layout.setSpacing(8)
 
         axes_form = qtw.QFormLayout()
         axes_form.setContentsMargins(0, 0, 0, 0)
@@ -88,10 +85,7 @@ class IrisGainUiMixin:
             self._error_bar_combo,
         )
         controls_layout.addLayout(axes_form)
-        controls_layout.addSpacing(10)
-
-        trend_title = self._make_title_label("Trend & Display")
-        controls_layout.addWidget(trend_title)
+        controls_layout.addSpacing(6)
 
         display_form = qtw.QFormLayout()
         display_form.setContentsMargins(0, 0, 0, 0)

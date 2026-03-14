@@ -3,6 +3,7 @@
 
 # Local runtime UI state
 config/ui_state.ini
+config/config.ini
 
 # Samples and archives
 EbusData
