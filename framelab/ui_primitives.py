@@ -8,6 +8,8 @@ from typing import Iterable
 from PySide6 import QtWidgets as qtw
 from PySide6.QtCore import Qt
 
+from .ui_density import DensityTokens, comfortable_density_tokens
+
 
 @dataclass(slots=True)
 class ChipSpec:
@@ -92,7 +94,11 @@ class PageHeader(qtw.QFrame):
     ) -> None:
         super().__init__(parent)
         self.setObjectName("PageHeader")
+        self._density_tokens = comfortable_density_tokens()
+        self._subtitle_requested_visible = bool(subtitle.strip())
+        self._compact_chip_mode = False
         layout = qtw.QVBoxLayout(self)
+        self._layout = layout
         layout.setContentsMargins(16, 14, 16, 14)
         layout.setSpacing(8)
 
@@ -117,6 +123,7 @@ class PageHeader(qtw.QFrame):
         self._chip_layout = chip_layout
         layout.addWidget(chip_row)
         chip_row.setVisible(False)
+        self.apply_density(self._density_tokens)
 
     def set_title(self, title: str) -> None:
         """Update header title."""
@@ -125,7 +132,34 @@ class PageHeader(qtw.QFrame):
     def set_subtitle(self, subtitle: str) -> None:
         """Update header subtitle and visibility."""
         self.subtitle_label.setText(subtitle)
-        self.subtitle_label.setVisible(bool(subtitle.strip()))
+        self._subtitle_requested_visible = bool(subtitle.strip())
+        self._sync_subtitle_visibility()
+
+    def set_subtitle_visible(self, visible: bool) -> None:
+        """Show or hide the subtitle without clearing its text."""
+
+        self._subtitle_requested_visible = bool(visible)
+        self._sync_subtitle_visibility()
+
+    def set_compact_chip_mode(self, enabled: bool) -> None:
+        """Toggle tighter spacing for the chip row."""
+
+        self._compact_chip_mode = bool(enabled)
+        self._sync_chip_spacing()
+
+    def apply_density(self, tokens: DensityTokens) -> None:
+        """Apply density spacing tokens to the header layout."""
+
+        self._density_tokens = tokens
+        self._layout.setContentsMargins(
+            tokens.header_margin_h,
+            tokens.header_margin_v,
+            tokens.header_margin_h,
+            tokens.header_margin_v,
+        )
+        self._layout.setSpacing(tokens.header_spacing)
+        self._sync_chip_spacing()
+        self._sync_subtitle_visibility()
 
     def set_chips(self, specs: Iterable[ChipSpec]) -> None:
         """Replace header chips with the provided specs."""
@@ -148,6 +182,19 @@ class PageHeader(qtw.QFrame):
                 chip,
             )
         self._chip_row.setVisible(self._chip_layout.count() > 1)
+        self._sync_chip_spacing()
+
+    def _sync_subtitle_visibility(self) -> None:
+        self.subtitle_label.setVisible(
+            bool(self._subtitle_requested_visible)
+            and bool(self.subtitle_label.text().strip()),
+        )
+
+    def _sync_chip_spacing(self) -> None:
+        spacing = self._density_tokens.chip_spacing
+        if self._compact_chip_mode:
+            spacing = max(4, spacing - 2)
+        self._chip_layout.setSpacing(spacing)
 
 
 def build_page_header(
@@ -169,12 +216,46 @@ class SummaryStrip(qtw.QFrame):
     def __init__(self, parent: qtw.QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("SummaryStrip")
+        self._density_tokens = comfortable_density_tokens()
+        self._items: list[SummaryItem] = []
+        self._collapsed = False
+        self._auto_hide_when_empty = True
         self._layout = qtw.QHBoxLayout(self)
         self._layout.setContentsMargins(0, 0, 0, 0)
         self._layout.setSpacing(8)
+        self.apply_density(self._density_tokens)
 
-    def set_items(self, items: Iterable[SummaryItem]) -> None:
+    def apply_density(self, tokens: DensityTokens) -> None:
+        """Apply density spacing tokens and rebuild cards if needed."""
+
+        self._density_tokens = tokens
+        self._layout.setSpacing(tokens.panel_spacing)
+        if self._items:
+            self._rebuild_items()
+
+    def set_collapsed(self, collapsed: bool) -> None:
+        """Show or hide the strip while retaining its content."""
+
+        self._collapsed = bool(collapsed)
+        self._sync_visibility()
+
+    def is_collapsed(self) -> bool:
+        """Return whether the strip is currently collapsed."""
+
+        return self._collapsed
+
+    def set_items(
+        self,
+        items: Iterable[SummaryItem],
+        *,
+        auto_hide_when_empty: bool = True,
+    ) -> None:
         """Replace strip contents with the provided summary cells."""
+        self._items = list(items)
+        self._auto_hide_when_empty = bool(auto_hide_when_empty)
+        self._rebuild_items()
+
+    def _rebuild_items(self) -> None:
         while self._layout.count():
             item = self._layout.takeAt(0)
             widget = item.widget()
@@ -184,7 +265,7 @@ class SummaryStrip(qtw.QFrame):
                 widget.deleteLater()
 
         visible_count = 0
-        for summary in items:
+        for summary in self._items:
             card = qtw.QFrame(self)
             card.setObjectName("SummaryCard")
             card.setProperty("statusLevel", str(summary.level or "neutral"))
@@ -193,8 +274,13 @@ class SummaryStrip(qtw.QFrame):
                 qtw.QSizePolicy.Fixed,
             )
             card_layout = qtw.QVBoxLayout(card)
-            card_layout.setContentsMargins(12, 10, 12, 10)
-            card_layout.setSpacing(4)
+            card_layout.setContentsMargins(
+                self._density_tokens.summary_card_margin_h,
+                self._density_tokens.summary_card_margin_v,
+                self._density_tokens.summary_card_margin_h,
+                self._density_tokens.summary_card_margin_v,
+            )
+            card_layout.setSpacing(self._density_tokens.summary_card_spacing)
 
             value = qtw.QLabel(summary.value)
             value.setObjectName("SummaryValue")
@@ -225,7 +311,13 @@ class SummaryStrip(qtw.QFrame):
                 card.setStatusTip(f"{summary.label}: {summary.value}")
             self._layout.addWidget(card, 1)
             visible_count += 1
-        self.setVisible(visible_count > 0)
+        self._sync_visibility()
+
+    def _sync_visibility(self) -> None:
+        should_show = not self._collapsed
+        if self._auto_hide_when_empty:
+            should_show = should_show and bool(self._items)
+        self.setVisible(should_show)
 
 
 def build_summary_strip(

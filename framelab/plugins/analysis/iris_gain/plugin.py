@@ -70,6 +70,11 @@ class IrisGainAnalysisPlugin(
     def __init__(self) -> None:
         self._context: Optional[AnalysisContext] = None
         self._root: Optional[qtw.QWidget] = None
+        self._controls_panel: Optional[qtw.QWidget] = None
+        self._workspace_widget: Optional[qtw.QWidget] = None
+        self._workspace_splitter: Optional[qtw.QSplitter] = None
+        self._plot_hint_label: Optional[qtw.QLabel] = None
+        self._control_signals_bound = False
         self._x_axis_combo: Optional[qtw.QComboBox] = None
         self._y_axis_combo: Optional[qtw.QComboBox] = None
         self._error_bar_combo: Optional[qtw.QComboBox] = None

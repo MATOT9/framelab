@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Iterable, Optional
 from collections import OrderedDict
 
@@ -30,7 +31,9 @@ from .plugins import (
     resolve_enabled_plugin_ids,
 )
 from .plugins.analysis import AnalysisPlugin
+from .ui_density import AdaptiveUiContext, UiDensityResolver
 from .scan_settings import load_skip_patterns, skip_config_path
+from .ui_settings import UiStateSnapshot, UiStateStore
 from .workers import DynamicStatsWorker, RoiApplyWorker
 
 
@@ -150,10 +153,33 @@ class FrameLabWindow(
             tuple[str, int], np.ndarray
         ] = OrderedDict()
         self._corrected_cache_capacity = 24
-        self.show_image_preview = True
-        self.show_histogram_preview = False
+        self._load_ui_state()
+        self.show_image_preview = self.ui_preferences.show_image_preview
+        self.show_histogram_preview = self.ui_preferences.show_histogram_preview
+        self._density_resolver = UiDensityResolver()
+        self._density_refresh_timer = QTimer(self)
+        self._density_refresh_timer.setSingleShot(True)
+        self._density_refresh_timer.setInterval(90)
+        self._density_refresh_timer.timeout.connect(
+            self._apply_dynamic_visibility_policy,
+        )
+        initial_context = AdaptiveUiContext(
+            usable_height=max(self.height(), 0),
+            active_page="data",
+            has_processing_banner=False,
+            has_loaded_data=False,
+        )
+        self._active_density_tokens = self._density_resolver.tokens_for_mode(
+            self.ui_preferences.density_mode,
+            initial_context,
+        )
+        self._active_visibility_policy = self._density_resolver.visibility_policy(
+            self.ui_preferences.density_mode,
+            initial_context,
+            preferences=self.ui_preferences,
+        )
         self._analysis_plugin_engaged = False
-        self._metadata_controls_auto_expanded = False
+        self._session_panel_overrides: dict[str, bool] = {}
         self._manual_data_column_visibility: dict[str, bool] = {}
         self._manual_measure_column_visibility: dict[str, bool] = {}
         self._data_column_actions: dict[str, QtGui.QAction] = {}
@@ -171,10 +197,11 @@ class FrameLabWindow(
         self._pause_preview_updates = False
         self._sort_column = -1
         self._sort_order = Qt.AscendingOrder
-        self._theme_mode = "dark"
+        self._theme_mode = self.ui_preferences.theme_mode
         self._processing_failures = []
         self._processing_failure_banners: list[qtw.QWidget] = []
         self._processing_failure_banner_labels: list[qtw.QLabel] = []
+        self._processing_failure_banner_layouts: list[qtw.QHBoxLayout] = []
 
         self.base_status = "Select a folder."
         self.context_hint = "Step 1: choose a dataset folder, then scan."
@@ -187,8 +214,277 @@ class FrameLabWindow(
         self._page_plugin_classes = load_enabled_plugins(self._enabled_plugin_ids)
         self._apply_base_font()
         self._build_ui()
-        self._apply_theme("dark")
+        self._apply_theme(self.ui_preferences.theme_mode)
+        self._restore_persisted_ui_state()
         self._set_status()
+
+    def _load_ui_state(self) -> None:
+        """Load persisted UI preferences and last-session workspace state."""
+
+        self.ui_state_store = UiStateStore()
+        try:
+            self.ui_state_snapshot = self.ui_state_store.load()
+        except Exception:
+            self.ui_state_snapshot = UiStateSnapshot()
+        self.ui_preferences = self.ui_state_snapshot.preferences
+
+    def _restore_persisted_ui_state(self) -> None:
+        """Restore last tab/plugin selection once widgets exist."""
+
+        if (
+            self.ui_preferences.restore_last_tab
+            and hasattr(self, "workflow_tabs")
+            and self.ui_state_snapshot.last_tab_index is not None
+        ):
+            index = self.ui_state_snapshot.last_tab_index
+            if 0 <= index < self.workflow_tabs.count():
+                self.workflow_tabs.setCurrentIndex(index)
+
+        plugin_id = self.ui_state_snapshot.last_analysis_plugin_id
+        if not plugin_id or not hasattr(self, "analysis_profile_combo"):
+            return
+        plugin_index = self.analysis_profile_combo.findData(plugin_id)
+        if plugin_index >= 0:
+            self.analysis_profile_combo.setCurrentIndex(plugin_index)
+        if hasattr(self, "_apply_dynamic_visibility_policy"):
+            self._apply_dynamic_visibility_policy()
+
+    def _current_analysis_plugin_id(self) -> str | None:
+        """Return the active analysis plugin id if one is selected."""
+
+        if not hasattr(self, "analysis_profile_combo"):
+            return None
+        plugin_id = self.analysis_profile_combo.currentData()
+        if plugin_id is None:
+            return None
+        text = str(plugin_id).strip()
+        if not text or text == "none":
+            return None
+        return text
+
+    def _save_ui_state(self) -> None:
+        """Persist current UI preferences and workspace selection state."""
+
+        preferences = replace(
+            self.ui_preferences,
+            theme_mode=self._theme_mode,
+            show_image_preview=bool(self.show_image_preview),
+            show_histogram_preview=bool(self.show_histogram_preview),
+        )
+        snapshot = UiStateSnapshot(
+            preferences=preferences,
+            panel_states=dict(self.ui_state_snapshot.panel_states),
+            splitter_sizes={
+                key: list(value)
+                for key, value in self.ui_state_snapshot.splitter_sizes.items()
+            },
+            last_tab_index=(
+                self.workflow_tabs.currentIndex()
+                if hasattr(self, "workflow_tabs")
+                else self.ui_state_snapshot.last_tab_index
+            ),
+            last_analysis_plugin_id=self._current_analysis_plugin_id(),
+        )
+        self.ui_state_store.save(snapshot)
+        self.ui_state_snapshot = snapshot
+        self.ui_preferences = snapshot.preferences
+
+    def _current_active_page_id(self) -> str:
+        """Return the active workflow page id."""
+
+        if not hasattr(self, "workflow_tabs"):
+            return "data"
+        current_widget = self.workflow_tabs.currentWidget()
+        if current_widget is getattr(self, "analysis_page", None):
+            return "analysis"
+        index = self.workflow_tabs.currentIndex()
+        if index <= 0:
+            return "data"
+        return "measure"
+
+    def _current_adaptive_ui_context(self) -> AdaptiveUiContext:
+        """Build runtime context used by the density resolver."""
+
+        central = self.centralWidget()
+        usable_height = central.height() if central is not None else self.height()
+        if usable_height <= 0:
+            usable_height = self.height()
+        return AdaptiveUiContext(
+            usable_height=max(int(usable_height), 0),
+            active_page=self._current_active_page_id(),
+            has_processing_banner=bool(getattr(self, "_processing_failures", [])),
+            has_loaded_data=bool(
+                self._has_loaded_data()
+                if hasattr(self, "_has_loaded_data")
+                else False
+            ),
+        )
+
+    def _visibility_user_overrides(self) -> dict[str, bool | None]:
+        """Return persisted disclosure states when restore is enabled."""
+
+        overrides: dict[str, bool] = {}
+        if self.ui_preferences.restore_panel_states:
+            overrides.update(
+                {
+                    str(key).strip().lower(): bool(value)
+                    for key, value in self.ui_state_snapshot.panel_states.items()
+                    if str(key).strip()
+                }
+            )
+        overrides.update(
+            {
+                str(key).strip().lower(): bool(value)
+                for key, value in self._session_panel_overrides.items()
+                if str(key).strip()
+            }
+        )
+        return overrides
+
+    def _remember_panel_state(self, key: str, expanded: bool) -> None:
+        """Store a panel disclosure override for the current session."""
+
+        clean_key = str(key).strip().lower()
+        if not clean_key:
+            return
+        value = bool(expanded)
+        self._session_panel_overrides[clean_key] = value
+        self.ui_state_snapshot.panel_states[clean_key] = value
+
+    def _persist_splitter_state(self, key: str, splitter: object | None) -> None:
+        """Store the latest splitter sizes in the current UI snapshot."""
+
+        clean_key = str(key).strip().lower()
+        if not clean_key or splitter is None or not hasattr(splitter, "sizes"):
+            return
+        try:
+            raw_sizes = splitter.sizes()
+        except Exception:
+            return
+        sizes = [max(0, int(size)) for size in raw_sizes]
+        if not sizes:
+            return
+        self.ui_state_snapshot.splitter_sizes[clean_key] = sizes
+
+    def _restore_splitter_state(self, key: str, splitter: object | None) -> None:
+        """Apply persisted splitter sizes when restore behavior is enabled."""
+
+        clean_key = str(key).strip().lower()
+        if (
+            not clean_key
+            or splitter is None
+            or not self.ui_preferences.restore_panel_states
+            or not hasattr(splitter, "setSizes")
+            or not hasattr(splitter, "count")
+        ):
+            return
+        sizes = self.ui_state_snapshot.splitter_sizes.get(clean_key)
+        if not sizes:
+            return
+        normalized = [max(0, int(size)) for size in sizes]
+        try:
+            expected_count = int(splitter.count())
+        except Exception:
+            expected_count = len(normalized)
+        if expected_count > 0 and len(normalized) != expected_count:
+            return
+        if sum(normalized) <= 0:
+            return
+        try:
+            splitter.setSizes(normalized)
+        except Exception:
+            return
+
+    def _policy_for_page(self, page_id: str):
+        """Resolve policy for one page using the current global context."""
+
+        context = replace(
+            self._current_adaptive_ui_context(),
+            active_page=page_id,
+        )
+        return self._density_resolver.visibility_policy(
+            self.ui_preferences.density_mode,
+            context,
+            preferences=self.ui_preferences,
+            user_overrides=self._visibility_user_overrides(),
+        )
+
+    def _apply_density_policy(self) -> None:
+        """Resolve and store active density tokens and visibility policy."""
+
+        context = self._current_adaptive_ui_context()
+        previous_tokens = getattr(self, "_active_density_tokens", None)
+        self._active_density_tokens = self._density_resolver.tokens_for_mode(
+            self.ui_preferences.density_mode,
+            context,
+        )
+        self._active_visibility_policy = self._density_resolver.visibility_policy(
+            self.ui_preferences.density_mode,
+            context,
+            preferences=self.ui_preferences,
+            user_overrides=self._visibility_user_overrides(),
+        )
+        if previous_tokens != self._active_density_tokens and hasattr(
+            self,
+            "_apply_density",
+        ):
+            self._apply_density()
+
+    @staticmethod
+    def _set_header_subtitle_visible(
+        header: object | None,
+        visible: bool,
+    ) -> None:
+        """Show or hide one header subtitle while preserving empty-state logic."""
+
+        if header is not None and hasattr(header, "set_subtitle_visible"):
+            header.set_subtitle_visible(bool(visible))
+            return
+        subtitle_label = getattr(header, "subtitle_label", None)
+        if subtitle_label is None:
+            return
+        subtitle_label.setVisible(
+            bool(visible) and bool(subtitle_label.text().strip()),
+        )
+
+    def _apply_visibility_policy(self) -> None:
+        """Apply the currently resolved visibility policy to existing widgets."""
+
+        self._set_header_subtitle_visible(
+            getattr(self, "_data_header", None),
+            self._policy_for_page("data").show_subtitles,
+        )
+        if hasattr(self, "_apply_data_page_visibility_policy"):
+            self._apply_data_page_visibility_policy(
+                self._policy_for_page("data"),
+            )
+        self._set_header_subtitle_visible(
+            getattr(self, "_measure_header", None),
+            self._policy_for_page("measure").show_subtitles,
+        )
+        if hasattr(self, "_apply_measure_page_visibility_policy"):
+            self._apply_measure_page_visibility_policy(
+                self._policy_for_page("measure"),
+            )
+        self._set_header_subtitle_visible(
+            getattr(self, "_analysis_header", None),
+            self._policy_for_page("analysis").show_subtitles,
+        )
+        if hasattr(self, "_apply_analysis_page_visibility_policy"):
+            self._apply_analysis_page_visibility_policy(
+                self._policy_for_page("analysis"),
+            )
+
+    def _schedule_density_refresh(self) -> None:
+        """Debounce resize-driven density recomputation."""
+
+        self._density_refresh_timer.start()
+
+    def resizeEvent(self, event: QtGui.QResizeEvent) -> None:
+        """Refresh density-dependent policy after the window is resized."""
+
+        super().resizeEvent(event)
+        self._schedule_density_refresh()
 
     @property
     def paths(self) -> list[str]:

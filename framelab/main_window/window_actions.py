@@ -50,7 +50,20 @@ class WindowActionsMixin:
 
         self._processing_failure_banners.append(banner)
         self._processing_failure_banner_labels.append(label)
+        self._processing_failure_banner_layouts.append(layout)
         return banner
+
+    def _apply_processing_banner_density(self, tokens) -> None:
+        """Apply density spacing to processing-failure banners."""
+
+        for layout in getattr(self, "_processing_failure_banner_layouts", []):
+            if hasattr(self, "_set_uniform_layout_margins"):
+                self._set_uniform_layout_margins(
+                    layout,
+                    tokens.panel_margin_h,
+                    tokens.panel_margin_v,
+                )
+            layout.setSpacing(tokens.panel_spacing)
 
     def _clear_processing_failures(
         self,
@@ -115,6 +128,8 @@ class WindowActionsMixin:
             self._refresh_data_header_state()
         if hasattr(self, "_refresh_measure_header_state"):
             self._refresh_measure_header_state()
+        if hasattr(self, "_apply_dynamic_visibility_policy"):
+            self._apply_dynamic_visibility_policy()
         self._set_status()
 
     def _show_processing_failures_dialog(self) -> None:
@@ -155,7 +170,11 @@ class WindowActionsMixin:
         button_row.addWidget(close_button)
         layout.addLayout(button_row)
 
-        theme_sheet = DARK_THEME if self._theme_mode == "dark" else LIGHT_THEME
+        theme_sheet = (
+            self._current_theme_stylesheet()
+            if hasattr(self, "_current_theme_stylesheet")
+            else DARK_THEME if self._theme_mode == "dark" else LIGHT_THEME
+        )
         dialog.setStyleSheet(theme_sheet)
         dialog.show()
         dialog.raise_()
@@ -518,6 +537,11 @@ class WindowActionsMixin:
 
     def closeEvent(self, event) -> None:  # type: ignore[override]
         """Ensure background threads are stopped before window closes."""
+        if hasattr(self, "_save_ui_state"):
+            try:
+                self._save_ui_state()
+            except Exception:
+                pass
         roi_thread = self._roi_apply_thread
         thread = self._stats_thread
         self._cancel_roi_apply_job()
@@ -542,7 +566,11 @@ class WindowActionsMixin:
         dialog.setText(message)
         dialog.setTextFormat(Qt.PlainText)
         dialog.setStandardButtons(qtw.QMessageBox.Ok)
-        theme_sheet = DARK_THEME if self._theme_mode == "dark" else LIGHT_THEME
+        theme_sheet = (
+            self._current_theme_stylesheet()
+            if hasattr(self, "_current_theme_stylesheet")
+            else DARK_THEME if self._theme_mode == "dark" else LIGHT_THEME
+        )
         dialog.setStyleSheet(theme_sheet)
         dialog.exec()
 

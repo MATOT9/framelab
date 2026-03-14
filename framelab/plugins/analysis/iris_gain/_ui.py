@@ -20,34 +20,61 @@ class IrisGainUiMixin:
     """Widget construction and control-state helpers."""
 
     def create_widget(self, parent: qtw.QWidget) -> qtw.QWidget:
-        """Create plugin widget and controls."""
+        """Create legacy plugin widget with controls above workspace."""
+
         root = qtw.QWidget(parent)
         layout = qtw.QVBoxLayout(root)
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(8)
 
-        controls_panel = qtw.QFrame()
-        controls_panel.setObjectName("SubtlePanel")
-        controls_layout = qtw.QGridLayout(controls_panel)
-        controls_layout.setContentsMargins(12, 8, 12, 8)
-        controls_layout.setHorizontalSpacing(8)
-        controls_layout.setVerticalSpacing(6)
+        controls_panel = self.create_controls_widget(root)
+        if controls_panel is not None:
+            layout.addWidget(controls_panel)
+        workspace_widget = self.create_workspace_widget(root)
+        if workspace_widget is not None:
+            layout.addWidget(workspace_widget, 1)
 
-        controls_layout.addWidget(self._make_title_label("X Axis"), 0, 0)
+        self._root = root
+        self._finalize_widget_state()
+        return root
+
+    def create_controls_widget(
+        self,
+        parent: qtw.QWidget,
+    ) -> qtw.QWidget | None:
+        """Create plugin controls surface for host side-rail layouts."""
+
+        controls_panel = qtw.QFrame(parent)
+        self._controls_panel = controls_panel
+        controls_panel.setObjectName("SubtlePanel")
+        controls_panel.setSizePolicy(
+            qtw.QSizePolicy.Preferred,
+            qtw.QSizePolicy.Expanding,
+        )
+        controls_layout = qtw.QVBoxLayout(controls_panel)
+        controls_layout.setContentsMargins(12, 10, 12, 10)
+        controls_layout.setSpacing(10)
+
+        axes_title = self._make_title_label("Axes")
+        controls_layout.addWidget(axes_title)
+
+        axes_form = qtw.QFormLayout()
+        axes_form.setContentsMargins(0, 0, 0, 0)
+        axes_form.setHorizontalSpacing(10)
+        axes_form.setVerticalSpacing(8)
+
         self._x_axis_combo = qtw.QComboBox()
         self._x_axis_combo.addItem("Iris Position", "iris")
         self._x_axis_combo.addItem("Exposure", "exposure")
         self._x_axis_combo.setToolTip("Select the independent variable.")
-        controls_layout.addWidget(self._x_axis_combo, 0, 1)
+        axes_form.addRow(self._make_title_label("X Axis"), self._x_axis_combo)
 
-        controls_layout.addWidget(self._make_title_label("Y Axis"), 0, 2)
         self._y_axis_combo = qtw.QComboBox()
         for label, key in self._Y_AXIS_OPTIONS:
             self._y_axis_combo.addItem(label, key)
         self._y_axis_combo.setToolTip("Select the dependent metric to plot.")
-        controls_layout.addWidget(self._y_axis_combo, 0, 3)
+        axes_form.addRow(self._make_title_label("Y Axis"), self._y_axis_combo)
 
-        controls_layout.addWidget(self._make_title_label("Error Bars"), 0, 4)
         self._error_bar_combo = qtw.QComboBox()
         self._error_bar_combo.addItem("Off", "off")
         self._error_bar_combo.addItem("Std", "std")
@@ -56,9 +83,21 @@ class IrisGainUiMixin:
             "Select uncertainty used for plot error bars. "
             "If display rounding is enabled, this also sets the rounding source.",
         )
-        controls_layout.addWidget(self._error_bar_combo, 0, 5)
+        axes_form.addRow(
+            self._make_title_label("Error Bars"),
+            self._error_bar_combo,
+        )
+        controls_layout.addLayout(axes_form)
+        controls_layout.addSpacing(10)
 
-        controls_layout.addWidget(self._make_title_label("Trend"), 1, 0)
+        trend_title = self._make_title_label("Trend & Display")
+        controls_layout.addWidget(trend_title)
+
+        display_form = qtw.QFormLayout()
+        display_form.setContentsMargins(0, 0, 0, 0)
+        display_form.setHorizontalSpacing(10)
+        display_form.setVerticalSpacing(8)
+
         self._trend_line_combo = qtw.QComboBox()
         self._trend_line_combo.addItem("Off", "off")
         self._trend_line_combo.addItem("Linear fit", "linear_fit")
@@ -66,7 +105,11 @@ class IrisGainUiMixin:
         self._trend_line_combo.setToolTip(
             "Overlay either a global linear fit or a mean-by-X trend line.",
         )
-        controls_layout.addWidget(self._trend_line_combo, 1, 1)
+        display_form.addRow(
+            self._make_title_label("Trend"),
+            self._trend_line_combo,
+        )
+        controls_layout.addLayout(display_form)
 
         self._round_sd_checkbox = qtw.QCheckBox("Round Display to 1 s.d.")
         self._round_sd_checkbox.setChecked(False)
@@ -75,7 +118,7 @@ class IrisGainUiMixin:
             "significant digit using the uncertainty source selected in "
             "Error Bars (Std or Std Err).",
         )
-        controls_layout.addWidget(self._round_sd_checkbox, 1, 2, 1, 2)
+        controls_layout.addWidget(self._round_sd_checkbox)
 
         self._gain_last_align_checkbox = qtw.QCheckBox("Align First Point to 1")
         self._gain_last_align_checkbox.setChecked(False)
@@ -83,21 +126,33 @@ class IrisGainUiMixin:
             "Display-only for Intensity Gain (last ref): multiply plotted "
             "Y values by a constant so the first point is 1.",
         )
-        controls_layout.addWidget(self._gain_last_align_checkbox, 1, 4, 1, 2)
+        controls_layout.addWidget(self._gain_last_align_checkbox)
 
         self._show_lines_checkbox = qtw.QCheckBox("Show Series Lines")
         self._show_lines_checkbox.setChecked(True)
         self._show_lines_checkbox.setToolTip(
             "When disabled, only points are shown for raw series.",
         )
-        controls_layout.addWidget(self._show_lines_checkbox, 2, 0, 1, 2)
+        controls_layout.addWidget(self._show_lines_checkbox)
+        controls_layout.addStretch(1)
+        self._finalize_widget_state()
+        return controls_panel
 
-        controls_layout.setColumnStretch(1, 1)
-        controls_layout.setColumnStretch(3, 1)
-        controls_layout.setColumnStretch(5, 1)
-        layout.addWidget(controls_panel)
+    def create_workspace_widget(
+        self,
+        parent: qtw.QWidget,
+    ) -> qtw.QWidget | None:
+        """Create plugin workspace surface for host side-rail layouts."""
+
+        workspace_widget = qtw.QWidget(parent)
+        self._workspace_widget = workspace_widget
+        layout = qtw.QVBoxLayout(workspace_widget)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
 
         splitter = qtw.QSplitter(Qt.Horizontal)
+        self._workspace_splitter = splitter
+        splitter.setChildrenCollapsible(False)
 
         table_panel = qtw.QWidget()
         table_panel.setObjectName("TablePanel")
@@ -128,6 +183,12 @@ class IrisGainUiMixin:
         plot_layout = qtw.QVBoxLayout(plot_panel)
         plot_layout.setContentsMargins(0, 0, 0, 0)
         plot_layout.setSpacing(0)
+        plot_hint_text = (
+            "Right-click plot for view actions: reset view, show all curves, "
+            "or copy plot."
+        )
+        plot_panel.setToolTip(plot_hint_text)
+        plot_panel.setStatusTip(plot_hint_text)
         if (
             MATPLOTLIB_AVAILABLE
             and Figure is not None
@@ -141,6 +202,8 @@ class IrisGainUiMixin:
                 qtw.QSizePolicy.Expanding,
             )
             self._canvas.updateGeometry()
+            self._canvas.setToolTip(plot_hint_text)
+            self._canvas.setStatusTip(plot_hint_text)
             plot_layout.addWidget(self._canvas, 1)
         else:
             self._fallback_plot_label = qtw.QLabel(
@@ -151,51 +214,79 @@ class IrisGainUiMixin:
             self._fallback_plot_label.setWordWrap(True)
             plot_layout.addWidget(self._fallback_plot_label, 1)
 
-        plot_hint = qtw.QLabel(
-            "Right-click plot for view actions (reset view, show all curves, copy plot).",
-        )
+        plot_hint = qtw.QLabel(plot_hint_text)
+        self._plot_hint_label = plot_hint
         plot_hint.setObjectName("MutedLabel")
         plot_hint.setWordWrap(True)
+        plot_hint.setToolTip(plot_hint_text)
+        plot_hint.setStatusTip(plot_hint_text)
         plot_layout.addWidget(plot_hint)
         splitter.addWidget(plot_panel)
-        splitter.setStretchFactor(0, 3)
-        splitter.setStretchFactor(1, 2)
+        splitter.setStretchFactor(0, 1)
+        splitter.setStretchFactor(1, 1)
+        splitter.setSizes([520, 520])
         layout.addWidget(splitter, 1)
-
-        if self._x_axis_combo is not None:
-            self._x_axis_combo.currentIndexChanged.connect(
-                self._on_x_axis_changed,
-            )
-        if self._y_axis_combo is not None:
-            self._y_axis_combo.currentIndexChanged.connect(
-                self._on_controls_changed,
-            )
-        if self._error_bar_combo is not None:
-            self._error_bar_combo.currentIndexChanged.connect(
-                self._on_controls_changed,
-            )
-        if self._round_sd_checkbox is not None:
-            self._round_sd_checkbox.toggled.connect(
-                self._on_controls_changed,
-            )
-        if self._gain_last_align_checkbox is not None:
-            self._gain_last_align_checkbox.toggled.connect(
-                self._on_controls_changed,
-            )
-        if self._trend_line_combo is not None:
-            self._trend_line_combo.currentIndexChanged.connect(
-                self._on_controls_changed,
-            )
-        if self._show_lines_checkbox is not None:
-            self._show_lines_checkbox.toggled.connect(
-                self._on_controls_changed,
-            )
         self._connect_plot_interactions()
+        self._finalize_widget_state()
+        return workspace_widget
 
-        self._root = root
+    def _finalize_widget_state(self) -> None:
+        """Finish UI wiring after controls/workspace widgets exist."""
+
+        if not getattr(self, "_control_signals_bound", False):
+            if self._x_axis_combo is not None:
+                self._x_axis_combo.currentIndexChanged.connect(
+                    self._on_x_axis_changed,
+                )
+            if self._y_axis_combo is not None:
+                self._y_axis_combo.currentIndexChanged.connect(
+                    self._on_controls_changed,
+                )
+            if self._error_bar_combo is not None:
+                self._error_bar_combo.currentIndexChanged.connect(
+                    self._on_controls_changed,
+                )
+            if self._round_sd_checkbox is not None:
+                self._round_sd_checkbox.toggled.connect(
+                    self._on_controls_changed,
+                )
+            if self._gain_last_align_checkbox is not None:
+                self._gain_last_align_checkbox.toggled.connect(
+                    self._on_controls_changed,
+                )
+            if self._trend_line_combo is not None:
+                self._trend_line_combo.currentIndexChanged.connect(
+                    self._on_controls_changed,
+                )
+            if self._show_lines_checkbox is not None:
+                self._show_lines_checkbox.toggled.connect(
+                    self._on_controls_changed,
+                )
+            self._control_signals_bound = True
         self._sync_y_axis_combo_for_x_mode()
         self._update_control_state()
-        return root
+
+    def has_collapsible_controls(self) -> bool:
+        """Return whether the plugin has a distinct controls panel."""
+
+        return self._controls_panel is not None
+
+    def set_controls_collapsed(self, collapsed: bool) -> None:
+        """Show or hide the plugin controls panel."""
+
+        if self._controls_panel is not None:
+            self._controls_panel.setVisible(not bool(collapsed))
+
+    def set_secondary_help_visible(self, visible: bool) -> None:
+        """Show or hide the compact plot hint line."""
+
+        if self._plot_hint_label is not None:
+            self._plot_hint_label.setVisible(bool(visible))
+
+    def workspace_splitter(self) -> qtw.QSplitter | None:
+        """Return the plugin workspace splitter for state persistence."""
+
+        return self._workspace_splitter
 
     @staticmethod
     def _make_title_label(text: str) -> qtw.QLabel:

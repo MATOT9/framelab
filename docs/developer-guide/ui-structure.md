@@ -119,7 +119,7 @@ This mixin owns analysis plugin hosting.
 Use it for:
 
 - analysis plugin instantiation
-- stacked-widget hosting
+- side-rail and workspace stacked-widget hosting
 - active analysis-plugin selection UI
 - analysis-context construction
 - dynamic visibility policy based on plugin UI capabilities
@@ -178,14 +178,14 @@ This is one of the most important UI boundaries in the app.
 
 - workflow tabs
 - the analysis-plugin selector
-- the stacked widget that contains analysis-plugin views
+- the left-rail controls stack and right-side workspace stack that contain analysis-plugin views
 - plugin menu containers under the **Plugins** menu
 - shared dataset and measurement context
 - theme propagation and visibility policy
 
 ### The plugin owns
 
-- its plugin-local widget tree
+- its plugin-local controls widget, workspace widget, or legacy combined widget
 - plugin-local rendering state
 - interpretation of the provided context
 - optional plugin-local menu actions inside the host-provided plugin menu
@@ -193,6 +193,13 @@ This is one of the most important UI boundaries in the app.
 ### Boundary rule
 
 Plugins should consume host-provided context and UI hooks. They should not silently become alternate owners of dataset state, shell structure, or cross-page UI policy.
+
+For analysis plugins, prefer the split host API when the plugin has a natural control surface and a natural workspace surface:
+
+- `create_controls_widget(parent)`
+- `create_workspace_widget(parent)`
+
+`create_widget(parent)` remains the fallback for legacy or compact plugin layouts, but new host-aware analysis plugins should let the page mixin own the outer shell structure.
 
 ## Threading and UI updates
 

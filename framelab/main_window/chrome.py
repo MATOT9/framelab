@@ -2,19 +2,39 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Any, Optional
 
 from PySide6 import QtGui, QtWidgets as qtw
-from PySide6.QtCore import Qt, QSignalBlocker, QSize
+from PySide6.QtCore import Qt, QSignalBlocker, QSize, QTimer
 
-from stylesheets import DARK_THEME, LIGHT_THEME
+from stylesheets import (
+    DARK_THEME,
+    LIGHT_THEME,
+    build_dark_theme,
+    build_light_theme,
+)
 
 from ..help_docs import open_help_page
+from ..preferences_dialog import PreferencesDialog
 from ..plugins import PAGE_IDS, enabled_plugin_manifests, load_enabled_plugins
+from ..ui_settings import UiPreferences
 
 
 class WindowChromeMixin:
     """Menu, toolbar, theme, and workflow-shell helpers."""
+
+    @staticmethod
+    def _set_uniform_layout_margins(
+        layout: qtw.QLayout | None,
+        horizontal: int,
+        vertical: int,
+    ) -> None:
+        """Apply symmetric horizontal/vertical margins to a layout."""
+
+        if layout is None:
+            return
+        layout.setContentsMargins(horizontal, vertical, horizontal, vertical)
 
     def _apply_base_font(self) -> None:
         preferred = (
@@ -78,8 +98,18 @@ class WindowChromeMixin:
         central.setObjectName("MainWindowCentral")
         central.setAutoFillBackground(True)
         root_layout = qtw.QVBoxLayout(central)
-        root_layout.setContentsMargins(12, 12, 12, 12)
-        root_layout.setSpacing(10)
+        self._root_layout = root_layout
+        tokens = getattr(self, "_active_density_tokens", None)
+        if tokens is not None:
+            self._set_uniform_layout_margins(
+                root_layout,
+                tokens.root_margin,
+                tokens.root_margin,
+            )
+            root_layout.setSpacing(tokens.page_spacing)
+        else:
+            root_layout.setContentsMargins(12, 12, 12, 12)
+            root_layout.setSpacing(10)
 
         self.workflow_tabs = qtw.QTabWidget()
         self.workflow_tabs.setDocumentMode(True)
@@ -178,6 +208,17 @@ class WindowChromeMixin:
         )
         select_all_action.triggered.connect(self._select_all_table_cells)
         edit_menu.addAction(select_all_action)
+
+        edit_menu.addSeparator()
+        preferences_action = QtGui.QAction("Preferences...", self)
+        preferences_action.setShortcut(QtGui.QKeySequence.Preferences)
+        self._apply_help_text(
+            preferences_action,
+            "Open application appearance and workspace preferences.",
+        )
+        preferences_action.triggered.connect(self._open_preferences_dialog)
+        edit_menu.addAction(preferences_action)
+        self.edit_preferences_action = preferences_action
 
         view_menu = menu_bar.addMenu("&View")
         preview_menu = view_menu.addMenu("Preview")
@@ -413,6 +454,20 @@ class WindowChromeMixin:
         )
         toolbar.addAction(self.toolbar_reload_plugins_action)
 
+        self.toolbar_preferences_action = QtGui.QAction(
+            self.style().standardIcon(qtw.QStyle.SP_FileDialogDetailedView),
+            "Preferences",
+            self,
+        )
+        self.toolbar_preferences_action.setToolTip(
+            "Open application preferences.",
+        )
+        self.toolbar_preferences_action.setStatusTip(
+            "Adjust appearance and workspace defaults.",
+        )
+        self.toolbar_preferences_action.triggered.connect(self._open_preferences_dialog)
+        toolbar.addAction(self.toolbar_preferences_action)
+
         toolbar.addSeparator()
 
         spacer = qtw.QWidget()
@@ -457,9 +512,9 @@ class WindowChromeMixin:
             engaged = analysis_index >= 0 and index == analysis_index
             if self._analysis_plugin_engaged != engaged:
                 self._analysis_plugin_engaged = engaged
-                if not engaged:
-                    self._metadata_controls_auto_expanded = False
                 self._apply_dynamic_visibility_policy()
+            if engaged and hasattr(self, "_restore_visible_analysis_layout"):
+                QTimer.singleShot(0, self._restore_visible_analysis_layout)
         self.context_hint = self._workflow_hint_for_index(index)
         self._set_status()
 
@@ -711,18 +766,145 @@ class WindowChromeMixin:
 
     def _apply_theme(self, mode: str) -> None:
         self._theme_mode = "dark" if mode == "dark" else "light"
-        stylesheet = DARK_THEME if self._theme_mode == "dark" else LIGHT_THEME
+        stylesheet = self._current_theme_stylesheet()
         app = qtw.QApplication.instance()
         if app is not None:
             app.setStyleSheet(stylesheet)
         else:
             self.setStyleSheet(stylesheet)
+        self._apply_density_to_shared_primitives()
         self.histogram_widget.set_theme(self._theme_mode)
         for plugin in self._analysis_plugins:
             plugin.set_theme(self._theme_mode)
         self._update_table_columns()
         self._update_average_controls()
 
+    def _apply_density(self) -> None:
+        """Reapply density-sensitive chrome without changing the theme mode."""
+
+        stylesheet = self._current_theme_stylesheet()
+        app = qtw.QApplication.instance()
+        if app is not None:
+            app.setStyleSheet(stylesheet)
+        else:
+            self.setStyleSheet(stylesheet)
+        self._apply_density_to_shared_primitives()
+        self._sync_tooltip_statuses()
+
+    def _current_theme_stylesheet(self) -> str:
+        """Return the active theme stylesheet using the current density tokens."""
+
+        tokens = getattr(self, "_active_density_tokens", None)
+        if tokens is None:
+            return DARK_THEME if self._theme_mode == "dark" else LIGHT_THEME
+        if self._theme_mode == "dark":
+            return build_dark_theme(tokens)
+        return build_light_theme(tokens)
+
+    def _apply_density_to_shared_primitives(self) -> None:
+        """Apply active density tokens to layouts and shared primitives."""
+
+        tokens = getattr(self, "_active_density_tokens", None)
+        if tokens is None:
+            return
+        if hasattr(self, "_root_layout"):
+            self._set_uniform_layout_margins(
+                self._root_layout,
+                tokens.root_margin,
+                tokens.root_margin,
+            )
+            self._root_layout.setSpacing(tokens.page_spacing)
+        if hasattr(self, "_apply_processing_banner_density"):
+            self._apply_processing_banner_density(tokens)
+        if hasattr(self, "_apply_data_page_density"):
+            self._apply_data_page_density(tokens)
+        if hasattr(self, "_apply_measure_page_density"):
+            self._apply_measure_page_density(tokens)
+        if hasattr(self, "_apply_analysis_page_density"):
+            self._apply_analysis_page_density(tokens)
+        compact_headers = tokens.title_pt < 20
+        for header_name in ("_data_header", "_measure_header", "_analysis_header"):
+            header = getattr(self, header_name, None)
+            if header is None:
+                continue
+            if hasattr(header, "apply_density"):
+                header.apply_density(tokens)
+            if hasattr(header, "set_compact_chip_mode"):
+                header.set_compact_chip_mode(compact_headers)
+        for strip_name in (
+            "_data_summary_strip",
+            "_measure_summary_strip",
+            "_analysis_summary_strip",
+        ):
+            strip = getattr(self, strip_name, None)
+            if strip is not None and hasattr(strip, "apply_density"):
+                strip.apply_density(tokens)
+
     def _on_theme_changed(self, mode: str) -> None:
         self._apply_theme(mode)
         self._sync_view_theme_actions()
+
+    def _current_ui_preferences(self) -> UiPreferences:
+        """Return the current effective UI preferences."""
+
+        return replace(
+            self.ui_preferences,
+            theme_mode=self._theme_mode,
+            show_image_preview=bool(self.show_image_preview),
+            show_histogram_preview=bool(self.show_histogram_preview),
+        )
+
+    def _preview_preferences_updated(self, prefs: UiPreferences) -> None:
+        """Apply live preference preview without persisting changes."""
+
+        self._apply_ui_preferences(prefs, persist=False)
+
+    def _on_preferences_updated(self, prefs: UiPreferences) -> None:
+        """Apply and persist preferences from the dialog."""
+
+        self._apply_ui_preferences(prefs, persist=True)
+
+    def _apply_ui_preferences(
+        self,
+        prefs: UiPreferences,
+        *,
+        persist: bool,
+    ) -> None:
+        """Apply UI preference changes to the live window."""
+
+        previous = self._current_ui_preferences()
+        self.ui_preferences = replace(prefs)
+
+        theme_changed = previous.theme_mode != prefs.theme_mode
+        preview_changed = (
+            previous.show_image_preview != prefs.show_image_preview
+            or previous.show_histogram_preview != prefs.show_histogram_preview
+        )
+
+        if theme_changed:
+            self._apply_theme(prefs.theme_mode)
+        else:
+            self._sync_view_theme_actions()
+
+        if preview_changed:
+            self.show_image_preview = prefs.show_image_preview
+            self.show_histogram_preview = prefs.show_histogram_preview
+            self._on_preview_visibility_changed()
+        else:
+            self._apply_dynamic_visibility_policy()
+
+        if persist:
+            self.ui_state_snapshot.preferences = replace(self.ui_preferences)
+            self._save_ui_state()
+
+    def _open_preferences_dialog(self) -> None:
+        """Open the Preferences dialog and apply accepted changes."""
+
+        snapshot = replace(
+            self.ui_state_snapshot,
+            preferences=self._current_ui_preferences(),
+        )
+        dialog = PreferencesDialog(snapshot, self)
+        dialog.preferences_changed.connect(self._preview_preferences_updated)
+        if dialog.exec() == qtw.QDialog.Accepted:
+            self._on_preferences_updated(dialog.current_preferences())

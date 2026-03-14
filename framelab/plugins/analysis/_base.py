@@ -48,6 +48,24 @@ class AnalysisPlugin(ABC):
     def create_widget(self, parent: qtw.QWidget) -> qtw.QWidget:
         """Create and return plugin UI widget."""
 
+    def create_controls_widget(
+        self,
+        parent: qtw.QWidget,
+    ) -> qtw.QWidget | None:
+        """Create and return an optional host-managed controls widget."""
+
+        _ = parent
+        return None
+
+    def create_workspace_widget(
+        self,
+        parent: qtw.QWidget,
+    ) -> qtw.QWidget | None:
+        """Create and return an optional host-managed workspace widget."""
+
+        _ = parent
+        return None
+
     @abstractmethod
     def on_context_changed(self, context: AnalysisContext) -> None:
         """Handle dataset/metric updates from the host app."""
@@ -71,6 +89,26 @@ class AnalysisPlugin(ABC):
             Menu instance already created by the host app for this plugin.
         """
         _ = menu
+
+    def has_collapsible_controls(self) -> bool:
+        """Return whether the plugin exposes a collapsible controls surface."""
+
+        return False
+
+    def set_controls_collapsed(self, collapsed: bool) -> None:
+        """Show or hide the plugin's secondary controls surface."""
+
+        _ = collapsed
+
+    def set_secondary_help_visible(self, visible: bool) -> None:
+        """Show or hide secondary hint text while keeping tooltips available."""
+
+        _ = visible
+
+    def workspace_splitter(self) -> qtw.QSplitter | None:
+        """Return an optional plugin workspace splitter for persistence."""
+
+        return None
 
     @staticmethod
     def _safe_float(value: object) -> float:

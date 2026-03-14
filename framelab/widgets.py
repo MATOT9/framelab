@@ -8,6 +8,10 @@ import numpy as np
 from PySide6 import QtCore, QtGui, QtWidgets as qtw
 from PySide6.QtCore import Qt, QPoint, QPointF, QRect, QRectF, QSize, Signal
 
+from .mpl_config import ensure_matplotlib_config_dir
+
+ensure_matplotlib_config_dir()
+
 try:
     from matplotlib.figure import Figure
     from matplotlib import pyplot as plt

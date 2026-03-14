@@ -1,6 +1,9 @@
 # documentation
 # *.pdf
 
+# Local runtime UI state
+config/ui_state.ini
+
 # Samples and archives
 EbusData
 archived
@@ -15,6 +18,7 @@ archived
 
 # Byte-compiled / optimized / DLL files
 */__pycache__/
+__pycache__
 *.py[cod]
 *$py.class
 

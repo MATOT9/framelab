@@ -36,10 +36,46 @@ from ..widgets import (
 class InspectPageMixin:
     """Measure-page construction and preview/control helpers."""
 
+    def _apply_measure_page_density(self, tokens) -> None:
+        """Apply density tokens to shared Measure-page layouts."""
+
+        layout = getattr(self, "_measure_page_layout", None)
+        if layout is not None:
+            layout.setSpacing(tokens.page_spacing)
+        control_panel_layout = getattr(self, "_measure_control_panel_layout", None)
+        if control_panel_layout is not None:
+            control_panel_layout.setSpacing(tokens.page_spacing)
+        metrics_layout = getattr(self, "_measure_metrics_layout", None)
+        if metrics_layout is not None:
+            self._set_uniform_layout_margins(
+                metrics_layout,
+                tokens.command_bar_margin_h,
+                tokens.command_bar_margin_v,
+            )
+            metrics_layout.setSpacing(tokens.command_bar_spacing)
+        for name in ("_measure_metrics_row", "_measure_topk_layout", "_measure_roi_row"):
+            row_layout = getattr(self, name, None)
+            if row_layout is not None:
+                row_layout.setSpacing(tokens.panel_spacing)
+        for name in ("_measure_table_layout", "_measure_image_panel_layout"):
+            panel_layout = getattr(self, name, None)
+            if panel_layout is not None:
+                self._set_uniform_layout_margins(
+                    panel_layout,
+                    tokens.panel_margin_h,
+                    tokens.panel_margin_v,
+                )
+                panel_layout.setSpacing(tokens.panel_spacing)
+        for name in ("_measure_image_page_layout", "_measure_hist_page_layout"):
+            nested_layout = getattr(self, name, None)
+            if nested_layout is not None:
+                nested_layout.setSpacing(tokens.panel_spacing)
+
     def _build_inspect_page(self) -> qtw.QWidget:
         """Build metrics inspection page (table + preview)."""
         page = qtw.QWidget()
         layout = qtw.QVBoxLayout(page)
+        self._measure_page_layout = layout
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(10)
         self._measure_header = build_page_header(
@@ -56,23 +92,40 @@ class InspectPageMixin:
         layout.addWidget(self._build_control_panel())
 
         splitter = qtw.QSplitter(Qt.Horizontal)
+        self.measure_main_splitter = splitter
         splitter.addWidget(self._build_table_panel())
         splitter.addWidget(self._build_image_panel())
         splitter.setStretchFactor(0, 3)
         splitter.setStretchFactor(1, 2)
+        splitter.splitterMoved.connect(
+            lambda _pos, _index: self._persist_splitter_state(
+                "measure.main_splitter",
+                splitter,
+            )
+            if hasattr(self, "_persist_splitter_state")
+            else None,
+        )
         install_large_splitter_handle_cursors(splitter)
         layout.addWidget(splitter, 1)
+        if hasattr(self, "_restore_splitter_state"):
+            self._restore_splitter_state("measure.main_splitter", splitter)
+        if hasattr(self, "_policy_for_page"):
+            self._apply_measure_page_visibility_policy(
+                self._policy_for_page("measure"),
+            )
         return page
 
     def _build_control_panel(self) -> qtw.QWidget:
         panel = qtw.QWidget()
         layout = qtw.QVBoxLayout(panel)
+        self._measure_control_panel_layout = layout
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(10)
 
         metrics_group = qtw.QFrame()
         metrics_group.setObjectName("CommandBar")
         metrics_layout = qtw.QVBoxLayout(metrics_group)
+        self._measure_metrics_layout = metrics_layout
         metrics_layout.setContentsMargins(14, 12, 14, 12)
         metrics_layout.setSpacing(8)
 
@@ -81,6 +134,7 @@ class InspectPageMixin:
         metrics_layout.addWidget(metrics_title)
 
         metrics_row = qtw.QHBoxLayout()
+        self._measure_metrics_row = metrics_row
         metrics_row.setSpacing(8)
         thr_label = qtw.QLabel("Saturation Threshold (>=)")
         thr_label.setObjectName("SectionTitle")
@@ -96,7 +150,7 @@ class InspectPageMixin:
         )
         metrics_row.addWidget(self.threshold_spin)
 
-        apply_threshold_button = qtw.QPushButton("Apply Threshold")
+        apply_threshold_button = qtw.QPushButton("Apply")
         apply_threshold_button.setObjectName("AccentButton")
         apply_threshold_button.setToolTip(
             "Apply threshold change and refresh saturation display.",
@@ -126,6 +180,7 @@ class InspectPageMixin:
 
         self.topk_controls_widget = qtw.QWidget()
         topk_layout = qtw.QHBoxLayout(self.topk_controls_widget)
+        self._measure_topk_layout = topk_layout
         topk_layout.setContentsMargins(0, 0, 0, 0)
         topk_layout.setSpacing(8)
 
@@ -155,40 +210,23 @@ class InspectPageMixin:
         metrics_row.addWidget(self.topk_controls_widget)
 
         metrics_row.addSpacing(12)
-        rounding_label = qtw.QLabel("Display Rounding")
-        rounding_label.setObjectName("SectionTitle")
-        metrics_row.addWidget(rounding_label)
-        self.rounding_mode_combo = qtw.QComboBox()
-        self.rounding_mode_combo.addItem("Off", "off")
-        self.rounding_mode_combo.addItem("1 s.d. from Std", "std")
-        self.rounding_mode_combo.addItem("1 s.d. from Std Err", "stderr")
-        self.rounding_mode_combo.setCurrentIndex(0)
-        self.rounding_mode_combo.setToolTip(
-            "Display rounding mode for mean/std/std err columns.",
+        self.measure_display_button = qtw.QToolButton()
+        self.measure_display_button.setObjectName("DisclosureButton")
+        self.measure_display_button.setPopupMode(qtw.QToolButton.InstantPopup)
+        self.measure_display_button.setText("Display")
+        self.measure_display_button.setToolTip(
+            "Open rounding and normalization display options.",
         )
-        self.rounding_mode_combo.currentIndexChanged.connect(
-            self._on_rounding_mode_changed,
+        self.measure_display_button.setMenu(
+            self._build_measure_display_menu(),
         )
-        metrics_row.addWidget(self.rounding_mode_combo)
-
-        self.normalize_intensity_checkbox = qtw.QCheckBox(
-            "Normalize Intensity (0-1)"
-        )
-        self.normalize_intensity_checkbox.setChecked(
-            self.metrics_state.normalize_intensity_values
-        )
-        self.normalize_intensity_checkbox.setToolTip(
-            "Show intensity-based values normalized by dataset max.",
-        )
-        self.normalize_intensity_checkbox.toggled.connect(
-            self._on_normalize_intensity_toggled
-        )
-        metrics_row.addWidget(self.normalize_intensity_checkbox)
+        metrics_row.addWidget(self.measure_display_button)
         metrics_row.addStretch(1)
         metrics_layout.addLayout(metrics_row)
 
         self.roi_controls_widget = qtw.QWidget()
         roi_row = qtw.QHBoxLayout(self.roi_controls_widget)
+        self._measure_roi_row = roi_row
         roi_row.setContentsMargins(0, 0, 0, 0)
         roi_row.setSpacing(8)
 
@@ -237,6 +275,7 @@ class InspectPageMixin:
         metrics_layout.addWidget(self.roi_controls_widget)
         self.roi_controls_widget.setVisible(False)
         layout.addWidget(metrics_group)
+        self._sync_measure_display_menu_state()
         self._refresh_measure_header_state()
 
         return panel
@@ -245,6 +284,7 @@ class InspectPageMixin:
         panel = qtw.QFrame()
         panel.setObjectName("TablePanel")
         layout = qtw.QVBoxLayout(panel)
+        self._measure_table_layout = layout
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(8)
 
@@ -376,6 +416,7 @@ class InspectPageMixin:
         panel = qtw.QFrame()
         panel.setObjectName("ImagePanel")
         layout = qtw.QVBoxLayout(panel)
+        self._measure_image_panel_layout = layout
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(8)
 
@@ -393,6 +434,7 @@ class InspectPageMixin:
 
         image_page = qtw.QWidget()
         image_layout = qtw.QVBoxLayout(image_page)
+        self._measure_image_page_layout = image_layout
         image_layout.setContentsMargins(0, 0, 0, 0)
         image_layout.setSpacing(6)
 
@@ -405,9 +447,8 @@ class InspectPageMixin:
         image_layout.addWidget(self.image_preview, 1)
 
         self.preview_help_label = qtw.QLabel(
-            "Wheel: zoom | Drag: move (or middle-drag in ROI mode) | "
-            "Double-click: reset view | ROI mode: left-drag to draw, "
-            "or drag inside ROI to move."
+            "Wheel to zoom, drag to pan, and double-click to reset. "
+            "ROI mode uses left-drag to draw or reposition the ROI."
         )
         self.preview_help_label.setObjectName("MutedLabel")
         self.preview_help_label.setWordWrap(True)
@@ -418,6 +459,7 @@ class InspectPageMixin:
 
         hist_page = qtw.QWidget()
         hist_layout = qtw.QVBoxLayout(hist_page)
+        self._measure_hist_page_layout = hist_layout
         hist_layout.setContentsMargins(0, 0, 0, 0)
         hist_layout.setSpacing(6)
 
@@ -429,7 +471,7 @@ class InspectPageMixin:
         hist_layout.addWidget(self.histogram_widget, 1)
 
         self.histogram_help_label = qtw.QLabel(
-            "Histogram of pixel intensity occurrences for the selected image."
+            "Histogram for the selected image after active preprocessing."
         )
         self.histogram_help_label.setObjectName("MutedLabel")
         self.histogram_help_label.setWordWrap(True)
@@ -447,11 +489,100 @@ class InspectPageMixin:
         self.info_label.setWordWrap(True)
         layout.addWidget(self.info_label)
         self._update_preview_page_visibility()
+        if hasattr(self, "_active_density_tokens"):
+            self._apply_measure_page_density(self._active_density_tokens)
         return panel
 
     def _current_average_mode(self) -> str:
         mode = self.avg_mode_combo.currentData()
         return str(mode) if mode is not None else "none"
+
+    def _build_measure_display_menu(self) -> qtw.QMenu:
+        """Build compact display-options menu for the Measure top band."""
+
+        menu = qtw.QMenu(self)
+        self.measure_normalize_action = menu.addAction(
+            "Normalize Intensity (0-1)",
+        )
+        self.measure_normalize_action.setCheckable(True)
+        self.measure_normalize_action.toggled.connect(
+            self._on_normalize_intensity_toggled,
+        )
+
+        rounding_menu = menu.addMenu("Rounding")
+        self._measure_rounding_actions: dict[str, QtGui.QAction] = {}
+        self._measure_rounding_action_group = QtGui.QActionGroup(rounding_menu)
+        self._measure_rounding_action_group.setExclusive(True)
+        for label, mode in (
+            ("Off", "off"),
+            ("1 s.d. from Std", "std"),
+            ("1 s.d. from Std Err", "stderr"),
+        ):
+            action = rounding_menu.addAction(label)
+            action.setCheckable(True)
+            action.setData(mode)
+            action.triggered.connect(
+                lambda _checked=False, rounding_mode=mode: self._set_rounding_mode(
+                    rounding_mode,
+                ),
+            )
+            self._measure_rounding_action_group.addAction(action)
+            self._measure_rounding_actions[mode] = action
+
+        return menu
+
+    def _sync_measure_display_menu_state(self) -> None:
+        """Sync display-menu actions and button tooltip from current state."""
+
+        metrics = self.metrics_state
+        normalize_action = getattr(self, "measure_normalize_action", None)
+        if normalize_action is not None:
+            blocker = QSignalBlocker(normalize_action)
+            normalize_action.setChecked(bool(metrics.normalize_intensity_values))
+            del blocker
+
+        rounding_mode = str(getattr(metrics, "rounding_mode", "off") or "off")
+        for mode, action in getattr(self, "_measure_rounding_actions", {}).items():
+            blocker = QSignalBlocker(action)
+            action.setChecked(mode == rounding_mode)
+            del blocker
+
+        button = getattr(self, "measure_display_button", None)
+        if button is None:
+            return
+        rounding_label = {
+            "off": "full precision",
+            "std": "Std rounding",
+            "stderr": "Std err rounding",
+        }.get(rounding_mode, "full precision")
+        normalization_label = (
+            "normalized"
+            if metrics.normalize_intensity_values
+            else "raw DN"
+        )
+        button.setToolTip(
+            "Open rounding and normalization display options. "
+            f"Current: {normalization_label}, {rounding_label}.",
+        )
+
+    def _apply_measure_page_visibility_policy(self, policy) -> None:
+        """Apply page-specific visibility policy to Measure-page widgets."""
+
+        if hasattr(self, "_measure_summary_strip"):
+            self._measure_summary_strip.set_collapsed(not policy.show_summary_strip)
+        self._set_measure_help_visibility(policy.show_measure_help_labels)
+
+    def _set_measure_help_visibility(self, visible: bool) -> None:
+        """Show contextual preview help only when both policy and preview allow it."""
+
+        if hasattr(self, "preview_help_label"):
+            self.preview_help_label.setVisible(
+                bool(visible) and bool(self.show_image_preview),
+            )
+        if hasattr(self, "histogram_help_label"):
+            self.histogram_help_label.setVisible(
+                bool(visible) and bool(self.show_histogram_preview),
+            )
 
     def _update_preview_page_visibility(self) -> None:
         show_any = self.show_image_preview or self.show_histogram_preview
@@ -460,27 +591,28 @@ class InspectPageMixin:
             self.preview_pages.setTabVisible(0, self.show_image_preview)
             self.preview_pages.setTabVisible(1, self.show_histogram_preview)
 
-        if self.show_image_preview:
-            self.preview_help_label.show()
-        else:
+        if not self.show_image_preview:
             self.preview_help_label.hide()
             self.image_preview.clear_image()
             self.image_preview.set_intensity_image(None)
 
-        if self.show_histogram_preview:
-            self.histogram_help_label.show()
-        else:
+        if not self.show_histogram_preview:
             self.histogram_help_label.hide()
             self.histogram_widget.clear_histogram()
 
         if not show_any:
             self.info_label.setText("Preview disabled.")
+            self._set_measure_help_visibility(False)
             return
 
         if self.show_image_preview:
             self.preview_pages.setCurrentIndex(0)
         elif self.show_histogram_preview:
             self.preview_pages.setCurrentIndex(1)
+        help_visible = True
+        if hasattr(self, "_policy_for_page"):
+            help_visible = self._policy_for_page("measure").show_measure_help_labels
+        self._set_measure_help_visibility(help_visible)
         self._refresh_measure_header_state()
 
     def _show_preview_context_menu(self, pos) -> None:
@@ -535,13 +667,19 @@ class InspectPageMixin:
         if not self.show_image_preview:
             self.image_preview.clear_image()
             self.image_preview.set_intensity_image(None)
+        if hasattr(self, "_apply_dynamic_visibility_policy"):
+            self._apply_dynamic_visibility_policy()
 
-    def _on_rounding_mode_changed(self, _index: int) -> None:
-        """Update scientific rounding mode from combo-box selection."""
+    def _set_rounding_mode(self, mode: str) -> None:
+        """Update scientific rounding mode from compact display controls."""
+
         dataset = self.dataset_state
         metrics = self.metrics_state
-        mode = self.rounding_mode_combo.currentData()
-        metrics.rounding_mode = str(mode) if mode is not None else "off"
+        metrics.rounding_mode = (
+            str(mode)
+            if str(mode) in {"off", "std", "stderr"}
+            else "off"
+        )
         self.table_model.set_rounding_mode(metrics.rounding_mode)
         if (
             dataset.selected_index is not None
@@ -549,6 +687,7 @@ class InspectPageMixin:
         ):
             self._display_image(dataset.selected_index)
         self._update_analysis_context()
+        self._sync_measure_display_menu_state()
 
     def _normalization_scale(self) -> float:
         """Return positive intensity scale used for 0-1 normalization."""
@@ -679,6 +818,7 @@ class InspectPageMixin:
         ):
             self._display_image(dataset.selected_index)
         self._update_analysis_context()
+        self._sync_measure_display_menu_state()
         self._refresh_measure_header_state()
 
     def _background_config_snapshot(self) -> BackgroundConfig:
@@ -1268,7 +1408,9 @@ class InspectPageMixin:
         self._update_background_status_label("cleared")
         self._set_status("Background reference cleared")
 
-    def _update_average_controls(self) -> None:
+    def _update_measure_contextual_controls_visibility(self) -> None:
+        """Show Measure controls only when the active mode makes them relevant."""
+
         mode = self._current_average_mode()
         topk_enabled = mode == "topk"
         self.topk_controls_widget.setVisible(topk_enabled)
@@ -1304,3 +1446,8 @@ class InspectPageMixin:
         )
         self.roi_apply_progress.setVisible(metrics.is_roi_applying and roi_enabled)
         self._refresh_measure_header_state()
+
+    def _update_average_controls(self) -> None:
+        """Compatibility wrapper for measure contextual-control updates."""
+
+        self._update_measure_contextual_controls_visibility()

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from string import Template
 
+from framelab.ui_density import DensityTokens, comfortable_density_tokens
+
 
 _THEME_TEMPLATE = Template(
     """
@@ -23,7 +25,7 @@ QToolTip {
     background: $tooltip_bg;
     color: $tooltip_fg;
     border: 1px solid $tooltip_border;
-    padding: 5px 7px;
+    padding: ${input_padding_v}px ${input_padding_h}px;
 }
 QMenuBar {
     background: $menu_bg;
@@ -35,7 +37,7 @@ QMenuBar {
 }
 QMenuBar::item {
     background: transparent;
-    padding: 5px 10px;
+    padding: ${menu_item_padding_v}px ${menu_item_padding_h}px;
     border-radius: 6px;
 }
 QMenuBar::item:selected {
@@ -47,7 +49,7 @@ QMenu {
     border: 1px solid $border;
 }
 QMenu::item {
-    padding: 6px 18px;
+    padding: ${menu_item_padding_v}px ${menu_item_padding_h}px;
 }
 QMenu::item:selected {
     background: $selection_bg;
@@ -57,8 +59,8 @@ QToolBar {
     background: $menu_bg;
     border: none;
     border-bottom: 1px solid $border;
-    spacing: 8px;
-    padding: 7px 8px;
+    spacing: ${toolbar_spacing}px;
+    padding: ${toolbar_padding_v}px ${toolbar_padding_h}px;
 }
 QMainWindow::separator {
     background: $border;
@@ -115,8 +117,8 @@ QGroupBox {
     background: transparent;
     border: 1px solid $subtle_border;
     border-radius: 10px;
-    margin-top: 12px;
-    padding-top: 10px;
+    margin-top: ${groupbox_margin_top}px;
+    padding-top: ${groupbox_padding_top}px;
     font-weight: 600;
 }
 QGroupBox::title {
@@ -133,12 +135,12 @@ QLabel {
 }
 QLabel#PageHeaderTitle {
     color: $heading;
-    font-size: 20px;
+    font-size: ${title_pt}px;
     font-weight: 650;
 }
 QLabel#PageHeaderSubtitle {
     color: $muted;
-    font-size: 12px;
+    font-size: ${subtitle_pt}px;
 }
 QLabel#SectionTitle {
     color: $heading;
@@ -150,20 +152,20 @@ QLabel#MutedLabel {
 }
 QLabel#SummaryValue {
     color: $heading;
-    font-size: 16px;
+    font-size: ${summary_value_pt}px;
     font-weight: 650;
 }
 QLabel#SummaryLabel {
     color: $muted;
-    font-size: 11px;
+    font-size: ${summary_label_pt}px;
 }
 QLabel#StatusChip {
     background: $chip_bg;
     border: 1px solid $chip_border;
     border-radius: 999px;
     color: $heading;
-    padding: 4px 10px;
-    font-size: 11px;
+    padding: ${chip_padding_v}px ${chip_padding_h}px;
+    font-size: ${chip_pt}px;
     font-weight: 650;
 }
 QLabel#StatusChip[statusLevel="neutral"] {
@@ -217,7 +219,7 @@ QComboBox {
     background: $field_bg;
     border: 1px solid $field_border;
     border-radius: 8px;
-    padding: 5px 7px;
+    padding: ${input_padding_v}px ${input_padding_h}px;
     color: $text;
     font-weight: 400;
 }
@@ -252,14 +254,14 @@ QFileDialog QHeaderView::section {
     color: $text;
     border: none;
     border-bottom: 1px solid $border;
-    padding: 6px;
+    padding: ${header_padding}px;
     font-weight: 500;
 }
 QFileDialog QToolButton {
     background: $subtle_surface;
     border: 1px solid $field_border;
     border-radius: 6px;
-    padding: 3px;
+    padding: ${small_button_padding}px;
     color: $text;
 }
 QFileDialog QToolButton:hover {
@@ -285,7 +287,7 @@ QPushButton {
     background: $button_bg;
     border: 1px solid $button_border;
     border-radius: 8px;
-    padding: 6px 12px;
+    padding: ${button_padding_v}px ${button_padding_h}px;
     color: $text;
     font-weight: 500;
 }
@@ -296,7 +298,7 @@ QToolButton#DisclosureButton {
     background: $button_bg;
     border: 1px solid $button_border;
     border-radius: 8px;
-    padding: 6px 10px;
+    padding: ${button_padding_v}px ${disclosure_padding_h}px;
     color: $text;
     font-weight: 500;
     text-align: left;
@@ -342,7 +344,7 @@ QTabBar::tab {
     border-bottom: none;
     border-top-left-radius: 8px;
     border-top-right-radius: 8px;
-    padding: 7px 12px;
+    padding: ${tab_padding_v}px ${tab_padding_h}px;
     margin-right: 4px;
     font-weight: 500;
 }
@@ -386,10 +388,10 @@ QListView {
 }
 QListWidget::item,
 QListView::item {
-    padding: 4px 6px;
+    padding: ${list_item_padding_v}px ${list_item_padding_h}px;
 }
 QTableView::item {
-    padding: 4px;
+    padding: ${table_item_padding}px;
 }
 QTableCornerButton::section {
     background: $header_bg;
@@ -404,7 +406,7 @@ QHeaderView::section {
     color: $text;
     border: none;
     border-bottom: 1px solid $border;
-    padding: 8px;
+    padding: ${header_padding}px;
     font-weight: 600;
 }
 QWidget#EbusInspectTreeHeaderViewport {
@@ -440,104 +442,152 @@ QTreeWidget#EbusInspectTree QScrollBar::sub-page:horizontal {
 )
 
 
-def _build_theme(palette: dict[str, str]) -> str:
-    """Render one stylesheet from a semantic palette."""
-    return _THEME_TEMPLATE.substitute(palette)
+_LIGHT_PALETTE = {
+    "window_bg": "#f3f6fb",
+    "surface": "#ffffff",
+    "subtle_surface": "#eef3fb",
+    "alt_surface": "#f8fbff",
+    "canvas_bg": "#f8fbff",
+    "menu_bg": "#ffffff",
+    "header_bg": "#eef3fb",
+    "status_bg": "#eef3fb",
+    "text": "#1f2937",
+    "heading": "#0f172a",
+    "muted": "#5f6b7a",
+    "border": "#dce5f2",
+    "subtle_border": "#e4ebf7",
+    "field_bg": "#ffffff",
+    "field_border": "#c7d6ea",
+    "checkbox_border": "#94a3b8",
+    "button_bg": "#eef3fb",
+    "button_border": "#d4e0f0",
+    "hover_bg": "#e4ebf7",
+    "tab_bg": "#eef3fb",
+    "gridline": "#edf2f9",
+    "selection_bg": "#dbeafe",
+    "selection_fg": "#1f2937",
+    "accent": "#2563eb",
+    "accent_hover": "#1d4ed8",
+    "focus_border": "#3b82f6",
+    "tooltip_bg": "#ffffff",
+    "tooltip_fg": "#1f2937",
+    "tooltip_border": "#c7d6ea",
+    "chip_bg": "#eef3fb",
+    "chip_border": "#d4e0f0",
+    "info_bg": "#e0f2fe",
+    "info_border": "#7dd3fc",
+    "info_fg": "#0c4a6e",
+    "success_bg": "#dcfce7",
+    "success_border": "#86efac",
+    "success_fg": "#166534",
+    "warning_bg": "#fef3c7",
+    "warning_border": "#fcd34d",
+    "warning_fg": "#92400e",
+    "error_bg": "#fee2e2",
+    "error_border": "#fca5a5",
+    "error_fg": "#991b1b",
+}
+
+_DARK_PALETTE = {
+    "window_bg": "#111827",
+    "surface": "#1f2937",
+    "subtle_surface": "#273548",
+    "alt_surface": "#243140",
+    "canvas_bg": "#0f172a",
+    "menu_bg": "#1f2937",
+    "header_bg": "#2b3a4d",
+    "status_bg": "#0f172a",
+    "text": "#e5e7eb",
+    "heading": "#f3f4f6",
+    "muted": "#9ca3af",
+    "border": "#334155",
+    "subtle_border": "#3b4c61",
+    "field_bg": "#1f2937",
+    "field_border": "#475569",
+    "checkbox_border": "#64748b",
+    "button_bg": "#334155",
+    "button_border": "#475569",
+    "hover_bg": "#3f5065",
+    "tab_bg": "#2b3a4d",
+    "gridline": "#334155",
+    "selection_bg": "#1d4ed8",
+    "selection_fg": "#f3f4f6",
+    "accent": "#3b82f6",
+    "accent_hover": "#2563eb",
+    "focus_border": "#60a5fa",
+    "tooltip_bg": "#1f2937",
+    "tooltip_fg": "#f3f4f6",
+    "tooltip_border": "#475569",
+    "chip_bg": "#334155",
+    "chip_border": "#475569",
+    "info_bg": "#082f49",
+    "info_border": "#0ea5e9",
+    "info_fg": "#e0f2fe",
+    "success_bg": "#052e16",
+    "success_border": "#22c55e",
+    "success_fg": "#dcfce7",
+    "warning_bg": "#451a03",
+    "warning_border": "#f59e0b",
+    "warning_fg": "#fef3c7",
+    "error_bg": "#450a0a",
+    "error_border": "#ef4444",
+    "error_fg": "#fee2e2",
+}
 
 
-LIGHT_THEME = _build_theme(
-    {
-        "window_bg": "#f3f6fb",
-        "surface": "#ffffff",
-        "subtle_surface": "#eef3fb",
-        "alt_surface": "#f8fbff",
-        "canvas_bg": "#f8fbff",
-        "menu_bg": "#ffffff",
-        "header_bg": "#eef3fb",
-        "status_bg": "#eef3fb",
-        "text": "#1f2937",
-        "heading": "#0f172a",
-        "muted": "#5f6b7a",
-        "border": "#dce5f2",
-        "subtle_border": "#e4ebf7",
-        "field_bg": "#ffffff",
-        "field_border": "#c7d6ea",
-        "checkbox_border": "#94a3b8",
-        "button_bg": "#eef3fb",
-        "button_border": "#d4e0f0",
-        "hover_bg": "#e4ebf7",
-        "tab_bg": "#eef3fb",
-        "gridline": "#edf2f9",
-        "selection_bg": "#dbeafe",
-        "selection_fg": "#1f2937",
-        "accent": "#2563eb",
-        "accent_hover": "#1d4ed8",
-        "focus_border": "#3b82f6",
-        "tooltip_bg": "#ffffff",
-        "tooltip_fg": "#1f2937",
-        "tooltip_border": "#c7d6ea",
-        "chip_bg": "#eef3fb",
-        "chip_border": "#d4e0f0",
-        "info_bg": "#e0f2fe",
-        "info_border": "#7dd3fc",
-        "info_fg": "#0c4a6e",
-        "success_bg": "#dcfce7",
-        "success_border": "#86efac",
-        "success_fg": "#166534",
-        "warning_bg": "#fef3c7",
-        "warning_border": "#fcd34d",
-        "warning_fg": "#92400e",
-        "error_bg": "#fee2e2",
-        "error_border": "#fca5a5",
-        "error_fg": "#991b1b",
-    }
-)
+def build_theme_stylesheet(
+    palette: dict[str, str],
+    density: DensityTokens,
+) -> str:
+    """Render one stylesheet from a semantic palette and density tokens."""
+
+    payload = dict(palette)
+    payload.update(
+        {
+            "input_padding_h": str(density.input_padding_h),
+            "input_padding_v": str(density.input_padding_v),
+            "menu_item_padding_h": str(density.menu_item_padding_h),
+            "menu_item_padding_v": str(density.menu_item_padding_v),
+            "toolbar_padding_h": str(density.toolbar_padding_h),
+            "toolbar_padding_v": str(density.toolbar_padding_v),
+            "toolbar_spacing": str(density.panel_spacing),
+            "groupbox_margin_top": str(density.panel_margin_v + 2),
+            "groupbox_padding_top": str(density.panel_spacing + 2),
+            "title_pt": str(density.title_pt),
+            "subtitle_pt": str(density.subtitle_pt),
+            "summary_value_pt": str(density.summary_value_pt),
+            "summary_label_pt": str(density.summary_label_pt),
+            "chip_padding_h": str(density.chip_padding_h),
+            "chip_padding_v": str(density.chip_padding_v),
+            "chip_pt": str(density.chip_pt),
+            "header_padding": str(max(6, density.panel_spacing)),
+            "small_button_padding": str(max(2, density.input_padding_v - 1)),
+            "button_padding_h": str(density.button_padding_h),
+            "button_padding_v": str(density.button_padding_v),
+            "disclosure_padding_h": str(max(8, density.button_padding_h - 2)),
+            "tab_padding_h": str(density.tab_padding_h),
+            "tab_padding_v": str(density.tab_padding_v),
+            "list_item_padding_h": str(max(4, density.input_padding_h - 1)),
+            "list_item_padding_v": str(max(3, density.input_padding_v - 1)),
+            "table_item_padding": str(max(3, density.input_padding_v - 1)),
+        },
+    )
+    return _THEME_TEMPLATE.substitute(payload)
 
 
-DARK_THEME = _build_theme(
-    {
-        "window_bg": "#111827",
-        "surface": "#1f2937",
-        "subtle_surface": "#273548",
-        "alt_surface": "#243140",
-        "canvas_bg": "#0f172a",
-        "menu_bg": "#1f2937",
-        "header_bg": "#2b3a4d",
-        "status_bg": "#0f172a",
-        "text": "#e5e7eb",
-        "heading": "#f3f4f6",
-        "muted": "#9ca3af",
-        "border": "#334155",
-        "subtle_border": "#3b4c61",
-        "field_bg": "#1f2937",
-        "field_border": "#475569",
-        "checkbox_border": "#64748b",
-        "button_bg": "#334155",
-        "button_border": "#475569",
-        "hover_bg": "#3f5065",
-        "tab_bg": "#2b3a4d",
-        "gridline": "#334155",
-        "selection_bg": "#1d4ed8",
-        "selection_fg": "#f3f4f6",
-        "accent": "#3b82f6",
-        "accent_hover": "#2563eb",
-        "focus_border": "#60a5fa",
-        "tooltip_bg": "#1f2937",
-        "tooltip_fg": "#f3f4f6",
-        "tooltip_border": "#475569",
-        "chip_bg": "#334155",
-        "chip_border": "#475569",
-        "info_bg": "#082f49",
-        "info_border": "#0ea5e9",
-        "info_fg": "#e0f2fe",
-        "success_bg": "#052e16",
-        "success_border": "#22c55e",
-        "success_fg": "#dcfce7",
-        "warning_bg": "#451a03",
-        "warning_border": "#f59e0b",
-        "warning_fg": "#fef3c7",
-        "error_bg": "#450a0a",
-        "error_border": "#ef4444",
-        "error_fg": "#fee2e2",
-    }
-)
+def build_light_theme(density: DensityTokens) -> str:
+    """Return the light stylesheet for one density token set."""
+
+    return build_theme_stylesheet(_LIGHT_PALETTE, density)
+
+
+def build_dark_theme(density: DensityTokens) -> str:
+    """Return the dark stylesheet for one density token set."""
+
+    return build_theme_stylesheet(_DARK_PALETTE, density)
+
+
+_DEFAULT_DENSITY = comfortable_density_tokens()
+
+LIGHT_THEME = build_light_theme(_DEFAULT_DENSITY)
+DARK_THEME = build_dark_theme(_DEFAULT_DENSITY)

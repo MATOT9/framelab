@@ -15,11 +15,6 @@ from ..acquisition_datacard import (
     SESSION_DATACARD_NAME,
 )
 from ..datacard_labels import label_for_metadata_field
-from ..ebus import (
-    discover_ebus_snapshot_path,
-    discover_effective_ebus_snapshot_path,
-    ebus_enabled_for_acquisition,
-)
 from ..metadata import (
     clear_metadata_cache,
     extract_path_metadata,
@@ -31,6 +26,7 @@ from ..ui_primitives import (
     SummaryItem,
     build_page_header,
     build_summary_strip,
+    make_status_chip,
 )
 from ..widgets import install_large_header_resize_cursor
 
@@ -114,10 +110,53 @@ class _SkipRulesEditorDialog(qtw.QDialog):
 class DataPageMixin:
     """Dataset input, skip rules, and metadata table helpers."""
 
+    def _apply_data_page_density(self, tokens) -> None:
+        """Apply density tokens to shared Data-page layouts."""
+
+        layout = getattr(self, "_data_page_layout", None)
+        if layout is not None:
+            layout.setSpacing(tokens.page_spacing)
+        command_layout = getattr(self, "_data_command_layout", None)
+        if command_layout is not None:
+            self._set_uniform_layout_margins(
+                command_layout,
+                tokens.command_bar_margin_h,
+                tokens.command_bar_margin_v,
+            )
+            command_layout.setSpacing(tokens.command_bar_spacing)
+        advanced_row = getattr(self, "_data_advanced_row_layout", None)
+        if advanced_row is not None:
+            advanced_row.setSpacing(tokens.page_spacing)
+        for name in (
+            "_data_skip_layout",
+            "_data_metadata_outer_layout",
+            "_data_table_layout",
+        ):
+            panel_layout = getattr(self, name, None)
+            if panel_layout is None:
+                continue
+            self._set_uniform_layout_margins(
+                panel_layout,
+                tokens.panel_margin_h,
+                tokens.panel_margin_v,
+            )
+            panel_layout.setSpacing(tokens.panel_spacing)
+        for name in (
+            "_data_metadata_header_row",
+            "_data_metadata_group_layout",
+            "_data_metadata_row",
+            "_data_skip_header_row",
+        ):
+            nested_layout = getattr(self, name, None)
+            if nested_layout is None:
+                continue
+            nested_layout.setSpacing(tokens.panel_spacing)
+
     def _build_data_page(self) -> qtw.QWidget:
         """Build dataset-loading and metadata inspection page."""
         page = qtw.QWidget()
         layout = qtw.QVBoxLayout(page)
+        self._data_page_layout = layout
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(10)
 
@@ -134,6 +173,7 @@ class DataPageMixin:
         command_bar = qtw.QFrame()
         command_bar.setObjectName("CommandBar")
         command_layout = qtw.QHBoxLayout(command_bar)
+        self._data_command_layout = command_layout
         command_layout.setContentsMargins(14, 12, 14, 12)
         command_layout.setSpacing(8)
 
@@ -172,69 +212,94 @@ class DataPageMixin:
             lambda _checked=False: self.load_folder(),
         )
         command_layout.addWidget(load_button)
+
+        self.data_advanced_toggle = qtw.QToolButton()
+        self.data_advanced_toggle.setObjectName("DisclosureButton")
+        self.data_advanced_toggle.setToolButtonStyle(
+            Qt.ToolButtonTextBesideIcon
+        )
+        self.data_advanced_toggle.setArrowType(Qt.RightArrow)
+        self.data_advanced_toggle.setCheckable(True)
+        self.data_advanced_toggle.setChecked(False)
+        self.data_advanced_toggle.setText("Intake Controls (Show)")
+        self.data_advanced_toggle.setToolTip(
+            "Expand/collapse skip rules and metadata intake controls.",
+        )
+        self.data_advanced_toggle.toggled.connect(
+            self._on_data_advanced_row_toggled,
+        )
+        command_layout.addWidget(self.data_advanced_toggle)
         layout.addWidget(command_bar)
 
         self._data_summary_strip = build_summary_strip()
         layout.addWidget(self._data_summary_strip)
 
-        advanced_row = qtw.QHBoxLayout()
+        advanced_container = qtw.QWidget()
+        self._data_advanced_container = advanced_container
+        advanced_row = qtw.QHBoxLayout(advanced_container)
+        self._data_advanced_row_layout = advanced_row
+        advanced_row.setContentsMargins(0, 0, 0, 0)
         advanced_row.setSpacing(10)
 
         skip_panel = qtw.QFrame()
         skip_panel.setObjectName("SubtlePanel")
         skip_layout = qtw.QVBoxLayout(skip_panel)
+        self._data_skip_layout = skip_layout
         skip_layout.setContentsMargins(12, 10, 12, 10)
         skip_layout.setSpacing(8)
 
+        skip_header_row = qtw.QHBoxLayout()
+        self._data_skip_header_row = skip_header_row
+        skip_header_row.setSpacing(8)
+
         skip_title = qtw.QLabel("Skip Rules")
         skip_title.setObjectName("SectionTitle")
-        skip_layout.addWidget(skip_title)
+        skip_header_row.addWidget(skip_title)
 
-        edit_skip_rules_button = qtw.QPushButton("Edit Skip Rules...")
+        self.skip_pattern_count_chip = make_status_chip(
+            "0 rules",
+            parent=skip_panel,
+        )
+        skip_header_row.addWidget(self.skip_pattern_count_chip)
+        skip_header_row.addStretch(1)
+
+        edit_skip_rules_button = qtw.QPushButton("Edit...")
         edit_skip_rules_button.setToolTip(
             "Open the skip-rule editor in a separate window.",
         )
         edit_skip_rules_button.clicked.connect(
             lambda _checked=False: self._open_skip_rules_dialog(),
         )
-        skip_layout.addWidget(edit_skip_rules_button, 0, Qt.AlignLeft)
+        skip_header_row.addWidget(edit_skip_rules_button)
+        skip_layout.addLayout(skip_header_row)
 
         self.skip_pattern_hint = qtw.QLabel()
         self.skip_pattern_hint.setObjectName("MutedLabel")
         self.skip_pattern_hint.setWordWrap(True)
         skip_layout.addWidget(self.skip_pattern_hint)
+
+        self.skip_pattern_preview_label = qtw.QLabel()
+        self.skip_pattern_preview_label.setObjectName("MutedLabel")
+        self.skip_pattern_preview_label.setWordWrap(True)
+        self.skip_pattern_preview_label.setVisible(False)
+        skip_layout.addWidget(self.skip_pattern_preview_label)
         self._refresh_skip_pattern_ui()
         advanced_row.addWidget(skip_panel, 1)
 
         metadata_panel = qtw.QFrame()
         metadata_panel.setObjectName("SubtlePanel")
         metadata_outer_layout = qtw.QVBoxLayout(metadata_panel)
+        self._data_metadata_outer_layout = metadata_outer_layout
         metadata_outer_layout.setContentsMargins(12, 10, 12, 10)
         metadata_outer_layout.setSpacing(8)
 
         metadata_header_row = qtw.QHBoxLayout()
+        self._data_metadata_header_row = metadata_header_row
         metadata_header_row.setSpacing(8)
         metadata_title = qtw.QLabel("Metadata Controls")
         metadata_title.setObjectName("SectionTitle")
         metadata_header_row.addWidget(metadata_title)
         metadata_header_row.addStretch(1)
-
-        self.metadata_controls_toggle = qtw.QToolButton()
-        self.metadata_controls_toggle.setObjectName("DisclosureButton")
-        self.metadata_controls_toggle.setToolButtonStyle(
-            Qt.ToolButtonTextBesideIcon
-        )
-        self.metadata_controls_toggle.setArrowType(Qt.RightArrow)
-        self.metadata_controls_toggle.setCheckable(True)
-        self.metadata_controls_toggle.setChecked(False)
-        self.metadata_controls_toggle.setText("Advanced Metadata (Show)")
-        self.metadata_controls_toggle.toggled.connect(
-            self._on_metadata_controls_toggle,
-        )
-        self.metadata_controls_toggle.setToolTip(
-            "Expand/collapse metadata controls.",
-        )
-        metadata_header_row.addWidget(self.metadata_controls_toggle)
         metadata_outer_layout.addLayout(metadata_header_row)
 
         self.ebus_config_status_label = qtw.QLabel("")
@@ -245,10 +310,12 @@ class DataPageMixin:
 
         self.metadata_controls_body = qtw.QWidget()
         metadata_group_layout = qtw.QVBoxLayout(self.metadata_controls_body)
+        self._data_metadata_group_layout = metadata_group_layout
         metadata_group_layout.setContentsMargins(0, 0, 0, 0)
         metadata_group_layout.setSpacing(8)
 
         metadata_row = qtw.QHBoxLayout()
+        self._data_metadata_row = metadata_row
         metadata_row.setSpacing(8)
 
         group_label = qtw.QLabel("Group Rows By")
@@ -300,13 +367,15 @@ class DataPageMixin:
 
         metadata_outer_layout.addWidget(self.metadata_controls_body)
         advanced_row.addWidget(metadata_panel, 2)
-        self._set_metadata_controls_expanded(False)
+        self._set_metadata_controls_expanded(True)
 
-        layout.addLayout(advanced_row)
+        self._set_data_advanced_row_expanded(False)
+        layout.addWidget(advanced_container)
 
         table_panel = qtw.QFrame()
         table_panel.setObjectName("TablePanel")
         table_layout = qtw.QVBoxLayout(table_panel)
+        self._data_table_layout = table_layout
         table_layout.setContentsMargins(12, 12, 12, 12)
         table_layout.setSpacing(8)
 
@@ -359,6 +428,12 @@ class DataPageMixin:
         layout.addWidget(table_panel, 1)
         self._apply_data_table_visibility()
         self._refresh_data_header_state()
+        if hasattr(self, "_policy_for_page"):
+            self._apply_data_page_visibility_policy(
+                self._policy_for_page("data"),
+            )
+        if hasattr(self, "_active_density_tokens"):
+            self._apply_data_page_density(self._active_density_tokens)
         return page
 
     def _open_skip_rules_dialog(self) -> None:
@@ -407,20 +482,90 @@ class DataPageMixin:
 
     def _refresh_skip_pattern_ui(self) -> None:
         """Refresh visual list + hint of active skip patterns."""
-        hint_text = (
-            f"{len(self.skip_patterns)} active pattern(s). "
-            "Directory names, file names, wildcards, and relative paths "
-            "are supported."
-        )
+        count = len(self.skip_patterns)
+        rule_word = "rule" if count == 1 else "rules"
+        if count:
+            hint_text = (
+                f"{count} active {rule_word}. "
+                "Scan skips matching names, wildcards, and relative paths."
+            )
+        else:
+            hint_text = (
+                "No active skip rules. Matching supports names, wildcards, "
+                "and relative paths."
+            )
+        preview_text = self._skip_pattern_preview_text()
         if hasattr(self, "skip_pattern_hint"):
             self.skip_pattern_hint.setText(hint_text)
+        if hasattr(self, "skip_pattern_preview_label"):
+            self.skip_pattern_preview_label.setText(preview_text)
+            self.skip_pattern_preview_label.setVisible(bool(preview_text))
+        if hasattr(self, "skip_pattern_count_chip"):
+            self.skip_pattern_count_chip.set_status(
+                f"{count} {rule_word}",
+                level="warning" if count else "neutral",
+                tooltip="\n".join(self.skip_patterns),
+            )
 
         dialog = getattr(self, "_skip_rules_dialog", None)
         if dialog is not None:
             dialog.pattern_list.clear()
             dialog.pattern_list.addItems(self.skip_patterns)
-            dialog.hint_label.setText(hint_text)
+            dialog.hint_label.setText(
+                hint_text if not preview_text else f"{hint_text}\n{preview_text}",
+            )
         self._refresh_data_header_state()
+
+    def _skip_pattern_preview_text(self) -> str:
+        """Return a short inline preview of the active skip rules."""
+
+        if not self.skip_patterns:
+            return ""
+        preview = ", ".join(self.skip_patterns[:3])
+        remainder = len(self.skip_patterns) - 3
+        if remainder > 0:
+            preview = f"{preview} +{remainder} more"
+        return f"Active patterns: {preview}"
+
+    def _apply_data_page_visibility_policy(self, policy) -> None:
+        """Apply page-specific visibility policy to Data-page widgets."""
+
+        if hasattr(self, "_data_summary_strip"):
+            self._data_summary_strip.set_collapsed(not policy.show_summary_strip)
+        advanced_expanded = not policy.collapse_data_advanced_row
+        caps = self._active_plugin_capabilities()
+        if caps.show_metadata_controls:
+            advanced_expanded = True
+        self._set_data_advanced_row_expanded(advanced_expanded)
+
+    def _set_data_advanced_row_expanded(self, expanded: bool) -> None:
+        """Show or hide the Data-page advanced controls row."""
+
+        container = getattr(self, "_data_advanced_container", None)
+        if container is not None:
+            container.setVisible(bool(expanded))
+        toggle = getattr(self, "data_advanced_toggle", None)
+        if toggle is None:
+            return
+        blocker = QSignalBlocker(toggle)
+        toggle.setChecked(bool(expanded))
+        toggle.setArrowType(Qt.DownArrow if expanded else Qt.RightArrow)
+        toggle.setText(
+            "Intake Controls (Hide)"
+            if expanded
+            else "Intake Controls (Show)"
+        )
+        del blocker
+
+    def _on_data_advanced_row_toggled(self, checked: bool) -> None:
+        """Handle user disclosure toggles for the advanced Data row."""
+
+        if hasattr(self, "_remember_panel_state"):
+            self._remember_panel_state("data.advanced_row", bool(checked))
+        if hasattr(self, "_apply_dynamic_visibility_policy"):
+            self._apply_dynamic_visibility_policy()
+            return
+        self._set_data_advanced_row_expanded(bool(checked))
 
     def _refresh_data_header_state(self) -> None:
         """Refresh page header and summary-strip state for the Data tab."""
@@ -428,13 +573,8 @@ class DataPageMixin:
         has_loaded = dataset.has_loaded_data()
         folder_text = self.folder_edit.text().strip() if hasattr(self, "folder_edit") else ""
         folder = Path(folder_text).expanduser() if folder_text else None
-        raw_snapshot_path = None
-        effective_snapshot_path = None
-        ebus_enabled = True
-        if folder is not None and folder.is_dir():
-            raw_snapshot_path = discover_ebus_snapshot_path(folder)
-            ebus_enabled = ebus_enabled_for_acquisition(folder)
-            effective_snapshot_path = discover_effective_ebus_snapshot_path(folder)
+        ebus_configs = self._discover_recursive_ebus_configs(folder)
+        ebus_tooltip = self._ebus_config_tooltip(folder, ebus_configs)
         metadata_mode = "JSON" if dataset.metadata_source_mode == "json" else "Path"
         metadata_level = (
             "info"
@@ -452,26 +592,26 @@ class DataPageMixin:
                 level="info" if datacard_present else "warning",
             ),
         ]
-        if raw_snapshot_path is not None and not ebus_enabled:
+        if len(ebus_configs) > 1:
             chips.append(
                 ChipSpec(
-                    "eBUS snapshot disabled",
-                    level="warning",
-                    tooltip=str(raw_snapshot_path),
+                    "eBUS configs detected",
+                    level="success",
+                    tooltip=ebus_tooltip,
                 ),
             )
-        elif effective_snapshot_path is not None and effective_snapshot_path.is_file():
+        elif len(ebus_configs) == 1:
             chips.append(
                 ChipSpec(
-                    "eBUS snapshot detected",
+                    "eBUS config detected",
                     level="success",
-                    tooltip=str(effective_snapshot_path),
+                    tooltip=ebus_tooltip,
                 ),
             )
         elif folder is not None and folder.is_dir():
             chips.append(
                 ChipSpec(
-                    "No eBUS snapshot",
+                    "No eBUS config",
                     level="neutral",
                 ),
             )
@@ -504,25 +644,9 @@ class DataPageMixin:
                 ),
                 SummaryItem(
                     "eBUS",
-                    (
-                        "Disabled"
-                        if raw_snapshot_path is not None and not ebus_enabled
-                        else "Snapshot"
-                        if effective_snapshot_path is not None and effective_snapshot_path.is_file()
-                        else "None"
-                    ),
-                    level=(
-                        "warning"
-                        if raw_snapshot_path is not None and not ebus_enabled
-                        else "success"
-                        if effective_snapshot_path is not None and effective_snapshot_path.is_file()
-                        else "neutral"
-                    ),
-                    tooltip=(
-                        str(raw_snapshot_path)
-                        if raw_snapshot_path is not None
-                        else ""
-                    ),
+                    self._ebus_summary_value(ebus_configs),
+                    level="success" if ebus_configs else "neutral",
+                    tooltip=ebus_tooltip,
                 ),
                 SummaryItem(
                     "Skip Rules",
@@ -683,36 +807,20 @@ class DataPageMixin:
             self._refresh_metadata_table()
 
     def _set_metadata_controls_expanded(self, expanded: bool) -> None:
-        """Set collapsed/expanded state of metadata controls."""
+        """Keep metadata controls visible inside the intake panel."""
+
         if not hasattr(self, "metadata_controls_body"):
             return
-        if not hasattr(self, "metadata_controls_toggle"):
-            return
-        self.metadata_controls_body.setVisible(expanded)
-        blocker = QSignalBlocker(self.metadata_controls_toggle)
-        self.metadata_controls_toggle.setChecked(expanded)
-        self.metadata_controls_toggle.setArrowType(
-            Qt.DownArrow if expanded else Qt.RightArrow
-        )
-        self.metadata_controls_toggle.setText(
-            "Advanced Metadata (Hide)"
-            if expanded
-            else "Advanced Metadata (Show)"
-        )
-        del blocker
-
-    def _on_metadata_controls_toggle(self, checked: bool) -> None:
-        """Handle user toggle for metadata collapsed section."""
-        self._set_metadata_controls_expanded(bool(checked))
+        _ = expanded
+        self.metadata_controls_body.setVisible(True)
 
     def _update_metadata_controls_visibility(self) -> None:
-        """Auto-expand metadata controls when a plugin requires it."""
-        if not hasattr(self, "metadata_controls_toggle"):
-            return
+        """Keep metadata controls available when intake controls are shown."""
+
+        self._set_metadata_controls_expanded(True)
         caps = self._active_plugin_capabilities()
-        if caps.show_metadata_controls and not self._metadata_controls_auto_expanded:
-            self._set_metadata_controls_expanded(True)
-            self._metadata_controls_auto_expanded = True
+        if caps.show_metadata_controls:
+            self._set_data_advanced_row_expanded(True)
 
     def _set_metadata_source_combo_value(self, mode: str) -> None:
         """Select a metadata-source combo entry without emitting signals."""
@@ -830,7 +938,7 @@ class DataPageMixin:
         )
 
     def _refresh_ebus_config_status(self, folder: Path | None = None) -> None:
-        """Update compact status text for a discovered acquisition-local eBUS snapshot."""
+        """Update compact status text for recursively discovered eBUS configs."""
         if not hasattr(self, "ebus_config_status_label"):
             return
         candidate = folder
@@ -839,27 +947,80 @@ class DataPageMixin:
             candidate = Path(text).expanduser() if text else None
         if candidate is None or not candidate.is_dir():
             self.ebus_config_status_label.setText("")
+            self.ebus_config_status_label.setToolTip("")
             self._refresh_data_header_state()
             return
-        raw_snapshot_path = discover_ebus_snapshot_path(candidate)
-        if raw_snapshot_path is not None and not ebus_enabled_for_acquisition(candidate):
+        ebus_configs = self._discover_recursive_ebus_configs(candidate)
+        if not ebus_configs:
+            self.ebus_config_status_label.setText("")
+            self.ebus_config_status_label.setToolTip("")
+            self._refresh_data_header_state()
+            return
+        if len(ebus_configs) == 1:
             self.ebus_config_status_label.setText(
-                f"eBUS snapshot disabled: {raw_snapshot_path.name}"
+                f"eBUS config: {ebus_configs[0].name}"
             )
-            self.ebus_config_status_label.setToolTip(str(raw_snapshot_path))
+            self.ebus_config_status_label.setToolTip(
+                self._ebus_config_tooltip(candidate, ebus_configs),
+            )
             self._refresh_data_header_state()
             return
-        snapshot_path = discover_effective_ebus_snapshot_path(candidate)
-        if snapshot_path is not None and snapshot_path.is_file():
-            self.ebus_config_status_label.setText(
-                f"eBUS snapshot: {snapshot_path.name}"
-            )
-            self.ebus_config_status_label.setToolTip(str(snapshot_path))
-            self._refresh_data_header_state()
-            return
-        self.ebus_config_status_label.setText("")
-        self.ebus_config_status_label.setToolTip("")
+        self.ebus_config_status_label.setText(
+            f"eBUS configs found: {len(ebus_configs)}"
+        )
+        self.ebus_config_status_label.setToolTip(
+            self._ebus_config_tooltip(candidate, ebus_configs),
+        )
         self._refresh_data_header_state()
+
+    @staticmethod
+    def _discover_recursive_ebus_configs(folder: Path | None) -> list[Path]:
+        """Return ``.pvcfg`` files discovered anywhere under the selected root."""
+
+        if folder is None or not folder.is_dir():
+            return []
+        discovered: list[Path] = []
+        for root, _dirs, files in os.walk(folder, onerror=lambda _err: None):
+            for name in sorted(files):
+                if Path(name).suffix.lower() != ".pvcfg":
+                    continue
+                discovered.append(Path(root).joinpath(name))
+        discovered.sort(key=lambda path: str(path).lower())
+        return discovered
+
+    @staticmethod
+    def _ebus_summary_value(configs: list[Path]) -> str:
+        """Return summary-strip value for discovered eBUS config files."""
+
+        if not configs:
+            return "None"
+        if len(configs) == 1:
+            return "1 file"
+        return f"{len(configs)} files"
+
+    @staticmethod
+    def _ebus_config_tooltip(root: Path | None, configs: list[Path]) -> str:
+        """Return concise tooltip text for detected eBUS config files."""
+
+        if not configs:
+            return ""
+        if len(configs) == 1:
+            return str(configs[0])
+        preview: list[str] = []
+        for path in configs[:3]:
+            if root is None:
+                preview.append(path.name)
+                continue
+            try:
+                preview.append(str(path.relative_to(root)))
+            except ValueError:
+                preview.append(path.name)
+        suffix = f" +{len(configs) - 3} more" if len(configs) > 3 else ""
+        root_label = str(root) if root is not None else "selected root"
+        return (
+            f"{len(configs)} eBUS config files under {root_label}: "
+            f"{', '.join(preview)}{suffix}"
+        )
 
     def _refresh_metadata_table(self) -> None:
         """Refresh metadata table with grouping/filtering controls."""

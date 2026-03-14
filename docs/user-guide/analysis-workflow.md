@@ -38,13 +38,14 @@ If no analysis plugin was enabled at startup, the **Analyze** tab is hidden.
 
 The exact controls depend on the active analysis plugin, but the Analyze tab generally contains:
 
-- an **Analysis Plugin** selector at the top of the page
-- a plugin-specific control panel
-- a result table
-- a plot area
+- a top summary band with the active plugin and current dataset context
+- a left rail with the **Analysis Plugin** selector and plugin-specific controls
+- a right-side workspace with the result table and plot
 - plugin-specific runtime actions in the **Plugins** menu
 
 The selector at the top of the page switches between analysis plugins that were already loaded for the current session. It is not a preset manager and it does not load disabled plugins after launch.
+
+The left rail is intentionally lightweight. If you need more horizontal room for the result table or plot, collapse the plugin controls band from the rail and keep the workspace open on the right.
 
 ## Startup selector versus plugin selector
 

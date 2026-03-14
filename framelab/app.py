@@ -7,6 +7,7 @@ import sys
 from PySide6 import QtWidgets as qtw
 
 from .icons import apply_app_identity, prepare_process_identity
+from .mpl_config import ensure_matplotlib_config_dir
 from .plugins import discover_plugin_manifests
 from .plugins.selection import (
     PluginStartupDialog,
@@ -26,6 +27,7 @@ def main() -> int:
         Process exit code from the Qt event loop.
     """
     prepare_process_identity()
+    ensure_matplotlib_config_dir()
     app = qtw.QApplication(sys.argv)
     apply_app_identity(app)
     app.setStyleSheet(DARK_THEME)
