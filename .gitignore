@@ -1,19 +1,18 @@
-# documentation
-# *.pdf
-
 # Local runtime UI state
 config/ui_state.ini
 config/config.ini
 config/plugin_selection.json
 
-# Samples and archives
+# Misc
 EbusData
 archived
+json_templates
 
 # vscode
-.vscode
+/.vscode/
 
 # Documentation build artifacts
+# *.pdf
 .docs_build/
 .docs_check_site/
 .docs_build_deps/
@@ -139,7 +138,7 @@ venv.bak/
 .ropeproject
 
 # mkdocs documentation
-/site
+site
 
 # mypy
 .mypy_cache/
