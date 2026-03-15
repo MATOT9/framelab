@@ -19,3 +19,13 @@ def test_background_correction_manifest_is_discovered() -> None:
     manifest = manifests["background_correction"]
     assert manifest.display_name == "Background Correction"
     assert manifest.page == "measure"
+
+
+def test_session_manager_manifest_is_marked_legacy() -> None:
+    manifests = {
+        manifest.plugin_id: manifest
+        for manifest in discover_plugin_manifests("data")
+    }
+    assert "session_manager" in manifests
+    manifest = manifests["session_manager"]
+    assert manifest.display_name == "Session Manager (Legacy)"

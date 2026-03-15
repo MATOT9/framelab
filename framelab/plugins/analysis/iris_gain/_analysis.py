@@ -1017,7 +1017,7 @@ class IrisGainAnalysisMixin:
     ) -> qtw.QTableWidgetItem:
         """Create sortable display item for the analysis table."""
         item = _SortableTableItem(value, sort_value)
-        item.setTextAlignment(int(align | Qt.AlignVCenter))
+        item.setTextAlignment(align | Qt.AlignVCenter)
         return item
 
     def _fill_table(

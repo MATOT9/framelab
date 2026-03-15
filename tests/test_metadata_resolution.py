@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from framelab.metadata import clear_metadata_cache, extract_path_metadata
+from framelab.node_metadata import save_nodecard
 
 
 pytestmark = [pytest.mark.data, pytest.mark.core]
@@ -161,6 +162,22 @@ class _MetadataHarness:
             _acquisition_payload(**kwargs),
         )
 
+    def write_node_metadata(
+        self,
+        root: Path,
+        metadata: dict,
+        *,
+        profile_id: str | None = None,
+        node_type_id: str | None = None,
+    ) -> None:
+        root.mkdir(parents=True, exist_ok=True)
+        save_nodecard(
+            root,
+            metadata,
+            profile_id=profile_id,
+            node_type_id=node_type_id,
+        )
+
 
 @pytest.fixture
 def metadata_harness(tmp_path: Path) -> _MetadataHarness:
@@ -231,6 +248,38 @@ def test_none_in_higher_layer_does_not_erase_inherited_value(
     metadata = extract_path_metadata(str(frame), metadata_source="json")
     assert metadata.get("exposure_source") == "campaign_default"
     assert float(metadata["exposure_ms"]) == pytest.approx(1.0)
+
+
+def test_metadata_boundary_root_excludes_defaults_above_loaded_subtree(
+    metadata_harness: _MetadataHarness,
+) -> None:
+    frame = metadata_harness.frame_path(campaign=True, session=True)
+    campaign_root = metadata_harness.repo / "campaign"
+    session_root = campaign_root / "01_sessions" / "2026-03-05__sess01"
+    acquisition_root = session_root / "acquisitions" / "acq-0011__test"
+
+    metadata_harness.write_campaign(
+        campaign_root,
+        campaign_defaults={"camera_settings": {"exposure_us": 1000}},
+    )
+    metadata_harness.write_acquisition(
+        acquisition_root,
+        defaults={
+            "camera_settings": {},
+            "instrument": {},
+            "acquisition_settings": {},
+        },
+    )
+
+    metadata = extract_path_metadata(
+        str(frame),
+        metadata_source="json",
+        metadata_boundary_root=session_root,
+    )
+
+    assert metadata.get("json_metadata_available") is True
+    assert metadata.get("exposure_source") == "none"
+    assert metadata.get("exposure_ms") is None
 
 
 def test_matching_override_replaces_only_targeted_fields(
@@ -423,6 +472,73 @@ def test_session_and_campaign_defaults_apply_without_acquisition_datacard(
     assert metadata.get("iris_source") == "session_default"
     assert float(metadata["exposure_ms"]) == pytest.approx(0.8)
     assert float(metadata["iris_position"]) == pytest.approx(6.0)
+
+
+def test_node_metadata_applies_without_legacy_datacards(
+    metadata_harness: _MetadataHarness,
+) -> None:
+    frame = metadata_harness.frame_path()
+    acquisitions_root = metadata_harness.repo / "acquisitions"
+
+    metadata_harness.write_node_metadata(
+        acquisitions_root,
+        {
+            "camera_settings": {"exposure_us": 1800},
+            "instrument": {"optics": {"iris": {"position": 5}}},
+        },
+        profile_id="calibration",
+        node_type_id="session",
+    )
+
+    metadata = extract_path_metadata(str(frame), metadata_source="json")
+
+    assert bool(metadata.get("json_metadata_available"))
+    assert metadata.get("exposure_source") == "node_inherited"
+    assert metadata.get("iris_source") == "node_inherited"
+    assert float(metadata["exposure_ms"]) == pytest.approx(1.8)
+    assert float(metadata["iris_position"]) == pytest.approx(5.0)
+
+
+def test_node_metadata_overrides_legacy_session_and_campaign_defaults(
+    metadata_harness: _MetadataHarness,
+) -> None:
+    frame = metadata_harness.frame_path(campaign=True, session=True)
+    campaign_root = metadata_harness.repo / "campaign"
+    session_root = campaign_root / "01_sessions" / "2026-03-05__sess01"
+    acquisition_root = session_root / "acquisitions" / "acq-0011__test"
+
+    metadata_harness.write_campaign(
+        campaign_root,
+        campaign_defaults={"camera_settings": {"exposure_us": 1000}},
+    )
+    metadata_harness.write_session(
+        session_root,
+        session_defaults={"camera_settings": {"exposure_us": 1500}},
+    )
+    metadata_harness.write_node_metadata(
+        session_root,
+        {
+            "camera_settings": {"exposure_us": 1750},
+            "instrument": {"optics": {"iris": {"position": 4}}},
+        },
+        profile_id="calibration",
+        node_type_id="session",
+    )
+    metadata_harness.write_acquisition(
+        acquisition_root,
+        defaults={
+            "camera_settings": {},
+            "instrument": {},
+            "acquisition_settings": {},
+        },
+    )
+
+    metadata = extract_path_metadata(str(frame), metadata_source="json")
+
+    assert metadata.get("exposure_source") == "node_inherited"
+    assert metadata.get("iris_source") == "node_inherited"
+    assert float(metadata["exposure_ms"]) == pytest.approx(1.75)
+    assert float(metadata["iris_position"]) == pytest.approx(4.0)
 
 
 def test_malformed_acquisition_datacard_falls_back_to_session_defaults(

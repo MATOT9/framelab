@@ -1,21 +1,64 @@
 # FrameLab Imaging Analysis Workbench
 
-FrameLab is a desktop workbench for image-based acquisition review. It helps you scan TIFF datasets, inspect hierarchical metadata and datacards, manage acquisition/session structure, review eBUS configuration files, compute image measurements, and hand those results to analysis plugins.
+FrameLab is a desktop workbench for image-based acquisition review. It helps you scan TIFF datasets, inspect hierarchical metadata and datacards, manage workflow structure, review eBUS configuration files, compute image measurements, and hand those results to analysis plugins.
 
-This README is intentionally lightweight. It gives a newcomer enough context to launch the app, run the tests, and find the important parts of the repo. The full operator and maintenance guidance lives in [docs/](docs/).
+This README is intentionally lightweight. It gives a newcomer enough context to launch the app, understand the expected filesystem model, run the tests, and find the important parts of the repo. The full operator and maintenance guidance lives in [docs/](docs/).
 
 ## What The App Covers
 
 - **Data intake**: recursive dataset scan, skip rules, metadata source selection, datacard awareness, and compact preflight checks.
-- **Session tooling**: acquisition/session management, datacard authoring, and eBUS config inspection helpers.
+- **Workflow context**: profile-driven workspace selection with a persistent Workflow Explorer and Metadata Inspector in the main shell.
+- **Structure tooling**: workflow-native session/acquisition authoring plus legacy session repair flows that still remain outside the main workflow shell.
 - **Measurement**: table + preview workflows for ROI, thresholding, Top-K, normalization, and background-correction flows.
 - **Analysis**: plugin-driven plots and derived tables using a prepared analysis context instead of raw UI state.
 - **Offline help**: the same Markdown source in `docs/` is bundled into the app as static HTML help.
+
+## Workflow Profiles and Required Layout
+
+For most work, use the **Calibration** workflow profile.
+
+Its logical hierarchy is:
+
+```text
+workspace -> camera -> campaign -> session -> acquisition
+```
+
+Recommended calibration layout:
+
+```text
+workspace/
+  camera/
+    campaign/
+      01_sessions/
+        YYYY-MM-DD__sess01/
+          session_datacard.json
+          acquisitions/
+            acq-0001__dark/
+              acquisition_datacard.json
+              frames/
+              notes/
+              thumbs/
+            acq-0002__iris/
+              acquisition_datacard.json
+              frames/
+              notes/
+              thumbs/
+```
+
+Important code-backed layout rules:
+
+- sessions may live directly under the campaign folder or under `01_sessions/` or `sessions/`
+- `session_datacard.json.paths.acquisitions_root_rel` can redirect the acquisitions root
+- session-management tools only manage acquisition folders matching `acq-####` or `acq-####__label`
+- the workflow loader can still discover acquisitions from datacards even when the folder name is less strict, but that is not the recommended operating model
+
+The **Trials** profile exists, but it should still be treated as experimental.
 
 ## Repository Structure
 
 - `framelab/`: main application package.
 - `framelab/main_window/`: host window shell and the Data / Measure / Analyze page mixins.
+- `framelab/workflow/`: workflow profiles, typed hierarchy models, and workflow state loading.
 - `framelab/plugins/`: built-in data, measure, and analysis plugins.
 - `framelab/ebus/`: eBUS snapshot parsing, compare logic, effective config handling, and catalog helpers.
 - `framelab/datacard_authoring/`: datacard authoring models and services.
@@ -61,6 +104,13 @@ or
 python -m framelab
 ```
 
+On first launch, choose a workflow profile and workspace root. After that:
+
+- use the left **Workflow Explorer** dock to change the active node scope
+- use the right **Metadata Inspector** dock to inspect inherited and local metadata
+- use **Workflow Explorer -> Structure** for session and acquisition create/rename/delete/reindex work
+- keep **Session Manager (Legacy)** only for acquisition-datacard copy/paste or acquisition-local eBUS toggles that still live outside the workflow shell
+
 ### 3. Run the tests
 
 Use the lightweight repo runner:
@@ -87,7 +137,7 @@ extension at `pytest` and disable `unittest` discovery.
 
 ## Documentation
 
-The full docs site lives in `docs/` and covers operator workflows, architecture, plugin contracts, and packaging details.
+The full docs site lives in `docs/` and covers operator workflows, required folder structure, architecture, plugin contracts, and packaging details.
 
 ### Documentation layout
 
@@ -150,5 +200,6 @@ There is currently no dedicated Python freeze toolchain checked into the repo, s
 ## Where To Go Next
 
 - New operator: start with [docs/user-guide/quick-start.md](docs/user-guide/quick-start.md)
+- Required hierarchy and naming: [docs/user-guide/workflow-structure.md](docs/user-guide/workflow-structure.md)
 - Plugin or architecture work: start with [docs/developer-guide/index.md](docs/developer-guide/index.md)
 - Packaging or offline help maintenance: see [docs/developer-guide/packaging.md](docs/developer-guide/packaging.md)

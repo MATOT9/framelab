@@ -29,7 +29,7 @@ from ...session_manager import (
 )
 from ...ui_primitives import ChipSpec, SummaryItem, build_page_header, build_summary_strip
 from ...widgets import install_large_header_resize_cursor
-from ...window_drag import enable_window_content_drag
+from ...window_drag import configure_secondary_window
 
 
 def _selected_folder(host_window: qtw.QWidget) -> Path | None:
@@ -98,7 +98,7 @@ class SessionManagerDialog(qtw.QDialog):
         )
 
         self.setWindowTitle("Session Manager")
-        self.setWindowFlag(Qt.Window, True)
+        configure_secondary_window(self, draggable=True)
         self.setModal(False)
         self.setWindowModality(Qt.NonModal)
         self.setAttribute(Qt.WA_DeleteOnClose, True)
@@ -234,8 +234,6 @@ class SessionManagerDialog(qtw.QDialog):
         close_row.addWidget(self._close_button)
         layout.addLayout(close_row)
 
-        enable_window_content_drag(self)
-
         self.apply_initial_session_root(initial_session_root)
 
     def _browse_session(self) -> None:
@@ -282,7 +280,6 @@ class SessionManagerDialog(qtw.QDialog):
         self._refresh_table()
         self._refresh_header_state()
         self._refresh_action_state()
-        enable_window_content_drag(self)
 
     def apply_initial_session_root(self, session_root: str) -> None:
         """Update the dialog to one initial session root from the host."""
@@ -753,16 +750,17 @@ class SessionManagerDialog(qtw.QDialog):
 class SessionManagerPlugin:
     """Runtime plugin entrypoint for session-level acquisition management."""
 
+    # LEGACY_COMPAT[session_manager_plugin_bridge]: Keep the standalone Session Manager available while datacard copy/paste and eBUS toggles still live there and have not been absorbed into workflow-native tools. Remove after: workflow explorer or metadata/admin surfaces own the remaining session-manager-only actions.
     plugin_id = "session_manager"
-    display_name = "Session Manager"
+    display_name = "Session Manager (Legacy)"
     dependencies = ("acquisition_datacard_wizard",)
 
     @staticmethod
     def populate_page_menu(host_window: qtw.QWidget, menu: qtw.QMenu) -> None:
         """Populate runtime actions for the session manager."""
-        open_action = menu.addAction("Open Session Manager...")
+        open_action = menu.addAction("Open Legacy Session Manager...")
         open_action.setToolTip(
-            "Manage acquisition folders, numbering, datacard copy/paste, and eBUS enable state for one session.",
+            "Open the legacy session dialog for acquisition datacard copy/paste and acquisition-local eBUS enable state that are not yet workflow-native.",
         )
         open_action.setStatusTip(open_action.toolTip())
         open_action.triggered.connect(

@@ -9,6 +9,7 @@ from PySide6.QtCore import Qt, Signal
 
 from .ui_primitives import build_page_header
 from .ui_settings import DensityMode, UiPreferences, UiStateSnapshot
+from .window_drag import configure_secondary_window
 
 
 class PreferencesDialog(qtw.QDialog):
@@ -23,6 +24,7 @@ class PreferencesDialog(qtw.QDialog):
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Preferences")
+        configure_secondary_window(self)
         self.setModal(True)
         self.resize(760, 520)
         self.setMinimumSize(680, 460)

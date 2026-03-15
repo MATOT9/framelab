@@ -15,13 +15,16 @@ pytestmark = [pytest.mark.ui, pytest.mark.analysis]
 
 
 @pytest.fixture
-def analysis_window(framelab_window_factory) -> FrameLabWindow:
+def analysis_window(framelab_window_factory, process_events) -> FrameLabWindow:
     window = framelab_window_factory(
         enabled_plugin_ids=("iris_gain_vs_exposure",),
     )
     window.ui_state_snapshot.panel_states.clear()
     window.ui_state_snapshot.splitter_sizes.clear()
     window._session_panel_overrides.clear()
+    if hasattr(window, "_metadata_inspector_dock"):
+        window._metadata_inspector_dock.hide()
+    process_events()
     return window
 
 

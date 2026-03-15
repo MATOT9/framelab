@@ -16,9 +16,15 @@ from stylesheets import (
 )
 
 from ..help_docs import open_help_page
+from ..metadata_manager_dialog import MetadataManagerDialog
+from ..metadata_inspector_dock import MetadataInspectorDock
 from ..preferences_dialog import PreferencesDialog
 from ..plugins import PAGE_IDS, enabled_plugin_manifests, load_enabled_plugins
 from ..ui_settings import UiPreferences
+from ..workflow_explorer_dock import WorkflowExplorerDock
+from ..workflow_selection_dialog import WorkflowSelectionDialog
+from ..workflow_manager_dialog import WorkflowManagerDialog
+from ..workflow_widgets import WorkflowBreadcrumbBar
 
 
 class WindowChromeMixin:
@@ -90,6 +96,12 @@ class WindowChromeMixin:
                 action.setToolTip(status)
 
     def _build_ui(self) -> None:
+        self.setDockOptions(
+            self.dockOptions()
+            | qtw.QMainWindow.AllowNestedDocks
+            | qtw.QMainWindow.AllowTabbedDocks
+            | qtw.QMainWindow.AnimatedDocks,
+        )
         self._build_menu_bar()
         self._build_toolbar()
         self._build_status_bar()
@@ -113,6 +125,24 @@ class WindowChromeMixin:
 
         self.workflow_tabs = qtw.QTabWidget()
         self.workflow_tabs.setDocumentMode(True)
+        context_row = qtw.QWidget()
+        context_layout = qtw.QHBoxLayout(context_row)
+        context_layout.setContentsMargins(0, 0, 0, 0)
+        context_layout.setSpacing(8)
+        self._workflow_context_row = context_row
+        self._workflow_context_row_layout = context_layout
+        self._workflow_context_breadcrumb = WorkflowBreadcrumbBar(compact=True)
+        context_layout.addWidget(self._workflow_context_breadcrumb, 1)
+        self._workflow_context_select_button = qtw.QPushButton("Select Workflow...")
+        self._workflow_context_select_button.clicked.connect(
+            self._open_workflow_selection_dialog,
+        )
+        context_layout.addWidget(
+            self._workflow_context_select_button,
+            0,
+            Qt.AlignTop,
+        )
+        root_layout.addWidget(context_row, 0)
         self.workflow_tabs.addTab(self._build_data_page(), "1. Data")
         self.workflow_tabs.addTab(self._build_inspect_page(), "2. Measure")
         self._build_analysis_page()
@@ -121,6 +151,9 @@ class WindowChromeMixin:
         root_layout.addWidget(self.workflow_tabs, 1)
 
         self.setCentralWidget(central)
+        self._build_workflow_explorer_dock()
+        self._build_metadata_inspector_dock()
+        self._refresh_workflow_shell_context()
         self._apply_dynamic_visibility_policy()
         self._sync_tooltip_statuses()
 
@@ -145,6 +178,17 @@ class WindowChromeMixin:
         menu_bar = self.menuBar()
 
         file_menu = menu_bar.addMenu("&File")
+        open_workflow_action = QtGui.QAction("Open Workflow...", self)
+        open_workflow_action.setShortcut(QtGui.QKeySequence("Ctrl+Shift+O"))
+        self._apply_help_text(
+            open_workflow_action,
+            "Choose the active workflow profile and workspace root.",
+            status="Open the workflow selector for workspace/profile context.",
+        )
+        open_workflow_action.triggered.connect(self._open_workflow_selection_dialog)
+        file_menu.addAction(open_workflow_action)
+        self.file_open_workflow_action = open_workflow_action
+
         open_folder_action = QtGui.QAction("Open Folder...", self)
         open_folder_action.setShortcut(QtGui.QKeySequence.Open)
         self._apply_help_text(
@@ -156,6 +200,7 @@ class WindowChromeMixin:
             lambda _checked=False: self.browse_folder(),
         )
         file_menu.addAction(open_folder_action)
+        self.file_open_folder_action = open_folder_action
 
         scan_action = QtGui.QAction("Scan Folder", self)
         scan_action.setShortcut(QtGui.QKeySequence("Ctrl+R"))
@@ -166,6 +211,18 @@ class WindowChromeMixin:
         )
         scan_action.triggered.connect(lambda _checked=False: self.load_folder())
         file_menu.addAction(scan_action)
+        self.file_scan_scope_action = scan_action
+
+        clear_workflow_action = QtGui.QAction("Clear Workflow Context", self)
+        self._apply_help_text(
+            clear_workflow_action,
+            "Return to manual folder mode and clear the active workflow context.",
+        )
+        clear_workflow_action.triggered.connect(
+            lambda _checked=False: self.set_workflow_context(None, None),
+        )
+        file_menu.addAction(clear_workflow_action)
+        self.file_clear_workflow_action = clear_workflow_action
 
         file_menu.addSeparator()
 
@@ -220,6 +277,28 @@ class WindowChromeMixin:
         edit_menu.addAction(preferences_action)
         self.edit_preferences_action = preferences_action
 
+        edit_menu.addSeparator()
+        advanced_menu = edit_menu.addMenu("Advanced")
+        self.edit_advanced_menu = advanced_menu
+
+        workflow_manager_action = QtGui.QAction("Workflow Tools (Advanced)...", self)
+        self._apply_help_text(
+            workflow_manager_action,
+            "Open advanced workflow tools for rebinding, validation, and troubleshooting.",
+        )
+        workflow_manager_action.triggered.connect(self._open_workflow_manager_dialog)
+        advanced_menu.addAction(workflow_manager_action)
+        self.edit_workflow_manager_action = workflow_manager_action
+
+        metadata_manager_action = QtGui.QAction("Advanced Metadata Tools...", self)
+        self._apply_help_text(
+            metadata_manager_action,
+            "Open advanced metadata tools for governance, template, and detailed maintenance work.",
+        )
+        metadata_manager_action.triggered.connect(self._open_metadata_manager_dialog)
+        advanced_menu.addAction(metadata_manager_action)
+        self.edit_metadata_manager_action = metadata_manager_action
+
         view_menu = menu_bar.addMenu("&View")
         preview_menu = view_menu.addMenu("Preview")
         self.view_image_action = QtGui.QAction("Show Image Preview", self)
@@ -263,6 +342,7 @@ class WindowChromeMixin:
         columns_menu.addAction(reset_columns_action)
 
         view_menu.addSeparator()
+        self._view_menu = view_menu
         theme_menu = view_menu.addMenu("Theme")
         theme_action_group = QtGui.QActionGroup(self)
         theme_action_group.setExclusive(True)
@@ -392,6 +472,22 @@ class WindowChromeMixin:
         toolbar.setIconSize(QSize(18, 18))
         self.addToolBar(Qt.TopToolBarArea, toolbar)
 
+        self.toolbar_workflow_action = QtGui.QAction(
+            self.style().standardIcon(qtw.QStyle.SP_FileDialogContentsView),
+            "Open Workflow...",
+            self,
+        )
+        self.toolbar_workflow_action.setToolTip(
+            "Select the active workflow workspace and profile.",
+        )
+        self.toolbar_workflow_action.setStatusTip(
+            "Open the workflow selector for workspace/profile context.",
+        )
+        self.toolbar_workflow_action.triggered.connect(
+            self._open_workflow_selection_dialog,
+        )
+        toolbar.addAction(self.toolbar_workflow_action)
+
         self.toolbar_open_action = QtGui.QAction(
             self.style().standardIcon(qtw.QStyle.SP_DirOpenIcon),
             "Open Folder...",
@@ -496,6 +592,50 @@ class WindowChromeMixin:
     def _build_status_bar(self) -> None:
         status = qtw.QStatusBar(self)
         self.setStatusBar(status)
+
+    def _build_workflow_explorer_dock(self) -> None:
+        """Create the persistent left workflow explorer dock."""
+
+        dock = WorkflowExplorerDock(self)
+        dock.setMinimumWidth(280)
+        self._workflow_explorer_dock = dock
+        self.addDockWidget(Qt.LeftDockWidgetArea, dock)
+
+        visible_override = self._visibility_user_overrides().get(
+            WorkflowExplorerDock.PANEL_STATE_KEY,
+        )
+        blocker = QSignalBlocker(dock)
+        dock.setVisible(True if visible_override is None else bool(visible_override))
+        del blocker
+        self.resizeDocks([dock], [320], Qt.Horizontal)
+
+        if hasattr(self, "_view_menu"):
+            toggle_action = dock.toggleViewAction()
+            toggle_action.setText("Workflow Explorer")
+            self._view_menu.addAction(toggle_action)
+            self.view_workflow_explorer_action = toggle_action
+
+    def _build_metadata_inspector_dock(self) -> None:
+        """Create the persistent right metadata inspector dock."""
+
+        dock = MetadataInspectorDock(self)
+        dock.setMinimumWidth(340)
+        self._metadata_inspector_dock = dock
+        self.addDockWidget(Qt.RightDockWidgetArea, dock)
+
+        visible_override = self._visibility_user_overrides().get(
+            MetadataInspectorDock.PANEL_STATE_KEY,
+        )
+        blocker = QSignalBlocker(dock)
+        dock.setVisible(False if visible_override is None else bool(visible_override))
+        del blocker
+        self.resizeDocks([dock], [380], Qt.Horizontal)
+
+        if hasattr(self, "_view_menu"):
+            toggle_action = dock.toggleViewAction()
+            toggle_action.setText("Metadata Inspector")
+            self._view_menu.addAction(toggle_action)
+            self.view_metadata_inspector_action = toggle_action
 
     def _workflow_hint_for_index(self, index: int) -> str:
         """Return concise guidance message for each workflow tab."""
@@ -816,6 +956,14 @@ class WindowChromeMixin:
             self._root_layout.setSpacing(tokens.page_spacing)
         if hasattr(self, "_apply_processing_banner_density"):
             self._apply_processing_banner_density(tokens)
+        dock = getattr(self, "_workflow_explorer_dock", None)
+        if dock is not None and hasattr(dock, "apply_density"):
+            dock.apply_density(tokens)
+        dock = getattr(self, "_metadata_inspector_dock", None)
+        if dock is not None and hasattr(dock, "apply_density"):
+            dock.apply_density(tokens)
+        if hasattr(self, "_workflow_context_row_layout"):
+            self._workflow_context_row_layout.setSpacing(tokens.panel_spacing)
         if hasattr(self, "_apply_data_page_density"):
             self._apply_data_page_density(tokens)
         if hasattr(self, "_apply_measure_page_density"):
@@ -908,3 +1056,205 @@ class WindowChromeMixin:
         dialog.preferences_changed.connect(self._preview_preferences_updated)
         if dialog.exec() == qtw.QDialog.Accepted:
             self._on_preferences_updated(dialog.current_preferences())
+
+    def _refresh_workflow_shell_context(self) -> None:
+        """Sync the shell breadcrumb row with the current workflow context."""
+
+        if not hasattr(self, "_workflow_context_breadcrumb"):
+            return
+        controller = getattr(self, "workflow_state_controller", None)
+        profile = controller.profile if controller is not None else None
+        active_node = controller.active_node() if controller is not None else None
+        ancestry = (
+            controller.ancestry_for(active_node.node_id)
+            if controller is not None and active_node is not None
+            else ()
+        )
+        nodes = tuple(
+            (
+                node.display_name,
+                f"{node.type_id.replace('_', ' ').title()}: {node.folder_path}",
+            )
+            for node in ancestry
+        )
+        self._workflow_context_breadcrumb.set_breadcrumb(
+            profile_label=profile.display_name if profile is not None else None,
+            context_label=(
+                controller.anchor_summary_label()
+                if controller is not None and controller.is_partial_workspace()
+                else None
+            ),
+            nodes=nodes,
+            empty_text="No workflow selected",
+        )
+        has_workflow = bool(profile is not None)
+        self._workflow_context_select_button.setText(
+            "Switch Workflow..." if has_workflow else "Select Workflow...",
+        )
+        tooltip = (
+            (
+                f"Active workspace: {controller.workspace_root}\n"
+                f"Open As: {controller.anchor_summary_label()}"
+            )
+            if has_workflow and controller is not None and controller.workspace_root is not None
+            else "Choose the workflow profile and workspace root."
+        )
+        self._workflow_context_select_button.setToolTip(tooltip)
+        self._workflow_context_select_button.setStatusTip(tooltip)
+        if hasattr(self, "file_clear_workflow_action"):
+            self.file_clear_workflow_action.setEnabled(has_workflow)
+        self._sync_scope_action_labels()
+        self._ensure_primary_workflow_surfaces(has_workflow)
+
+    def _sync_scope_action_labels(self) -> None:
+        """Keep folder/scope affordances subordinate to workflow context."""
+
+        controller = getattr(self, "workflow_state_controller", None)
+        active_node = controller.active_node() if controller is not None else None
+        has_workflow = active_node is not None
+        scope_name = active_node.display_name if active_node is not None else "current folder"
+
+        workflow_button_text = "Switch Workflow..." if has_workflow else "Open Workflow..."
+        if hasattr(self, "toolbar_workflow_action"):
+            self.toolbar_workflow_action.setText(workflow_button_text)
+            self.toolbar_workflow_action.setToolTip(
+                "Switch the active workflow workspace and profile."
+                if has_workflow
+                else "Choose the active workflow profile and workspace root.",
+            )
+        if hasattr(self, "file_open_workflow_action"):
+            self.file_open_workflow_action.setText(workflow_button_text)
+
+        open_text = "Browse Scope Folder..." if has_workflow else "Open Folder..."
+        open_tooltip = (
+            f"Choose a folder for the selected workflow scope ({scope_name})."
+            if has_workflow
+            else "Open a dataset folder from disk."
+        )
+        open_status = (
+            "Choose a folder to align or temporarily override the selected workflow scope."
+            if has_workflow
+            else "Choose the root folder that contains the TIFF dataset."
+        )
+        scan_text = "Scan Selected Scope" if has_workflow else "Scan Folder"
+        scan_tooltip = (
+            f"Scan data for the selected workflow scope ({scope_name})."
+            if has_workflow
+            else "Scan the current dataset folder."
+        )
+        scan_status = (
+            "Scan the folder currently implied by the selected workflow node."
+            if has_workflow
+            else "Rescan the current folder and refresh metadata and metrics."
+        )
+        for action_name in ("file_open_folder_action", "toolbar_open_action"):
+            action = getattr(self, action_name, None)
+            if action is None:
+                continue
+            action.setText(open_text)
+            action.setToolTip(open_tooltip)
+            action.setStatusTip(open_status)
+        for action_name in ("file_scan_scope_action", "toolbar_scan_action"):
+            action = getattr(self, action_name, None)
+            if action is None:
+                continue
+            action.setText(scan_text)
+            action.setToolTip(scan_tooltip)
+            action.setStatusTip(scan_status)
+
+        label = getattr(self, "_data_scope_label", None)
+        if label is not None:
+            label.setText("Scope" if has_workflow else "Dataset")
+        folder_edit = getattr(self, "folder_edit", None)
+        if folder_edit is not None:
+            folder_edit.setPlaceholderText(
+                "Selected workflow node folder"
+                if has_workflow
+                else "Select folder containing TIFF files",
+            )
+            folder_edit.setToolTip(
+                f"Current selected workflow scope: {scope_name}."
+                if has_workflow
+                else "Root folder to scan recursively for TIFF images.",
+            )
+        browse_button = getattr(self, "_data_browse_button", None)
+        if browse_button is not None:
+            browse_button.setText("Browse Scope..." if has_workflow else "Browse Folder...")
+            browse_button.setToolTip(open_tooltip)
+        load_button = getattr(self, "_data_load_button", None)
+        if load_button is not None:
+            load_button.setText(scan_text)
+            load_button.setToolTip(scan_tooltip)
+
+    def _ensure_primary_workflow_surfaces(self, has_workflow: bool) -> None:
+        """Reveal the primary metadata dock when workflow mode first becomes active."""
+
+        if not has_workflow:
+            return
+        panel_states = {
+            str(key).strip().lower(): bool(value)
+            for key, value in getattr(self.ui_state_snapshot, "panel_states", {}).items()
+            if str(key).strip()
+        }
+        if MetadataInspectorDock.PANEL_STATE_KEY in panel_states:
+            return
+        dock = getattr(self, "_metadata_inspector_dock", None)
+        if dock is None or dock.isVisible():
+            return
+        dock.show()
+
+    def _open_workflow_selection_dialog(self) -> None:
+        """Open the dedicated workflow selector dialog."""
+
+        dialog = WorkflowSelectionDialog(self)
+        dialog.exec()
+        self._refresh_workflow_shell_context()
+
+    def _reveal_metadata_inspector_dock(self) -> None:
+        """Show and focus the persistent metadata inspector dock."""
+
+        dock = getattr(self, "_metadata_inspector_dock", None)
+        if dock is None:
+            return
+        dock.show()
+        dock.raise_()
+
+    def _open_workflow_manager_dialog(self) -> None:
+        """Open or focus the non-modal workflow manager dialog."""
+
+        dialog = getattr(self, "_workflow_manager_dialog", None)
+        if isinstance(dialog, WorkflowManagerDialog):
+            dialog.sync_from_host()
+            dialog.show()
+            dialog.raise_()
+            dialog.activateWindow()
+            return
+
+        dialog = WorkflowManagerDialog(self)
+        setattr(self, "_workflow_manager_dialog", dialog)
+        dialog.destroyed.connect(
+            lambda _obj=None, host=self: setattr(host, "_workflow_manager_dialog", None),
+        )
+        dialog.show()
+        dialog.raise_()
+        dialog.activateWindow()
+
+    def _open_metadata_manager_dialog(self) -> None:
+        """Open or focus the non-modal metadata manager dialog."""
+
+        dialog = getattr(self, "_metadata_manager_dialog", None)
+        if isinstance(dialog, MetadataManagerDialog):
+            dialog.sync_from_host()
+            dialog.show()
+            dialog.raise_()
+            dialog.activateWindow()
+            return
+
+        dialog = MetadataManagerDialog(self)
+        setattr(self, "_metadata_manager_dialog", dialog)
+        dialog.destroyed.connect(
+            lambda _obj=None, host=self: setattr(host, "_metadata_manager_dialog", None),
+        )
+        dialog.show()
+        dialog.raise_()
+        dialog.activateWindow()

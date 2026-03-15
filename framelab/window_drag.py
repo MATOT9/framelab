@@ -1,4 +1,4 @@
-"""Shared helpers for dragging top-level dialogs by their content area."""
+"""Shared helpers for draggable/maximizable secondary windows."""
 
 from __future__ import annotations
 
@@ -49,6 +49,9 @@ class _WindowDragController(QtCore.QObject):
         widget.setProperty("_window_drag_filter_installed", True)
 
     def _start_drag(self, event: QtGui.QMouseEvent) -> None:
+        if self._window.isMaximized():
+            self._drag_offset = None
+            return
         self._drag_offset = (
             event.globalPosition().toPoint()
             - self._window.frameGeometry().topLeft()
@@ -115,3 +118,26 @@ def enable_window_content_drag(
     controller = _WindowDragController(window, blocked_types=blocked_types)
     setattr(window, "_window_drag_controller", controller)
     controller.refresh()
+
+
+def configure_secondary_window(
+    window: qtw.QWidget,
+    *,
+    draggable: bool = False,
+    blocked_types: tuple[type[qtw.QWidget], ...] = DEFAULT_DRAG_BLOCKED_TYPES,
+) -> None:
+    """Apply standard top-level window flags to custom secondary windows."""
+
+    flags = window.windowFlags()
+    flags &= ~Qt.Tool
+    flags &= ~Qt.Dialog
+    flags |= (
+        Qt.Window
+        | Qt.WindowMinimizeButtonHint
+        | Qt.WindowMaximizeButtonHint
+        | Qt.WindowCloseButtonHint
+    )
+    flags &= ~Qt.WindowContextHelpButtonHint
+    window.setWindowFlags(flags)
+    if draggable:
+        enable_window_content_drag(window, blocked_types=blocked_types)

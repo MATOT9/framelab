@@ -9,16 +9,64 @@ FrameLab is a TIFF-centric calibration and exploratory analysis tool. It turns i
 A reliable mental model is:
 
 ```text
-TIFF files -> metadata per image -> metric image -> per-image statistics -> analysis-plugin curves and tables
+workflow scope -> TIFF files -> metadata per image -> metric image -> per-image statistics -> analysis-plugin curves and tables
 ```
 
 The app does not create physical meaning on its own. It helps you preserve metadata context, compute repeatable image-level quantities, and inspect those quantities consistently.
+
+## Workflow hierarchy concepts
+
+For most work, the primary profile is **Calibration**.
+
+Its logical hierarchy is:
+
+```text
+workspace -> camera -> campaign -> session -> acquisition
+```
+
+The **Trials** profile uses:
+
+```text
+workspace -> trial -> camera -> session -> acquisition
+```
+
+The trials profile exists, but it should still be treated as experimental.
+
+### Camera
+
+A **camera** is the long-lived asset level.
+
+### Campaign
+
+A **campaign** is one coherent calibration effort. A campaign may span multiple days and is the right place for cross-session outputs and derived products.
+
+### Session
+
+A **session** is one stable setup block. Split sessions when the setup changes meaningfully. Multiple sessions on the same day are supported.
+
+### Acquisition
+
+An **acquisition** is one capture block with one intent and one acquisition datacard context. Keep acquisitions semantically narrow.
 
 ## Core vocabulary
 
 ### Dataset
 
 A **dataset** is the currently scanned folder context. All normalization, grouping, row ordering, measurement tables, and analysis-plugin inputs are built from that currently loaded population.
+
+### Scope
+
+A **scope** is the workflow node currently driving the Data, Measure, and Analyze pages.
+
+Depending on what you opened, the scope may be:
+
+- the full workspace
+- one camera subtree
+- one campaign subtree
+- one session
+- one acquisition
+
+Always verify the current scope before interpreting results.
 
 ### Row
 
@@ -50,7 +98,7 @@ A **plugin** is an extension point loaded at startup.
 
 In the current shipped app, plugins appear in three roles:
 
-- **data plugins**, such as **Session Manager**, **Acquisition Datacard Wizard**, and **eBUS Config Tools**
+- **data plugins**, such as **Session Manager (Legacy)**, **Acquisition Datacard Wizard**, and **eBUS Config Tools**
 - **measure plugins**, such as **Background Correction**
 - **analysis plugins**, such as **Intensity Trend Explorer**
 
@@ -81,6 +129,7 @@ In the current implementation, that stack can combine:
 - acquisition defaults and frame-targeted overrides from `acquisition_datacard.json`
 - inherited session defaults from `session_datacard.json`
 - inherited campaign defaults and instrument defaults from `campaign_datacard.json`
+- inherited workflow-node metadata from `.framelab/nodecard.json`
 - effective acquisition-wide eBUS-backed baseline values for mapped canonical fields when one readable root-level `.pvcfg` snapshot exists and the field mapping marks those fields as eBUS-managed
 
 So the UI still says **Acquisition JSON**, but the runtime source can be a layered context rather than one standalone file.
@@ -227,6 +276,7 @@ FrameLab is well suited to:
 - fixed-ROI comparisons across conditions
 - bright-region trend inspection
 - metadata verification before deeper analysis
+- workflow-structured calibration datasets
 - acquisition/session/campaign datacard workflows
 - eBUS snapshot inspection and approved canonical overrides
 - practical engineering plots for calibration and exploratory work
@@ -248,9 +298,10 @@ Treat the app as a structured measurement-and-analysis environment, not as an au
 
 A reliable operating order is:
 
-1. verify dataset identity and scan population
-2. verify metadata source and resolved values
-3. verify measurement mode, threshold, normalization, ROI, and background state
-4. only then interpret curves, gain, or overlays
+1. verify workflow profile and dataset scope
+2. verify dataset identity and scan population
+3. verify metadata source and resolved values
+4. verify measurement mode, threshold, normalization, ROI, and background state
+5. only then interpret curves, gain, or overlays
 
 When the output matters, read the table and the plot together.

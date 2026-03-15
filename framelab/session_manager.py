@@ -53,8 +53,21 @@ class SessionMutationResult:
     """Filesystem mutation summary returned by session operations."""
 
     created_path: Path | None = None
+    created_paths: tuple[Path, ...] = ()
     deleted_paths: tuple[Path, ...] = ()
     renamed_paths: tuple[tuple[Path, Path], ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class AcquisitionCreationPreviewEntry:
+    """One proposed acquisition folder before filesystem mutation."""
+
+    number: int
+    label: str | None
+    width: int
+    folder_name: str
+    path: Path
+    collision_exists: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,6 +86,7 @@ _EBUS_ATTACHMENT_KEYS = (
     "parse_version",
     "attached_at_local",
 )
+_SESSION_CONTAINER_NAMES = ("01_sessions", "sessions")
 
 
 def resolve_acquisitions_root(session_root: str | Path) -> Path:
@@ -86,6 +100,38 @@ def resolve_acquisitions_root(session_root: str | Path) -> Path:
             if isinstance(raw_rel, str) and raw_rel.strip():
                 return root.joinpath(raw_rel).resolve()
     return root.joinpath("acquisitions")
+
+
+def resolve_campaign_sessions_root(campaign_root: str | Path) -> Path:
+    """Return the preferred directory used to hold session folders for one campaign."""
+
+    root = Path(campaign_root).resolve()
+    if root.name.lower() in _SESSION_CONTAINER_NAMES:
+        return root
+    for child_name in _SESSION_CONTAINER_NAMES:
+        candidate = root.joinpath(child_name)
+        if candidate.is_dir():
+            return candidate.resolve()
+    return root
+
+
+def _default_session_payload(folder_name: str) -> dict[str, Any]:
+    """Return a stable default session datacard payload."""
+
+    return {
+        "schema_version": "1.0",
+        "entity": "session",
+        "identity": {
+            "label": folder_name,
+        },
+        "paths": {
+            "session_root_rel": None,
+            "acquisitions_root_rel": "acquisitions",
+            "notes_rel": None,
+        },
+        "session_defaults": {},
+        "notes": "",
+    }
 
 
 def _frame_count_for_acquisition(acquisition_root: Path) -> int | None:
@@ -157,6 +203,49 @@ def inspect_session(session_root: str | Path) -> SessionIndex:
         number_width=number_width,
         numbering_valid=numbering_valid,
         warning_text=warning_text,
+    )
+
+
+def create_session(
+    campaign_root: str | Path,
+    folder_label: str,
+) -> SessionMutationResult:
+    """Create one new session folder under the preferred campaign session root."""
+
+    clean_label = str(folder_label).strip()
+    if not clean_label:
+        raise ValueError("Session folder label cannot be empty.")
+    if clean_label in {".", ".."} or "/" in clean_label or "\\" in clean_label:
+        raise ValueError("Session folder label cannot contain path separators.")
+
+    sessions_root = resolve_campaign_sessions_root(campaign_root)
+    session_root = sessions_root.joinpath(clean_label)
+    if session_root.exists():
+        raise FileExistsError(
+            f"Session folder already exists: {session_root.name}",
+        )
+
+    session_root.mkdir(parents=True, exist_ok=False)
+    write_json_dict(
+        resolve_session_datacard_path(session_root),
+        _default_session_payload(session_root.name),
+    )
+    resolve_acquisitions_root(session_root).mkdir(parents=True, exist_ok=True)
+    return SessionMutationResult(
+        created_path=session_root,
+        created_paths=(session_root,),
+    )
+
+
+def delete_session(session_root: str | Path) -> SessionMutationResult:
+    """Delete one session folder from disk."""
+
+    root = Path(session_root).resolve()
+    if not root.is_dir():
+        raise FileNotFoundError(f"session folder does not exist: {root}")
+    shutil.rmtree(root)
+    return SessionMutationResult(
+        deleted_paths=(root,),
     )
 
 
@@ -341,26 +430,89 @@ def add_acquisition(
 ) -> SessionMutationResult:
     """Create a new acquisition folder at the end of the session list."""
     index = inspect_session(session_root)
+    if index.entries and starting_number is not None and int(starting_number) != index.starting_number:
+        raise ValueError("Change the starting number through reindexing first.")
+    return create_acquisition_batch(
+        session_root,
+        count=1,
+        starting_number=None if index.entries else starting_number,
+        labels=((str(label).strip() or None) if label is not None else None,),
+    )
+
+
+def preview_acquisition_batch(
+    session_root: str | Path,
+    *,
+    count: int = 1,
+    starting_number: int | None = None,
+    labels: tuple[str | None, ...] = (),
+) -> tuple[AcquisitionCreationPreviewEntry, ...]:
+    """Return a preview of proposed acquisition folders for one session."""
+
+    index = inspect_session(session_root)
+    requested_count = max(1, int(count))
+    width = index.number_width
+    if starting_number is None:
+        base_number = index.entries[-1].number + 1 if index.entries else index.starting_number
+    else:
+        base_number = int(starting_number)
+
+    previews: list[AcquisitionCreationPreviewEntry] = []
+    for offset in range(requested_count):
+        label = None
+        if offset < len(labels):
+            clean = str(labels[offset]).strip() if labels[offset] is not None else ""
+            label = clean or None
+        number = base_number + offset
+        folder_name = format_acquisition_folder_name(number, label, width=width)
+        path = index.acquisitions_root.joinpath(folder_name)
+        previews.append(
+            AcquisitionCreationPreviewEntry(
+                number=number,
+                label=label,
+                width=width,
+                folder_name=folder_name,
+                path=path,
+                collision_exists=path.exists(),
+            ),
+        )
+    return tuple(previews)
+
+
+def create_acquisition_batch(
+    session_root: str | Path,
+    *,
+    count: int = 1,
+    starting_number: int | None = None,
+    labels: tuple[str | None, ...] = (),
+) -> SessionMutationResult:
+    """Create one or more acquisition folders from an explicit preview plan."""
+
+    index = inspect_session(session_root)
     if not index.numbering_valid:
         raise ValueError(index.warning_text or "Session numbering is not contiguous.")
-    base = int(starting_number or index.starting_number)
-    if index.entries and base != index.starting_number:
-        raise ValueError("Change the starting number through reindexing first.")
-    next_number = (
-        index.entries[-1].number + 1
-        if index.entries
-        else base
+    previews = preview_acquisition_batch(
+        session_root,
+        count=count,
+        starting_number=starting_number,
+        labels=labels,
     )
-    folder_name = format_acquisition_folder_name(
-        next_number,
-        label,
-        width=index.number_width,
+    collisions = [entry.folder_name for entry in previews if entry.collision_exists]
+    if collisions:
+        joined = ", ".join(collisions[:3])
+        suffix = f" (+{len(collisions) - 3} more)" if len(collisions) > 3 else ""
+        raise FileExistsError(f"Acquisition folder already exists: {joined}{suffix}")
+
+    created_paths: list[Path] = []
+    for preview in previews:
+        preview.path.mkdir(parents=True, exist_ok=False)
+        for child_name in ("frames", "notes", "thumbs"):
+            preview.path.joinpath(child_name).mkdir(parents=True, exist_ok=True)
+        created_paths.append(preview.path)
+    return SessionMutationResult(
+        created_path=created_paths[0] if created_paths else None,
+        created_paths=tuple(created_paths),
     )
-    acquisition_root = index.acquisitions_root.joinpath(folder_name)
-    acquisition_root.mkdir(parents=True, exist_ok=False)
-    for child_name in ("frames", "notes", "thumbs"):
-        acquisition_root.joinpath(child_name).mkdir(parents=True, exist_ok=True)
-    return SessionMutationResult(created_path=acquisition_root)
 
 
 def rename_acquisition_label(

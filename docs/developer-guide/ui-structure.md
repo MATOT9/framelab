@@ -25,6 +25,8 @@ This is the primary UI organization rule of the repo. If new UI behavior fits an
 It is responsible for:
 
 - window identity, size, and session-level defaults
+- workflow selection, active-node tracking, and workflow breadcrumb state
+- metadata-state control for effective/local workflow-node metadata
 - long-lived dataset, metric, ROI, cache, and background state
 - enabled plugin bookkeeping
 - table column policy and visibility state
@@ -43,6 +45,14 @@ The main shell is a tabbed workflow:
 
 The Analyze tab is conditional. It is only shown when at least one analysis plugin has been loaded.
 
+Around those tabs, the shell now also owns:
+
+- a compact workflow breadcrumb/path bar above the tabs
+- a left **Workflow Explorer** dock for active-node selection and session-structure authoring
+- a right **Metadata Inspector** dock for node-metadata editing and provenance review
+
+The explorer intentionally carries a small active-lineage rail so the current path reads as structure, not just as another badge row. The metadata inspector keeps provenance compact through source badges plus a source-node column instead of large explanation-heavy panels.
+
 This is an important UI policy detail: tab visibility is partly derived from plugin availability, not only from hard-coded shell structure.
 
 ## Mixin responsibilities
@@ -54,6 +64,8 @@ This mixin owns shell-level UI concerns:
 - menu bar
 - toolbar
 - status bar
+- workflow breadcrumb row
+- workflow and metadata dock construction
 - theme application
 - Help menu actions
 - column-visibility menus
@@ -142,6 +154,8 @@ The host window is the source of truth for shared workflow state.
 
 This includes:
 
+- workflow workspace/profile/active-node state
+- metadata inspector / workflow explorer visibility state
 - dataset paths and row metadata
 - measurement arrays
 - ROI selection
@@ -156,6 +170,11 @@ Mixins operate on that shared state. They are not independent widgets with isola
 ### Why this matters
 
 When refactoring, do not mistake file separation for state separation. Moving a method between mixins is easy. Moving state ownership away from the host is an architectural change.
+
+Two examples added by the workflow refactor are:
+
+- `workflow_state_controller` for typed node hierarchy, active-node selection, and profile context
+- `metadata_state_controller` for nodecard loading, schema/governance resolution, templates, and effective metadata validation
 
 ## Dynamic visibility policy
 

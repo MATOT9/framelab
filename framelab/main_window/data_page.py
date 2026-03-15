@@ -18,8 +18,9 @@ from ..datacard_labels import label_for_metadata_field
 from ..metadata import (
     clear_metadata_cache,
     extract_path_metadata,
-    path_has_acquisition_datacard,
+    path_has_json_metadata,
 )
+from ..node_metadata import NODECARD_DIR_NAME, NODECARD_FILE_NAME
 from ..scan_settings import save_skip_patterns
 from ..ui_primitives import (
     ChipSpec,
@@ -28,6 +29,7 @@ from ..ui_primitives import (
     build_summary_strip,
     make_status_chip,
 )
+from ..window_drag import configure_secondary_window
 from ..widgets import install_large_header_resize_cursor
 
 
@@ -38,6 +40,7 @@ class _SkipRulesEditorDialog(qtw.QDialog):
         super().__init__(None)
         self._host = host
         self.setWindowTitle("Edit Skip Rules")
+        configure_secondary_window(self)
         self.setAttribute(Qt.WA_DeleteOnClose, True)
         self.resize(920, 360)
         self.setMinimumSize(720, 280)
@@ -178,6 +181,7 @@ class DataPageMixin:
         command_layout.setSpacing(8)
 
         folder_label = qtw.QLabel("Dataset")
+        self._data_scope_label = folder_label
         folder_label.setObjectName("SectionTitle")
         command_layout.addWidget(folder_label)
 
@@ -197,6 +201,7 @@ class DataPageMixin:
         command_layout.addWidget(self.folder_edit, 1)
 
         browse_button = qtw.QPushButton("Browse Folder...")
+        self._data_browse_button = browse_button
         browse_button.setToolTip("Open dataset folder chooser.")
         browse_button.clicked.connect(
             lambda _checked=False: self.browse_folder(),
@@ -204,6 +209,7 @@ class DataPageMixin:
         command_layout.addWidget(browse_button)
 
         load_button = qtw.QPushButton("Scan Folder")
+        self._data_load_button = load_button
         load_button.setObjectName("AccentButton")
         load_button.setToolTip(
             "Scan folder, load metadata, and initialize image metrics.",
@@ -633,6 +639,11 @@ class DataPageMixin:
                     level="success" if has_loaded else "neutral",
                 ),
                 SummaryItem(
+                    "Scope",
+                    dataset.scope_summary_value(),
+                    level="info" if dataset.scope_snapshot.root is not None else "neutral",
+                ),
+                SummaryItem(
                     "Metadata Source",
                     metadata_mode,
                     level=metadata_level,
@@ -834,16 +845,21 @@ class DataPageMixin:
         del blocker
 
     def _dataset_has_json_metadata(self, paths: list[str]) -> bool:
-        """Return True when at least one loaded path has a datacard."""
+        """Return True when at least one loaded path has JSON-backed metadata."""
+        boundary_root = (
+            self.dataset_state.scope_snapshot.root
+            if self.dataset_state.scope_snapshot.source == "workflow"
+            else None
+        )
         for path in paths:
-            if path_has_acquisition_datacard(path):
+            if path_has_json_metadata(path, metadata_boundary_root=boundary_root):
                 return True
         return False
 
     @staticmethod
     def _folder_has_json_metadata(folder: Path) -> bool:
-        """Return True when at least one datacard exists under folder tree."""
-        for _root, _dirs, files in os.walk(folder):
+        """Return True when JSON metadata exists anywhere under the selected root."""
+        for root, _dirs, files in os.walk(folder):
             if any(
                 name.lower() in {
                     ACQUISITION_DATACARD_NAME,
@@ -851,6 +867,12 @@ class DataPageMixin:
                     CAMPAIGN_DATACARD_NAME,
                 }
                 for name in files
+            ):
+                return True
+            current_root = Path(root)
+            if (
+                current_root.name == NODECARD_DIR_NAME
+                and any(name.lower() == NODECARD_FILE_NAME for name in files)
             ):
                 return True
         return False
@@ -927,11 +949,17 @@ class DataPageMixin:
     def _refresh_metadata_cache(self) -> None:
         """Rebuild metadata mapping for currently loaded paths."""
         clear_metadata_cache()
+        boundary_root = (
+            self.dataset_state.scope_snapshot.root
+            if self.dataset_state.scope_snapshot.source == "workflow"
+            else None
+        )
         self.dataset_state.set_path_metadata(
             {
                 path: extract_path_metadata(
                     path,
                     metadata_source=self.dataset_state.metadata_source_mode,
+                    metadata_boundary_root=boundary_root,
                 )
                 for path in self.dataset_state.paths
             },
@@ -1104,7 +1132,7 @@ class DataPageMixin:
             for col_idx, value in enumerate(values):
                 item = qtw.QTableWidgetItem(value)
                 align = Qt.AlignLeft if col_idx == 0 else Qt.AlignCenter
-                item.setTextAlignment(int(align | Qt.AlignVCenter))
+                item.setTextAlignment(align | Qt.AlignVCenter)
                 self.metadata_table.setItem(row_idx, col_idx, item)
 
         group_count = len(

@@ -1,12 +1,22 @@
-# Session Manager
+# Session Manager (Legacy)
 
-Use **Session Manager** when you need to manage acquisition folders inside one session before or alongside ordinary dataset analysis.
+Use **Session Manager (Legacy)** only when you need the remaining session-side actions that are not yet workflow-native.
 
-This tool is a session-level organizer. It does not replace the **Data** tab, and it does not replace the **Acquisition Datacard Wizard**. Instead, it helps you prepare the acquisition tree that the rest of the app will later scan and interpret.
+For day-to-day structure work, prefer **Workflow Explorer -> Structure** from the selected session or campaign node. The workflow shell is now the primary place for:
+
+- creating sessions
+- deleting sessions
+- creating acquisitions
+- batch-creating acquisitions
+- renaming acquisition labels
+- deleting acquisitions
+- normalizing or reindexing acquisition numbering
+
+This legacy dialog remains useful for acquisition datacard copy/paste, acquisition-local eBUS toggles, and direct session repair workflows.
 
 ## What this tool is for
 
-Use **Session Manager** to:
+Use **Session Manager (Legacy)** to:
 
 - load one session root and inspect all managed acquisitions under it
 - create a new acquisition folder at the end of the numbering sequence
@@ -18,9 +28,17 @@ Use **Session Manager** to:
 - copy one acquisition datacard and paste a normalized copy onto another acquisition
 - toggle the acquisition-local eBUS enabled state when the eBUS tools plugin is also enabled
 
+## Where this fits in the current workflow
+
+Use the workflow shell first.
+
+Use **Session Manager (Legacy)** only after the folder hierarchy already exists and you specifically need one of the remaining legacy-only actions.
+
+If you are still deciding how sessions and acquisitions should be laid out on disk, read [Workflow Structure and Required Folder Layout](../workflow-structure.md) first.
+
 ## Session structure expected by the tool
 
-The Session Manager looks for a **session root** and then resolves the **acquisitions root** from `session_datacard.json`.
+The Session Manager (Legacy) looks for a **session root** and then resolves the **acquisitions root** from `session_datacard.json`.
 
 Current behavior:
 
@@ -30,17 +48,17 @@ Current behavior:
 Only folders whose names match the acquisition naming contract are managed:
 
 ```text
-acq-#### 
+acq-####
 acq-####__label
 ```
 
-Folders that do not match that pattern are ignored by the acquisition list.
+Folders that do not match that pattern are ignored by the acquisition list, even if they happen to contain TIFF data.
 
 ## Main workflow
 
 A reliable operating sequence is:
 
-1. Open **Plugins -> Open Session Manager...**
+1. Open **Plugins -> Data Page -> Session Manager (Legacy) -> Open Legacy Session Manager...**
 2. Choose the session folder and click **Load Session**
 3. Inspect numbering state, clipboard state, and acquisition list
 4. Perform any structural edits needed for the session
@@ -164,7 +182,9 @@ Use it when the acquisition should explicitly opt in or out of using the discove
 
 ## Relationship to the rest of the app
 
-Use **Session Manager** for session structure and acquisition selection.
+Use **Session Manager** for the remaining legacy session-side operations.
+
+Use **Workflow Explorer -> Structure** for the primary hierarchy workflow.
 
 Use **Data** for:
 
@@ -189,7 +209,7 @@ Use **eBUS Config Tools** for:
 
 ### I need a new acquisition folder before I can load data
 
-Use **Add Acquisition**, then **Load Selected**.
+Prefer **Workflow Explorer -> Structure**. Use **Add Acquisition** here only when you intentionally want the legacy session dialog.
 
 ### I copied the wrong acquisition metadata to the new run
 
@@ -223,25 +243,8 @@ Verify that the session row is selected and that the main window still exists be
 
 ## Related pages
 
+- [Workflow Structure and Required Folder Layout](../workflow-structure.md)
 - [Data Workflow](../data-workflow.md)
 - [Datacard Wizard](datacard-wizard.md)
 - [eBUS Config Tools](ebus-config-tools.md)
 - [Reference: Config Files](../../reference/config-files.md)
-
-<figure class="placeholder-figure">
-  <img src="../../assets/images/placeholders/screenshot-placeholder-16x9.svg" alt="Placeholder screenshot for the Session Manager dialog">
-  <figcaption>
-    Placeholder — Add screenshot: Session Manager dialog with a loaded session and several acquisitions listed. Target:
-    <code>docs/assets/images/user-guide/data/session-manager-overview.png</code>.
-    Theme: dark. Type: screenshot. State: session loaded, one row selected, summary strip visible.
-  </figcaption>
-</figure>
-
-<figure class="placeholder-figure">
-  <img src="../../assets/images/placeholders/screenshot-placeholder-16x9.svg" alt="Placeholder screenshot for a numbering warning in Session Manager">
-  <figcaption>
-    Placeholder — Add screenshot: Session Manager showing non-contiguous numbering and the Normalize/Reindex workflow. Target:
-    <code>docs/assets/images/user-guide/data/session-manager-reindex-warning.png</code>.
-    Theme: dark. Type: screenshot. State: numbering invalid warning visible, reindex controls emphasized.
-  </figcaption>
-</figure>

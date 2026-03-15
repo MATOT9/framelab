@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 from framelab.ui_settings import (
     DensityMode,
+    RecentWorkflowEntry,
     UiPreferences,
     UiStateSnapshot,
     UiStateStore,
@@ -41,6 +42,11 @@ def test_load_returns_defaults_when_config_missing(store: UiStateStore) -> None:
     assert snapshot.splitter_sizes == {}
     assert snapshot.last_tab_index is None
     assert snapshot.last_analysis_plugin_id is None
+    assert snapshot.workflow_workspace_root is None
+    assert snapshot.workflow_profile_id is None
+    assert snapshot.workflow_anchor_type_id is None
+    assert snapshot.workflow_active_node_id is None
+    assert snapshot.recent_workflows == []
 
 
 def test_save_and_reload_round_trips_preferences_and_state(
@@ -66,6 +72,24 @@ def test_save_and_reload_round_trips_preferences_and_state(
         splitter_sizes={"measure.main_splitter": [640, 360]},
         last_tab_index=2,
         last_analysis_plugin_id="iris_gain",
+        workflow_workspace_root="/tmp/workspaces/calibration",
+        workflow_profile_id="calibration",
+        workflow_anchor_type_id="session",
+        workflow_active_node_id="calibration:session:cam-a/campaign-1/session-01",
+        recent_workflows=[
+            RecentWorkflowEntry(
+                workspace_root="/tmp/workspaces/calibration",
+                profile_id="calibration",
+                anchor_type_id="root",
+                active_node_id="calibration:root",
+            ),
+            RecentWorkflowEntry(
+                workspace_root="/tmp/workspaces/trials/trial-0004",
+                profile_id="trials",
+                anchor_type_id="trial",
+                active_node_id="trials:trial",
+            ),
+        ],
     )
 
     store.save(snapshot)
@@ -88,6 +112,27 @@ def test_save_and_reload_round_trips_preferences_and_state(
     assert reloaded.splitter_sizes == {"measure.main_splitter": [640, 360]}
     assert reloaded.last_tab_index == 2
     assert reloaded.last_analysis_plugin_id == "iris_gain"
+    assert reloaded.workflow_workspace_root == "/tmp/workspaces/calibration"
+    assert reloaded.workflow_profile_id == "calibration"
+    assert reloaded.workflow_anchor_type_id == "session"
+    assert (
+        reloaded.workflow_active_node_id
+        == "calibration:session:cam-a/campaign-1/session-01"
+    )
+    assert reloaded.recent_workflows == [
+        RecentWorkflowEntry(
+            workspace_root="/tmp/workspaces/calibration",
+            profile_id="calibration",
+            anchor_type_id="root",
+            active_node_id="calibration:root",
+        ),
+        RecentWorkflowEntry(
+            workspace_root="/tmp/workspaces/trials/trial-0004",
+            profile_id="trials",
+            anchor_type_id="trial",
+            active_node_id="trials:trial",
+        ),
+    ]
 
 
 def test_incremental_panel_and_splitter_updates_preserve_other_sections(
@@ -158,3 +203,42 @@ def test_invalid_values_fall_back_to_defaults(
     assert snapshot.splitter_sizes == {}
     assert snapshot.last_tab_index is None
     assert snapshot.last_analysis_plugin_id == "iris_gain"
+    assert snapshot.workflow_workspace_root is None
+    assert snapshot.workflow_profile_id is None
+    assert snapshot.workflow_anchor_type_id is None
+    assert snapshot.workflow_active_node_id is None
+    assert snapshot.recent_workflows == []
+
+
+def test_invalid_recent_workflow_entries_are_ignored(
+    store: UiStateStore,
+    config_path: Path,
+) -> None:
+    config_path.write_text(
+        "\n".join(
+            [
+                "[recent_workflows]",
+                "entry_01 = not-json",
+                "entry_02 = {\"workspace_root\": \"/tmp/work\", \"profile_id\": \"\"}",
+                (
+                    "entry_03 = "
+                    "{\"workspace_root\": \"/tmp/work\", \"profile_id\": \"calibration\", "
+                    "\"anchor_type_id\": \"session\", "
+                    "\"active_node_id\": \"calibration:session\"}"
+                ),
+            ],
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    snapshot = store.load()
+
+    assert snapshot.recent_workflows == [
+        RecentWorkflowEntry(
+            workspace_root="/tmp/work",
+            profile_id="calibration",
+            anchor_type_id="session",
+            active_node_id="calibration:session",
+        ),
+    ]

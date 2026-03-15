@@ -2,7 +2,7 @@
 
 Use this section when something is wrong and you need to decide **where the fault is most likely located** before you start changing data, plugins, or code.
 
-This section is intentionally broader than the **User Troubleshooting** page. The user-guide page handles normal operator checks during a session. This page is the cross-cutting triage page for dataset issues, metadata failures, eBUS anomalies, measurement state, plugin enablement, and docs packaging.
+This section is intentionally broader than the **User Troubleshooting** page. The user-guide page handles normal operator checks during a session. This page is the cross-cutting triage page for workflow-scope mistakes, dataset issues, metadata failures, eBUS anomalies, measurement state, plugin enablement, and docs packaging.
 
 ## How to use this section
 
@@ -10,12 +10,37 @@ Work in the following order:
 
 1. Confirm the problem category.
 2. Perform the minimum checks for that category.
-3. Decide whether the issue belongs to dataset content, app configuration, metadata authoring, eBUS discovery, plugin enablement, or documentation packaging.
+3. Decide whether the issue belongs to workflow structure, dataset content, app configuration, metadata authoring, eBUS discovery, plugin enablement, or documentation packaging.
 4. Escalate to the user guide, reference, or developer guide only after the failure surface is clear.
 
 ## Problem categories
 
-### 1. Dataset intake and scan failures
+### 1. Workflow profile, hierarchy, and scope problems
+
+Use this branch when the wrong part of the filesystem was opened or when the workflow tree itself looks wrong.
+
+Typical symptoms:
+
+- the loaded tree is missing sessions or acquisitions
+- the selected folder opened as the wrong logical node type
+- a campaign folder was opened but no sessions appear
+- a session loads but acquisitions are missing
+- the dataset table is internally consistent but clearly comes from the wrong scope
+
+First checks:
+
+- confirm whether **Calibration** or **Trials** was chosen
+- confirm whether the selected folder represents a workspace, camera, campaign, session, or acquisition subtree
+- compare the on-disk layout against the documented workflow structure
+- inspect `session_datacard.json.paths.acquisitions_root_rel` when session contents appear incomplete
+
+See:
+
+- [Workflow Structure and Required Folder Layout](../user-guide/workflow-structure.md)
+- [User Troubleshooting](../user-guide/troubleshooting.md)
+- [Architecture](../developer-guide/architecture.md)
+
+### 2. Dataset intake and scan failures
 
 Use this branch when the dataset does not scan as expected or when the row count is clearly wrong.
 
@@ -39,7 +64,7 @@ See:
 - [Data Workflow](../user-guide/data-workflow.md)
 - [Config Files](../reference/config-files.md)
 
-### 2. Metadata, datacard, and eBUS resolution problems
+### 3. Metadata, datacard, and eBUS resolution problems
 
 Use this branch when images load but exposure, iris position, grouping, or frame-linked metadata are missing or suspicious.
 
@@ -72,7 +97,7 @@ See:
 - [Datacard System](../developer-guide/datacard-system.md)
 - [eBUS Config Integration](../developer-guide/ebus-config-integration.md)
 
-### 3. Measurement-stage problems
+### 4. Measurement-stage problems
 
 Use this branch when the dataset scans correctly, but the numeric metrics look wrong, unstable, blank, or physically implausible.
 
@@ -99,7 +124,7 @@ See:
 - [Measure Workflow](../user-guide/measure-workflow.md)
 - [Architecture](../developer-guide/architecture.md)
 
-### 4. Analysis and plugin-loading problems
+### 5. Analysis and plugin-loading problems
 
 Use this branch when analysis controls, plots, or plugin-specific actions are missing or inconsistent.
 
@@ -125,7 +150,7 @@ See:
 - [Plugin Manifests](../reference/plugin-manifests.md)
 - [Plugin System](../developer-guide/plugin-system.md)
 
-### 5. Offline help and documentation packaging problems
+### 6. Offline help and documentation packaging problems
 
 Use this branch when the app launches, but the Help system opens stale content, directory listings, or missing-page fallbacks.
 
@@ -153,6 +178,7 @@ See:
 
 | Symptom | Most likely layer | Go to first |
 | --- | --- | --- |
+| Tree missing sessions/acquisitions | workflow layout or scope | [Workflow Structure](../user-guide/workflow-structure.md) |
 | No files after scan | dataset path or skip rules | [User Troubleshooting](../user-guide/troubleshooting.md) |
 | Add/delete blocked in Session Manager | non-contiguous acquisition numbering | [Session Manager](../user-guide/data/session-manager.md) |
 | Exposure or iris missing | metadata source or datacard | [Datacard Wizard](../user-guide/data/datacard-wizard.md) |
@@ -169,4 +195,4 @@ Use this rule of thumb:
 
 - if the problem is visible during ordinary use, start in the **User Guide**
 - if the problem is about file locations, schema keys, or manifests, continue to **Reference**
-- if the problem is about startup flow, host/plugin boundaries, packaging, or internal contracts, continue to the **Developer Guide**
+- if the problem is about startup flow, workflow loading, host/plugin boundaries, packaging, or internal contracts, continue to the **Developer Guide**

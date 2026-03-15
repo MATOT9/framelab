@@ -5,6 +5,7 @@ from __future__ import annotations
 import sys
 
 from PySide6 import QtWidgets as qtw
+from PySide6.QtCore import QTimer
 
 from .icons import apply_app_identity, prepare_process_identity
 from .mpl_config import ensure_matplotlib_config_dir
@@ -66,4 +67,6 @@ def main() -> int:
     win.showMaximized()
     # Re-apply once native window handle exists (helps Windows taskbar icon).
     apply_app_identity(app, win)
+    if win.workflow_state_controller.workspace_root is None:
+        QTimer.singleShot(0, win._open_workflow_selection_dialog)
     return app.exec()

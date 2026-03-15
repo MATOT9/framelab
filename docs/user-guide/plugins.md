@@ -11,7 +11,7 @@ Use this page to understand what plugins are allowed to change, when they are lo
 Data plugins extend dataset-side workflows. In the current app, the built-in data plugins are:
 
 - **Acquisition Datacard Wizard** — create, edit, validate, and save acquisition datacards for the selected dataset
-- **Session Manager** — manage acquisitions inside one session, including numbering, add/delete, datacard copy/paste, and acquisition-local eBUS enable state
+- **Session Manager (Legacy)** — legacy dialog for acquisition datacard copy/paste, acquisition-local eBUS enable state, and session-level repair tasks that are still outside the workflow shell
 - **eBUS Config Tools** — inspect raw `.pvcfg` snapshots, compare sources in raw or effective mode, and hand off to the datacard wizard when canonical app-side metadata changes are required
 
 ### Measure plugins
@@ -61,13 +61,16 @@ After startup, loaded plugins expose whatever UI they own:
 - menu actions under **Plugins**
 - embedded analysis views
 - page-specific controls or status additions
-- focused dialogs such as **Session Manager** or **Background Correction**
+- focused dialogs such as **Session Manager (Legacy)** or **Background Correction**
 
 ## Practical guidance
 
 - Keep the enabled set lean when you want a simpler session and lower startup overhead.
 - Enable additional plugins only when their workflow is part of the current task.
-- Use **Session Manager** when the acquisition folders themselves still need to be prepared.
+- Use the **Calibration** workflow profile for most production work; treat **Trials** as experimental.
+- Use [Workflow Structure and Required Folder Layout](workflow-structure.md) before enabling plugins merely to compensate for weak dataset organization.
+- Use **Workflow Explorer -> Structure** first when the session and acquisition folders themselves still need to be prepared.
+- Keep **Session Manager (Legacy)** for datacard copy/paste and acquisition-local eBUS enable state until those flows are fully workflow-native.
 - Use the **eBUS Config Tools** plugin for snapshot inspection and cross-source compare, not as a replacement for canonical datacard authoring.
 - Use the **Acquisition Datacard Wizard** when you need a stable acquisition record, frame-targeted metadata, or approved app-side overrides of eBUS-managed canonical fields.
 - Use **Background Correction** when you want a focused dialog around the same host-owned background-subtraction state used by the Measure page.
@@ -78,7 +81,7 @@ This page is the generic overview. Detailed usage belongs to the pages that matc
 
 Current plugin-specific user pages:
 
-- [Session Manager](data/session-manager.md)
+- [Session Manager (Legacy)](data/session-manager.md)
 - [Datacard Wizard](data/datacard-wizard.md)
 - [eBUS Config Tools](data/ebus-config-tools.md)
 - [Intensity Trend Explorer](analysis/intensity-trend-explorer.md)
@@ -87,7 +90,7 @@ Current plugin-specific user pages:
 
 Open the **Plugins** menu when you need:
 
-- the **Session Manager** for one session root
+- the **Session Manager (Legacy)** for one session root
 - the **Acquisition Datacard Wizard** for the current dataset
 - the **eBUS Config Tools** for snapshot inspect or compare work
 - the **Background Correction** dialog for a focused background-reference workflow
@@ -95,16 +98,8 @@ Open the **Plugins** menu when you need:
 
 ## Related pages
 
+- [Workflow Structure and Required Folder Layout](workflow-structure.md)
 - [Plugin Selector](plugin-selector.md)
 - [Data Workflow](data-workflow.md)
 - [Measure Workflow](measure-workflow.md)
 - [Analysis Workflow](analysis-workflow.md)
-
-<figure class="placeholder-figure">
-  <img src="../assets/images/placeholders/screenshot-placeholder-16x9.svg" alt="Placeholder screenshot for the startup plugin selector">
-  <figcaption>
-    Placeholder — Add screenshot: Startup plugin selector with Data, Measure, and Analyze groups visible. Target:
-    <code>docs/assets/images/user-guide/plugins/plugin-selector-grouped.png</code>.
-    Theme: dark. Type: screenshot. State: Session Manager, Background Correction, and Intensity Trend Explorer visible in their respective groups.
-  </figcaption>
-</figure>

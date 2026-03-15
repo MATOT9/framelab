@@ -74,7 +74,7 @@ class AnalysisPageMixin:
         main_splitter.setChildrenCollapsible(False)
 
         side_rail = qtw.QWidget()
-        side_rail.setMinimumWidth(280)
+        side_rail.setMinimumWidth(180)
         side_layout = qtw.QVBoxLayout(side_rail)
         self._analysis_side_rail_layout = side_layout
         side_layout.setContentsMargins(0, 0, 0, 0)
@@ -349,7 +349,7 @@ class AnalysisPageMixin:
     def _analysis_main_splitter_key() -> str:
         """Return UI-state key used for the top-level Analysis splitter."""
 
-        return "analysis.main_splitter.v2"
+        return "analysis.main_splitter.v3"
 
     def _analysis_workspace_splitter_key(self, plugin: AnalysisPlugin) -> str:
         """Return UI-state key used for one plugin workspace splitter."""
@@ -381,7 +381,15 @@ class AnalysisPageMixin:
         ):
             self._restore_splitter_state(key, splitter)
             return
-        splitter.setSizes([320, 980])
+        total_width = splitter.width()
+        if total_width <= 0:
+            total_width = splitter.sizeHint().width()
+        if total_width <= 0:
+            splitter.setSizes([320, 980])
+            return
+        left_width = min(300, max(180, int(total_width * 0.25)))
+        right_width = max(total_width - left_width, left_width + 1)
+        splitter.setSizes([left_width, right_width])
 
     def _restore_visible_analysis_layout(self) -> None:
         """Reapply active Analysis splitter sizes after the page becomes visible."""
@@ -646,6 +654,15 @@ class AnalysisPageMixin:
                     "Records",
                     str(record_count),
                     level="success" if self._has_loaded_data() else "neutral",
+                ),
+                SummaryItem(
+                    "Scope",
+                    dataset.scope_summary_value() if dataset is not None else "None",
+                    level=(
+                        "info"
+                        if dataset is not None and dataset.scope_snapshot.root is not None
+                        else "neutral"
+                    ),
                 ),
                 SummaryItem(
                     "Metric Mode",

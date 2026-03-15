@@ -1,10 +1,10 @@
 {
   "plugin_id": "session_manager",
-  "display_name": "Session Manager",
+  "display_name": "Session Manager (Legacy)",
   "page": "data",
   "entrypoint_module": "framelab.plugins.data.session_manager",
   "dependencies": [
     "acquisition_datacard_wizard"
   ],
-  "description": "Manage acquisitions inside one session, including numbering, datacard copy/paste, and acquisition-local eBUS enable state."
+  "description": "Legacy session dialog for acquisition datacard copy/paste, eBUS enable state, and session-level repair tasks that are still outside the workflow shell."
 }

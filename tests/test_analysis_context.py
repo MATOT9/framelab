@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from framelab.analysis_context import AnalysisContextController
-from framelab.dataset_state import DatasetStateController
+from framelab.dataset_state import DatasetScopeNode, DatasetStateController
 from framelab.metrics_state import MetricsPipelineController
 
 
@@ -90,3 +90,72 @@ def test_build_context_sets_background_flags_and_reference_labels() -> None:
     assert record_b.metadata["background_enabled"]
     assert not record_b.metadata["background_applied"]
     assert record_b.metadata["background_reference"] == "raw_fallback"
+
+
+def test_build_context_exposes_workflow_scope_and_effective_metadata() -> None:
+    dataset = DatasetStateController()
+    dataset.set_loaded_dataset("/tmp/workspace/session-01", ["/tmp/workspace/session-01/a.tif"])
+    dataset.set_path_metadata(
+        {
+            "/tmp/workspace/session-01/a.tif": {
+                "exposure_ms": 12.0,
+            },
+        },
+    )
+    dataset.set_workflow_scope(
+        root="/tmp/workspace/session-01",
+        kind="session",
+        label="Session 01",
+        workflow_profile_id="calibration",
+        workflow_anchor_type_id="session",
+        workflow_anchor_label="Session subtree",
+        workflow_anchor_path="/tmp/workspace/session-01",
+        workflow_is_partial=True,
+        active_node_id="calibration:session:session-01",
+        active_node_type="session",
+        active_node_path="/tmp/workspace/session-01",
+        ancestor_chain=(
+            DatasetScopeNode(
+                node_id="calibration:root",
+                type_id="root",
+                display_name="Calibration",
+                folder_path="/tmp/workspace",
+            ),
+            DatasetScopeNode(
+                node_id="calibration:session:session-01",
+                type_id="session",
+                display_name="Session 01",
+                folder_path="/tmp/workspace/session-01",
+            ),
+        ),
+        effective_metadata={"camera_settings.exposure_us": 12000},
+        metadata_sources={"camera_settings.exposure_us": "node_inherited"},
+    )
+    metrics = MetricsPipelineController()
+
+    controller = AnalysisContextController(
+        dataset,
+        metrics,
+        background_reference_label_resolver=lambda path: f"ref:{path}",
+    )
+    context = controller.build_context(
+        mode="none",
+        normalization_scale=1.0,
+    )
+
+    assert context.workflow_profile_id == "calibration"
+    assert context.workflow_anchor_type_id == "session"
+    assert context.workflow_anchor_label == "Session subtree"
+    assert context.workflow_anchor_path == "/tmp/workspace/session-01"
+    assert context.workflow_is_partial
+    assert context.active_node_id == "calibration:session:session-01"
+    assert context.active_node_type == "session"
+    assert context.active_scope_kind == "session"
+    assert context.active_scope_label == "Session 01"
+    assert context.dataset_scope_source == "workflow"
+    assert context.dataset_scope_root == "/tmp/workspace/session-01"
+    assert context.effective_metadata == {"camera_settings.exposure_us": 12000}
+    assert context.metadata_sources == {
+        "camera_settings.exposure_us": "node_inherited",
+    }
+    assert [node.type_id for node in context.ancestor_chain] == ["root", "session"]

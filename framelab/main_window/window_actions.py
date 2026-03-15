@@ -17,6 +17,7 @@ from ..processing_failures import (
     merge_processing_failures,
     summarize_processing_failures,
 )
+from ..window_drag import configure_secondary_window
 
 
 class WindowActionsMixin:
@@ -143,6 +144,7 @@ class WindowActionsMixin:
 
         dialog = qtw.QDialog(self)
         dialog.setWindowTitle("Processing Issues")
+        configure_secondary_window(dialog)
         dialog.setModal(False)
         dialog.setAttribute(Qt.WA_DeleteOnClose, True)
         dialog.resize(860, 480)
@@ -561,6 +563,7 @@ class WindowActionsMixin:
         """Show a themed message dialog."""
         dialog = qtw.QMessageBox(self)
         dialog.setOption(qtw.QMessageBox.DontUseNativeDialog, True)
+        configure_secondary_window(dialog)
         dialog.setIcon(icon)
         dialog.setWindowTitle(title)
         dialog.setText(message)

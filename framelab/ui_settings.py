@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from configparser import ConfigParser
 from dataclasses import dataclass, field
 from enum import StrEnum
@@ -17,6 +18,7 @@ _SECTION_DATA_PAGE = "data_page"
 _SECTION_ANALYSIS_PAGE = "analysis_page"
 _SECTION_PANELS = "panels"
 _SECTION_SPLITTERS = "splitters"
+_SECTION_RECENT_WORKFLOWS = "recent_workflows"
 _TRUE_VALUES = {"1", "true", "yes", "on"}
 _FALSE_VALUES = {"0", "false", "no", "off"}
 
@@ -53,6 +55,16 @@ class UiPanelState:
 
 
 @dataclass(slots=True)
+class RecentWorkflowEntry:
+    """One recently used workflow workspace/profile pair."""
+
+    workspace_root: str
+    profile_id: str
+    anchor_type_id: str | None = None
+    active_node_id: str | None = None
+
+
+@dataclass(slots=True)
 class UiStateSnapshot:
     """Complete UI snapshot persisted between launches."""
 
@@ -61,6 +73,11 @@ class UiStateSnapshot:
     splitter_sizes: dict[str, list[int]] = field(default_factory=dict)
     last_tab_index: int | None = None
     last_analysis_plugin_id: str | None = None
+    workflow_workspace_root: str | None = None
+    workflow_profile_id: str | None = None
+    workflow_anchor_type_id: str | None = None
+    workflow_active_node_id: str | None = None
+    recent_workflows: list[RecentWorkflowEntry] = field(default_factory=list)
 
 
 def ui_state_config_path() -> Path:
@@ -125,6 +142,43 @@ def _serialize_bool(value: bool) -> str:
 
 def _serialize_splitter_sizes(sizes: list[int]) -> str:
     return ",".join(str(int(size)) for size in sizes)
+
+
+def _parse_recent_workflow_entry(value: object) -> RecentWorkflowEntry | None:
+    text = str(value).strip()
+    if not text:
+        return None
+    try:
+        payload = json.loads(text)
+    except Exception:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    workspace_root = str(payload.get("workspace_root", "")).strip()
+    profile_id = str(payload.get("profile_id", "")).strip().lower()
+    if not workspace_root or not profile_id:
+        return None
+    anchor_type_id = str(payload.get("anchor_type_id", "")).strip().lower() or None
+    active_node_id = str(payload.get("active_node_id", "")).strip() or None
+    return RecentWorkflowEntry(
+        workspace_root=workspace_root,
+        profile_id=profile_id,
+        anchor_type_id=anchor_type_id,
+        active_node_id=active_node_id,
+    )
+
+
+def _serialize_recent_workflow_entry(entry: RecentWorkflowEntry) -> str:
+    return json.dumps(
+        {
+            "workspace_root": entry.workspace_root,
+            "profile_id": entry.profile_id,
+            "anchor_type_id": entry.anchor_type_id,
+            "active_node_id": entry.active_node_id,
+        },
+        ensure_ascii=True,
+        sort_keys=True,
+    )
 
 
 class UiStateStore:
@@ -265,6 +319,44 @@ class UiStateStore:
             fallback="",
         )
         last_analysis_plugin_id = str(raw_plugin_id).strip() or None
+        workflow_workspace_root = (
+            config.get(
+                _SECTION_WORKSPACE,
+                "workflow_root",
+                fallback="",
+            ).strip()
+            or None
+        )
+        workflow_profile_id = (
+            config.get(
+                _SECTION_WORKSPACE,
+                "workflow_profile_id",
+                fallback="",
+            ).strip()
+            or None
+        )
+        workflow_anchor_type_id = (
+            config.get(
+                _SECTION_WORKSPACE,
+                "workflow_anchor_type_id",
+                fallback="",
+            ).strip()
+            or None
+        )
+        workflow_active_node_id = (
+            config.get(
+                _SECTION_WORKSPACE,
+                "workflow_active_node_id",
+                fallback="",
+            ).strip()
+            or None
+        )
+        recent_workflows: list[RecentWorkflowEntry] = []
+        if config.has_section(_SECTION_RECENT_WORKFLOWS):
+            for _key, raw_value in sorted(config.items(_SECTION_RECENT_WORKFLOWS)):
+                entry = _parse_recent_workflow_entry(raw_value)
+                if entry is not None:
+                    recent_workflows.append(entry)
 
         return UiStateSnapshot(
             preferences=preferences,
@@ -272,6 +364,11 @@ class UiStateStore:
             splitter_sizes=splitter_sizes,
             last_tab_index=last_tab_index,
             last_analysis_plugin_id=last_analysis_plugin_id,
+            workflow_workspace_root=workflow_workspace_root,
+            workflow_profile_id=workflow_profile_id,
+            workflow_anchor_type_id=workflow_anchor_type_id,
+            workflow_active_node_id=workflow_active_node_id,
+            recent_workflows=recent_workflows,
         )
 
     def save(self, snapshot: UiStateSnapshot) -> None:
@@ -354,6 +451,30 @@ class UiStateStore:
             "last_plugin_id",
             snapshot.last_analysis_plugin_id or None,
         )
+        self._set_option(
+            config,
+            _SECTION_WORKSPACE,
+            "workflow_root",
+            snapshot.workflow_workspace_root or None,
+        )
+        self._set_option(
+            config,
+            _SECTION_WORKSPACE,
+            "workflow_profile_id",
+            snapshot.workflow_profile_id or None,
+        )
+        self._set_option(
+            config,
+            _SECTION_WORKSPACE,
+            "workflow_anchor_type_id",
+            snapshot.workflow_anchor_type_id or None,
+        )
+        self._set_option(
+            config,
+            _SECTION_WORKSPACE,
+            "workflow_active_node_id",
+            snapshot.workflow_active_node_id or None,
+        )
         self._replace_section(
             config,
             _SECTION_PANELS,
@@ -369,6 +490,15 @@ class UiStateStore:
                 key: _serialize_splitter_sizes(value)
                 for key, value in sorted(snapshot.splitter_sizes.items())
                 if value
+            },
+        )
+        self._replace_section(
+            config,
+            _SECTION_RECENT_WORKFLOWS,
+            {
+                f"entry_{index:02d}": _serialize_recent_workflow_entry(entry)
+                for index, entry in enumerate(snapshot.recent_workflows[:8], start=1)
+                if entry.workspace_root and entry.profile_id
             },
         )
         self._write_config(config)

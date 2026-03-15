@@ -42,19 +42,20 @@ Examples of wording preferences:
 - Prefer "defaults are inherited baseline values; overrides replace targeted values; blank fields do not erase inherited values"
   over vague datacard descriptions.
 
+The user may ask for:
+- single-page replacements,
+- whole-folder replacements,
+- complete docs-folder substitutes,
+- top-level maintenance file updates such as mkdocs.yml, README.md, scripts/docs/check.py or others.
+
 The user also wants deliverables packaged as files, not just pasted chat content.
 Ideal workflow:
 - analyze the code,
 - analyze the existing markdown docs,
 - provide findings and critique,
 - then produce drop-in replacement markdown files,
-- then provide zip bundles containing the replacement docs tree when requested.
-
-The user may ask for:
-- single-page replacements,
-- whole-folder replacements,
-- complete docs-folder substitutes,
-- top-level maintenance file updates such as mkdocs.yml or scripts/docs/check.py.
+- then provide zip bundles containing the replacement docs tree when requested. If maintenance files were updated,
+  provide them in the zip at their original position relative to the root directory.
 
 ----------------------------------------------------------------------
 2. REVIEW METHOD THAT WORKED WELL

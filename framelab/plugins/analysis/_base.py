@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Mapping
 
 import numpy as np
@@ -24,6 +24,16 @@ class AnalysisRecord:
 
 
 @dataclass(frozen=True)
+class AnalysisScopeNode:
+    """One workflow node in the active context ancestry chain."""
+
+    node_id: str
+    type_id: str
+    display_name: str
+    folder_path: str
+
+
+@dataclass(frozen=True)
 class AnalysisContext:
     """Context bundle passed to every analysis plugin."""
 
@@ -32,6 +42,21 @@ class AnalysisContext:
     metadata_fields: tuple[str, ...]
     normalization_enabled: bool
     normalization_scale: float
+    workflow_profile_id: str | None = None
+    workflow_anchor_type_id: str | None = None
+    workflow_anchor_label: str | None = None
+    workflow_anchor_path: str | None = None
+    workflow_is_partial: bool = False
+    active_node_id: str | None = None
+    active_node_type: str | None = None
+    active_node_path: str | None = None
+    active_scope_kind: str | None = None
+    active_scope_label: str | None = None
+    dataset_scope_root: str | None = None
+    dataset_scope_source: str = "manual"
+    effective_metadata: Mapping[str, object] = field(default_factory=dict)
+    metadata_sources: Mapping[str, str] = field(default_factory=dict)
+    ancestor_chain: tuple[AnalysisScopeNode, ...] = ()
 
 
 class AnalysisPlugin(ABC):

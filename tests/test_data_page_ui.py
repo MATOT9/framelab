@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 from PySide6 import QtWidgets as qtw
 
+from framelab.node_metadata import save_nodecard
 from framelab.ui_primitives import StatusChip
 from framelab.window import FrameLabWindow
 
@@ -131,3 +132,19 @@ def test_ebus_status_scans_selected_root_recursively(
         summary_values[label.text()] = value.text()
 
     assert summary_values.get("eBUS") == "1 file"
+
+
+def test_folder_json_metadata_scan_detects_nodecards_recursively(
+    tmp_path: Path,
+) -> None:
+    dataset_root = tmp_path / "workspace"
+    node_root = dataset_root / "camera-a" / "campaign-a"
+    node_root.mkdir(parents=True, exist_ok=True)
+    save_nodecard(
+        node_root,
+        {"camera_settings": {"exposure_us": 1000}},
+        profile_id="calibration",
+        node_type_id="campaign",
+    )
+
+    assert FrameLabWindow._folder_has_json_metadata(dataset_root)

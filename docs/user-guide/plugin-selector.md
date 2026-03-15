@@ -79,13 +79,13 @@ Enable:
 - **Background Correction** when you use background-reference workflows
 - **Intensity Trend Explorer** when you intend to analyze the results immediately
 
-### Session-preparation session
+### Structure and session-preparation session
 
 Enable:
 
-- **Session Manager**
 - **Acquisition Datacard Wizard**
-- optionally **eBUS Config Tools** if acquisition-local eBUS enable state or snapshot interpretation must be reviewed
+- **Session Manager (Legacy)** only if you still need datacard copy/paste or acquisition-local eBUS toggles
+- optionally **eBUS Config Tools** if snapshot interpretation must be reviewed
 
 ### eBUS inspection session
 
@@ -106,6 +106,7 @@ Opening the **Plugins** menu later does not load a plugin that was disabled befo
 
 ## Related pages
 
+- [Workflow Structure and Required Folder Layout](workflow-structure.md)
 - [Plugin Guide](plugins.md)
 - [Session Manager](data/session-manager.md)
 - [Datacard Wizard](data/datacard-wizard.md)

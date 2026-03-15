@@ -22,6 +22,7 @@ from ..ui_primitives import (
     build_summary_strip,
     make_status_chip,
 )
+from ..window_drag import configure_secondary_window
 
 _SELECTION_CONFIG_FILE = "plugin_selection.json"
 _SELECTION_SCHEMA_VERSION = "1.0"
@@ -114,9 +115,8 @@ class PluginStartupDialog(qtw.QDialog):
         parent: Optional[qtw.QWidget] = None,
     ) -> None:
         super().__init__(parent)
-        self.setWindowFlag(QtCore.Qt.Tool, True)
-        self.setWindowFlag(QtCore.Qt.WindowContextHelpButtonHint, False)
         self.setWindowTitle("Select Plugins")
+        configure_secondary_window(self)
         self.setModal(True)
         self.setWindowModality(QtCore.Qt.ApplicationModal)
         self.resize(680, 520)

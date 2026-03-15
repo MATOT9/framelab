@@ -69,6 +69,7 @@ nav:
       - Overview: user-guide/index.md
       - Concepts and Limits: user-guide/concepts-and-limits.md
       - Quick Start: user-guide/quick-start.md
+      - Workflow Structure and Required Folder Layout: user-guide/workflow-structure.md
       - Plugin Guide: user-guide/plugins.md
       - Plugin Selector: user-guide/plugin-selector.md
       - Data Workflow:

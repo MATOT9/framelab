@@ -3,16 +3,17 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from pathlib import Path
 from typing import Iterable, Optional
 from collections import OrderedDict
 
 import numpy as np
 from PySide6 import QtGui, QtWidgets as qtw
-from PySide6.QtCore import Qt, QThread, QTimer
+from PySide6.QtCore import Qt, QSignalBlocker, QThread, QTimer
 
 from .analysis_context import AnalysisContextController
 from .datacard_labels import label_for_metadata_field
-from .dataset_state import DatasetStateController
+from .dataset_state import DatasetScopeNode, DatasetStateController
 from .main_window import (
     AnalysisPageMixin,
     DataPageMixin,
@@ -23,6 +24,7 @@ from .main_window import (
     WindowActionsMixin,
 )
 from .metrics_state import MetricsPipelineController
+from .metadata_state import MetadataStateController
 from .plugins import (
     PAGE_IDS,
     PluginManifest,
@@ -33,7 +35,8 @@ from .plugins import (
 from .plugins.analysis import AnalysisPlugin
 from .ui_density import AdaptiveUiContext, UiDensityResolver
 from .scan_settings import load_skip_patterns, skip_config_path
-from .ui_settings import UiStateSnapshot, UiStateStore
+from .ui_settings import RecentWorkflowEntry, UiStateSnapshot, UiStateStore
+from .workflow import WorkflowStateController
 from .workers import DynamicStatsWorker, RoiApplyWorker
 
 
@@ -154,6 +157,11 @@ class FrameLabWindow(
         ] = OrderedDict()
         self._corrected_cache_capacity = 24
         self._load_ui_state()
+        self.workflow_state_controller = WorkflowStateController()
+        self.metadata_state_controller = MetadataStateController(
+            self.workflow_state_controller,
+        )
+        self._restore_persisted_workflow_state()
         self.show_image_preview = self.ui_preferences.show_image_preview
         self.show_histogram_preview = self.ui_preferences.show_histogram_preview
         self._density_resolver = UiDensityResolver()
@@ -214,6 +222,10 @@ class FrameLabWindow(
         self._page_plugin_classes = load_enabled_plugins(self._enabled_plugin_ids)
         self._apply_base_font()
         self._build_ui()
+        self._sync_dataset_scope_to_workflow(
+            update_folder_edit=True,
+            unload_mismatched_dataset=False,
+        )
         self._apply_theme(self.ui_preferences.theme_mode)
         self._restore_persisted_ui_state()
         self._set_status()
@@ -248,6 +260,754 @@ class FrameLabWindow(
             self.analysis_profile_combo.setCurrentIndex(plugin_index)
         if hasattr(self, "_apply_dynamic_visibility_policy"):
             self._apply_dynamic_visibility_policy()
+
+    def _restore_persisted_workflow_state(self) -> None:
+        """Restore persisted workflow workspace selection when available."""
+
+        root = self.ui_state_snapshot.workflow_workspace_root
+        profile_id = self.ui_state_snapshot.workflow_profile_id
+        if not root or not profile_id:
+            self.workflow_state_controller.clear()
+            self.metadata_state_controller.clear_cache()
+            return
+        try:
+            self.workflow_state_controller.load_workspace(
+                root,
+                profile_id,
+                anchor_type_id=self.ui_state_snapshot.workflow_anchor_type_id,
+                active_node_id=self.ui_state_snapshot.workflow_active_node_id,
+            )
+            self.metadata_state_controller.clear_cache()
+            self._remember_recent_workflow_context(
+                root,
+                profile_id,
+                self.workflow_state_controller.anchor_type_id,
+                self.workflow_state_controller.active_node_id,
+            )
+        except Exception:
+            self.workflow_state_controller.clear()
+            self.metadata_state_controller.clear_cache()
+
+    def _set_folder_edit_text(self, path: str | None) -> None:
+        """Update the dataset-folder editor without emitting user-change noise."""
+
+        if not hasattr(self, "folder_edit"):
+            return
+        text = str(path).strip() if path else ""
+        blocker = QSignalBlocker(self.folder_edit)
+        self.folder_edit.setText(text)
+        del blocker
+
+    def _sync_dataset_scope_to_workflow(
+        self,
+        *,
+        update_folder_edit: bool,
+        unload_mismatched_dataset: bool,
+    ) -> None:
+        """Mirror the active workflow node into dataset-scope state."""
+
+        active_node = self.workflow_state_controller.active_node()
+        if active_node is None:
+            if not getattr(self.workflow_state_controller, "profile_id", None):
+                self.dataset_state.clear_scope()
+            return
+
+        metadata_snapshot = self.metadata_state_controller.resolve_active_node_metadata()
+        ancestry = self.workflow_state_controller.ancestry_for(active_node.node_id)
+        self.dataset_state.set_workflow_scope(
+            root=active_node.folder_path,
+            kind=active_node.type_id,
+            label=active_node.display_name,
+            workflow_profile_id=self.workflow_state_controller.profile_id,
+            workflow_anchor_type_id=self.workflow_state_controller.anchor_type_id,
+            workflow_anchor_label=self.workflow_state_controller.anchor_summary_label(),
+            workflow_anchor_path=self.workflow_state_controller.workspace_root,
+            workflow_is_partial=self.workflow_state_controller.is_partial_workspace(),
+            active_node_id=active_node.node_id,
+            active_node_type=active_node.type_id,
+            active_node_path=active_node.folder_path,
+            ancestor_chain=tuple(
+                DatasetScopeNode(
+                    node_id=node.node_id,
+                    type_id=node.type_id,
+                    display_name=node.display_name,
+                    folder_path=node.folder_path,
+                )
+                for node in ancestry
+            ),
+            effective_metadata=(
+                dict(metadata_snapshot.flat_metadata)
+                if metadata_snapshot is not None
+                else {}
+            ),
+            metadata_sources=(
+                {
+                    key: source.provenance
+                    for key, source in metadata_snapshot.field_sources.items()
+                }
+                if metadata_snapshot is not None
+                else {}
+            ),
+        )
+        if update_folder_edit:
+            self._set_folder_edit_text(str(active_node.folder_path))
+        loaded_root = self.dataset_state.dataset_root
+        if (
+            unload_mismatched_dataset
+            and loaded_root is not None
+            and loaded_root.resolve() != active_node.folder_path.resolve()
+            and hasattr(self, "unload_folder")
+        ):
+            self.unload_folder(clear_folder_edit=False)
+
+    def _refresh_manager_dialogs(self) -> None:
+        """Refresh open workflow surfaces after host-state changes."""
+
+        for attr_name in (
+            "_workflow_manager_dialog",
+            "_metadata_manager_dialog",
+            "_workflow_explorer_dock",
+            "_metadata_inspector_dock",
+        ):
+            dialog = getattr(self, attr_name, None)
+            refresh = getattr(dialog, "sync_from_host", None)
+            if callable(refresh):
+                try:
+                    refresh()
+                except Exception:
+                    continue
+
+    def _notify_workflow_scope_changed(self) -> None:
+        """Refresh page summaries and dialogs after the active workflow node changes."""
+
+        if hasattr(self, "_refresh_workflow_shell_context"):
+            self._refresh_workflow_shell_context()
+        if hasattr(self, "_refresh_data_header_state"):
+            self._refresh_data_header_state()
+        if hasattr(self, "_refresh_measure_header_state"):
+            self._refresh_measure_header_state()
+        if hasattr(self, "_refresh_analysis_summary"):
+            self._refresh_analysis_summary()
+        if self.dataset_state.has_loaded_data():
+            if hasattr(self, "_update_analysis_context"):
+                self._update_analysis_context()
+            elif hasattr(self, "_refresh_analysis_summary"):
+                self._refresh_analysis_summary()
+        if hasattr(self, "_apply_dynamic_visibility_policy"):
+            self._apply_dynamic_visibility_policy()
+        if hasattr(self, "_set_status"):
+            self._set_status()
+        self._refresh_manager_dialogs()
+
+    def _notify_metadata_context_changed(self) -> None:
+        """Refresh derived metadata state after node metadata is edited."""
+
+        self.metadata_state_controller.clear_cache()
+        if self.workflow_state_controller.active_node() is not None:
+            self._sync_dataset_scope_to_workflow(
+                update_folder_edit=False,
+                unload_mismatched_dataset=False,
+            )
+        if self.dataset_state.has_loaded_data():
+            if hasattr(self, "_refresh_metadata_cache"):
+                self._refresh_metadata_cache()
+            if hasattr(self, "_refresh_metadata_table"):
+                self._refresh_metadata_table()
+            if hasattr(self, "_refresh_table"):
+                self._refresh_table()
+        self._notify_workflow_scope_changed()
+
+    def _set_manual_dataset_scope(self, folder: Path | None) -> None:
+        """Store a manual folder-driven scope when workflow resolution is not used."""
+
+        if folder is None:
+            self.dataset_state.clear_scope()
+            return
+        self.dataset_state.set_manual_scope(folder)
+
+    def _resolve_requested_dataset_scope_folder(self, folder: Path) -> Path:
+        """Resolve the effective scan root from manual input and workflow state."""
+
+        candidate = folder.expanduser()
+        workflow = self.workflow_state_controller
+        active_node = workflow.active_node()
+        if active_node is None:
+            return candidate
+
+        node_id = workflow.resolve_node_id_for_path(candidate)
+        if node_id is not None:
+            self.set_active_workflow_node(
+                node_id,
+                sync_scope=True,
+                unload_mismatched_dataset=False,
+            )
+            resolved_node = workflow.active_node()
+            if resolved_node is not None:
+                return resolved_node.folder_path
+
+        # LEGACY_COMPAT[manual_folder_scope_override]: Preserve folder-edit driven scans outside the active workflow tree while legacy Open Folder and Session Manager entry points still coexist with workflow scope. Remove after: workflow explorer owns scope changes and manual folder-loading paths are retired or explicitly redesigned.
+        return candidate
+
+    def set_workflow_context(
+        self,
+        workspace_root: str | None,
+        profile_id: str | None,
+        *,
+        anchor_type_id: str | None = None,
+        active_node_id: str | None = None,
+    ) -> str | None:
+        """Load or clear the current workflow context."""
+
+        if not workspace_root or not profile_id:
+            self.workflow_state_controller.clear()
+            self.metadata_state_controller.clear_cache()
+            self.ui_state_snapshot.workflow_workspace_root = None
+            self.ui_state_snapshot.workflow_profile_id = None
+            self.ui_state_snapshot.workflow_anchor_type_id = None
+            self.ui_state_snapshot.workflow_active_node_id = None
+            current_folder = (
+                Path(self.folder_edit.text().strip()).expanduser()
+                if hasattr(self, "folder_edit") and self.folder_edit.text().strip()
+                else None
+            )
+            self._set_manual_dataset_scope(current_folder)
+            self._notify_workflow_scope_changed()
+            return None
+
+        load_result = self.workflow_state_controller.load_workspace(
+            workspace_root,
+            profile_id,
+            anchor_type_id=anchor_type_id,
+            active_node_id=active_node_id,
+        )
+        self.metadata_state_controller.clear_cache()
+        self.ui_state_snapshot.workflow_workspace_root = str(load_result.workspace_root)
+        self.ui_state_snapshot.workflow_profile_id = load_result.profile_id
+        self.ui_state_snapshot.workflow_anchor_type_id = load_result.anchor_type_id
+        self.ui_state_snapshot.workflow_active_node_id = load_result.active_node_id
+        self._remember_recent_workflow_context(
+            load_result.workspace_root,
+            load_result.profile_id,
+            load_result.anchor_type_id,
+            load_result.active_node_id,
+        )
+        if hasattr(self, "folder_edit"):
+            self._sync_dataset_scope_to_workflow(
+                update_folder_edit=True,
+                unload_mismatched_dataset=True,
+            )
+        self._notify_workflow_scope_changed()
+        return load_result.active_node_id
+
+    def set_active_workflow_node(
+        self,
+        node_id: str | None,
+        *,
+        sync_scope: bool = True,
+        unload_mismatched_dataset: bool = True,
+    ) -> str | None:
+        """Update the active workflow node inside the loaded controller state."""
+
+        node = self.workflow_state_controller.set_active_node(node_id)
+        self.metadata_state_controller.clear_cache()
+        self.ui_state_snapshot.workflow_active_node_id = (
+            node.node_id if node is not None else None
+        )
+        if self.workflow_state_controller.workspace_root is not None:
+            self._remember_recent_workflow_context(
+                self.workflow_state_controller.workspace_root,
+                self.workflow_state_controller.profile_id,
+                self.workflow_state_controller.anchor_type_id,
+                self.ui_state_snapshot.workflow_active_node_id,
+            )
+        if sync_scope and hasattr(self, "folder_edit"):
+            self._sync_dataset_scope_to_workflow(
+                update_folder_edit=True,
+                unload_mismatched_dataset=unload_mismatched_dataset,
+            )
+        self._notify_workflow_scope_changed()
+        return self.ui_state_snapshot.workflow_active_node_id
+
+    def recent_workflow_entries(self) -> tuple[RecentWorkflowEntry, ...]:
+        """Return recent workflow contexts in most-recent-first order."""
+
+        return tuple(self.ui_state_snapshot.recent_workflows)
+
+    def _workflow_selected_folder(self) -> Path | None:
+        """Return the current folder-edit path when present."""
+
+        if not hasattr(self, "folder_edit"):
+            return None
+        text = self.folder_edit.text().strip()
+        if not text:
+            return None
+        return Path(text).expanduser()
+
+    def _workflow_node_and_session_context(
+        self,
+        node_id: str | None = None,
+    ):
+        """Return selected node plus nearest session/acquisition workflow context."""
+
+        controller = self.workflow_state_controller
+        node = controller.node(node_id) if node_id else controller.active_node()
+        if node is None:
+            return (None, None, None, None)
+        if node.type_id == "session":
+            from .session_manager import inspect_session
+
+            session_index = inspect_session(node.folder_path)
+            return (node, node, session_index, None)
+        if node.type_id == "acquisition":
+            ancestry = controller.ancestry_for(node.node_id)
+            session_node = next(
+                (entry for entry in reversed(ancestry) if entry.type_id == "session"),
+                None,
+            )
+            session_index = None
+            if session_node is not None:
+                from .session_manager import inspect_session
+
+                session_index = inspect_session(session_node.folder_path)
+            selected_entry = None
+            if session_index is not None:
+                selected_entry = next(
+                    (entry for entry in session_index.entries if entry.path == node.folder_path),
+                    None,
+                )
+            return (node, session_node, session_index, selected_entry)
+        return (node, None, None, None)
+
+    def _workflow_structure_action_state(
+        self,
+        node_id: str | None = None,
+    ) -> dict[str, object]:
+        """Return structure-authoring capabilities for one workflow selection."""
+
+        node, session_node, session_index, selected_entry = self._workflow_node_and_session_context(
+            node_id,
+        )
+        numbering_valid = session_index.numbering_valid if session_index is not None else False
+        return {
+            "node": node,
+            "session_node": session_node,
+            "session_index": session_index,
+            "selected_entry": selected_entry,
+            "can_create_session": node is not None and node.type_id == "campaign",
+            "can_delete_session": node is not None and node.type_id == "session",
+            "can_create": session_node is not None and numbering_valid,
+            "can_batch_create": session_node is not None and numbering_valid,
+            "can_rename": selected_entry is not None,
+            "can_delete": selected_entry is not None and numbering_valid,
+            "can_reindex": session_index is not None and bool(session_index.entries),
+            "warning_text": session_index.warning_text if session_index is not None else "",
+        }
+
+    def _apply_loaded_dataset_path_mutation(
+        self,
+        result: object,
+        *,
+        force_refresh_if_loaded: bool = False,
+    ) -> None:
+        """Apply acquisition-path mutations to the currently loaded dataset view."""
+
+        if not hasattr(result, "deleted_paths") or not hasattr(result, "renamed_paths"):
+            return
+        loaded_folder = self._workflow_selected_folder()
+        if loaded_folder is None:
+            return
+        unloaded = False
+        deleted_paths = tuple(getattr(result, "deleted_paths", ()))
+        renamed_paths = tuple(getattr(result, "renamed_paths", ()))
+        for deleted_path in deleted_paths:
+            if loaded_folder == deleted_path or deleted_path in loaded_folder.parents:
+                if hasattr(self, "unload_folder"):
+                    self.unload_folder(clear_folder_edit=True)
+                unloaded = True
+                break
+        if unloaded:
+            return
+
+        for old_path, new_path in renamed_paths:
+            if loaded_folder == old_path or old_path in loaded_folder.parents:
+                relative = loaded_folder.relative_to(old_path)
+                new_loaded_path = new_path.joinpath(relative)
+                self._set_folder_edit_text(str(new_loaded_path))
+                if hasattr(self, "load_folder"):
+                    self.load_folder()
+                return
+
+        if deleted_paths and force_refresh_if_loaded and self.dataset_state.has_loaded_data():
+            if hasattr(self, "load_folder"):
+                self.load_folder()
+            return
+
+        created_paths = tuple(getattr(result, "created_paths", ()))
+        if created_paths and self.dataset_state.has_loaded_data():
+            for created_path in created_paths:
+                if loaded_folder == created_path or loaded_folder in created_path.parents:
+                    if hasattr(self, "load_folder"):
+                        self.load_folder()
+                    return
+
+    def _map_path_through_workflow_mutation(
+        self,
+        path: Path | None,
+        result: object,
+    ) -> Path | None:
+        """Map one workflow path through acquisition create/rename/delete changes."""
+
+        if path is None:
+            return None
+        deleted_paths = tuple(getattr(result, "deleted_paths", ()))
+        renamed_paths = tuple(getattr(result, "renamed_paths", ()))
+        for deleted_path in deleted_paths:
+            if path == deleted_path or deleted_path in path.parents:
+                return None
+        mapped = path
+        for old_path, new_path in renamed_paths:
+            if mapped == old_path or old_path in mapped.parents:
+                relative = mapped.relative_to(old_path)
+                mapped = new_path.joinpath(relative)
+        return mapped
+
+    def _refresh_workflow_after_structure_mutation(
+        self,
+        result: object,
+        *,
+        preferred_active_path: Path | None = None,
+        force_refresh_if_loaded: bool = False,
+    ) -> None:
+        """Refresh workflow and dataset state after session/acquisition edits."""
+
+        self._apply_loaded_dataset_path_mutation(
+            result,
+            force_refresh_if_loaded=force_refresh_if_loaded,
+        )
+        controller = self.workflow_state_controller
+        if controller.workspace_root is None or controller.profile_id is None:
+            return
+
+        target_path = preferred_active_path
+        if target_path is None:
+            active_node = controller.active_node()
+            target_path = active_node.folder_path if active_node is not None else None
+        target_path = self._map_path_through_workflow_mutation(target_path, result)
+
+        self.set_workflow_context(
+            str(controller.workspace_root),
+            controller.profile_id,
+            anchor_type_id=controller.anchor_type_id,
+        )
+        if target_path is not None:
+            node_id = self.workflow_state_controller.resolve_node_id_for_path(target_path)
+            if node_id is not None:
+                self.set_active_workflow_node(
+                    node_id,
+                    unload_mismatched_dataset=False,
+                )
+
+    def _open_workflow_acquisition_creation_dialog(
+        self,
+        node_id: str | None = None,
+        *,
+        batch: bool = False,
+    ) -> None:
+        """Create one or more acquisitions under the selected workflow session."""
+
+        _node, session_node, session_index, _selected_entry = self._workflow_node_and_session_context(
+            node_id,
+        )
+        if session_node is None or session_index is None:
+            return
+        from .acquisition_authoring_dialog import AcquisitionAuthoringDialog
+
+        dialog = AcquisitionAuthoringDialog(
+            session_node.folder_path,
+            self,
+            initial_mode="batch" if batch else "next",
+        )
+        if dialog.exec() != qtw.QDialog.Accepted or not dialog.created_paths:
+            return
+        preferred_path = (
+            session_node.folder_path
+            if batch and len(dialog.created_paths) > 1
+            else dialog.created_paths[-1]
+        )
+        self._refresh_workflow_after_structure_mutation(
+            dialog,
+            preferred_active_path=preferred_path,
+            force_refresh_if_loaded=False,
+        )
+
+    def _rename_workflow_acquisition(
+        self,
+        node_id: str | None = None,
+    ) -> None:
+        """Rename the selected acquisition label from the workflow shell."""
+
+        _node, _session_node, _session_index, selected_entry = self._workflow_node_and_session_context(
+            node_id,
+        )
+        if selected_entry is None:
+            return
+        label, accepted = qtw.QInputDialog.getText(
+            self,
+            "Rename Acquisition",
+            "Name (leave blank for no __name suffix):",
+            text=selected_entry.label or "",
+        )
+        if not accepted:
+            return
+        from .session_manager import rename_acquisition_label
+
+        try:
+            result = rename_acquisition_label(selected_entry.path, label.strip() or None)
+        except Exception as exc:
+            qtw.QMessageBox.warning(self, "Rename Acquisition", str(exc))
+            return
+        preferred = (
+            result.renamed_paths[0][1]
+            if result.renamed_paths
+            else selected_entry.path
+        )
+        self._refresh_workflow_after_structure_mutation(
+            result,
+            preferred_active_path=preferred,
+            force_refresh_if_loaded=True,
+        )
+
+    def _workflow_delete_confirmation_text(self, entry_path: Path, folder_name: str) -> str:
+        """Return confirmation copy for a workflow-driven acquisition delete."""
+
+        loaded_folder = self._workflow_selected_folder()
+        loaded_note = ""
+        if loaded_folder is not None:
+            loaded_note = (
+                "\n\nA dataset is currently loaded. Confirming will trigger a full refresh."
+            )
+            if entry_path in loaded_folder.parents or loaded_folder == entry_path:
+                loaded_note = (
+                    "\n\nThe currently loaded dataset is inside this acquisition. "
+                    "Confirming will unload it and refresh the UI."
+                )
+        return (
+            f"Delete acquisition folder '{folder_name}'?\n"
+            "Later acquisitions will be renumbered to close the gap."
+            f"{loaded_note}"
+        )
+
+    def _delete_workflow_acquisition(
+        self,
+        node_id: str | None = None,
+    ) -> None:
+        """Delete the selected acquisition from the workflow shell."""
+
+        _node, session_node, _session_index, selected_entry = self._workflow_node_and_session_context(
+            node_id,
+        )
+        if session_node is None or selected_entry is None:
+            return
+        answer = qtw.QMessageBox.question(
+            self,
+            "Delete Acquisition",
+            self._workflow_delete_confirmation_text(
+                selected_entry.path,
+                selected_entry.folder_name,
+            ),
+            qtw.QMessageBox.Yes | qtw.QMessageBox.No,
+            qtw.QMessageBox.No,
+        )
+        if answer != qtw.QMessageBox.Yes:
+            return
+        from .session_manager import delete_acquisition
+
+        try:
+            result = delete_acquisition(session_node.folder_path, selected_entry.path)
+        except Exception as exc:
+            qtw.QMessageBox.warning(self, "Delete Acquisition", str(exc))
+            return
+        self._refresh_workflow_after_structure_mutation(
+            result,
+            preferred_active_path=session_node.folder_path,
+            force_refresh_if_loaded=True,
+        )
+
+    def _workflow_session_delete_confirmation_text(
+        self,
+        session_path: Path,
+        folder_name: str,
+    ) -> str:
+        """Return confirmation copy for a workflow-driven session delete."""
+
+        loaded_folder = self._workflow_selected_folder()
+        loaded_note = ""
+        if loaded_folder is not None:
+            loaded_note = (
+                "\n\nA dataset is currently loaded. Confirming will trigger a full refresh."
+            )
+            if session_path in loaded_folder.parents or loaded_folder == session_path:
+                loaded_note = (
+                    "\n\nThe currently loaded dataset is inside this session. "
+                    "Confirming will unload it and refresh the UI."
+                )
+        return (
+            f"Delete session folder '{folder_name}'?\n"
+            "This removes the entire session directory and all acquisitions inside it."
+            f"{loaded_note}"
+        )
+
+    def _create_workflow_session(
+        self,
+        node_id: str | None,
+        folder_label: str,
+    ) -> Path | None:
+        """Create a session under the selected workflow campaign."""
+
+        controller = self.workflow_state_controller
+        node = controller.node(node_id) if node_id else controller.active_node()
+        if node is None or node.type_id != "campaign":
+            return None
+        from .session_manager import create_session
+
+        result = create_session(node.folder_path, folder_label)
+        preferred_path = result.created_path or node.folder_path
+        self._refresh_workflow_after_structure_mutation(
+            result,
+            preferred_active_path=preferred_path,
+            force_refresh_if_loaded=False,
+        )
+        return result.created_path
+
+    def _delete_workflow_session(
+        self,
+        node_id: str | None = None,
+    ) -> None:
+        """Delete the selected workflow session."""
+
+        controller = self.workflow_state_controller
+        node = controller.node(node_id) if node_id else controller.active_node()
+        if node is None or node.type_id != "session":
+            return
+
+        answer = qtw.QMessageBox.question(
+            self,
+            "Delete Session",
+            self._workflow_session_delete_confirmation_text(
+                node.folder_path,
+                node.folder_path.name,
+            ),
+            qtw.QMessageBox.Yes | qtw.QMessageBox.No,
+            qtw.QMessageBox.No,
+        )
+        if answer != qtw.QMessageBox.Yes:
+            return
+
+        from .session_manager import delete_session
+
+        try:
+            result = delete_session(node.folder_path)
+        except Exception as exc:
+            qtw.QMessageBox.warning(self, "Delete Session", str(exc))
+            return
+
+        preferred_path = None
+        ancestry = controller.ancestry_for(node.node_id)
+        campaign_node = next(
+            (entry for entry in reversed(ancestry) if entry.type_id == "campaign"),
+            None,
+        )
+        if campaign_node is not None:
+            preferred_path = campaign_node.folder_path
+        self._refresh_workflow_after_structure_mutation(
+            result,
+            preferred_active_path=preferred_path,
+            force_refresh_if_loaded=True,
+        )
+
+    def _reindex_workflow_session(
+        self,
+        node_id: str | None = None,
+    ) -> None:
+        """Normalize acquisition numbering for the selected workflow session."""
+
+        _node, session_node, session_index, _selected_entry = self._workflow_node_and_session_context(
+            node_id,
+        )
+        if session_node is None or session_index is None:
+            return
+        starting_number, accepted = qtw.QInputDialog.getInt(
+            self,
+            "Normalize/Reindex",
+            "Starting number:",
+            value=session_index.starting_number,
+            minValue=0,
+            maxValue=999999,
+        )
+        if not accepted:
+            return
+        answer = qtw.QMessageBox.question(
+            self,
+            "Normalize/Reindex",
+            (
+                f"Renumber acquisitions contiguously from {starting_number}?\n"
+                "Acquisition folder names will change and loaded datasets may be reloaded."
+            ),
+            qtw.QMessageBox.Yes | qtw.QMessageBox.No,
+            qtw.QMessageBox.No,
+        )
+        if answer != qtw.QMessageBox.Yes:
+            return
+        from .session_manager import reindex_acquisitions
+
+        try:
+            result = reindex_acquisitions(
+                session_node.folder_path,
+                starting_number=starting_number,
+            )
+        except Exception as exc:
+            qtw.QMessageBox.warning(self, "Normalize/Reindex", str(exc))
+            return
+        self._refresh_workflow_after_structure_mutation(
+            result,
+            preferred_active_path=session_node.folder_path,
+            force_refresh_if_loaded=True,
+        )
+
+    def _remember_recent_workflow_context(
+        self,
+        workspace_root: str | Path | None,
+        profile_id: str | None,
+        anchor_type_id: str | None,
+        active_node_id: str | None,
+    ) -> None:
+        """Track one workflow context for later quick selection."""
+
+        if workspace_root is None or not profile_id:
+            return
+        try:
+            normalized_root = str(Path(workspace_root).expanduser().resolve())
+        except Exception:
+            normalized_root = str(workspace_root).strip()
+        normalized_profile = str(profile_id).strip().lower()
+        if not normalized_root or not normalized_profile:
+            return
+
+        current = RecentWorkflowEntry(
+            workspace_root=normalized_root,
+            profile_id=normalized_profile,
+            anchor_type_id=str(anchor_type_id).strip().lower() or None,
+            active_node_id=str(active_node_id).strip() or None,
+        )
+        updated = [current]
+        for entry in self.ui_state_snapshot.recent_workflows:
+            same_root = entry.workspace_root == current.workspace_root
+            same_profile = entry.profile_id == current.profile_id
+            same_anchor = entry.anchor_type_id == current.anchor_type_id
+            if same_root and same_profile and same_anchor:
+                continue
+            updated.append(entry)
+        self.ui_state_snapshot.recent_workflows = updated[:8]
 
     def _current_analysis_plugin_id(self) -> str | None:
         """Return the active analysis plugin id if one is selected."""
@@ -284,6 +1044,15 @@ class FrameLabWindow(
                 else self.ui_state_snapshot.last_tab_index
             ),
             last_analysis_plugin_id=self._current_analysis_plugin_id(),
+            workflow_workspace_root=(
+                str(self.workflow_state_controller.workspace_root)
+                if self.workflow_state_controller.workspace_root is not None
+                else None
+            ),
+            workflow_profile_id=self.workflow_state_controller.profile_id,
+            workflow_anchor_type_id=self.workflow_state_controller.anchor_type_id,
+            workflow_active_node_id=self.workflow_state_controller.active_node_id,
+            recent_workflows=list(self.ui_state_snapshot.recent_workflows),
         )
         self.ui_state_store.save(snapshot)
         self.ui_state_snapshot = snapshot

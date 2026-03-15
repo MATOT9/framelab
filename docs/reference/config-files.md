@@ -9,9 +9,11 @@ This page documents the file locations, ownership model, and runtime role of eac
 | File | Created automatically | Intended editor | Purpose |
 | --- | --- | --- | --- |
 | `config/config.ini` | Yes | user or app | Persistent scan settings, currently used for skip-pattern storage |
+| `config/ui_state.ini` | Yes | app | Persisted UI state such as workflow selection, dock visibility, panel state, and splitter positions |
 | `config/plugin_selection.json` | Yes | app, optionally user | Persisted startup plugin-selection state |
 | `config/acquisition_field_mapping.json` | Yes, if missing | user or app | Editable field-definition mapping used by the Acquisition Datacard Wizard |
 | `config/ebus_parameter_catalog.json` | Yes, if missing | user or app | Editable eBUS parameter catalog used by inspect, compare, and eBUS-override eligibility rules |
+| `config/workflow_metadata_governance.json` | No, created on demand | user or app | Profile-level metadata governance overrides and promoted ad-hoc field definitions |
 | `framelab/assets/acquisition_field_mapping.default.json` | No, bundled asset | project source only | Factory-default mapping used as the seed/fallback for the editable runtime mapping |
 | `framelab/assets/ebus_parameter_catalog.default.json` | No, bundled asset | project source only | Factory-default eBUS parameter catalog used as the seed/fallback for the editable runtime catalog |
 | `framelab/assets/help/` | No, bundled build output | project source/build process | Offline documentation bundle opened from the Help menu |
@@ -48,6 +50,24 @@ Important notes:
 - the file is created after the startup selector is accepted
 - if the file is missing or invalid, the app falls back to enabling all discovered plugins
 - dependency closure is resolved at load time, so the effective enabled set may be larger than the explicitly stored list
+
+### `config/ui_state.ini`
+
+This file stores host-window UI state in INI format.
+
+Current use:
+
+- selected workflow workspace root and profile
+- active workflow node id
+- recent workflow entries
+- dock visibility and panel disclosure state
+- splitter positions for workflow, analysis, and metadata surfaces
+
+Important notes:
+
+- the file is created when UI state is first saved
+- it is intentionally separate from `config.ini` so tracked shareable config is not polluted by per-user runtime state
+- deleting it is safe; the app will recreate it from defaults
 
 ### `config/acquisition_field_mapping.json`
 
@@ -92,6 +112,28 @@ Important notes:
 - canonical mapping is derived at runtime from `acquisition_field_mapping.json` through each field's `ebus_label`
 - uncatalogued keys may still parse and compare, but they lose catalog-backed labeling and policy metadata
 
+### `config/workflow_metadata_governance.json`
+
+This file stores optional profile-level governance overrides for workflow metadata.
+
+Typical use:
+
+- promote an ad-hoc metadata field into a profile-defined field
+- tighten or relax ad-hoc field/group policy per workflow profile
+- override labels, groups, type hints, or enum options for workflow metadata fields
+
+Payload characteristics:
+
+- top-level `profiles` object keyed by workflow profile id
+- optional `allow_ad_hoc_fields` and `allow_ad_hoc_groups` flags per profile
+- `fields` list of promoted or overridden field definitions
+
+Important notes:
+
+- the file is created only when needed, for example when a field is promoted from the Metadata Inspector
+- missing files are acceptable; built-in workflow profile governance remains authoritative until an override exists
+- this file extends workflow metadata governance and does not replace acquisition datacard schema mapping
+
 ### Bundled default JSON assets
 
 These files are shipped with the app and are used to seed missing editable runtime copies:
@@ -105,6 +147,22 @@ Use them as factory defaults and packaging assets, not as the normal runtime edi
 
 Some metadata files live next to datasets rather than under the global `config/` directory.
 
+### `.framelab/nodecard.json`
+
+Generic workflow-node metadata file.
+
+Current runtime role:
+
+- stores local metadata for workflow nodes such as workspace, trial, camera, campaign, or session levels
+- participates in ancestry-based metadata inheritance
+- is editable from the Workflow Manager / Metadata Inspector surfaces
+
+Important notes:
+
+- this is the primary higher-level metadata format for the workflow-driven shell
+- it is separate from acquisition-specific datacards on purpose
+- nodecards can coexist with older campaign/session datacards while compatibility bridges remain in place
+
 ### `campaign_datacard.json`
 
 Campaign-level metadata file.
@@ -115,6 +173,10 @@ Current runtime role:
 - may also provide `instrument_defaults`
 - acts as the broadest JSON metadata layer in hierarchical resolution
 
+Important note:
+
+- this is now a compatibility layer alongside `.framelab/nodecard.json`, not the preferred long-term higher-level metadata authoring target
+
 ### `session_datacard.json`
 
 Session-level metadata file.
@@ -124,6 +186,10 @@ Current runtime role:
 - provides `session_defaults`
 - can redefine the acquisitions root through `paths.acquisitions_root_rel`
 - is used by Session Manager to locate and manage acquisitions under one session
+
+Important note:
+
+- session datacards remain important for acquisition/session tooling, but generic session metadata is moving toward `.framelab/nodecard.json`
 
 ### `acquisition_datacard.json`
 
@@ -164,8 +230,8 @@ When a current file is missing, the app may attempt limited migration from legac
 
 General guidance:
 
-- safe to edit while the app is closed: `config.ini`, `plugin_selection.json`, `acquisition_field_mapping.json`, `ebus_parameter_catalog.json`
-- safe to edit while the app is closed when you intentionally manage dataset metadata: `campaign_datacard.json`, `session_datacard.json`, `acquisition_datacard.json`
+- safe to edit while the app is closed: `config.ini`, `ui_state.ini`, `plugin_selection.json`, `acquisition_field_mapping.json`, `ebus_parameter_catalog.json`, `workflow_metadata_governance.json`
+- safe to edit while the app is closed when you intentionally manage dataset metadata: `.framelab/nodecard.json`, `campaign_datacard.json`, `session_datacard.json`, `acquisition_datacard.json`
 - not intended for routine runtime editing: bundled asset files under `framelab/assets/`
 - if a file becomes invalid, the app will usually fall back to defaults rather than partially trusting malformed content
 

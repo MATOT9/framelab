@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from pathlib import Path
 
 import numpy as np
 
 from .dataset_state import DatasetStateController
 from .metrics_state import MetricsPipelineController
-from .plugins.analysis import AnalysisContext, AnalysisRecord
+from .plugins.analysis import AnalysisContext, AnalysisRecord, AnalysisScopeNode
 
 
 class AnalysisContextController:
@@ -141,4 +142,39 @@ class AnalysisContextController:
             metadata_fields=tuple(sorted(metadata_fields)),
             normalization_enabled=normalize_intensity,
             normalization_scale=scale,
+            workflow_profile_id=dataset.scope_snapshot.workflow_profile_id,
+            workflow_anchor_type_id=dataset.scope_snapshot.workflow_anchor_type_id,
+            workflow_anchor_label=dataset.scope_snapshot.workflow_anchor_label,
+            workflow_anchor_path=(
+                str(dataset.scope_snapshot.workflow_anchor_path)
+                if dataset.scope_snapshot.workflow_anchor_path is not None
+                else None
+            ),
+            workflow_is_partial=dataset.scope_snapshot.workflow_is_partial,
+            active_node_id=dataset.scope_snapshot.active_node_id,
+            active_node_type=dataset.scope_snapshot.active_node_type,
+            active_node_path=(
+                str(dataset.scope_snapshot.active_node_path)
+                if dataset.scope_snapshot.active_node_path is not None
+                else None
+            ),
+            active_scope_kind=dataset.scope_snapshot.kind,
+            active_scope_label=dataset.scope_snapshot.label,
+            dataset_scope_root=(
+                str(dataset.scope_snapshot.root)
+                if dataset.scope_snapshot.root is not None
+                else None
+            ),
+            dataset_scope_source=dataset.scope_snapshot.source,
+            effective_metadata=dict(dataset.scope_effective_metadata),
+            metadata_sources=dict(dataset.scope_metadata_sources),
+            ancestor_chain=tuple(
+                AnalysisScopeNode(
+                    node_id=node.node_id,
+                    type_id=node.type_id,
+                    display_name=node.display_name,
+                    folder_path=str(Path(node.folder_path)),
+                )
+                for node in dataset.scope_snapshot.ancestor_chain
+            ),
         )

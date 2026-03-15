@@ -1047,6 +1047,11 @@ class InspectPageMixin:
                     level="success" if selection != "None" else "neutral",
                 ),
                 SummaryItem(
+                    "Scope",
+                    dataset.scope_summary_value(),
+                    level="info" if dataset.scope_snapshot.root is not None else "neutral",
+                ),
+                SummaryItem(
                     "Average Mode",
                     mode_label,
                     level="info" if mode != "none" else "neutral",

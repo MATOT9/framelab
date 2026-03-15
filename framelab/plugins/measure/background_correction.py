@@ -7,7 +7,7 @@ from PySide6.QtCore import QSignalBlocker
 
 from ..registry import register_page_plugin
 from ...ui_primitives import SummaryItem, build_page_header, build_summary_strip
-from ...window_drag import enable_window_content_drag
+from ...window_drag import configure_secondary_window
 
 
 class BackgroundCorrectionDialog(qtw.QDialog):
@@ -18,6 +18,7 @@ class BackgroundCorrectionDialog(qtw.QDialog):
         self._host_window = host_window
 
         self.setWindowTitle("Background Correction")
+        configure_secondary_window(self, draggable=True)
         self.setModal(True)
         self.resize(900, 360)
         self.setMinimumSize(760, 320)
@@ -113,7 +114,6 @@ class BackgroundCorrectionDialog(qtw.QDialog):
         close_row.addWidget(self._close_button)
         layout.addLayout(close_row)
 
-        enable_window_content_drag(self)
         self._sync_from_host()
 
     def _current_mode(self) -> str:

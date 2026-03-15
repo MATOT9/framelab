@@ -1,0 +1,1890 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="User, developer, and reference documentation for the FrameLab application.">
+      
+      
+      
+      <link rel="icon" href="../assets/images/branding/app-icon.png">
+      <meta name="generator" content="mkdocs-1.3.0, mkdocs-material-8.5.2">
+    
+    
+      
+        <title>Workflow Structure and Required Folder Layout - FrameLab Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.9f9400aa.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.cbb835fc.min.css">
+        
+      
+      
+
+    
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce((e,_)=>(e<<5)-e+_.charCodeAt(0),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="blue">
+  
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&"object"==typeof palette.color)for(var key of Object.keys(palette.color))document.body.setAttribute("data-md-color-"+key,palette.color[key])</script>
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#workflow-structure-and-required-folder-layout" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../index.html" title="FrameLab Documentation" class="md-header__button md-logo" aria-label="FrameLab Documentation" data-md-component="logo">
+      
+  <img src="../assets/images/branding/app-icon.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2Z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            FrameLab Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Workflow Structure and Required Folder Layout
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      <form class="md-header__option" data-md-component="palette">
+        
+          
+          
+          <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+          
+            <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_2" hidden>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3 3.19.09m3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95 2.06.05m-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31Z"/></svg>
+            </label>
+          
+        
+          
+          
+          <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="blue-grey" data-md-color-accent="light-blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_2">
+          
+            <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m3.55 19.09 1.41 1.41 1.8-1.79-1.42-1.42M12 6c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6c0-3.32-2.69-6-6-6m8 7h3v-2h-3m-2.76 7.71 1.8 1.79 1.41-1.41-1.79-1.8M20.45 5l-1.41-1.4-1.8 1.79 1.42 1.42M13 1h-2v3h2M6.76 5.39 4.96 3.6 3.55 5l1.79 1.81 1.42-1.42M1 13h3v-2H1m12 9h-2v3h2"/></svg>
+            </label>
+          
+        
+      </form>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7 0-.24-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91 1.61 0 2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08Z"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41Z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../index.html" title="FrameLab Documentation" class="md-nav__button md-logo" aria-label="FrameLab Documentation" data-md-component="logo">
+      
+  <img src="../assets/images/branding/app-icon.png" alt="logo">
+
+    </a>
+    FrameLab Documentation
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../index.html" class="md-nav__link">
+        Home
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+    
+  
+  
+    
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+      
+        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_2" type="checkbox" id="__nav_2" checked>
+      
+      
+      
+        
+          
+            
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+      
+      
+        
+        
+        <div class="md-nav__link md-nav__link--index ">
+          <a href="index.html">User Guide</a>
+          
+            <label for="__nav_2">
+              <span class="md-nav__icon md-icon"></span>
+            </label>
+          
+        </div>
+      
+      <nav class="md-nav" aria-label="User Guide" data-md-level="1">
+        <label class="md-nav__title" for="__nav_2">
+          <span class="md-nav__icon md-icon"></span>
+          User Guide
+        </label>
+        <ul class="md-nav__list" data-md-scrollfix>
+          
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="concepts-and-limits.html" class="md-nav__link">
+        Concepts and Limits
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="quick-start.html" class="md-nav__link">
+        Quick Start
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+    
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" data-md-toggle="toc" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          Workflow Structure and Required Folder Layout
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="workflow-structure.html" class="md-nav__link md-nav__link--active">
+        Workflow Structure and Required Folder Layout
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#recommended-mental-model" class="md-nav__link">
+    Recommended mental model
+  </a>
+  
+    <nav class="md-nav" aria-label="Recommended mental model">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#camera" class="md-nav__link">
+    Camera
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#campaign" class="md-nav__link">
+    Campaign
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#session" class="md-nav__link">
+    Session
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#acquisition" class="md-nav__link">
+    Acquisition
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#built-in-workflow-profiles" class="md-nav__link">
+    Built-in workflow profiles
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#calibration" class="md-nav__link">
+    Calibration
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#trials" class="md-nav__link">
+    Trials
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#exact-folder-layout-expectations" class="md-nav__link">
+    Exact folder-layout expectations
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#calibration-profile" class="md-nav__link">
+    Calibration profile
+  </a>
+  
+    <nav class="md-nav" aria-label="Calibration profile">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#recommended-calibration-layout-in-compact-form" class="md-nav__link">
+    Recommended calibration layout in compact form
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-is-strongly-recommended-versus-merely-supported" class="md-nav__link">
+    What is strongly recommended versus merely supported
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#trials-profile" class="md-nav__link">
+    Trials profile
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#discovery-rules-that-matter-in-practice" class="md-nav__link">
+    Discovery rules that matter in practice
+  </a>
+  
+    <nav class="md-nav" aria-label="Discovery rules that matter in practice">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#session-discovery-under-campaigns" class="md-nav__link">
+    Session discovery under campaigns
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#acquisition-discovery-under-sessions" class="md-nav__link">
+    Acquisition discovery under sessions
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#acquisition-folder-recognition" class="md-nav__link">
+    Acquisition folder recognition
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#session-management-naming-contract" class="md-nav__link">
+    Session-management naming contract
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#naming-guidance" class="md-nav__link">
+    Naming guidance
+  </a>
+  
+    <nav class="md-nav" aria-label="Naming guidance">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#camera-folder" class="md-nav__link">
+    Camera folder
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#campaign-folder" class="md-nav__link">
+    Campaign folder
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#session-folder" class="md-nav__link">
+    Session folder
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#acquisition-folder" class="md-nav__link">
+    Acquisition folder
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#datacards-and-nodecards-in-the-structure" class="md-nav__link">
+    Datacards and nodecards in the structure
+  </a>
+  
+    <nav class="md-nav" aria-label="Datacards and nodecards in the structure">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#framelabnodecardjson" class="md-nav__link">
+    .framelab/nodecard.json
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#campaign_datacardjson" class="md-nav__link">
+    campaign_datacard.json
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#session_datacardjson" class="md-nav__link">
+    session_datacard.json
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#acquisition_datacardjson" class="md-nav__link">
+    acquisition_datacard.json
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-decide-where-to-split-work" class="md-nav__link">
+    How to decide where to split work
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#common-layout-mistakes" class="md-nav__link">
+    Common layout mistakes
+  </a>
+  
+    <nav class="md-nav" aria-label="Common layout mistakes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#mixing-tiff-files-directly-under-the-campaign-folder" class="md-nav__link">
+    Mixing TIFF files directly under the campaign folder
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-arbitrary-acquisition-folder-names" class="md-nav__link">
+    Using arbitrary acquisition folder names
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#treating-a-full-day-of-unrelated-captures-as-one-acquisition" class="md-nav__link">
+    Treating a full day of unrelated captures as one acquisition
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#loading-a-folder-above-the-intended-workspace-without-checking-the-anchor" class="md-nav__link">
+    Loading a folder above the intended workspace without checking the anchor
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#recommended-starting-point" class="md-nav__link">
+    Recommended starting point
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related-pages" class="md-nav__link">
+    Related pages
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="plugins.html" class="md-nav__link">
+        Plugin Guide
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="plugin-selector.html" class="md-nav__link">
+        Plugin Selector
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+      
+        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_2_7" type="checkbox" id="__nav_2_7" >
+      
+      
+      
+        
+          
+        
+          
+        
+          
+        
+          
+        
+      
+      
+        <label class="md-nav__link" for="__nav_2_7">
+          Data Workflow
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <nav class="md-nav" aria-label="Data Workflow" data-md-level="2">
+        <label class="md-nav__title" for="__nav_2_7">
+          <span class="md-nav__icon md-icon"></span>
+          Data Workflow
+        </label>
+        <ul class="md-nav__list" data-md-scrollfix>
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="data-workflow.html" class="md-nav__link">
+        Overview
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="data/session-manager.html" class="md-nav__link">
+        Session Manager
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="data/datacard-wizard.html" class="md-nav__link">
+        Datacard Wizard
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="data/ebus-config-tools.html" class="md-nav__link">
+        eBUS Config Tools
+      </a>
+    </li>
+  
+
+            
+          
+        </ul>
+      </nav>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="measure-workflow.html" class="md-nav__link">
+        Measure Workflow
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+      
+        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_2_9" type="checkbox" id="__nav_2_9" >
+      
+      
+      
+        
+          
+        
+          
+        
+      
+      
+        <label class="md-nav__link" for="__nav_2_9">
+          Analysis Workflow
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <nav class="md-nav" aria-label="Analysis Workflow" data-md-level="2">
+        <label class="md-nav__title" for="__nav_2_9">
+          <span class="md-nav__icon md-icon"></span>
+          Analysis Workflow
+        </label>
+        <ul class="md-nav__list" data-md-scrollfix>
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="analysis-workflow.html" class="md-nav__link">
+        Overview
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="analysis/intensity-trend-explorer.html" class="md-nav__link">
+        Intensity Trend Explorer
+      </a>
+    </li>
+  
+
+            
+          
+        </ul>
+      </nav>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="troubleshooting.html" class="md-nav__link">
+        User Troubleshooting
+      </a>
+    </li>
+  
+
+            
+          
+        </ul>
+      </nav>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    
+      
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+      
+        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_3" type="checkbox" id="__nav_3" >
+      
+      
+      
+        
+          
+            
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+      
+      
+        
+        
+        <div class="md-nav__link md-nav__link--index ">
+          <a href="../developer-guide/index.html">Developer Guide</a>
+          
+            <label for="__nav_3">
+              <span class="md-nav__icon md-icon"></span>
+            </label>
+          
+        </div>
+      
+      <nav class="md-nav" aria-label="Developer Guide" data-md-level="1">
+        <label class="md-nav__title" for="__nav_3">
+          <span class="md-nav__icon md-icon"></span>
+          Developer Guide
+        </label>
+        <ul class="md-nav__list" data-md-scrollfix>
+          
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer-guide/architecture.html" class="md-nav__link">
+        Architecture
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer-guide/plugin-system.html" class="md-nav__link">
+        Plugin System
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer-guide/datacard-system.html" class="md-nav__link">
+        Datacard System
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer-guide/ebus-config-integration.html" class="md-nav__link">
+        eBUS Config Integration
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer-guide/ui-structure.html" class="md-nav__link">
+        UI Structure
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer-guide/packaging.html" class="md-nav__link">
+        Packaging
+      </a>
+    </li>
+  
+
+            
+          
+        </ul>
+      </nav>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    
+      
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+      
+        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_4" type="checkbox" id="__nav_4" >
+      
+      
+      
+        
+          
+            
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+      
+      
+        
+        
+        <div class="md-nav__link md-nav__link--index ">
+          <a href="../reference/index.html">Reference</a>
+          
+            <label for="__nav_4">
+              <span class="md-nav__icon md-icon"></span>
+            </label>
+          
+        </div>
+      
+      <nav class="md-nav" aria-label="Reference" data-md-level="1">
+        <label class="md-nav__title" for="__nav_4">
+          <span class="md-nav__icon md-icon"></span>
+          Reference
+        </label>
+        <ul class="md-nav__list" data-md-scrollfix>
+          
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/config-files.html" class="md-nav__link">
+        Config Files
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/plugin-manifests.html" class="md-nav__link">
+        Plugin Manifests
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/acquisition-mapping.html" class="md-nav__link">
+        Acquisition Mapping
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/ebus-parameter-catalog.html" class="md-nav__link">
+        eBUS Parameter Catalog
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/keyboard-shortcuts.html" class="md-nav__link">
+        Keyboard Shortcuts
+      </a>
+    </li>
+  
+
+            
+          
+        </ul>
+      </nav>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    
+      
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+      
+        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_5" type="checkbox" id="__nav_5" >
+      
+      
+      
+        
+          
+            
+          
+        
+      
+      
+        
+        
+        <div class="md-nav__link md-nav__link--index ">
+          <a href="../troubleshooting/index.html">Troubleshooting</a>
+          
+        </div>
+      
+      <nav class="md-nav" aria-label="Troubleshooting" data-md-level="1">
+        <label class="md-nav__title" for="__nav_5">
+          <span class="md-nav__icon md-icon"></span>
+          Troubleshooting
+        </label>
+        <ul class="md-nav__list" data-md-scrollfix>
+          
+            
+          
+        </ul>
+      </nav>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#recommended-mental-model" class="md-nav__link">
+    Recommended mental model
+  </a>
+  
+    <nav class="md-nav" aria-label="Recommended mental model">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#camera" class="md-nav__link">
+    Camera
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#campaign" class="md-nav__link">
+    Campaign
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#session" class="md-nav__link">
+    Session
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#acquisition" class="md-nav__link">
+    Acquisition
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#built-in-workflow-profiles" class="md-nav__link">
+    Built-in workflow profiles
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#calibration" class="md-nav__link">
+    Calibration
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#trials" class="md-nav__link">
+    Trials
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#exact-folder-layout-expectations" class="md-nav__link">
+    Exact folder-layout expectations
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#calibration-profile" class="md-nav__link">
+    Calibration profile
+  </a>
+  
+    <nav class="md-nav" aria-label="Calibration profile">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#recommended-calibration-layout-in-compact-form" class="md-nav__link">
+    Recommended calibration layout in compact form
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-is-strongly-recommended-versus-merely-supported" class="md-nav__link">
+    What is strongly recommended versus merely supported
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#trials-profile" class="md-nav__link">
+    Trials profile
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#discovery-rules-that-matter-in-practice" class="md-nav__link">
+    Discovery rules that matter in practice
+  </a>
+  
+    <nav class="md-nav" aria-label="Discovery rules that matter in practice">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#session-discovery-under-campaigns" class="md-nav__link">
+    Session discovery under campaigns
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#acquisition-discovery-under-sessions" class="md-nav__link">
+    Acquisition discovery under sessions
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#acquisition-folder-recognition" class="md-nav__link">
+    Acquisition folder recognition
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#session-management-naming-contract" class="md-nav__link">
+    Session-management naming contract
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#naming-guidance" class="md-nav__link">
+    Naming guidance
+  </a>
+  
+    <nav class="md-nav" aria-label="Naming guidance">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#camera-folder" class="md-nav__link">
+    Camera folder
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#campaign-folder" class="md-nav__link">
+    Campaign folder
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#session-folder" class="md-nav__link">
+    Session folder
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#acquisition-folder" class="md-nav__link">
+    Acquisition folder
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#datacards-and-nodecards-in-the-structure" class="md-nav__link">
+    Datacards and nodecards in the structure
+  </a>
+  
+    <nav class="md-nav" aria-label="Datacards and nodecards in the structure">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#framelabnodecardjson" class="md-nav__link">
+    .framelab/nodecard.json
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#campaign_datacardjson" class="md-nav__link">
+    campaign_datacard.json
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#session_datacardjson" class="md-nav__link">
+    session_datacard.json
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#acquisition_datacardjson" class="md-nav__link">
+    acquisition_datacard.json
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-decide-where-to-split-work" class="md-nav__link">
+    How to decide where to split work
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#common-layout-mistakes" class="md-nav__link">
+    Common layout mistakes
+  </a>
+  
+    <nav class="md-nav" aria-label="Common layout mistakes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#mixing-tiff-files-directly-under-the-campaign-folder" class="md-nav__link">
+    Mixing TIFF files directly under the campaign folder
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-arbitrary-acquisition-folder-names" class="md-nav__link">
+    Using arbitrary acquisition folder names
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#treating-a-full-day-of-unrelated-captures-as-one-acquisition" class="md-nav__link">
+    Treating a full day of unrelated captures as one acquisition
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#loading-a-folder-above-the-intended-workspace-without-checking-the-anchor" class="md-nav__link">
+    Loading a folder above the intended workspace without checking the anchor
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#recommended-starting-point" class="md-nav__link">
+    Recommended starting point
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related-pages" class="md-nav__link">
+    Related pages
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+<h1 id="workflow-structure-and-required-folder-layout">Workflow Structure and Required Folder Layout<a class="headerlink" href="#workflow-structure-and-required-folder-layout" title="Permanent link">&para;</a></h1>
+<p>Use this page to decide <strong>how the filesystem should be organized before you start scanning TIFF data</strong>.</p>
+<p>This matters because the workflow shell is profile-driven. The app does not treat every directory tree as equivalent. Reliable workflow loading, session authoring, metadata inheritance, and acquisition-management tools all work best when the dataset follows the expected hierarchy.</p>
+<h2 id="recommended-mental-model">Recommended mental model<a class="headerlink" href="#recommended-mental-model" title="Permanent link">&para;</a></h2>
+<h3 id="camera">Camera<a class="headerlink" href="#camera" title="Permanent link">&para;</a></h3>
+<p>A <strong>camera</strong> is a long-lived asset. Keep one top-level camera folder per physical system or stable camera identity.</p>
+<h3 id="campaign">Campaign<a class="headerlink" href="#campaign" title="Permanent link">&para;</a></h3>
+<p>A <strong>campaign</strong> is one coherent calibration effort.</p>
+<p>A campaign can span multiple days. It is the right place to keep:</p>
+<ul>
+<li>final outputs for that calibration effort</li>
+<li>derived products that combine several sessions</li>
+<li>campaign-level notes or workflow metadata</li>
+</ul>
+<h3 id="session">Session<a class="headerlink" href="#session" title="Permanent link">&para;</a></h3>
+<p>A <strong>session</strong> is one stable block of work.</p>
+<p>Create a new session when the setup changes meaningfully enough that you no longer want later acquisitions to inherit the same working context.</p>
+<p>Typical reasons to split sessions:</p>
+<ul>
+<li>optics were changed</li>
+<li>camera configuration changed in a meaningful way</li>
+<li>environmental conditions changed enough to matter</li>
+<li>the work resumed later and should be treated as a separate capture block</li>
+</ul>
+<p>Multiple sessions on the same day are supported and recommended when the setup really changed.</p>
+<h3 id="acquisition">Acquisition<a class="headerlink" href="#acquisition" title="Permanent link">&para;</a></h3>
+<p>An <strong>acquisition</strong> is one intent, one datacard, one block of frames.</p>
+<p>Keep acquisitions semantically narrow. Good examples are:</p>
+<ul>
+<li>one dark sweep</li>
+<li>one iris sweep</li>
+<li>one exposure sweep</li>
+<li>one flat-field run</li>
+<li>one stability check</li>
+</ul>
+<p>Do not treat an acquisition as an entire day of unrelated captures.</p>
+<h2 id="built-in-workflow-profiles">Built-in workflow profiles<a class="headerlink" href="#built-in-workflow-profiles" title="Permanent link">&para;</a></h2>
+<h2 id="calibration">Calibration<a class="headerlink" href="#calibration" title="Permanent link">&para;</a></h2>
+<p>This is the primary structured workflow profile.</p>
+<p>Its logical hierarchy is:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>workspace -&gt; camera -&gt; campaign -&gt; session -&gt; acquisition
+</code></pre></div>
+<p>Use this profile for lab and calibration work where cameras are long-lived assets and campaigns collect several sessions over time.</p>
+<h2 id="trials">Trials<a class="headerlink" href="#trials" title="Permanent link">&para;</a></h2>
+<p>The Trials profile is available, but it should still be treated as <strong>experimental</strong>.</p>
+<p>Its logical hierarchy is:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>workspace -&gt; trial -&gt; camera -&gt; session -&gt; acquisition
+</code></pre></div>
+<p>Use it only when trial-first organization is genuinely the right fit and you accept that the calibration profile is the more mature path.</p>
+<h2 id="exact-folder-layout-expectations">Exact folder-layout expectations<a class="headerlink" href="#exact-folder-layout-expectations" title="Permanent link">&para;</a></h2>
+<h2 id="calibration-profile">Calibration profile<a class="headerlink" href="#calibration-profile" title="Permanent link">&para;</a></h2>
+<p>The calibration profile expects a workspace whose immediate children are camera folders.</p>
+<p>Recommended layout:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>&lt;workspace_root&gt;/
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>  &lt;camera_id&gt;/
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    .framelab/nodecard.json                optional higher-level workflow metadata
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    &lt;campaign_id&gt;/
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>      .framelab/nodecard.json              optional higher-level workflow metadata
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>      campaign_datacard.json               optional legacy compatibility layer
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>      01_sessions/                         optional but recommended container
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>        &lt;session_id&gt;/
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>          .framelab/nodecard.json          optional higher-level workflow metadata
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>          session_datacard.json            recommended
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>          acquisitions/                    default acquisitions root
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>            acq-0001__dark/
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>              acquisition_datacard.json
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>              frames/
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>              notes/
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>              thumbs/
+<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>            acq-0002__iris_sweep/
+<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>              acquisition_datacard.json
+<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a>              frames/
+<a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a>              notes/
+<a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a>              thumbs/
+</code></pre></div>
+<p>The workflow loader also supports these variants:</p>
+<ul>
+<li>session folders directly under the campaign folder</li>
+<li>a session container named <code>sessions</code> instead of <code>01_sessions</code></li>
+<li>a session datacard that redirects acquisitions through <code>paths.acquisitions_root_rel</code></li>
+<li>an acquisition discovered from its datacard even if the folder name is not parseable, although session-management tooling is stricter than workflow discovery</li>
+</ul>
+<h3 id="recommended-calibration-layout-in-compact-form">Recommended calibration layout in compact form<a class="headerlink" href="#recommended-calibration-layout-in-compact-form" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>workspace/
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>  camera/
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    campaign/
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>      01_sessions/
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>        YYYY-MM-DD__sess01/
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>          session_datacard.json
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>          acquisitions/
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>            acq-0001__dark/
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>            acq-0002__flat/
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>            acq-0003__iris/
+</code></pre></div>
+<h3 id="what-is-strongly-recommended-versus-merely-supported">What is strongly recommended versus merely supported<a class="headerlink" href="#what-is-strongly-recommended-versus-merely-supported" title="Permanent link">&para;</a></h3>
+<p>For the calibration profile, the safest operating choice is:</p>
+<ul>
+<li>use one camera folder per camera</li>
+<li>use one campaign folder per coherent calibration effort</li>
+<li>keep sessions inside <code>01_sessions/</code></li>
+<li>keep acquisitions inside <code>acquisitions/</code></li>
+<li>create <code>session_datacard.json</code> for every session</li>
+<li>use the <code>acq-####</code> naming contract for every managed acquisition</li>
+</ul>
+<p>The loader is more tolerant than the recommended structure, but the docs intentionally describe the layout that is easiest to maintain and least surprising.</p>
+<h2 id="trials-profile">Trials profile<a class="headerlink" href="#trials-profile" title="Permanent link">&para;</a></h2>
+<p>Recommended layout:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>&lt;workspace_root&gt;/
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>  &lt;trial_id&gt;/
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    .framelab/nodecard.json
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    &lt;camera_id&gt;/
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>      .framelab/nodecard.json
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>      &lt;session_id&gt;/
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>        session_datacard.json
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>        acquisitions/
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>          acq-0001/
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>          acq-0002__run_b/
+</code></pre></div>
+<p>Again, the trials workflow should be considered experimental.</p>
+<h2 id="discovery-rules-that-matter-in-practice">Discovery rules that matter in practice<a class="headerlink" href="#discovery-rules-that-matter-in-practice" title="Permanent link">&para;</a></h2>
+<p>These rules come directly from the current workflow and session-management code.</p>
+<h3 id="session-discovery-under-campaigns">Session discovery under campaigns<a class="headerlink" href="#session-discovery-under-campaigns" title="Permanent link">&para;</a></h3>
+<p>For the calibration profile, sessions may be discovered:</p>
+<ul>
+<li>directly under the campaign folder, or</li>
+<li>under a child folder named <code>01_sessions</code>, or</li>
+<li>under a child folder named <code>sessions</code></li>
+</ul>
+<p>A folder looks like a session when either of the following is true:</p>
+<ul>
+<li>it contains <code>session_datacard.json</code>, or</li>
+<li>it contains discoverable acquisitions</li>
+</ul>
+<h3 id="acquisition-discovery-under-sessions">Acquisition discovery under sessions<a class="headerlink" href="#acquisition-discovery-under-sessions" title="Permanent link">&para;</a></h3>
+<p>For a session, acquisition discovery first tries the session acquisitions root:</p>
+<ul>
+<li><code>session_datacard.json.paths.acquisitions_root_rel</code> when present and non-empty</li>
+<li>otherwise <code>session_root/acquisitions</code></li>
+</ul>
+<p>If that path does not yield acquisitions, the workflow loader may still fall back to direct child folders under the session when they look like acquisitions.</p>
+<h3 id="acquisition-folder-recognition">Acquisition folder recognition<a class="headerlink" href="#acquisition-folder-recognition" title="Permanent link">&para;</a></h3>
+<p>A folder is treated as an acquisition when either of the following is true:</p>
+<ul>
+<li>it contains <code>acquisition_datacard.json</code>, or</li>
+<li>its name matches <code>acq-####</code> or <code>acq-####__label</code> <strong>and</strong> it contains a <code>frames/</code> directory</li>
+</ul>
+<p>The workflow loader is intentionally more permissive than the structural editing tools.</p>
+<h3 id="session-management-naming-contract">Session-management naming contract<a class="headerlink" href="#session-management-naming-contract" title="Permanent link">&para;</a></h3>
+<p>Session-management operations such as add, rename, delete, and reindex only manage acquisition folders that match this contract:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>acq-####
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>acq-####__label
+</code></pre></div>
+<p>That contract is case-insensitive for parsing, but you should not rely on mixed casing in normal usage.</p>
+<h2 id="naming-guidance">Naming guidance<a class="headerlink" href="#naming-guidance" title="Permanent link">&para;</a></h2>
+<p>The app does not strictly enforce every folder name above the acquisition level, but consistent naming reduces ambiguity.</p>
+<h3 id="camera-folder">Camera folder<a class="headerlink" href="#camera-folder" title="Permanent link">&para;</a></h3>
+<p>Use a stable camera identity, for example:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>cam_visible_main
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>cam_mwir_a
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>xenics_bobcat_640
+</code></pre></div>
+<h3 id="campaign-folder">Campaign folder<a class="headerlink" href="#campaign-folder" title="Permanent link">&para;</a></h3>
+<p>Use a label that describes one coherent effort, for example:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>2026-03_linearity
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>2026-03_iris_response
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>uv_calibration_round2
+</code></pre></div>
+<h3 id="session-folder">Session folder<a class="headerlink" href="#session-folder" title="Permanent link">&para;</a></h3>
+<p>The code accepts arbitrary non-empty folder names without path separators, but the recommended format is:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>YYYY-MM-DD__sessNN
+</code></pre></div>
+<p>Examples:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>2026-03-05__sess01
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>2026-03-05__sess02
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>2026-03-06__sess01
+</code></pre></div>
+<p>This format works well because:</p>
+<ul>
+<li>it allows multiple sessions on the same day</li>
+<li>it stays readable in the Workflow Explorer</li>
+<li>it keeps chronology obvious without forcing the app to infer meaning from folder depth</li>
+</ul>
+<h3 id="acquisition-folder">Acquisition folder<a class="headerlink" href="#acquisition-folder" title="Permanent link">&para;</a></h3>
+<p>Use the required acquisition contract:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>acq-0001
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>acq-0002__dark
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>acq-0003__iris_opening
+</code></pre></div>
+<p>Prefer short semantic labels after the double underscore. The label should describe the acquisition intent, not repeat the whole campaign name.</p>
+<h2 id="datacards-and-nodecards-in-the-structure">Datacards and nodecards in the structure<a class="headerlink" href="#datacards-and-nodecards-in-the-structure" title="Permanent link">&para;</a></h2>
+<p>Higher-level workflow metadata and acquisition-local metadata do not serve the same purpose.</p>
+<h3 id="framelabnodecardjson"><code>.framelab/nodecard.json</code><a class="headerlink" href="#framelabnodecardjson" title="Permanent link">&para;</a></h3>
+<p>Use nodecards for generic workflow-node metadata on folders such as:</p>
+<ul>
+<li>camera</li>
+<li>campaign</li>
+<li>session</li>
+<li>trial</li>
+</ul>
+<p>This is the preferred higher-level metadata mechanism for the workflow shell.</p>
+<h3 id="campaign_datacardjson"><code>campaign_datacard.json</code><a class="headerlink" href="#campaign_datacardjson" title="Permanent link">&para;</a></h3>
+<p>This remains a compatibility layer for campaign-level defaults and instrument defaults.</p>
+<h3 id="session_datacardjson"><code>session_datacard.json</code><a class="headerlink" href="#session_datacardjson" title="Permanent link">&para;</a></h3>
+<p>This remains operationally important because it can:</p>
+<ul>
+<li>define <code>session_defaults</code></li>
+<li>redirect the acquisitions root through <code>paths.acquisitions_root_rel</code></li>
+<li>support session tooling</li>
+</ul>
+<h3 id="acquisition_datacardjson"><code>acquisition_datacard.json</code><a class="headerlink" href="#acquisition_datacardjson" title="Permanent link">&para;</a></h3>
+<p>This is still the authoritative acquisition-local canonical metadata record.</p>
+<p>Use it for:</p>
+<ul>
+<li>stable acquisition defaults</li>
+<li>frame-targeted overrides</li>
+<li>acquisition-local eBUS enable state and app-side overrides</li>
+</ul>
+<h2 id="how-to-decide-where-to-split-work">How to decide where to split work<a class="headerlink" href="#how-to-decide-where-to-split-work" title="Permanent link">&para;</a></h2>
+<p>A practical rule is:</p>
+<ul>
+<li>new <strong>campaign</strong> when the work is a distinct calibration effort with its own outputs</li>
+<li>new <strong>session</strong> when the setup changed meaningfully or the work block should stand on its own</li>
+<li>new <strong>acquisition</strong> when the capture intent changed</li>
+</ul>
+<p>Examples:</p>
+<ul>
+<li>change only exposure across several runs with the same setup -&gt; usually same session, multiple acquisitions</li>
+<li>switch optics or move to a different physical arrangement -&gt; new session</li>
+<li>begin a different calibration objective with different deliverables -&gt; new campaign</li>
+</ul>
+<h2 id="common-layout-mistakes">Common layout mistakes<a class="headerlink" href="#common-layout-mistakes" title="Permanent link">&para;</a></h2>
+<h3 id="mixing-tiff-files-directly-under-the-campaign-folder">Mixing TIFF files directly under the campaign folder<a class="headerlink" href="#mixing-tiff-files-directly-under-the-campaign-folder" title="Permanent link">&para;</a></h3>
+<p>This bypasses the normal camera/campaign/session/acquisition model and makes structure harder to interpret.</p>
+<h3 id="using-arbitrary-acquisition-folder-names">Using arbitrary acquisition folder names<a class="headerlink" href="#using-arbitrary-acquisition-folder-names" title="Permanent link">&para;</a></h3>
+<p>The workflow loader may still discover some acquisitions through datacards, but session-management tools will not treat arbitrary names as managed acquisitions.</p>
+<h3 id="treating-a-full-day-of-unrelated-captures-as-one-acquisition">Treating a full day of unrelated captures as one acquisition<a class="headerlink" href="#treating-a-full-day-of-unrelated-captures-as-one-acquisition" title="Permanent link">&para;</a></h3>
+<p>This usually produces a weak datacard, weak grouping, and poor analysis semantics.</p>
+<h3 id="loading-a-folder-above-the-intended-workspace-without-checking-the-anchor">Loading a folder above the intended workspace without checking the anchor<a class="headerlink" href="#loading-a-folder-above-the-intended-workspace-without-checking-the-anchor" title="Permanent link">&para;</a></h3>
+<p>The workflow shell can open partial subtrees, but you should confirm whether you opened:</p>
+<ul>
+<li>the full workspace</li>
+<li>a camera subtree</li>
+<li>a campaign subtree</li>
+<li>a session subtree</li>
+<li>one acquisition</li>
+</ul>
+<p>Use the breadcrumb and profile chips to verify the loaded scope.</p>
+<h2 id="recommended-starting-point">Recommended starting point<a class="headerlink" href="#recommended-starting-point" title="Permanent link">&para;</a></h2>
+<p>For most work, start with the calibration profile and this layout:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>workspace/
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>  camera/
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>    campaign/
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>      01_sessions/
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>        YYYY-MM-DD__sess01/
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>          session_datacard.json
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>          acquisitions/
+<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a>            acq-0001__dark/
+<a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a>            acq-0002__flat/
+<a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a>            acq-0003__iris/
+</code></pre></div>
+<p>That layout is the clearest match to the current code, the workflow shell, the session tools, and the metadata model.</p>
+<h2 id="related-pages">Related pages<a class="headerlink" href="#related-pages" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="quick-start.html">Quick Start</a></li>
+<li><a href="data-workflow.html">Data Workflow</a></li>
+<li><a href="data/session-manager.html">Session Manager (Legacy)</a></li>
+<li><a href="../reference/config-files.html">Reference: Config Files</a></li>
+<li><a href="../developer-guide/architecture.html">Developer Guide: Architecture</a></li>
+</ul>
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var tab,labels=set.querySelector(".tabbed-labels");for(tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+        </div>
+        
+          <a href="#" class="md-top md-icon" data-md-component="top" hidden>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12Z"/></svg>
+            Back to top
+          </a>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+    <nav class="md-footer__inner md-grid" aria-label="Footer" >
+      
+        
+        <a href="quick-start.html" class="md-footer__link md-footer__link--prev" aria-label="Previous: Quick Start" rel="prev">
+          <div class="md-footer__button md-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"/></svg>
+          </div>
+          <div class="md-footer__title">
+            <div class="md-ellipsis">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              Quick Start
+            </div>
+          </div>
+        </a>
+      
+      
+        
+        <a href="plugins.html" class="md-footer__link md-footer__link--next" aria-label="Next: Plugin Guide" rel="next">
+          <div class="md-footer__title">
+            <div class="md-ellipsis">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              Plugin Guide
+            </div>
+          </div>
+          <div class="md-footer__button md-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11H4Z"/></svg>
+          </div>
+        </a>
+      
+    </nav>
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    <script id="__config" type="application/json">{"base": "..", "features": ["navigation.sections", "navigation.indexes", "navigation.top", "navigation.footer", "content.code.copy", "content.tabs.link", "search.highlight", "search.share", "toc.follow"], "search": "../assets/javascripts/workers/search.ecf98df9.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version.title": "Select version"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.39f04ddb.min.js"></script>
+      
+        <script src="../assets/javascripts/mathjax-config.js"></script>
+      
+        <script src="../assets/vendor/mathjax/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

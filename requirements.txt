@@ -3,27 +3,27 @@
 # Install the whole file for a batteries-included local environment, or copy
 # just the block you need into your own install command.
 #
-# Recommended Python: 3.11 or 3.12
+# Recommended Python: 3.13
 
 # Running toolchain
 PySide6>=6.6,<7
 numpy>=1.26,<3
 tifffile>=2024.8
-# Used by built-in histogram and analysis plotting surfaces.
 matplotlib>=3.8,<4
-# Used by the visible .xlsx export path in the Measure table.
 openpyxl>=3.1,<4
 
-# Testing toolchain
+# Testing and developping toolchain
+commit-check
 pytest>=8,<9
 
 # Documentation toolchain
 mkdocs==1.6.1
 mkdocs-material==9.7.4
 pymdown-extensions>=10.0,<11
-# Provides MathJax assets staged into the offline help bundle.
-mathjax
+mathjax  # Provides MathJax assets staged into the offline help bundle.
 
 # Build toolchain
 # FrameLab currently ships as a folder-based application.
 # No extra Python build packages are required by repo scripts at this time.
+# Packages listed here are for future support
+nuitka

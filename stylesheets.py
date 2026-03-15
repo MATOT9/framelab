@@ -62,6 +62,50 @@ QToolBar {
     spacing: ${toolbar_spacing}px;
     padding: ${toolbar_padding_v}px ${toolbar_padding_h}px;
 }
+QDockWidget {
+    background: $window_bg;
+    color: $text;
+}
+QDockWidget::title {
+    background: $menu_bg;
+    color: $heading;
+    border: 1px solid $border;
+    border-bottom: none;
+    padding: ${header_padding}px;
+    font-weight: 650;
+    text-align: left;
+}
+QDockWidget#WorkflowExplorerDock,
+QDockWidget#MetadataInspectorDock,
+QWidget#WorkflowExplorerDockContent,
+QWidget#MetadataInspectorDockContent {
+    background: $window_bg;
+}
+QWidget#DockTitleBar {
+    background: $menu_bg;
+    border: 1px solid $border;
+    border-bottom: none;
+}
+QLabel#DockTitleLabel {
+    color: $heading;
+    font-weight: 650;
+}
+QToolButton#DockTitleButton {
+    background: $button_bg;
+    border: 1px solid $focus_border;
+    border-radius: 5px;
+    min-width: 22px;
+    min-height: 22px;
+    padding: 0px;
+}
+QToolButton#DockTitleButton:hover {
+    background: $hover_bg;
+    border-color: $accent;
+}
+QToolButton#DockTitleButton:pressed {
+    background: $selection_bg;
+    border-color: $accent;
+}
 QMainWindow::separator {
     background: $border;
     width: 1px;
@@ -306,6 +350,17 @@ QToolButton#DisclosureButton {
 QToolButton#DisclosureButton:hover {
     background: $hover_bg;
 }
+QToolButton#DockActionButton {
+    background: $button_bg;
+    border: 1px solid $button_border;
+    border-radius: 8px;
+    padding: ${button_padding_v}px ${button_padding_h}px;
+    color: $text;
+    font-weight: 500;
+}
+QToolButton#DockActionButton:hover {
+    background: $hover_bg;
+}
 QToolButton#DisclosureButton:checked {
     background: $selection_bg;
     border: 1px solid $focus_border;
@@ -390,6 +445,49 @@ QListWidget::item,
 QListView::item {
     padding: ${list_item_padding_v}px ${list_item_padding_h}px;
 }
+QScrollBar:vertical {
+    background: $scrollbar_bg;
+    width: 12px;
+    margin: 2px;
+    border: none;
+    border-radius: 6px;
+}
+QScrollBar:horizontal {
+    background: $scrollbar_bg;
+    height: 12px;
+    margin: 2px;
+    border: none;
+    border-radius: 6px;
+}
+QScrollBar::handle:vertical {
+    background: $scrollbar_handle;
+    min-height: 24px;
+    border-radius: 6px;
+}
+QScrollBar::handle:horizontal {
+    background: $scrollbar_handle;
+    min-width: 24px;
+    border-radius: 6px;
+}
+QScrollBar::handle:vertical:hover,
+QScrollBar::handle:horizontal:hover {
+    background: $scrollbar_handle_hover;
+}
+QScrollBar::add-line:vertical,
+QScrollBar::sub-line:vertical,
+QScrollBar::add-line:horizontal,
+QScrollBar::sub-line:horizontal {
+    background: transparent;
+    border: none;
+    width: 0px;
+    height: 0px;
+}
+QScrollBar::add-page:vertical,
+QScrollBar::sub-page:vertical,
+QScrollBar::add-page:horizontal,
+QScrollBar::sub-page:horizontal {
+    background: transparent;
+}
 QTableView::item {
     padding: ${table_item_padding}px;
 }
@@ -464,6 +562,9 @@ _LIGHT_PALETTE = {
     "hover_bg": "#e4ebf7",
     "tab_bg": "#eef3fb",
     "gridline": "#edf2f9",
+    "scrollbar_bg": "#dbe5f3",
+    "scrollbar_handle": "#94a3b8",
+    "scrollbar_handle_hover": "#64748b",
     "selection_bg": "#dbeafe",
     "selection_fg": "#1f2937",
     "accent": "#2563eb",
@@ -510,6 +611,9 @@ _DARK_PALETTE = {
     "hover_bg": "#3f5065",
     "tab_bg": "#2b3a4d",
     "gridline": "#334155",
+    "scrollbar_bg": "#182230",
+    "scrollbar_handle": "#475569",
+    "scrollbar_handle_hover": "#64748b",
     "selection_bg": "#1d4ed8",
     "selection_fg": "#f3f4f6",
     "accent": "#3b82f6",

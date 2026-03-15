@@ -29,3 +29,20 @@ def test_compact_stylesheet_is_tighter_than_comfortable() -> None:
     assert "padding: 5px 10px;" in compact_sheet
     assert "font-size: 20px;" in comfortable_sheet
     assert "font-size: 18px;" in compact_sheet
+
+
+def test_theme_stylesheets_include_scrollbar_rules() -> None:
+    dark_sheet = build_dark_theme(comfortable_density_tokens())
+    light_sheet = build_light_theme(comfortable_density_tokens())
+
+    assert "QScrollBar:vertical" in dark_sheet
+    assert "QScrollBar::handle:horizontal:hover" in dark_sheet
+    assert "QScrollBar:horizontal" in light_sheet
+
+
+def test_theme_stylesheets_include_dock_button_rules() -> None:
+    dark_sheet = build_dark_theme(comfortable_density_tokens())
+
+    assert "QWidget#DockTitleBar" in dark_sheet
+    assert "QToolButton#DockTitleButton" in dark_sheet
+    assert "QWidget#MetadataInspectorDockContent" in dark_sheet

@@ -15,6 +15,7 @@ from ....ui_primitives import (
     build_page_header,
     build_summary_strip,
 )
+from ....window_drag import configure_secondary_window
 
 
 def _display_value(value: Any) -> str:
@@ -87,6 +88,7 @@ class EbusInspectDialog(qtw.QDialog):
             raise ValueError("Could not load eBUS source.")
 
         self.setWindowTitle(f"Inspect eBUS Config - {descriptor.display_name}")
+        configure_secondary_window(self)
         self.resize(1080, 720)
 
         layout = qtw.QVBoxLayout(self)
@@ -210,6 +212,7 @@ class EbusCompareDialog(qtw.QDialog):
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Compare eBUS Configs")
+        configure_secondary_window(self)
         self.resize(1280, 760)
         self._initial_path = initial_path
         self._source_path_role = int(Qt.UserRole)

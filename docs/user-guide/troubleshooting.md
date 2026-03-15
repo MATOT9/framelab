@@ -2,7 +2,7 @@
 
 Use this page for operational issues encountered during normal use of the app.
 
-This page is organized by workflow stage so you can isolate whether the problem is in startup, dataset intake, session tools, eBUS inspection, measurement, or analysis.
+This page is organized by workflow stage so you can isolate whether the problem is in startup, workflow scope, dataset intake, session tools, eBUS inspection, measurement, or analysis.
 
 ## 1. App and startup issues
 
@@ -42,7 +42,51 @@ Action:
 - rebuild the bundled documentation
 - verify the packaged help files were refreshed after the latest documentation edits
 
-## 2. Data and metadata issues
+## 2. Workflow profile and scope issues
+
+### The workflow tree looks wrong immediately after loading a folder
+
+Possible causes:
+
+- the selected folder is above or below the intended logical root
+- the wrong workflow profile was chosen
+- the filesystem layout does not match the profile you chose
+
+Action:
+
+- verify whether you chose **Calibration** or **Trials**
+- verify whether the selected path represents a workspace, camera, campaign, session, or acquisition subtree
+- compare the actual folder tree against [Workflow Structure and Required Folder Layout](workflow-structure.md)
+
+### A campaign folder was opened, but sessions are missing
+
+Possible causes:
+
+- sessions are not stored directly under the campaign or under `01_sessions` / `sessions`
+- the session folders do not contain `session_datacard.json`
+- the session folders do not contain discoverable acquisitions
+
+Action:
+
+- verify the campaign layout
+- verify the session folder contents
+- add `session_datacard.json` where appropriate
+
+### The session loads, but acquisitions are missing from the tree
+
+Possible causes:
+
+- `session_datacard.json.paths.acquisitions_root_rel` points to the wrong place
+- acquisitions are stored outside the resolved acquisitions root
+- acquisition folders do not match the managed naming contract and do not carry acquisition datacards
+
+Action:
+
+- inspect `session_datacard.json`
+- verify the actual acquisitions root on disk
+- verify acquisition folder naming and datacard presence
+
+## 3. Data and metadata issues
 
 ### No TIFF files were found
 
@@ -115,7 +159,7 @@ Action:
 - verify that exactly one root-level `.pvcfg` file exists
 - remove ambiguity before expecting automatic discovery
 
-## 3. Session management issues
+## 4. Session management issues
 
 ### Add or delete is disabled in Session Manager
 
@@ -151,7 +195,7 @@ Action:
 - relaunch with the eBUS plugin enabled if needed
 - then reopen Session Manager and select the intended acquisition
 
-## 4. eBUS inspection and compare issues
+## 5. eBUS inspection and compare issues
 
 ### The compare dialog opens but does not preload the current acquisition
 
@@ -190,7 +234,7 @@ Action:
 - treat the eBUS snapshot as authoritative for that acquisition-wide field
 - only use the wizard to override fields whose eBUS catalog entry explicitly allows app-side override
 
-## 5. Measurement issues
+## 6. Measurement issues
 
 ### `DN/ms` is blank or unavailable
 
@@ -258,130 +302,30 @@ Cause:
 
 Action:
 
-- compare normalized values only when the dataset context is intentionally the same
-- switch back to raw values for cross-dataset engineering comparison when appropriate
+- verify whether the loaded dataset population changed
+- verify whether background subtraction changed the metric image
+- compare raw and normalized views deliberately rather than mixing them mentally
 
-### Preview and table disagree
+## 7. Analysis issues
 
-Possible causes:
-
-- the preview is showing a different selected row than the one you think you are reading
-- the table is showing normalized values while you are visually reasoning in raw DN
-- background subtraction changed the metric image even though the raw TIFF looks different
-
-Action:
-
-- reselect the row explicitly
-- verify raw versus normalized display state
-- verify whether background subtraction is active
-
-### Exported table does not match what you expected
+### The plot looks clean, but the result is obviously physically wrong
 
 Possible causes:
 
-- you exported the currently visible table, not a hypothetical full schema view
-- column visibility, sorting, or active measure mode changed what was visible at export time
+- the wrong workflow scope was scanned
+- the wrong metadata source was used
+- grouping does not match the actual sweep variable
+- upstream measurement settings were wrong
 
 Action:
 
-- verify the current visible table state before exporting again
-- re-export after setting the intended columns and mode
+- return to the workflow scope, Data, and Measure stages
+- verify the upstream assumptions before trusting the plot
 
-## 6. Analysis issues
+## Related pages
 
-### No curves appear in the plot
-
-Possible causes:
-
-- the selected X or Y variable has insufficient valid data
-- required metadata is missing
-- the active measurement mode did not produce the quantity needed by the plugin
-
-Action:
-
-- verify measurement-stage values first
-- check metadata completeness on **Data**
-- confirm the selected Y mode is compatible with the available measurements
-
-### The plot looks correct, but the interpretation seems wrong
-
-Cause:
-
-- upstream metadata source, normalization state, background handling, or measurement mode is not the intended one
-
-Action:
-
-- return to **Data** and **Measure**
-- verify the full upstream state before drawing conclusions from the plot
-
-### Gain jumps sharply or behaves unexpectedly
-
-Possible causes:
-
-- the reference point is not the one you intended
-- the underlying signal is noisy or partially invalid
-- exposure-dependent inputs to `DN/ms` are incorrect
-- you are in the iris-position gain special case, which is built from aggregated `DN/ms`
-
-Action:
-
-- verify the gain reference mode
-- inspect the table values behind the curve
-- confirm exposure metadata and measurement stability
-
-### The plot and result table disagree with the preview or Measure table
-
-Possible causes:
-
-- normalization changed the plugin input values
-- background subtraction changed the metric image used upstream
-- the plugin is aggregating repeated operating points, so one plotted point is not one original row
-
-Action:
-
-- inspect the Measure table first
-- then inspect the plugin result table
-- only then interpret the plot
-
-## 7. Datacard authoring issues
-
-### Defaults do not behave as expected
-
-Check whether the authored value belongs in **Defaults** or **Frame Mapping**.
-
-Use **Defaults** only for values that should apply acquisition-wide unless specifically replaced.
-
-### An override did not clear an inherited value
-
-Cause:
-
-- blank override fields do not erase inherited defaults
-
-Action:
-
-- enter the explicit replacement value you want
-- do not rely on blank fields to clear inherited metadata
-
-### Validation fails before save
-
-Possible causes:
-
-- a field name is unknown
-- a value type is incompatible with the mapped field definition
-- frame targeting is inconsistent
-
-Action:
-
-- reload the field mapping if needed
-- inspect the offending row and value type
-- correct the structure before saving
-
-## 8. When to escalate
-
-Escalate beyond normal user troubleshooting when:
-
-- repeated rescans produce inconsistent row populations without any dataset change
-- correct metadata still produces obviously invalid analysis behavior
-- background application appears inconsistent despite valid matching conditions
-- eBUS effective compare appears inconsistent with the stored datacard override block
-- the app fails during launch or scan instead of producing a recoverable workflow-state issue
+- [Workflow Structure and Required Folder Layout](workflow-structure.md)
+- [Data Workflow](data-workflow.md)
+- [Session Manager (Legacy)](data/session-manager.md)
+- [Measure Workflow](measure-workflow.md)
+- [Analysis Workflow](analysis-workflow.md)

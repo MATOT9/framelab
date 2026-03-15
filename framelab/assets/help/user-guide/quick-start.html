@@ -10,18 +10,8 @@
       
       
       
-      
-        <link rel="prev" href="concepts-and-limits.html">
-      
-      
-        <link rel="next" href="plugins.html">
-      
-      
-        
-      
-      
       <link rel="icon" href="../assets/images/branding/app-icon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.4">
+      <meta name="generator" content="mkdocs-1.3.0, mkdocs-material-8.5.2">
     
     
       
@@ -29,17 +19,15 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.9f9400aa.min.css">
       
         
-        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.cbb835fc.min.css">
+        
       
       
 
-
     
-    
-      
     
     
       
@@ -53,10 +41,11 @@
     
       <link rel="stylesheet" href="../stylesheets/extra.css">
     
-    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce((e,_)=>(e<<5)-e+_.charCodeAt(0),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
+    
     
     
   </head>
@@ -71,6 +60,9 @@
     
     <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="blue">
   
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&"object"==typeof palette.color)for(var key of Object.keys(palette.color))document.body.setAttribute("data-md-color-"+key,palette.color[key])</script>
     
     <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
     <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
@@ -90,9 +82,7 @@
     
       
 
-  
-
-<header class="md-header md-header--shadow" data-md-component="header">
+<header class="md-header" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
     <a href="../index.html" title="FrameLab Documentation" class="md-header__button md-logo" aria-label="FrameLab Documentation" data-md-component="logo">
       
@@ -100,8 +90,7 @@
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
-      
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2Z"/></svg>
     </label>
     <div class="md-header__title" data-md-component="header-title">
       <div class="md-header__ellipsis">
@@ -120,81 +109,66 @@
       </div>
     </div>
     
-      
-        <form class="md-header__option" data-md-component="palette">
-  
-    
-    
-    
-    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
-    
-      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
-      </label>
-    
-  
-    
-    
-    
-    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="blue-grey" data-md-color-accent="light-blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
-    
-      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m3.55 19.09 1.41 1.41 1.8-1.79-1.42-1.42M12 6c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6c0-3.32-2.69-6-6-6m8 7h3v-2h-3m-2.76 7.71 1.8 1.79 1.41-1.41-1.79-1.8M20.45 5l-1.41-1.4-1.8 1.79 1.42 1.42M13 1h-2v3h2M6.76 5.39 4.96 3.6 3.55 5l1.79 1.81zM1 13h3v-2H1m12 9h-2v3h2"/></svg>
-      </label>
-    
-  
-</form>
-      
-    
-    
-      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
-    
-    
-    
-      
-      
-        <label class="md-header__button md-icon" for="__search">
+      <form class="md-header__option" data-md-component="palette">
+        
           
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
-        </label>
-        <div class="md-search" data-md-component="search" role="dialog">
+          
+          <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+          
+            <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_2" hidden>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3 3.19.09m3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95 2.06.05m-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31Z"/></svg>
+            </label>
+          
+        
+          
+          
+          <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="blue-grey" data-md-color-accent="light-blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_2">
+          
+            <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m3.55 19.09 1.41 1.41 1.8-1.79-1.42-1.42M12 6c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6c0-3.32-2.69-6-6-6m8 7h3v-2h-3m-2.76 7.71 1.8 1.79 1.41-1.41-1.79-1.8M20.45 5l-1.41-1.4-1.8 1.79 1.42 1.42M13 1h-2v3h2M6.76 5.39 4.96 3.6 3.55 5l1.79 1.81 1.42-1.42M1 13h3v-2H1m12 9h-2v3h2"/></svg>
+            </label>
+          
+        
+      </form>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
   <label class="md-search__overlay" for="__search"></label>
   <div class="md-search__inner" role="search">
     <form class="md-search__form" name="search">
       <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
       <label class="md-search__icon md-icon" for="__search">
-        
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
-        
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"/></svg>
       </label>
       <nav class="md-search__options" aria-label="Search">
         
           <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
-            
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7 0-.24-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91 1.61 0 2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08Z"/></svg>
           </a>
         
         <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
-          
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41Z"/></svg>
         </button>
       </nav>
       
     </form>
     <div class="md-search__output">
-      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+      <div class="md-search__scrollwrap" data-md-scrollfix>
         <div class="md-search-result" data-md-component="search-result">
           <div class="md-search-result__meta">
             Initializing search
           </div>
-          <ol class="md-search-result__list" role="presentation"></ol>
+          <ol class="md-search-result__list"></ol>
         </div>
       </div>
     </div>
   </div>
 </div>
-      
     
     
   </nav>
@@ -219,7 +193,6 @@
                     
 
 
-
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
     <a href="../index.html" title="FrameLab Documentation" class="md-nav__button md-logo" aria-label="FrameLab Documentation" data-md-component="logo">
@@ -234,26 +207,14 @@
     
       
       
-  
+      
+
   
   
   
     <li class="md-nav__item">
       <a href="../index.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Home
-  
-
-    
-  </span>
-  
-  
-
+        Home
       </a>
     </li>
   
@@ -261,166 +222,104 @@
     
       
       
+      
+
   
   
     
   
   
-  
-    
     
       
-        
-          
-        
-      
-        
-      
-        
-      
-        
-      
-        
-      
-        
-      
-        
-      
-        
-      
-        
-      
-    
-    
-    
-      
-        
-        
-      
-    
     
     <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+      
+        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_2" type="checkbox" id="__nav_2" checked>
+      
+      
+      
         
           
-          <div class="md-nav__link md-nav__container">
-            <a href="index.html" class="md-nav__link ">
-              
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    User Guide
-  
-
-    
-  </span>
-  
-  
-
-            </a>
             
-              
-              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="">
-                <span class="md-nav__icon md-icon"></span>
-              </label>
-            
-          </div>
+          
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_2">
-            <span class="md-nav__icon md-icon"></span>
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+      
+      
+        
+        
+        <div class="md-nav__link md-nav__link--index ">
+          <a href="index.html">User Guide</a>
+          
+            <label for="__nav_2">
+              <span class="md-nav__icon md-icon"></span>
+            </label>
+          
+        </div>
+      
+      <nav class="md-nav" aria-label="User Guide" data-md-level="1">
+        <label class="md-nav__title" for="__nav_2">
+          <span class="md-nav__icon md-icon"></span>
+          User Guide
+        </label>
+        <ul class="md-nav__list" data-md-scrollfix>
+          
             
-  
-    User Guide
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
+          
             
               
-            
-              
-                
-  
   
   
   
     <li class="md-nav__item">
       <a href="concepts-and-limits.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Concepts and Limits
-  
-
-    
-  </span>
-  
-  
-
+        Concepts and Limits
       </a>
     </li>
   
 
-              
+            
+          
             
               
-                
   
   
     
   
   
-  
     <li class="md-nav__item md-nav__item--active">
       
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      <input class="md-nav__toggle md-toggle" data-md-toggle="toc" type="checkbox" id="__toc">
       
       
         
       
       
         <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Quick Start
-  
-
-    
-  </span>
-  
-  
-
+          Quick Start
           <span class="md-nav__icon md-icon"></span>
         </label>
       
       <a href="quick-start.html" class="md-nav__link md-nav__link--active">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Quick Start
-  
-
-    
-  </span>
-  
-  
-
+        Quick Start
       </a>
       
         
@@ -440,89 +339,64 @@
       
         <li class="md-nav__item">
   <a href="#recommended-session-flow" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Recommended session flow
-      
-    </span>
+    Recommended session flow
   </a>
   
 </li>
       
         <li class="md-nav__item">
   <a href="#minimal-decision-path" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Minimal decision path
-      
-    </span>
+    Minimal decision path
   </a>
   
     <nav class="md-nav" aria-label="Minimal decision path">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#1-confirm-the-metadata-source" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        1. Confirm the metadata source
-      
-    </span>
+  <a href="#1-confirm-the-workflow-profile-and-scope" class="md-nav__link">
+    1. Confirm the workflow profile and scope
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#2-decide-whether-session-level-preparation-is-needed" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        2. Decide whether session-level preparation is needed
-      
-    </span>
+  <a href="#2-confirm-the-metadata-source" class="md-nav__link">
+    2. Confirm the metadata source
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#3-decide-whether-acquisition-side-metadata-editing-is-needed" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        3. Decide whether acquisition-side metadata editing is needed
-      
-    </span>
+  <a href="#3-decide-whether-structure-work-is-still-needed" class="md-nav__link">
+    3. Decide whether structure work is still needed
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#4-choose-the-measurement-mode" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        4. Choose the measurement mode
-      
-    </span>
+  <a href="#4-decide-whether-metadata-editing-is-needed" class="md-nav__link">
+    4. Decide whether metadata editing is needed
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#5-verify-exposure-dependent-metrics" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        5. Verify exposure-dependent metrics
-      
-    </span>
+  <a href="#5-choose-the-measurement-mode" class="md-nav__link">
+    5. Choose the measurement mode
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#6-choose-the-analysis-plugin" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        6. Choose the analysis plugin
-      
-    </span>
+  <a href="#6-verify-exposure-dependent-metrics" class="md-nav__link">
+    6. Verify exposure-dependent metrics
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#7-choose-the-analysis-plugin" class="md-nav__link">
+    7. Choose the analysis plugin
   </a>
   
 </li>
@@ -534,22 +408,14 @@
       
         <li class="md-nav__item">
   <a href="#fast-sanity-checklist" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Fast sanity checklist
-      
-    </span>
+    Fast sanity checklist
   </a>
   
 </li>
       
         <li class="md-nav__item">
   <a href="#related-pages" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Related pages
-      
-    </span>
+    Related pages
   </a>
   
 </li>
@@ -561,968 +427,568 @@
     </li>
   
 
-              
+            
+          
             
               
-                
   
+  
+  
+    <li class="md-nav__item">
+      <a href="workflow-structure.html" class="md-nav__link">
+        Workflow Structure and Required Folder Layout
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
   
   
   
     <li class="md-nav__item">
       <a href="plugins.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Plugin Guide
-  
-
-    
-  </span>
-  
-  
-
+        Plugin Guide
       </a>
     </li>
   
 
-              
+            
+          
             
               
-                
-  
   
   
   
     <li class="md-nav__item">
       <a href="plugin-selector.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Plugin Selector
-  
-
-    
-  </span>
-  
-  
-
+        Plugin Selector
       </a>
     </li>
   
 
-              
+            
+          
             
               
-                
   
   
   
-  
-    
-    
-      
-        
-      
-        
-      
-        
-      
-        
-      
-    
-    
-    
-      
-    
     
     <li class="md-nav__item md-nav__item--nested">
       
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_6" >
+      
+        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_2_7" type="checkbox" id="__nav_2_7" >
+      
+      
+      
         
           
-          <label class="md-nav__link" for="__nav_2_6" id="__nav_2_6_label" tabindex="0">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Data Workflow
-  
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_6_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_2_6">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Data Workflow
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
+          
+        
+          
+        
+          
+        
+      
+      
+        <label class="md-nav__link" for="__nav_2_7">
+          Data Workflow
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <nav class="md-nav" aria-label="Data Workflow" data-md-level="2">
+        <label class="md-nav__title" for="__nav_2_7">
+          <span class="md-nav__icon md-icon"></span>
+          Data Workflow
+        </label>
+        <ul class="md-nav__list" data-md-scrollfix>
+          
             
               
-                
-  
   
   
   
     <li class="md-nav__item">
       <a href="data-workflow.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Overview
-  
-
-    
-  </span>
-  
-  
-
+        Overview
       </a>
     </li>
   
 
-              
+            
+          
             
               
-                
-  
   
   
   
     <li class="md-nav__item">
       <a href="data/session-manager.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Session Manager
-  
-
-    
-  </span>
-  
-  
-
+        Session Manager
       </a>
     </li>
   
 
-              
+            
+          
             
               
-                
-  
   
   
   
     <li class="md-nav__item">
       <a href="data/datacard-wizard.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Datacard Wizard
-  
-
-    
-  </span>
-  
-  
-
+        Datacard Wizard
       </a>
     </li>
   
 
-              
+            
+          
             
               
-                
-  
   
   
   
     <li class="md-nav__item">
       <a href="data/ebus-config-tools.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    eBUS Config Tools
-  
-
-    
-  </span>
-  
-  
-
+        eBUS Config Tools
       </a>
     </li>
   
 
-              
             
-          </ul>
-        </nav>
-      
+          
+        </ul>
+      </nav>
     </li>
   
 
-              
+            
+          
             
               
-                
-  
   
   
   
     <li class="md-nav__item">
       <a href="measure-workflow.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Measure Workflow
-  
-
-    
-  </span>
-  
-  
-
+        Measure Workflow
       </a>
     </li>
   
 
-              
+            
+          
             
               
-                
   
   
   
-  
-    
-    
-      
-        
-      
-        
-      
-    
-    
-    
-      
-    
     
     <li class="md-nav__item md-nav__item--nested">
       
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_8" >
+      
+        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_2_9" type="checkbox" id="__nav_2_9" >
+      
+      
+      
         
           
-          <label class="md-nav__link" for="__nav_2_8" id="__nav_2_8_label" tabindex="0">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Analysis Workflow
-  
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_8_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_2_8">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Analysis Workflow
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
+          
+        
+      
+      
+        <label class="md-nav__link" for="__nav_2_9">
+          Analysis Workflow
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <nav class="md-nav" aria-label="Analysis Workflow" data-md-level="2">
+        <label class="md-nav__title" for="__nav_2_9">
+          <span class="md-nav__icon md-icon"></span>
+          Analysis Workflow
+        </label>
+        <ul class="md-nav__list" data-md-scrollfix>
+          
             
               
-                
-  
   
   
   
     <li class="md-nav__item">
       <a href="analysis-workflow.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Overview
-  
-
-    
-  </span>
-  
-  
-
+        Overview
       </a>
     </li>
   
 
-              
+            
+          
             
               
-                
-  
   
   
   
     <li class="md-nav__item">
       <a href="analysis/intensity-trend-explorer.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Intensity Trend Explorer
-  
-
-    
-  </span>
-  
-  
-
+        Intensity Trend Explorer
       </a>
     </li>
   
 
-              
             
-          </ul>
-        </nav>
-      
+          
+        </ul>
+      </nav>
     </li>
   
 
-              
+            
+          
             
               
-                
-  
   
   
   
     <li class="md-nav__item">
       <a href="troubleshooting.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    User Troubleshooting
-  
-
-    
-  </span>
-  
-  
-
+        User Troubleshooting
       </a>
     </li>
   
 
-              
             
-          </ul>
-        </nav>
-      
+          
+        </ul>
+      </nav>
     </li>
   
 
     
       
       
+      
+
   
   
   
-  
-    
     
       
-        
-          
-        
-      
-        
-      
-        
-      
-        
-      
-        
-      
-        
-      
-        
-      
-    
-    
-    
-      
-        
-        
-      
-    
     
     <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+      
+        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_3" type="checkbox" id="__nav_3" >
+      
+      
+      
         
           
-          <div class="md-nav__link md-nav__container">
-            <a href="../developer-guide/index.html" class="md-nav__link ">
-              
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Developer Guide
-  
-
-    
-  </span>
-  
-  
-
-            </a>
             
-              
-              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="">
-                <span class="md-nav__icon md-icon"></span>
-              </label>
-            
-          </div>
+          
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3">
-            <span class="md-nav__icon md-icon"></span>
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+      
+      
+        
+        
+        <div class="md-nav__link md-nav__link--index ">
+          <a href="../developer-guide/index.html">Developer Guide</a>
+          
+            <label for="__nav_3">
+              <span class="md-nav__icon md-icon"></span>
+            </label>
+          
+        </div>
+      
+      <nav class="md-nav" aria-label="Developer Guide" data-md-level="1">
+        <label class="md-nav__title" for="__nav_3">
+          <span class="md-nav__icon md-icon"></span>
+          Developer Guide
+        </label>
+        <ul class="md-nav__list" data-md-scrollfix>
+          
             
-  
-    Developer Guide
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
+          
             
               
-            
-              
-                
-  
   
   
   
     <li class="md-nav__item">
       <a href="../developer-guide/architecture.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Architecture
-  
-
-    
-  </span>
-  
-  
-
+        Architecture
       </a>
     </li>
   
 
-              
+            
+          
             
               
-                
-  
   
   
   
     <li class="md-nav__item">
       <a href="../developer-guide/plugin-system.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Plugin System
-  
-
-    
-  </span>
-  
-  
-
+        Plugin System
       </a>
     </li>
   
 
-              
+            
+          
             
               
-                
-  
   
   
   
     <li class="md-nav__item">
       <a href="../developer-guide/datacard-system.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Datacard System
-  
-
-    
-  </span>
-  
-  
-
+        Datacard System
       </a>
     </li>
   
 
-              
+            
+          
             
               
-                
-  
   
   
   
     <li class="md-nav__item">
       <a href="../developer-guide/ebus-config-integration.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    eBUS Config Integration
-  
-
-    
-  </span>
-  
-  
-
+        eBUS Config Integration
       </a>
     </li>
   
 
-              
+            
+          
             
               
-                
-  
   
   
   
     <li class="md-nav__item">
       <a href="../developer-guide/ui-structure.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    UI Structure
-  
-
-    
-  </span>
-  
-  
-
+        UI Structure
       </a>
     </li>
   
 
-              
+            
+          
             
               
-                
-  
   
   
   
     <li class="md-nav__item">
       <a href="../developer-guide/packaging.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Packaging
-  
-
-    
-  </span>
-  
-  
-
+        Packaging
       </a>
     </li>
   
 
-              
             
-          </ul>
-        </nav>
-      
+          
+        </ul>
+      </nav>
     </li>
   
 
     
       
       
+      
+
   
   
   
-  
-    
     
       
-        
-          
-        
-      
-        
-      
-        
-      
-        
-      
-        
-      
-        
-      
-    
-    
-    
-      
-        
-        
-      
-    
     
     <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+      
+        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_4" type="checkbox" id="__nav_4" >
+      
+      
+      
         
           
-          <div class="md-nav__link md-nav__container">
-            <a href="../reference/index.html" class="md-nav__link ">
-              
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Reference
-  
-
-    
-  </span>
-  
-  
-
-            </a>
             
-              
-              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
-                <span class="md-nav__icon md-icon"></span>
-              </label>
-            
-          </div>
+          
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4">
-            <span class="md-nav__icon md-icon"></span>
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+      
+      
+        
+        
+        <div class="md-nav__link md-nav__link--index ">
+          <a href="../reference/index.html">Reference</a>
+          
+            <label for="__nav_4">
+              <span class="md-nav__icon md-icon"></span>
+            </label>
+          
+        </div>
+      
+      <nav class="md-nav" aria-label="Reference" data-md-level="1">
+        <label class="md-nav__title" for="__nav_4">
+          <span class="md-nav__icon md-icon"></span>
+          Reference
+        </label>
+        <ul class="md-nav__list" data-md-scrollfix>
+          
             
-  
-    Reference
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
+          
             
               
-            
-              
-                
-  
   
   
   
     <li class="md-nav__item">
       <a href="../reference/config-files.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Config Files
-  
-
-    
-  </span>
-  
-  
-
+        Config Files
       </a>
     </li>
   
 
-              
+            
+          
             
               
-                
-  
   
   
   
     <li class="md-nav__item">
       <a href="../reference/plugin-manifests.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Plugin Manifests
-  
-
-    
-  </span>
-  
-  
-
+        Plugin Manifests
       </a>
     </li>
   
 
-              
+            
+          
             
               
-                
-  
   
   
   
     <li class="md-nav__item">
       <a href="../reference/acquisition-mapping.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Acquisition Mapping
-  
-
-    
-  </span>
-  
-  
-
+        Acquisition Mapping
       </a>
     </li>
   
 
-              
+            
+          
             
               
-                
-  
   
   
   
     <li class="md-nav__item">
       <a href="../reference/ebus-parameter-catalog.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    eBUS Parameter Catalog
-  
-
-    
-  </span>
-  
-  
-
+        eBUS Parameter Catalog
       </a>
     </li>
   
 
-              
+            
+          
             
               
-                
-  
   
   
   
     <li class="md-nav__item">
       <a href="../reference/keyboard-shortcuts.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Keyboard Shortcuts
-  
-
-    
-  </span>
-  
-  
-
+        Keyboard Shortcuts
       </a>
     </li>
   
 
-              
             
-          </ul>
-        </nav>
-      
+          
+        </ul>
+      </nav>
     </li>
   
 
     
       
       
+      
+
   
   
   
-  
-    
     
       
-        
-          
-        
-      
-    
-    
-    
-      
-        
-        
-      
-    
     
     <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+      
+        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_5" type="checkbox" id="__nav_5" >
+      
+      
+      
         
           
-          <div class="md-nav__link md-nav__container">
-            <a href="../troubleshooting/index.html" class="md-nav__link ">
-              
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Troubleshooting
-  
-
-    
-  </span>
-  
-  
-
-            </a>
             
-          </div>
+          
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Troubleshooting
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-            
-          </ul>
-        </nav>
       
+      
+        
+        
+        <div class="md-nav__link md-nav__link--index ">
+          <a href="../troubleshooting/index.html">Troubleshooting</a>
+          
+        </div>
+      
+      <nav class="md-nav" aria-label="Troubleshooting" data-md-level="1">
+        <label class="md-nav__title" for="__nav_5">
+          <span class="md-nav__icon md-icon"></span>
+          Troubleshooting
+        </label>
+        <ul class="md-nav__list" data-md-scrollfix>
+          
+            
+          
+        </ul>
+      </nav>
     </li>
   
 
@@ -1555,89 +1021,64 @@
       
         <li class="md-nav__item">
   <a href="#recommended-session-flow" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Recommended session flow
-      
-    </span>
+    Recommended session flow
   </a>
   
 </li>
       
         <li class="md-nav__item">
   <a href="#minimal-decision-path" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Minimal decision path
-      
-    </span>
+    Minimal decision path
   </a>
   
     <nav class="md-nav" aria-label="Minimal decision path">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#1-confirm-the-metadata-source" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        1. Confirm the metadata source
-      
-    </span>
+  <a href="#1-confirm-the-workflow-profile-and-scope" class="md-nav__link">
+    1. Confirm the workflow profile and scope
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#2-decide-whether-session-level-preparation-is-needed" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        2. Decide whether session-level preparation is needed
-      
-    </span>
+  <a href="#2-confirm-the-metadata-source" class="md-nav__link">
+    2. Confirm the metadata source
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#3-decide-whether-acquisition-side-metadata-editing-is-needed" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        3. Decide whether acquisition-side metadata editing is needed
-      
-    </span>
+  <a href="#3-decide-whether-structure-work-is-still-needed" class="md-nav__link">
+    3. Decide whether structure work is still needed
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#4-choose-the-measurement-mode" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        4. Choose the measurement mode
-      
-    </span>
+  <a href="#4-decide-whether-metadata-editing-is-needed" class="md-nav__link">
+    4. Decide whether metadata editing is needed
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#5-verify-exposure-dependent-metrics" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        5. Verify exposure-dependent metrics
-      
-    </span>
+  <a href="#5-choose-the-measurement-mode" class="md-nav__link">
+    5. Choose the measurement mode
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#6-choose-the-analysis-plugin" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        6. Choose the analysis plugin
-      
-    </span>
+  <a href="#6-verify-exposure-dependent-metrics" class="md-nav__link">
+    6. Verify exposure-dependent metrics
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#7-choose-the-analysis-plugin" class="md-nav__link">
+    7. Choose the analysis plugin
   </a>
   
 </li>
@@ -1649,22 +1090,14 @@
       
         <li class="md-nav__item">
   <a href="#fast-sanity-checklist" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Fast sanity checklist
-      
-    </span>
+    Fast sanity checklist
   </a>
   
 </li>
       
         <li class="md-nav__item">
   <a href="#related-pages" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Related pages
-      
-    </span>
+    Related pages
   </a>
   
 </li>
@@ -1679,11 +1112,9 @@
           
           
             <div class="md-content" data-md-component="content">
-              
               <article class="md-content__inner md-typeset">
                 
                   
-
 
 
 <h1 id="quick-start">Quick Start<a class="headerlink" href="#quick-start" title="Permanent link">&para;</a></h1>
@@ -1692,65 +1123,89 @@
 <h2 id="recommended-session-flow">Recommended session flow<a class="headerlink" href="#recommended-session-flow" title="Permanent link">&para;</a></h2>
 <ol>
 <li>Launch the app and enable only the plugins required for the session.</li>
-<li>If you are preparing or selecting acquisitions inside a session rather than going straight to one dataset folder, open <strong>Session Manager</strong> first and load the intended acquisition into the main window.</li>
-<li>On <strong>Data</strong>, select the dataset folder and click <strong>Scan Folder</strong>.</li>
+<li>Choose the workflow profile and workspace root.</li>
+<li>Confirm the active node, breadcrumb, and scope chips in <strong>Workflow Explorer</strong>.</li>
+<li>If the filesystem layout is still being designed or repaired, stop and read <a href="workflow-structure.html">Workflow Structure and Required Folder Layout</a> before scanning.</li>
+<li>Use <strong>Metadata Inspector</strong> to confirm inherited and local metadata for the active node.</li>
+<li>On <strong>Data</strong>, confirm the dataset folder implied by the active node scope and click <strong>Scan Selected Scope</strong> if needed.</li>
 <li>If unwanted files were included, open <strong>Edit Skip Rules...</strong>, update the patterns, and rescan.</li>
 <li>Review the metadata table and choose the correct metadata source.</li>
-<li>If the dataset carries hierarchical JSON metadata or an eBUS snapshot, decide whether you need the <strong>Session Manager</strong>, <strong>Acquisition Datacard Wizard</strong>, or <strong>eBUS Config Tools</strong> before continuing.</li>
+<li>If the dataset carries hierarchical JSON metadata or an eBUS snapshot, decide whether you need <strong>Workflow Explorer -&gt; Structure</strong>, the <strong>Acquisition Datacard Wizard</strong>, <strong>eBUS Config Tools</strong>, or the <strong>Session Manager (Legacy)</strong> fallback before continuing.</li>
 <li>On <strong>Measure</strong>, choose the measurement mode that matches the comparison you want to make.</li>
 <li>Verify the preview, histogram, and measurement table before moving on.</li>
 <li>On <strong>Analyze</strong>, select the analysis plugin and configure the plot for the intended sweep or comparison.</li>
 </ol>
 <h2 id="minimal-decision-path">Minimal decision path<a class="headerlink" href="#minimal-decision-path" title="Permanent link">&para;</a></h2>
-<p>When time is limited, make these decisions in order:</p>
-<h3 id="1-confirm-the-metadata-source">1. Confirm the metadata source<a class="headerlink" href="#1-confirm-the-metadata-source" title="Permanent link">&para;</a></h3>
+<p>When time is limited, make these decisions in order.</p>
+<h3 id="1-confirm-the-workflow-profile-and-scope">1. Confirm the workflow profile and scope<a class="headerlink" href="#1-confirm-the-workflow-profile-and-scope" title="Permanent link">&para;</a></h3>
+<p>For most work, use the <strong>Calibration</strong> profile.</p>
+<p>Its intended logical hierarchy is:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>workspace -&gt; camera -&gt; campaign -&gt; session -&gt; acquisition
+</code></pre></div>
+<p>Use the <strong>Trials</strong> profile only when a trial-first layout is truly required. It is still experimental.</p>
+<p>Do not continue until you know whether you opened the full workspace or only a subtree such as one camera, campaign, session, or acquisition.</p>
+<h3 id="2-confirm-the-metadata-source">2. Confirm the metadata source<a class="headerlink" href="#2-confirm-the-metadata-source" title="Permanent link">&para;</a></h3>
 <p>Choose the source that most faithfully represents the acquisition:</p>
 <ul>
 <li><strong>Path</strong> when file names and folders already encode the experiment correctly</li>
-<li><strong>Acquisition JSON</strong> when the acquisition-root JSON path defines the authoritative metadata, including any inherited session or campaign defaults</li>
+<li><strong>Acquisition JSON</strong> when the acquisition-root JSON path defines the authoritative metadata, including any inherited session, campaign, or node-level values</li>
 </ul>
 <p>Do not continue to measurement until exposure, iris position, and grouping fields are correct in the Data table.</p>
-<h3 id="2-decide-whether-session-level-preparation-is-needed">2. Decide whether session-level preparation is needed<a class="headerlink" href="#2-decide-whether-session-level-preparation-is-needed" title="Permanent link">&para;</a></h3>
-<p>Use <strong>Session Manager</strong> when you need to:</p>
+<h3 id="3-decide-whether-structure-work-is-still-needed">3. Decide whether structure work is still needed<a class="headerlink" href="#3-decide-whether-structure-work-is-still-needed" title="Permanent link">&para;</a></h3>
+<p>Use <strong>Workflow Explorer</strong> first when you need to:</p>
 <ul>
+<li>change the active workspace scope</li>
+<li>move between workflow nodes</li>
+<li>inspect which node is currently driving Data, Measure, and Analyze</li>
+</ul>
+<p>Use <strong>Workflow Explorer -&gt; Structure</strong> when you need to:</p>
+<ul>
+<li>create or delete sessions</li>
 <li>create or delete acquisition folders inside one session</li>
 <li>normalize or reindex acquisition numbering</li>
 <li>rename acquisition labels</li>
+</ul>
+<p>Use <strong>Session Manager (Legacy)</strong> only when you specifically need to:</p>
+<ul>
 <li>copy one acquisition datacard to another acquisition</li>
 <li>toggle acquisition-local eBUS enable state before loading the dataset</li>
 </ul>
 <p>If the acquisition already exists and only its canonical metadata needs authoring, you can skip straight to the wizard.</p>
-<h3 id="3-decide-whether-acquisition-side-metadata-editing-is-needed">3. Decide whether acquisition-side metadata editing is needed<a class="headerlink" href="#3-decide-whether-acquisition-side-metadata-editing-is-needed" title="Permanent link">&para;</a></h3>
+<h3 id="4-decide-whether-metadata-editing-is-needed">4. Decide whether metadata editing is needed<a class="headerlink" href="#4-decide-whether-metadata-editing-is-needed" title="Permanent link">&para;</a></h3>
 <p>Use:</p>
 <ul>
+<li><strong>Metadata Inspector</strong> when you need to edit generic workflow-node metadata or understand inherited values</li>
 <li><strong>Acquisition Datacard Wizard</strong> when defaults, frame-targeted overrides, or canonical acquisition metadata must be authored or corrected</li>
 <li><strong>eBUS Config Tools</strong> when you need to inspect or compare <code>.pvcfg</code> snapshots before deciding whether a canonical app-side override is justified</li>
 </ul>
 <p>Do not open the wizard simply because an eBUS snapshot exists. Use it when a canonical acquisition record or approved app-side override is actually required.</p>
-<h3 id="4-choose-the-measurement-mode">4. Choose the measurement mode<a class="headerlink" href="#4-choose-the-measurement-mode" title="Permanent link">&para;</a></h3>
+<h3 id="5-choose-the-measurement-mode">5. Choose the measurement mode<a class="headerlink" href="#5-choose-the-measurement-mode" title="Permanent link">&para;</a></h3>
 <p>Use:</p>
 <ul>
 <li><strong>Top-K Mean</strong> for bright-feature tracking when the brightest region may move slightly</li>
 <li><strong>ROI Mean</strong> when the same spatial region must be compared across images</li>
 <li><strong>Disabled</strong> when you only need threshold-based metrics such as saturation inspection</li>
 </ul>
-<h3 id="5-verify-exposure-dependent-metrics">5. Verify exposure-dependent metrics<a class="headerlink" href="#5-verify-exposure-dependent-metrics" title="Permanent link">&para;</a></h3>
+<h3 id="6-verify-exposure-dependent-metrics">6. Verify exposure-dependent metrics<a class="headerlink" href="#6-verify-exposure-dependent-metrics" title="Permanent link">&para;</a></h3>
 <p>If later interpretation depends on <code>DN/ms</code>, verify that exposure metadata is present and numerically valid before leaving <strong>Data</strong>.</p>
-<h3 id="6-choose-the-analysis-plugin">6. Choose the analysis plugin<a class="headerlink" href="#6-choose-the-analysis-plugin" title="Permanent link">&para;</a></h3>
+<h3 id="7-choose-the-analysis-plugin">7. Choose the analysis plugin<a class="headerlink" href="#7-choose-the-analysis-plugin" title="Permanent link">&para;</a></h3>
 <p>On <strong>Analyze</strong>, use the plugin that matches the question being asked. In the current app, the primary built-in analysis plugin is <strong>Intensity Trend Explorer</strong>.</p>
 <h2 id="fast-sanity-checklist">Fast sanity checklist<a class="headerlink" href="#fast-sanity-checklist" title="Permanent link">&para;</a></h2>
 <p>Before trusting a result, confirm:</p>
 <ul>
-<li>the intended dataset root was scanned</li>
+<li>the intended workflow profile is loaded</li>
+<li>the intended dataset scope was scanned</li>
+<li>the folder structure matches the workflow you think you are using</li>
 <li>the correct metadata source is selected</li>
 <li>exposure and iris values are populated where required</li>
 <li>the chosen measurement mode matches the physical comparison</li>
-<li>any session-manager, datacard, or eBUS intervention was intentional rather than incidental</li>
+<li>any workflow-structure, legacy session-manager, datacard, or eBUS intervention was intentional rather than incidental</li>
 </ul>
 <h2 id="related-pages">Related pages<a class="headerlink" href="#related-pages" title="Permanent link">&para;</a></h2>
 <ul>
+<li><a href="workflow-structure.html">Workflow Structure and Required Folder Layout</a></li>
 <li><a href="data-workflow.html">Data Workflow</a></li>
-<li><a href="data/session-manager.html">Session Manager</a></li>
+<li><a href="data/session-manager.html">Session Manager (Legacy)</a></li>
 <li><a href="data/datacard-wizard.html">Datacard Wizard</a></li>
 <li><a href="data/ebus-config-tools.html">eBUS Config Tools</a></li>
 <li><a href="measure-workflow.html">Measure Workflow</a></li>
@@ -1761,72 +1216,59 @@
 
 
 
-
-
-
-
-
-
-
                 
               </article>
             </div>
           
           
-  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var tab,labels=set.querySelector(".tabbed-labels");for(tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
 
-<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
         </div>
         
-          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
-  Back to top
-</button>
+          <a href="#" class="md-top md-icon" data-md-component="top" hidden>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12Z"/></svg>
+            Back to top
+          </a>
         
       </main>
       
         <footer class="md-footer">
   
     
+    <nav class="md-footer__inner md-grid" aria-label="Footer" >
       
-      <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
-          
-          <a href="concepts-and-limits.html" class="md-footer__link md-footer__link--prev" aria-label="Previous: Concepts and Limits">
-            <div class="md-footer__button md-icon">
-              
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
-            </div>
-            <div class="md-footer__title">
+        <a href="concepts-and-limits.html" class="md-footer__link md-footer__link--prev" aria-label="Previous: Concepts and Limits" rel="prev">
+          <div class="md-footer__button md-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"/></svg>
+          </div>
+          <div class="md-footer__title">
+            <div class="md-ellipsis">
               <span class="md-footer__direction">
                 Previous
               </span>
-              <div class="md-ellipsis">
-                Concepts and Limits
-              </div>
+              Concepts and Limits
             </div>
-          </a>
+          </div>
+        </a>
+      
+      
         
-        
-          
-          <a href="plugins.html" class="md-footer__link md-footer__link--next" aria-label="Next: Plugin Guide">
-            <div class="md-footer__title">
+        <a href="workflow-structure.html" class="md-footer__link md-footer__link--next" aria-label="Next: Workflow Structure and Required Folder Layout" rel="next">
+          <div class="md-footer__title">
+            <div class="md-ellipsis">
               <span class="md-footer__direction">
                 Next
               </span>
-              <div class="md-ellipsis">
-                Plugin Guide
-              </div>
+              Workflow Structure and Required Folder Layout
             </div>
-            <div class="md-footer__button md-icon">
-              
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
-            </div>
-          </a>
-        
-      </nav>
-    
+          </div>
+          <div class="md-footer__button md-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11H4Z"/></svg>
+          </div>
+        </a>
+      
+    </nav>
   
   <div class="md-footer-meta md-typeset">
     <div class="md-footer-meta__inner md-grid">
@@ -1849,14 +1291,10 @@
       <div class="md-dialog__inner md-typeset"></div>
     </div>
     
+    <script id="__config" type="application/json">{"base": "..", "features": ["navigation.sections", "navigation.indexes", "navigation.top", "navigation.footer", "content.code.copy", "content.tabs.link", "search.highlight", "search.share", "toc.follow"], "search": "../assets/javascripts/workers/search.ecf98df9.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version.title": "Select version"}}</script>
     
     
-      
-      
-      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.indexes", "navigation.top", "navigation.footer", "content.code.copy", "content.tabs.link", "search.highlight", "search.share", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
-    
-    
-      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../assets/javascripts/bundle.39f04ddb.min.js"></script>
       
         <script src="../assets/javascripts/mathjax-config.js"></script>
       

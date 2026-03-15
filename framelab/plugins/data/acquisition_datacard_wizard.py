@@ -37,7 +37,7 @@ from ...ui_primitives import (
     build_page_header,
     build_summary_strip,
 )
-from ...window_drag import enable_window_content_drag
+from ...window_drag import configure_secondary_window
 
 
 @dataclass(slots=True)
@@ -108,6 +108,7 @@ class AcquisitionDatacardWizardDialog(qtw.QDialog):
     ) -> None:
         super().__init__(host_window)
         self.setWindowTitle("Acquisition Datacard Wizard")
+        configure_secondary_window(self, draggable=True)
         self.setModal(True)
         self.resize(1120, 760)
         self.setMinimumSize(980, 640)
@@ -1127,7 +1128,7 @@ class AcquisitionDatacardWizardDialog(qtw.QDialog):
                 self._set_field_editor_tooltip(editor, field_spec, "default")
 
     def _install_drag_filters(self) -> None:
-        enable_window_content_drag(self)
+        configure_secondary_window(self, draggable=True)
 
     def _review_widgets_ready(self) -> bool:
         return hasattr(self, "_review_json") and hasattr(
@@ -1650,7 +1651,7 @@ class AcquisitionDatacardWizardDialog(qtw.QDialog):
             for col_idx, value in enumerate(values):
                 item = qtw.QTableWidgetItem(value)
                 align = Qt.AlignCenter if col_idx in {0, 1} else Qt.AlignLeft
-                item.setTextAlignment(int(align | Qt.AlignVCenter))
+                item.setTextAlignment(align | Qt.AlignVCenter)
                 self._rows_table.setItem(row_idx, col_idx, item)
         self._rows_summary_label.setText(f"Editor rows: {len(self._row_entries)}")
         self._refresh_wizard_header_state()

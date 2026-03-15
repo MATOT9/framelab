@@ -14,12 +14,17 @@ from framelab.plugins.data.session_manager_ui_state import (
 )
 from framelab.session_manager import (
     add_acquisition,
+    create_session,
+    create_acquisition_batch,
+    delete_session,
     copy_acquisition_datacard,
     delete_acquisition,
     inspect_session,
     paste_acquisition_datacard,
+    preview_acquisition_batch,
     reindex_acquisitions,
     rename_acquisition_label,
+    resolve_campaign_sessions_root,
     set_acquisition_ebus_enabled,
 )
 
@@ -182,6 +187,46 @@ def test_detects_non_one_starting_number(session_harness: _SessionHarness) -> No
     assert index.numbering_valid
 
 
+def test_create_session_uses_nested_session_container_when_present(tmp_path: Path) -> None:
+    campaign_root = tmp_path / "campaign-2026"
+    sessions_root = campaign_root / "01_sessions"
+    sessions_root.mkdir(parents=True, exist_ok=True)
+
+    result = create_session(campaign_root, "2026-03-06__sess02")
+
+    created = sessions_root / "2026-03-06__sess02"
+    assert resolve_campaign_sessions_root(campaign_root) == sessions_root.resolve()
+    assert result.created_path == created
+    assert created.joinpath("session_datacard.json").is_file()
+    assert created.joinpath("acquisitions").is_dir()
+
+
+def test_create_session_falls_back_to_campaign_root_when_no_session_container_exists(
+    tmp_path: Path,
+) -> None:
+    campaign_root = tmp_path / "campaign-2026"
+    campaign_root.mkdir(parents=True, exist_ok=True)
+
+    result = create_session(campaign_root, "2026-03-06__sess02")
+
+    created = campaign_root / "2026-03-06__sess02"
+    assert resolve_campaign_sessions_root(campaign_root) == campaign_root.resolve()
+    assert result.created_path == created
+    assert created.joinpath("session_datacard.json").is_file()
+    assert created.joinpath("acquisitions").is_dir()
+
+
+def test_delete_session_removes_session_folder(tmp_path: Path) -> None:
+    campaign_root = tmp_path / "campaign-2026"
+    created = create_session(campaign_root, "2026-03-06__sess02").created_path
+    assert created is not None
+
+    result = delete_session(created)
+
+    assert result.deleted_paths == (created,)
+    assert not created.exists()
+
+
 def test_add_acquisition_preserves_detected_base(
     session_harness: _SessionHarness,
 ) -> None:
@@ -198,6 +243,55 @@ def test_add_acquisition_preserves_detected_base(
         "acq-0011__one",
         "acq-0012__two",
         "acq-0013__three",
+    ]
+
+
+def test_preview_acquisition_batch_reports_labels_and_collisions(
+    session_harness: _SessionHarness,
+) -> None:
+    session_harness.make_acquisition(11, label="one")
+    session_harness.make_acquisition(12, label="taken")
+
+    preview = preview_acquisition_batch(
+        session_harness.session_root,
+        count=3,
+        starting_number=12,
+        labels=("taken", "new-dark", None),
+    )
+
+    assert [entry.folder_name for entry in preview] == [
+        "acq-0012__taken",
+        "acq-0013__new-dark",
+        "acq-0014",
+    ]
+    assert preview[0].collision_exists
+    assert not preview[1].collision_exists
+    assert not preview[2].collision_exists
+
+
+def test_create_acquisition_batch_creates_multiple_folders(
+    session_harness: _SessionHarness,
+) -> None:
+    session_harness.make_acquisition(11, label="one")
+
+    result = create_acquisition_batch(
+        session_harness.session_root,
+        count=2,
+        labels=("dark", "bright"),
+    )
+
+    assert [path.name for path in result.created_paths] == [
+        "acq-0012__dark",
+        "acq-0013__bright",
+    ]
+    for created_path in result.created_paths:
+        assert created_path.joinpath("frames").is_dir()
+        assert created_path.joinpath("notes").is_dir()
+        assert created_path.joinpath("thumbs").is_dir()
+    assert [entry.folder_name for entry in inspect_session(session_harness.session_root).entries] == [
+        "acq-0011__one",
+        "acq-0012__dark",
+        "acq-0013__bright",
     ]
 
 

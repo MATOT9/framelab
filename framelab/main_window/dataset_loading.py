@@ -365,9 +365,15 @@ class DatasetLoadingMixin:
         """Load the dataset, compute static metrics, and refresh UI state."""
         metrics = self.metrics_state
         folder = Path(self.folder_edit.text().strip()).expanduser()
+        if hasattr(self, "_resolve_requested_dataset_scope_folder"):
+            folder = self._resolve_requested_dataset_scope_folder(folder)
         if not folder.is_dir():
             self._show_error("Invalid folder", "Choose a valid directory.")
             return
+        if hasattr(self, "_set_folder_edit_text"):
+            self._set_folder_edit_text(str(folder))
+        elif hasattr(self, "folder_edit"):
+            self.folder_edit.setText(str(folder))
 
         if hasattr(self, "metadata_filter_edit"):
             filter_text = self.metadata_filter_edit.text().strip()
@@ -414,6 +420,14 @@ class DatasetLoadingMixin:
             return
 
         self.dataset_state.set_loaded_dataset(folder, paths)
+        if getattr(self.dataset_state.scope_snapshot, "source", "manual") == "workflow":
+            if hasattr(self, "_sync_dataset_scope_to_workflow"):
+                self._sync_dataset_scope_to_workflow(
+                    update_folder_edit=False,
+                    unload_mismatched_dataset=False,
+                )
+        elif hasattr(self, "_set_manual_dataset_scope"):
+            self._set_manual_dataset_scope(folder)
         if hasattr(self, "_refresh_ebus_config_status"):
             self._refresh_ebus_config_status(folder)
         has_json_metadata = (
