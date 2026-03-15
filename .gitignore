@@ -11,7 +11,7 @@ EbusData
 archived
 
 # vscode
-# .vscode
+.vscode
 
 # Documentation build artifacts
 .docs_build/
