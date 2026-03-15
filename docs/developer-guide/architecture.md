@@ -51,9 +51,7 @@ This stage should remain lightweight. Do not import heavy plugin UI or dataset l
 
 ### 2. Manifest discovery before runtime import
 
-The app discovers plugin manifests before importing plugin implementation modules. This is a deliberate design choice.
-
-Why it matters:
+The app discovers plugin manifests before importing plugin implementation modules. This is a deliberate design choice. Why it matters:
 
 - the startup selector can list plugins without importing them
 - dependency closure can be resolved before the main window is created
@@ -75,18 +73,12 @@ At this point the app still has not built the main workflow window.
 
 ### 4. Workflow profile and workspace loading
 
-The workflow shell is profile-driven. The built-in profiles currently live in `framelab/workflow/profiles.py`.
-
-Current built-in profiles:
+The workflow shell is profile-driven. The built-in profiles currently live in `framelab/workflow/profiles.py`. Current built-in profiles:
 
 - `calibration`: `workspace -> camera -> campaign -> session -> acquisition`
 - `trials`: `workspace -> trial -> camera -> session -> acquisition`
 
-The trials profile exists, but it should still be treated as experimental in operator documentation.
-
-Typed hierarchy loading is owned by `WorkflowStateController` in `framelab/workflow/state.py`.
-
-Important architectural point:
+The trials profile exists, but it should still be treated as experimental in operator documentation. Typed hierarchy loading is owned by `WorkflowStateController` in `framelab/workflow/state.py`. Important architectural point:
 
 - the workflow tree is **not** loaded purely by folder depth
 - node type is inferred from the active profile, explicit anchor choice, nodecards, and filesystem heuristics
@@ -98,11 +90,7 @@ This means workflow behavior should be documented and maintained as a contract, 
 
 ### 5. Main window construction
 
-The enabled plugin set can include both page-embedded plugins and dialog-style tools such as Session Manager, eBUS compare/inspect helpers, or Background Correction. The host window must therefore support both permanent page contributions and transient runtime actions from the same plugin system.
-
-`FrameLabWindow` in `framelab/window.py` is then constructed with the enabled plugin ids.
-
-During initialization it:
+The enabled plugin set can include both page-embedded plugins and dialog-style tools such as Session Manager, eBUS compare/inspect helpers, or Background Correction. The host window must therefore support both permanent page contributions and transient runtime actions from the same plugin system. `FrameLabWindow` in `framelab/window.py` is then constructed with the enabled plugin ids. During initialization it:
 
 - resolves the enabled plugin set again for safety
 - groups enabled manifests by page
@@ -148,11 +136,7 @@ A folder looks like an acquisition when either of the following is true:
 
 ### Session-management strictness
 
-Session-management operations are intentionally stricter than workflow loading.
-
-They only manage acquisition folders matching the acquisition naming contract parsed by `framelab/acquisition_datacard.py`.
-
-That distinction is intentional:
+Session-management operations are intentionally stricter than workflow loading. They only manage acquisition folders matching the acquisition naming contract parsed by `framelab/acquisition_datacard.py`. That distinction is intentional:
 
 - workflow loading tries to stay tolerant enough to open existing data
 - structure-authoring tools try to keep the filesystem normalized and predictable
@@ -186,9 +170,7 @@ Dataset discovery and image loading helpers live primarily in `framelab/main_win
 
 ### Stage 2: metadata resolution
 
-For each discovered image, metadata is resolved through `framelab/metadata.py`.
-
-This stage can combine:
+For each discovered image, metadata is resolved through `framelab/metadata.py`. This stage can combine:
 
 - path-derived metadata
 - workflow nodecards from `.framelab/nodecard.json`
@@ -214,9 +196,7 @@ These results are stored through `MetricsPipelineController`. Dynamic metric com
 
 ### Stage 4: analysis context build
 
-The Analyze workflow does not re-measure images. It packages the current dataset and metric controller state into an `AnalysisContext` through `framelab/analysis_context.py`.
-
-That context is built from:
+The Analyze workflow does not re-measure images. It packages the current dataset and metric controller state into an `AnalysisContext` through `framelab/analysis_context.py`. That context is built from:
 
 - measurement-mode-dependent mean/std/SEM values
 - per-row metadata

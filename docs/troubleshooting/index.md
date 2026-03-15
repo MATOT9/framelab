@@ -17,9 +17,7 @@ Work in the following order:
 
 ### 1. Workflow profile, hierarchy, and scope problems
 
-Use this branch when the wrong part of the filesystem was opened or when the workflow tree itself looks wrong.
-
-Typical symptoms:
+Use this branch when the wrong part of the filesystem was opened or when the workflow tree itself looks wrong. Typical symptoms:
 
 - the loaded tree is missing sessions or acquisitions
 - the selected folder opened as the wrong logical node type
@@ -42,9 +40,7 @@ See:
 
 ### 2. Dataset intake and scan failures
 
-Use this branch when the dataset does not scan as expected or when the row count is clearly wrong.
-
-Typical symptoms:
+Use this branch when the dataset does not scan as expected or when the row count is clearly wrong. Typical symptoms:
 
 - no TIFF files appear after scan
 - too few or too many files are loaded
@@ -66,9 +62,7 @@ See:
 
 ### 3. Metadata, datacard, and eBUS resolution problems
 
-Use this branch when images load but exposure, iris position, grouping, or frame-linked metadata are missing or suspicious.
-
-Typical symptoms:
+Use this branch when images load but exposure, iris position, grouping, or frame-linked metadata are missing or suspicious. Typical symptoms:
 
 - exposure or iris columns are blank
 - JSON-backed metadata is missing even though a datacard exists
@@ -99,9 +93,7 @@ See:
 
 ### 4. Measurement-stage problems
 
-Use this branch when the dataset scans correctly, but the numeric metrics look wrong, unstable, blank, or physically implausible.
-
-Typical symptoms:
+Use this branch when the dataset scans correctly, but the numeric metrics look wrong, unstable, blank, or physically implausible. Typical symptoms:
 
 - `DN/ms` is blank or appears only for some rows
 - ROI metrics remain empty
@@ -126,9 +118,7 @@ See:
 
 ### 5. Analysis and plugin-loading problems
 
-Use this branch when analysis controls, plots, or plugin-specific actions are missing or inconsistent.
-
-Typical symptoms:
+Use this branch when analysis controls, plots, or plugin-specific actions are missing or inconsistent. Typical symptoms:
 
 - the **Analyze** tab is absent
 - an expected plugin is missing from the selector
@@ -152,9 +142,7 @@ See:
 
 ### 6. Offline help and documentation packaging problems
 
-Use this branch when the app launches, but the Help system opens stale content, directory listings, or missing-page fallbacks.
-
-Typical symptoms:
+Use this branch when the app launches, but the Help system opens stale content, directory listings, or missing-page fallbacks. Typical symptoms:
 
 - Help opens a directory listing instead of a page
 - Help content is missing or outdated after doc edits
@@ -189,9 +177,7 @@ See:
 
 ## Escalation rule
 
-Do not jump directly into code changes unless the failure has already been localized.
-
-Use this rule of thumb:
+Do not jump directly into code changes unless the failure has already been localized. Use this rule of thumb:
 
 - if the problem is visible during ordinary use, start in the **User Guide**
 - if the problem is about file locations, schema keys, or manifests, continue to **Reference**

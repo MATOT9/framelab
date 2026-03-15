@@ -1,8 +1,6 @@
 # Session Manager (Legacy)
 
-Use **Session Manager (Legacy)** only when you need the remaining session-side actions that are not yet workflow-native.
-
-For day-to-day structure work, prefer **Workflow Explorer -> Structure** from the selected session or campaign node. The workflow shell is now the primary place for:
+Use **Session Manager (Legacy)** only when you need the remaining session-side actions that are not yet workflow-native. For day-to-day structure work, prefer **Workflow Explorer -> Structure** from the selected session or campaign node. The workflow shell is now the primary place for:
 
 - creating sessions
 - deleting sessions
@@ -30,17 +28,11 @@ Use **Session Manager (Legacy)** to:
 
 ## Where this fits in the current workflow
 
-Use the workflow shell first.
-
-Use **Session Manager (Legacy)** only after the folder hierarchy already exists and you specifically need one of the remaining legacy-only actions.
-
-If you are still deciding how sessions and acquisitions should be laid out on disk, read [Workflow Structure and Required Folder Layout](../workflow-structure.md) first.
+Use the workflow shell first. Use **Session Manager (Legacy)** only after the folder hierarchy already exists and you specifically need one of the remaining legacy-only actions. If you are still deciding how sessions and acquisitions should be laid out on disk, read [Workflow Structure and Required Folder Layout](../workflow-structure.md) first.
 
 ## Session structure expected by the tool
 
-The Session Manager (Legacy) looks for a **session root** and then resolves the **acquisitions root** from `session_datacard.json`.
-
-Current behavior:
+The Session Manager (Legacy) looks for a **session root** and then resolves the **acquisitions root** from `session_datacard.json`. Current behavior:
 
 - if `session_datacard.json.paths.acquisitions_root_rel` is present and non-empty, that relative path is used
 - otherwise the default acquisitions root is `session_root/acquisitions`
@@ -67,9 +59,7 @@ A reliable operating sequence is:
 
 ## Understanding the acquisition table
 
-The table summarizes one row per managed acquisition.
-
-Current columns are:
+The table summarizes one row per managed acquisition. Current columns are:
 
 - **Number** — parsed acquisition number from the folder name
 - **Name** — label suffix, if present
@@ -87,9 +77,7 @@ The Session Manager is intentionally conservative about structural edits.
 
 ### Valid numbering
 
-A session is considered numbering-valid when the managed acquisitions are contiguous from the detected starting number.
-
-Example of valid numbering:
+A session is considered numbering-valid when the managed acquisitions are contiguous from the detected starting number. Example of valid numbering:
 
 ```text
 acq-0011__one
@@ -99,9 +87,7 @@ acq-0013__three
 
 ### Invalid numbering
 
-A session becomes numbering-invalid when there is a gap or other non-contiguous sequence.
-
-Example:
+A session becomes numbering-invalid when there is a gap or other non-contiguous sequence. Example:
 
 ```text
 acq-0011__one
@@ -121,15 +107,11 @@ This is intentional. The tool does not silently guess how structural edits shoul
 
 ### Load Selected
 
-Loads the selected acquisition into the main window by writing its path into the host dataset field and triggering a full dataset load.
-
-Use this when you want Session Manager to act as the acquisition chooser for the rest of the app.
+Loads the selected acquisition into the main window by writing its path into the host dataset field and triggering a full dataset load. Use this when you want Session Manager to act as the acquisition chooser for the rest of the app.
 
 ### Add Acquisition
 
-Creates a new acquisition folder at the end of the current contiguous sequence.
-
-Current behavior:
+Creates a new acquisition folder at the end of the current contiguous sequence. Current behavior:
 
 - the new folder is named from the detected or requested starting number and label
 - standard child folders `frames`, `notes`, and `thumbs` are created
@@ -137,33 +119,23 @@ Current behavior:
 
 ### Rename
 
-Changes only the label suffix of the selected acquisition folder while preserving its acquisition number.
-
-If the acquisition already has a datacard, the datacard is normalized so that identity and path fields remain consistent with the new folder name.
+Changes only the label suffix of the selected acquisition folder while preserving its acquisition number. If the acquisition already has a datacard, the datacard is normalized so that identity and path fields remain consistent with the new folder name.
 
 ### Delete Acquisition
 
-Deletes the selected acquisition folder and then renumbers later acquisitions contiguously to close the gap.
-
-Use this cautiously. It is a structural edit, not only a metadata edit.
+Deletes the selected acquisition folder and then renumbers later acquisitions contiguously to close the gap. Use this cautiously. It is a structural edit, not only a metadata edit.
 
 ### Normalize/Reindex
 
-Renumbers all managed acquisitions contiguously from the chosen starting number.
-
-This is the recovery operation for sessions whose numbering is not contiguous.
+Renumbers all managed acquisitions contiguously from the chosen starting number. This is the recovery operation for sessions whose numbering is not contiguous.
 
 ### Edit Datacard
 
-Opens the **Acquisition Datacard Wizard** directly on the selected acquisition.
-
-This works because **Session Manager** depends on the datacard wizard plugin.
+Opens the **Acquisition Datacard Wizard** directly on the selected acquisition. This works because **Session Manager** depends on the datacard wizard plugin.
 
 ### Copy Datacard / Paste Datacard
 
-Copies one acquisition datacard into an in-memory clipboard and pastes a normalized version onto another acquisition.
-
-Important current behavior:
+Copies one acquisition datacard into an in-memory clipboard and pastes a normalized version onto another acquisition. Important current behavior:
 
 - the pasted payload is normalized for the destination acquisition folder name
 - acquisition identity and path fields are rewritten for the target
@@ -174,11 +146,7 @@ Treat paste as a controlled reuse tool, not as a blind file copy.
 
 ### Toggle eBUS
 
-Toggles `external_sources.ebus.enabled` for the selected acquisition.
-
-This action is available only when the **eBUS Config Tools** plugin is also enabled.
-
-Use it when the acquisition should explicitly opt in or out of using the discoverable root-level eBUS snapshot as part of effective metadata resolution.
+Toggles `external_sources.ebus.enabled` for the selected acquisition. This action is available only when the **eBUS Config Tools** plugin is also enabled. Use it when the acquisition should explicitly opt in or out of using the discoverable root-level eBUS snapshot as part of effective metadata resolution.
 
 ## Relationship to the rest of the app
 

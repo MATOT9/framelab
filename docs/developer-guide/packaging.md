@@ -1,8 +1,6 @@
 # Packaging
 
-Packaging for FrameLab is more than building a Python executable. A working distribution depends on code, manifests, runtime assets, local-config behavior, and a current offline-help bundle.
-
-This page documents what must ship, what is generated locally, and what to verify before release.
+Packaging for FrameLab is more than building a Python executable. A working distribution depends on code, manifests, runtime assets, local-config behavior, and a current offline-help bundle. This page documents what must ship, what is generated locally, and what to verify before release.
 
 ## Packaging goals
 
@@ -102,9 +100,7 @@ These are created or updated on the target machine:
 
 ## Offline documentation packaging
 
-The offline-help model is a deliberate packaging choice.
-
-Source chain:
+The offline-help model is a deliberate packaging choice. Source chain:
 
 ```text
 docs/*.md

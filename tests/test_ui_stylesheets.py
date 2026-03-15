@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from framelab.ui_density import compact_density_tokens, comfortable_density_tokens
-from stylesheets import build_dark_theme, build_light_theme
+from framelab.stylesheets import build_dark_theme, build_light_theme
 
 
 pytestmark = [pytest.mark.fast, pytest.mark.core]

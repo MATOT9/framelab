@@ -1,8 +1,6 @@
 # Plugin Guide
 
-Plugins extend the app by adding workflow actions, embedded UI, or analysis capabilities without forcing every feature into the base window.
-
-Use this page to understand what plugins are allowed to change, when they are loaded, and where their detailed user documentation lives.
+Plugins extend the app by adding workflow actions, embedded UI, or analysis capabilities without forcing every feature into the base window. Use this page to understand what plugins are allowed to change, when they are loaded, and where their detailed user documentation lives.
 
 ## Plugin roles in the current app
 
@@ -46,9 +44,7 @@ These are separate concepts.
 
 ### Startup loading
 
-The startup selector determines which plugins are part of the session at all.
-
-If a plugin is not enabled at startup:
+The startup selector determines which plugins are part of the session at all. If a plugin is not enabled at startup:
 
 - its entrypoint is not imported
 - its runtime actions are not registered
@@ -77,9 +73,7 @@ After startup, loaded plugins expose whatever UI they own:
 
 ## Where to find plugin-specific instructions
 
-This page is the generic overview. Detailed usage belongs to the pages that match the plugin's workflow.
-
-Current plugin-specific user pages:
+This page is the generic overview. Detailed usage belongs to the pages that match the plugin's workflow. Current plugin-specific user pages:
 
 - [Session Manager (Legacy)](data/session-manager.md)
 - [Datacard Wizard](data/datacard-wizard.md)

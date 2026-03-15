@@ -1,10 +1,6 @@
 # eBUS Config Tools
 
-Use **eBUS Config Tools** when an acquisition carries a readable eBUS Player `.pvcfg` snapshot and you need to inspect the raw snapshot, compare sources, or decide whether an app-side canonical override is justified.
-
-This plugin does **not** replace the datacard wizard. It complements it.
-
-The current plugin provides three workflows:
+Use **eBUS Config Tools** when an acquisition carries a readable eBUS Player `.pvcfg` snapshot and you need to inspect the raw snapshot, compare sources, or decide whether an app-side canonical override is justified. This plugin does **not** replace the datacard wizard. It complements it. The current plugin provides three workflows:
 
 - inspect one standalone `.pvcfg` file
 - compare multiple sources in **raw** or **effective** mode
@@ -31,9 +27,7 @@ Operationally, this means:
 
 ## Inspect one raw `.pvcfg`
 
-Use **Inspect eBUS Config File...** when you need a read-only view of a saved eBUS snapshot.
-
-The inspect dialog shows:
+Use **Inspect eBUS Config File...** when you need a read-only view of a saved eBUS snapshot. The inspect dialog shows:
 
 - grouped sections such as `device`, `device.communication`, `stream`, and `context`
 - raw values as saved in the file
@@ -46,9 +40,7 @@ Use this dialog to verify what the camera or eBUS software actually recorded bef
 
 ## Compare dialog overview
 
-Use **Compare eBUS Configs...** when you need to compare several sources.
-
-The compare dialog maintains a transient source list for the current session.
+Use **Compare eBUS Configs...** when you need to compare several sources. The compare dialog maintains a transient source list for the current session.
 
 ### Ways to add sources
 
@@ -105,9 +97,7 @@ Use these controls to move between broad forensic inspection and narrow engineer
 
 ## Interaction with the Datacard Wizard
 
-When an acquisition has a readable root-level eBUS snapshot, some canonical datacard fields can become **eBUS-managed**.
-
-Current behavior:
+When an acquisition has a readable root-level eBUS snapshot, some canonical datacard fields can become **eBUS-managed**. Current behavior:
 
 - those fields remain visible in the wizard
 - non-overridable fields become read-only

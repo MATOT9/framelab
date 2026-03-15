@@ -1395,11 +1395,9 @@
 <p>Location:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>framelab/session_manager.py
 </code></pre></div>
-<p>This layer is not a second datacard authoring system. It is a structural helper that normalizes acquisition payloads when folders are renamed, reindexed, copied, or pasted across acquisitions.</p>
-<p>Treat it as the bridge between folder-level session operations and stable datacard identity/path contracts.</p>
+<p>This layer is not a second datacard authoring system. It is a structural helper that normalizes acquisition payloads when folders are renamed, reindexed, copied, or pasted across acquisitions. Treat it as the bridge between folder-level session operations and stable datacard identity/path contracts.</p>
 <h2 id="metadata-hierarchy">Metadata hierarchy<a class="headerlink" href="#metadata-hierarchy" title="Permanent link">&para;</a></h2>
-<p>The runtime JSON metadata path is broader than one acquisition file.</p>
-<p>Current layering order in <code>metadata.py</code> is:</p>
+<p>The runtime JSON metadata path is broader than one acquisition file. Current layering order in <code>metadata.py</code> is:</p>
 <ol>
 <li>campaign defaults and instrument defaults from <code>campaign_datacard.json</code></li>
 <li>session defaults from <code>session_datacard.json</code></li>
@@ -1413,8 +1411,7 @@
 <h3 id="defaults">Defaults<a class="headerlink" href="#defaults" title="Permanent link">&para;</a></h3>
 <p><code>defaults</code> define the acquisition-level baseline metadata.</p>
 <h3 id="overrides">Overrides<a class="headerlink" href="#overrides" title="Permanent link">&para;</a></h3>
-<p><code>overrides</code> provide frame-targeted replacement values layered on top of the inherited baseline.</p>
-<p>Each serialized override row currently has this shape:</p>
+<p><code>overrides</code> provide frame-targeted replacement values layered on top of the inherited baseline. Each serialized override row currently has this shape:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="p">{</span>
 <a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nt">&quot;selector&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;frame_range&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">9</span><span class="p">]},</span>
 <a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span><span class="nt">&quot;changes&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;camera_settings&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;exposure_us&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">5000</span><span class="p">}},</span>
@@ -1440,8 +1437,7 @@
 <li>marked <code>ebus_managed</code></li>
 <li>backed by one readable acquisition-root <code>.pvcfg</code> snapshot</li>
 </ul>
-<p>When that is true, the canonical field's acquisition-wide baseline is derived through the eBUS integration path rather than ordinary acquisition defaults alone.</p>
-<p>Current consequences:</p>
+<p>When that is true, the canonical field's acquisition-wide baseline is derived through the eBUS integration path rather than ordinary acquisition defaults alone. Current consequences:</p>
 <ul>
 <li>the field may appear read-only or editable in the wizard depending on catalog policy</li>
 <li>frame-targeted override generation excludes those fields</li>
@@ -1449,8 +1445,7 @@
 </ul>
 <p>This keeps acquisition-wide eBUS state from competing silently with ordinary frame-targeted override semantics.</p>
 <h2 id="frame-indexing-and-selector-normalization">Frame indexing and selector normalization<a class="headerlink" href="#frame-indexing-and-selector-normalization" title="Permanent link">&para;</a></h2>
-<p>Frame-targeted overrides are meaningful only if selector semantics match the actual acquisition frame list.</p>
-<p>Current responsibilities:</p>
+<p>Frame-targeted overrides are meaningful only if selector semantics match the actual acquisition frame list. Current responsibilities:</p>
 <ul>
 <li><code>frame_indexing.py</code> resolves frame indices from the configured frames directory</li>
 <li><code>acquisition_datacard.py</code> normalizes override selectors to zero-based indices</li>
@@ -1462,8 +1457,7 @@
 <h3 id="rename-and-reindex">Rename and reindex<a class="headerlink" href="#rename-and-reindex" title="Permanent link">&para;</a></h3>
 <p>When acquisition folders are renamed or renumbered, the helper rewrites normalized datacard identity and path fields so the payload remains self-consistent with the new folder name.</p>
 <h3 id="copy-and-paste">Copy and paste<a class="headerlink" href="#copy-and-paste" title="Permanent link">&para;</a></h3>
-<p>Copy/paste behaves as structured reuse, not as raw file duplication.</p>
-<p>Current behavior:</p>
+<p>Copy/paste behaves as structured reuse, not as raw file duplication. Current behavior:</p>
 <ul>
 <li>destination acquisition identity and label are normalized to the target folder</li>
 <li>path strings containing the old acquisition folder name are rewritten</li>
@@ -1474,8 +1468,7 @@
 <h3 id="ebus-enable-toggling">eBUS enable toggling<a class="headerlink" href="#ebus-enable-toggling" title="Permanent link">&para;</a></h3>
 <p>Session Manager persists <code>external_sources.ebus.enabled</code> at the acquisition level. That flag affects whether the acquisition is considered eBUS-enabled when later loaded through the normal dataset path.</p>
 <h2 id="validation-and-serialization-rules">Validation and serialization rules<a class="headerlink" href="#validation-and-serialization-rules" title="Permanent link">&para;</a></h2>
-<p>The datacard service layer remains the authoritative validator.</p>
-<p>Important current rules:</p>
+<p>The datacard service layer remains the authoritative validator. Important current rules:</p>
 <ul>
 <li>unknown mapped fields should not survive as trusted typed entries</li>
 <li>field values must satisfy type and enum expectations from the mapping</li>

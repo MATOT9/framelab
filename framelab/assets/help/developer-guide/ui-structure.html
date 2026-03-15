@@ -1420,8 +1420,7 @@
 <h1 id="ui-structure">UI Structure<a class="headerlink" href="#ui-structure" title="Permanent link">&para;</a></h1>
 <p>The FrameLab UI is intentionally split into a host shell plus page-specific mixins and plugin-owned widgets. The goal is not just file organization. The split reflects ownership boundaries: the host owns workflow state and shell behavior, while plugins own plugin-local UI and interpretation logic.</p>
 <h2 id="structural-overview">Structural overview<a class="headerlink" href="#structural-overview" title="Permanent link">&para;</a></h2>
-<p>The top-level host class is <code>FrameLabWindow</code> in <code>framelab/window.py</code>.</p>
-<p>It is assembled from mixins under <code>framelab/main_window/</code>:</p>
+<p>The top-level host class is <code>FrameLabWindow</code> in <code>framelab/window.py</code>. It is assembled from mixins under <code>framelab/main_window/</code>:</p>
 <ul>
 <li><code>WindowChromeMixin</code></li>
 <li><code>DataPageMixin</code></li>
@@ -1433,8 +1432,7 @@
 </ul>
 <p>This is the primary UI organization rule of the repo. If new UI behavior fits an existing workflow responsibility, add it to the owning mixin rather than expanding <code>window.py</code> indiscriminately.</p>
 <h2 id="host-window-responsibilities">Host window responsibilities<a class="headerlink" href="#host-window-responsibilities" title="Permanent link">&para;</a></h2>
-<p><code>FrameLabWindow</code> is the UI host and shared-state owner.</p>
-<p>It is responsible for:</p>
+<p><code>FrameLabWindow</code> is the UI host and shared-state owner. It is responsible for:</p>
 <ul>
 <li>window identity, size, and session-level defaults</li>
 <li>workflow selection, active-node tracking, and workflow breadcrumb state</li>
@@ -1453,15 +1451,13 @@
 <li><strong>Measure</strong></li>
 <li><strong>Analyze</strong></li>
 </ol>
-<p>The Analyze tab is conditional. It is only shown when at least one analysis plugin has been loaded.</p>
-<p>Around those tabs, the shell now also owns:</p>
+<p>The Analyze tab is conditional. It is only shown when at least one analysis plugin has been loaded. Around those tabs, the shell now also owns:</p>
 <ul>
 <li>a compact workflow breadcrumb/path bar above the tabs</li>
 <li>a left <strong>Workflow Explorer</strong> dock for active-node selection and session-structure authoring</li>
 <li>a right <strong>Metadata Inspector</strong> dock for node-metadata editing and provenance review</li>
 </ul>
-<p>The explorer intentionally carries a small active-lineage rail so the current path reads as structure, not just as another badge row. The metadata inspector keeps provenance compact through source badges plus a source-node column instead of large explanation-heavy panels.</p>
-<p>This is an important UI policy detail: tab visibility is partly derived from plugin availability, not only from hard-coded shell structure.</p>
+<p>The explorer intentionally carries a small active-lineage rail so the current path reads as structure, not just as another badge row. The metadata inspector keeps provenance compact through source badges plus a source-node column instead of large explanation-heavy panels. This is an important UI policy detail: tab visibility is partly derived from plugin availability, not only from hard-coded shell structure.</p>
 <h2 id="mixin-responsibilities">Mixin responsibilities<a class="headerlink" href="#mixin-responsibilities" title="Permanent link">&para;</a></h2>
 <h3 id="windowchromemixin"><code>WindowChromeMixin</code><a class="headerlink" href="#windowchromemixin" title="Permanent link">&para;</a></h3>
 <p>This mixin owns shell-level UI concerns:</p>
@@ -1478,16 +1474,14 @@
 </ul>
 <p>If a feature changes app-wide chrome rather than page-local workflow behavior, it belongs here.</p>
 <h3 id="datapagemixin"><code>DataPageMixin</code><a class="headerlink" href="#datapagemixin" title="Permanent link">&para;</a></h3>
-<p>This mixin owns Data-tab widgets and interactions, including metadata controls and the data table.</p>
-<p>Use it for:</p>
+<p>This mixin owns Data-tab widgets and interactions, including metadata controls and the data table. Use it for:</p>
 <ul>
 <li>controls that affect how rows are grouped or inspected in the Data stage</li>
 <li>Data-page widget layout and signals</li>
 <li>Data-page-only interactions that do not require scan or cache internals</li>
 </ul>
 <h3 id="datasetloadingmixin"><code>DatasetLoadingMixin</code><a class="headerlink" href="#datasetloadingmixin" title="Permanent link">&para;</a></h3>
-<p>This mixin owns dataset lifecycle operations and image access helpers.</p>
-<p>Use it for:</p>
+<p>This mixin owns dataset lifecycle operations and image access helpers. Use it for:</p>
 <ul>
 <li>browse/open folder flow</li>
 <li>recursive TIFF discovery</li>
@@ -1498,8 +1492,7 @@
 </ul>
 <p>This mixin is the correct place for scan and cache behavior, even when those operations are triggered from the Data or Measure pages.</p>
 <h3 id="inspectpagemixin"><code>InspectPageMixin</code><a class="headerlink" href="#inspectpagemixin" title="Permanent link">&para;</a></h3>
-<p>This mixin owns Measure-tab UI layout and user interactions.</p>
-<p>Use it for:</p>
+<p>This mixin owns Measure-tab UI layout and user interactions. Use it for:</p>
 <ul>
 <li>threshold controls</li>
 <li>average-mode controls</li>
@@ -1509,8 +1502,7 @@
 <li>Measure-page labels and state presentation</li>
 </ul>
 <h3 id="metricsruntimemixin"><code>MetricsRuntimeMixin</code><a class="headerlink" href="#metricsruntimemixin" title="Permanent link">&para;</a></h3>
-<p>This mixin owns asynchronous metric job orchestration.</p>
-<p>Use it for:</p>
+<p>This mixin owns asynchronous metric job orchestration. Use it for:</p>
 <ul>
 <li>starting and cancelling background metric jobs</li>
 <li>applying worker results back to host state</li>
@@ -1519,8 +1511,7 @@
 </ul>
 <p>This separation matters because measurement runtime is not only widget behavior; it is host-state mutation coordinated with workers.</p>
 <h3 id="analysispagemixin"><code>AnalysisPageMixin</code><a class="headerlink" href="#analysispagemixin" title="Permanent link">&para;</a></h3>
-<p>This mixin owns analysis plugin hosting.</p>
-<p>Use it for:</p>
+<p>This mixin owns analysis plugin hosting. Use it for:</p>
 <ul>
 <li>analysis plugin instantiation</li>
 <li>side-rail and workspace stacked-widget hosting</li>
@@ -1530,13 +1521,11 @@
 </ul>
 <p>A practical maintenance note: some internal variable names still use <code>profile</code> for historical reasons, but the user-facing concept is an <strong>analysis plugin</strong>, not a saved analysis profile.</p>
 <h3 id="windowactionsmixin"><code>WindowActionsMixin</code><a class="headerlink" href="#windowactionsmixin" title="Permanent link">&para;</a></h3>
-<p>This mixin owns menu or shell actions that do not fit entirely inside a single page-layout mixin.</p>
-<p>Typical examples include ROI save/load and table export behavior.</p>
+<p>This mixin owns menu or shell actions that do not fit entirely inside a single page-layout mixin. Typical examples include ROI save/load and table export behavior.</p>
 <h2 id="shared-state-model">Shared-state model<a class="headerlink" href="#shared-state-model" title="Permanent link">&para;</a></h2>
 <p>The UI is modular in file layout, but the session model is still centralized.</p>
 <h3 id="important-rule">Important rule<a class="headerlink" href="#important-rule" title="Permanent link">&para;</a></h3>
-<p>The host window is the source of truth for shared workflow state.</p>
-<p>This includes:</p>
+<p>The host window is the source of truth for shared workflow state. This includes:</p>
 <ul>
 <li>workflow workspace/profile/active-node state</li>
 <li>metadata inspector / workflow explorer visibility state</li>
@@ -1551,15 +1540,13 @@
 </ul>
 <p>Mixins operate on that shared state. They are not independent widgets with isolated data models.</p>
 <h3 id="why-this-matters">Why this matters<a class="headerlink" href="#why-this-matters" title="Permanent link">&para;</a></h3>
-<p>When refactoring, do not mistake file separation for state separation. Moving a method between mixins is easy. Moving state ownership away from the host is an architectural change.</p>
-<p>Two examples added by the workflow refactor are:</p>
+<p>When refactoring, do not mistake file separation for state separation. Moving a method between mixins is easy. Moving state ownership away from the host is an architectural change. Two examples added by the workflow refactor are:</p>
 <ul>
 <li><code>workflow_state_controller</code> for typed node hierarchy, active-node selection, and profile context</li>
 <li><code>metadata_state_controller</code> for nodecard loading, schema/governance resolution, templates, and effective metadata validation</li>
 </ul>
 <h2 id="dynamic-visibility-policy">Dynamic visibility policy<a class="headerlink" href="#dynamic-visibility-policy" title="Permanent link">&para;</a></h2>
-<p>The host UI includes a real policy layer for what is shown.</p>
-<p>Examples:</p>
+<p>The host UI includes a real policy layer for what is shown. Examples:</p>
 <ul>
 <li>the Analyze tab only appears when analysis plugins exist</li>
 <li>plugin UI capabilities can request additional data or measurement columns</li>
@@ -1586,8 +1573,7 @@
 <li>optional plugin-local menu actions inside the host-provided plugin menu</li>
 </ul>
 <h3 id="boundary-rule">Boundary rule<a class="headerlink" href="#boundary-rule" title="Permanent link">&para;</a></h3>
-<p>Plugins should consume host-provided context and UI hooks. They should not silently become alternate owners of dataset state, shell structure, or cross-page UI policy.</p>
-<p>For analysis plugins, prefer the split host API when the plugin has a natural control surface and a natural workspace surface:</p>
+<p>Plugins should consume host-provided context and UI hooks. They should not silently become alternate owners of dataset state, shell structure, or cross-page UI policy. For analysis plugins, prefer the split host API when the plugin has a natural control surface and a natural workspace surface:</p>
 <ul>
 <li><code>create_controls_widget(parent)</code></li>
 <li><code>create_workspace_widget(parent)</code></li>
@@ -1606,8 +1592,7 @@
 </ol>
 <p>Avoid direct widget access from worker code.</p>
 <h2 id="help-integration">Help integration<a class="headerlink" href="#help-integration" title="Permanent link">&para;</a></h2>
-<p>The UI deliberately avoids embedding long-form help inside Qt widgets.</p>
-<p>Instead:</p>
+<p>The UI deliberately avoids embedding long-form help inside Qt widgets. Instead:</p>
 <ul>
 <li>Help menu actions call <code>framelab/help_docs.py</code></li>
 <li>help pages are resolved to local HTML files under <code>framelab/assets/help/</code></li>

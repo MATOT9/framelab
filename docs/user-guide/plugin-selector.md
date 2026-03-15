@@ -1,14 +1,10 @@
 # Plugin Selector
 
-The startup plugin selector defines which plugins are loaded for the current session.
-
-This step is operationally important. It affects which menus, pages, and analysis tools exist after launch.
+The startup plugin selector defines which plugins are loaded for the current session. This step is operationally important. It affects which menus, pages, and analysis tools exist after launch.
 
 ## Purpose
 
-Use the selector to build a session that contains exactly the workflows you need.
-
-A smaller plugin set usually means:
+Use the selector to build a session that contains exactly the workflows you need. A smaller plugin set usually means:
 
 - lower startup overhead
 - fewer runtime actions in the **Plugins** menu
@@ -46,15 +42,11 @@ Each row shows:
 
 ### Enabling a plugin
 
-When you enable a plugin, the selector checks whether other plugins are required for that plugin to work.
-
-If dependencies are missing, they are enabled automatically so the final selection remains valid.
+When you enable a plugin, the selector checks whether other plugins are required for that plugin to work. If dependencies are missing, they are enabled automatically so the final selection remains valid.
 
 ### Disabling a plugin
 
-When you disable a plugin, the selector checks whether any enabled plugin depends on it.
-
-If so, dependent plugins are also disabled. This prevents invalid plugin combinations from reaching the main window.
+When you disable a plugin, the selector checks whether any enabled plugin depends on it. If so, dependent plugins are also disabled. This prevents invalid plugin combinations from reaching the main window.
 
 ## Launch behavior
 

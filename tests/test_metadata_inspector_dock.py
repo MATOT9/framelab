@@ -118,6 +118,7 @@ def test_metadata_inspector_dock_displays_effective_and_local_metadata(
     assert isinstance(dock, MetadataInspectorDock)
     assert dock.features() & qtw.QDockWidget.DockWidgetFloatable
     assert dock.allowedAreas() == Qt.AllDockWidgetAreas
+    assert not dock.windowIcon().isNull()
     assert dock.titleBarWidget() is not None
     assert dock.titleBarWidget().objectName() == "DockTitleBar"
     assert dock.widget().objectName() == "MetadataInspectorDockContent"

@@ -1,8 +1,6 @@
 # Acquisition Mapping
 
-The acquisition field mapping JSON defines which canonical datacard fields the wizard exposes and how those fields behave in the editor.
-
-This mapping is an editor/schema-definition file. It does not directly define measurement formulas or analysis behavior.
+The acquisition field mapping JSON defines which canonical datacard fields the wizard exposes and how those fields behave in the editor. This mapping is an editor/schema-definition file. It does not directly define measurement formulas or analysis behavior.
 
 ## Mapping file locations
 
@@ -63,9 +61,7 @@ Duplicate keys are ignored after the first valid occurrence.
 
 ### Visibility flags
 
-`show_in_defaults` and `show_in_overrides` control **UI visibility**, not datacard payload validity.
-
-That means:
+`show_in_defaults` and `show_in_overrides` control **UI visibility**, not datacard payload validity. That means:
 
 - a hidden field is not automatically illegal in payloads
 - a visible field is not automatically required in payloads
@@ -73,9 +69,7 @@ That means:
 
 ### `ebus_label`
 
-`ebus_label` links one canonical field to one qualified eBUS parameter key, for example `device.Exposure`.
-
-The reverse eBUS-to-canonical lookup is derived at runtime from this mapping. The eBUS catalog does not redundantly store canonical field keys.
+`ebus_label` links one canonical field to one qualified eBUS parameter key, for example `device.Exposure`. The reverse eBUS-to-canonical lookup is derived at runtime from this mapping. The eBUS catalog does not redundantly store canonical field keys.
 
 ### `ebus_managed`
 
@@ -113,9 +107,7 @@ The reverse eBUS-to-canonical lookup is derived at runtime from this mapping. Th
 
 ## Operational guidance
 
-Use the mapping file to define how canonical fields should be presented and validated in the authoring UI.
-
-Do not use it to encode:
+Use the mapping file to define how canonical fields should be presented and validated in the authoring UI. Do not use it to encode:
 
 - workflow decisions that belong in the User Guide
 - plugin-loading behavior

@@ -1,8 +1,6 @@
 # Measure Workflow
 
-The **Measure** tab converts each loaded TIFF image into per-image metrics that can be inspected directly or reused by analysis plugins. This is where thresholding, average-mode selection, ROI-based measurement, optional background subtraction, normalization, and preview validation are brought into one workflow.
-
-A useful mental model is:
+The **Measure** tab converts each loaded TIFF image into per-image metrics that can be inspected directly or reused by analysis plugins. This is where thresholding, average-mode selection, ROI-based measurement, optional background subtraction, normalization, and preview validation are brought into one workflow. A useful mental model is:
 
 ```text
 image -> metric image -> per-image statistics -> downstream analysis inputs
@@ -51,9 +49,7 @@ The **Metrics Setup** group determines how the app computes per-image values.
 
 ### Disabled
 
-No average-based metric is computed.
-
-Use this mode when you only care about:
+No average-based metric is computed. Use this mode when you only care about:
 
 - saturated-pixel counts
 - peak-value inspection
@@ -61,9 +57,7 @@ Use this mode when you only care about:
 
 ### Top-K Mean
 
-The app selects the `K` brightest pixels in each metric image and computes statistics only on that subset.
-
-Use **Top-K Mean** when:
+The app selects the `K` brightest pixels in each metric image and computes statistics only on that subset. Use **Top-K Mean** when:
 
 - you want a bright-region proxy without drawing a fixed spatial mask
 - the brightest feature may shift slightly between images
@@ -77,9 +71,7 @@ Be careful when:
 
 ### ROI Mean
 
-The app computes statistics only inside the current ROI rectangle.
-
-Use **ROI Mean** when:
+The app computes statistics only inside the current ROI rectangle. Use **ROI Mean** when:
 
 - the same physical region must be compared across images
 - spatial consistency matters more than automatic bright-pixel selection
@@ -93,9 +85,7 @@ When **ROI Mean** is selected:
 
 ## How to choose `K`
 
-`K` is not just a UI parameter. It defines the pixel population used to build the Top-K statistics.
-
-General guidance:
+`K` is not just a UI parameter. It defines the pixel population used to build the Top-K statistics. General guidance:
 
 - **smaller `K`** emphasizes the brightest core and is more sensitive to hot pixels, clipping, and small spatial changes
 - **larger `K`** is usually more stable, but it pulls in more surrounding structure and background
@@ -123,9 +113,7 @@ Top-K std      = std(p_1 ... p_K)
 Top-K std err  = Top-K std / sqrt(K)
 ```
 
-The current implementation uses NumPy's population standard deviation (`ddof = 0`).
-
-If the requested `K` is larger than the number of pixels in the image, the app uses all available pixels.
+The current implementation uses NumPy's population standard deviation (`ddof = 0`). If the requested `K` is larger than the number of pixels in the image, the app uses all available pixels.
 
 ### ROI metrics
 
@@ -149,13 +137,7 @@ DN/ms std      = std_intensity / exposure_ms
 DN/ms std err  = std_err_intensity / exposure_ms
 ```
 
-This is computed only when the active average mode is **Top-K Mean** or **ROI Mean**.
-
-Dividing the measured intensity by exposure time normalizes the result by integration duration, allowing first-order comparison across images acquired with different exposure settings.
-
-`DN/ms` is useful for engineering analysis of relative trends, especially in exposure and iris sweeps. It is not a radiometric quantity and should not be interpreted, by itself, as evidence of constant scene radiance, detector linearity, or invariant optical throughput. Those conclusions require additional calibration and control of acquisition conditions.
-
-If exposure metadata is missing, non-finite, or non-positive, `DN/ms` remains unavailable for that image.
+This is computed only when the active average mode is **Top-K Mean** or **ROI Mean**. Dividing the measured intensity by exposure time normalizes the result by integration duration, allowing first-order comparison across images acquired with different exposure settings. `DN/ms` is useful for analysis of relative trends, especially in exposure and iris sweeps. It is not a radiometric quantity and should not be interpreted, by itself, as evidence of constant scene radiance, detector linearity, or invariant optical throughput. Those conclusions require additional calibration and control of acquisition conditions. If exposure metadata is missing, non-finite, or non-positive, `DN/ms` remains unavailable for that image.
 
 ### Normalization
 
@@ -165,9 +147,7 @@ When **Normalize Intensity (0-1)** is enabled, intensity-like values are divided
 normalized_value = value / current_dataset_max_pixel
 ```
 
-In the current implementation, the divisor is the maximum value in the current **max pixel** array. Because that array follows the active metric image, the divisor can change when background subtraction changes the metric image population.
-
-Important consequences:
+In the current implementation, the divisor is the maximum value in the current **max pixel** array. Because that array follows the active metric image, the divisor can change when background subtraction changes the metric image population. Important consequences:
 
 - normalization does **not** rewrite the TIFF data on disk
 - normalization rescales displayed mean/std/SEM and `DN/ms`
@@ -244,9 +224,7 @@ The measurement statistics are then computed from `metric_image`, not from the r
 
 ### Folder-library matching behavior
 
-In **Folder Library** mode, background references are matched by exposure after metadata resolution.
-
-Current behavior:
+In **Folder Library** mode, background references are matched by exposure after metadata resolution. Current behavior:
 
 - the match policy is **require exact exposure-key match**
 - exposure keys are canonicalized numerically before lookup
@@ -277,9 +255,7 @@ Negative clipping is convenient, but it also biases statistics by removing negat
 
 ### Background Correction plugin
 
-If the **Background Correction** plugin is enabled, the same host-owned background state can also be managed through **Plugins -> Open Background Correction...**.
-
-Use that dialog when you want:
+If the **Background Correction** plugin is enabled, the same host-owned background state can also be managed through **Plugins -> Open Background Correction...**. Use that dialog when you want:
 
 - a focused background workflow without occupying the full Measure page
 - a quick summary of current reference coverage
@@ -294,11 +270,7 @@ The lower part of the page is split into:
 - the **Image Metrics** table on the left
 - the **Preview / Histogram** panel on the right
 
-Use them together.
-
-The table tells you what the app computed. The preview and histogram tell you whether those numbers are physically plausible for the selected image.
-
-The mean/statistics headers depend on the active average mode:
+Use them together. The table tells you what the app computed. The preview and histogram tell you whether those numbers are physically plausible for the selected image. The mean/statistics headers depend on the active average mode:
 
 - **Top-K**, **Top-K Std**, **Top-K Std Err** in Top-K mode
 - **ROI**, **ROI Std**, **ROI Std Err** in ROI mode

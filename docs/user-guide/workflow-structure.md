@@ -1,8 +1,6 @@
 # Workflow Structure and Required Folder Layout
 
-Use this page to decide **how the filesystem should be organized before you start scanning TIFF data**.
-
-This matters because the workflow shell is profile-driven. The app does not treat every directory tree as equivalent. Reliable workflow loading, session authoring, metadata inheritance, and acquisition-management tools all work best when the dataset follows the expected hierarchy.
+Use this page to decide **how the filesystem should be organized before you start scanning TIFF data**. This matters because the workflow shell is profile-driven. The app does not treat every directory tree as equivalent. Reliable workflow loading, session authoring, metadata inheritance, and acquisition-management tools all work best when the dataset follows the expected hierarchy.
 
 ## Recommended mental model
 
@@ -12,9 +10,7 @@ A **camera** is a long-lived asset. Keep one top-level camera folder per physica
 
 ### Campaign
 
-A **campaign** is one coherent calibration effort.
-
-A campaign can span multiple days. It is the right place to keep:
+A **campaign** is one coherent calibration effort. A campaign can span multiple days. It is the right place to keep:
 
 - final outputs for that calibration effort
 - derived products that combine several sessions
@@ -22,11 +18,7 @@ A campaign can span multiple days. It is the right place to keep:
 
 ### Session
 
-A **session** is one stable block of work.
-
-Create a new session when the setup changes meaningfully enough that you no longer want later acquisitions to inherit the same working context.
-
-Typical reasons to split sessions:
+A **session** is one stable block of work. Create a new session when the setup changes meaningfully enough that you no longer want later acquisitions to inherit the same working context. Typical reasons to split sessions:
 
 - optics were changed
 - camera configuration changed in a meaningful way
@@ -37,9 +29,7 @@ Multiple sessions on the same day are supported and recommended when the setup r
 
 ### Acquisition
 
-An **acquisition** is one intent, one datacard, one block of frames.
-
-Keep acquisitions semantically narrow. Good examples are:
+An **acquisition** is one intent, one datacard, one block of frames. Keep acquisitions semantically narrow. Good examples are:
 
 - one dark sweep
 - one iris sweep
@@ -53,9 +43,7 @@ Do not treat an acquisition as an entire day of unrelated captures.
 
 ## Calibration
 
-This is the primary structured workflow profile.
-
-Its logical hierarchy is:
+This is the primary structured workflow profile. Its logical hierarchy is:
 
 ```text
 workspace -> camera -> campaign -> session -> acquisition
@@ -65,9 +53,7 @@ Use this profile for lab and calibration work where cameras are long-lived asset
 
 ## Trials
 
-The Trials profile is available, but it should still be treated as **experimental**.
-
-Its logical hierarchy is:
+The Trials profile is available, but it should still be treated as **experimental**. Its logical hierarchy is:
 
 ```text
 workspace -> trial -> camera -> session -> acquisition
@@ -79,9 +65,7 @@ Use it only when trial-first organization is genuinely the right fit and you acc
 
 ## Calibration profile
 
-The calibration profile expects a workspace whose immediate children are camera folders.
-
-Recommended layout:
+The calibration profile expects a workspace whose immediate children are camera folders. Recommended layout:
 
 ```text
 <workspace_root>/
@@ -294,9 +278,7 @@ This remains operationally important because it can:
 
 ### `acquisition_datacard.json`
 
-This is still the authoritative acquisition-local canonical metadata record.
-
-Use it for:
+This is still the authoritative acquisition-local canonical metadata record. Use it for:
 
 - stable acquisition defaults
 - frame-targeted overrides

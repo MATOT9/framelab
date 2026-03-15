@@ -118,15 +118,11 @@ Location:
 framelab/session_manager.py
 ```
 
-This layer is not a second datacard authoring system. It is a structural helper that normalizes acquisition payloads when folders are renamed, reindexed, copied, or pasted across acquisitions.
-
-Treat it as the bridge between folder-level session operations and stable datacard identity/path contracts.
+This layer is not a second datacard authoring system. It is a structural helper that normalizes acquisition payloads when folders are renamed, reindexed, copied, or pasted across acquisitions. Treat it as the bridge between folder-level session operations and stable datacard identity/path contracts.
 
 ## Metadata hierarchy
 
-The runtime JSON metadata path is broader than one acquisition file.
-
-Current layering order in `metadata.py` is:
+The runtime JSON metadata path is broader than one acquisition file. Current layering order in `metadata.py` is:
 
 1. campaign defaults and instrument defaults from `campaign_datacard.json`
 2. session defaults from `session_datacard.json`
@@ -146,9 +142,7 @@ The most important developer concept is the acquisition datacard inheritance mod
 
 ### Overrides
 
-`overrides` provide frame-targeted replacement values layered on top of the inherited baseline.
-
-Each serialized override row currently has this shape:
+`overrides` provide frame-targeted replacement values layered on top of the inherited baseline. Each serialized override row currently has this shape:
 
 ```json
 {
@@ -180,9 +174,7 @@ Some canonical fields can be both:
 - marked `ebus_managed`
 - backed by one readable acquisition-root `.pvcfg` snapshot
 
-When that is true, the canonical field's acquisition-wide baseline is derived through the eBUS integration path rather than ordinary acquisition defaults alone.
-
-Current consequences:
+When that is true, the canonical field's acquisition-wide baseline is derived through the eBUS integration path rather than ordinary acquisition defaults alone. Current consequences:
 
 - the field may appear read-only or editable in the wizard depending on catalog policy
 - frame-targeted override generation excludes those fields
@@ -192,9 +184,7 @@ This keeps acquisition-wide eBUS state from competing silently with ordinary fra
 
 ## Frame indexing and selector normalization
 
-Frame-targeted overrides are meaningful only if selector semantics match the actual acquisition frame list.
-
-Current responsibilities:
+Frame-targeted overrides are meaningful only if selector semantics match the actual acquisition frame list. Current responsibilities:
 
 - `frame_indexing.py` resolves frame indices from the configured frames directory
 - `acquisition_datacard.py` normalizes override selectors to zero-based indices
@@ -212,9 +202,7 @@ When acquisition folders are renamed or renumbered, the helper rewrites normaliz
 
 ### Copy and paste
 
-Copy/paste behaves as structured reuse, not as raw file duplication.
-
-Current behavior:
+Copy/paste behaves as structured reuse, not as raw file duplication. Current behavior:
 
 - destination acquisition identity and label are normalized to the target folder
 - path strings containing the old acquisition folder name are rewritten
@@ -229,9 +217,7 @@ Session Manager persists `external_sources.ebus.enabled` at the acquisition leve
 
 ## Validation and serialization rules
 
-The datacard service layer remains the authoritative validator.
-
-Important current rules:
+The datacard service layer remains the authoritative validator. Important current rules:
 
 - unknown mapped fields should not survive as trusted typed entries
 - field values must satisfy type and enum expectations from the mapping

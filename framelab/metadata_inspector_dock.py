@@ -28,6 +28,8 @@ class MetadataInspectorDock(qtw.QDockWidget):
             | qtw.QDockWidget.DockWidgetMovable
             | qtw.QDockWidget.DockWidgetFloatable,
         )
+        if not host_window.windowIcon().isNull():
+            self.setWindowIcon(host_window.windowIcon())
         self.setAttribute(Qt.WA_StyledBackground, True)
         self.setAutoFillBackground(True)
         self.setTitleBarWidget(DockTitleBar(self))

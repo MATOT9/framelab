@@ -1214,8 +1214,7 @@
 
 
 <h1 id="config-files">Config Files<a class="headerlink" href="#config-files" title="Permanent link">&para;</a></h1>
-<p>The app keeps its shareable runtime configuration in the project/app folder under <code>config/</code>.</p>
-<p>This page documents the file locations, ownership model, and runtime role of each configuration file.</p>
+<p>The app keeps its shareable runtime configuration in the project/app folder under <code>config/</code>. This page documents the file locations, ownership model, and runtime role of each configuration file.</p>
 <h2 id="main-configuration-files">Main configuration files<a class="headerlink" href="#main-configuration-files" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -1285,8 +1284,7 @@
 </table>
 <h2 id="file-details">File details<a class="headerlink" href="#file-details" title="Permanent link">&para;</a></h2>
 <h3 id="configconfigini"><code>config/config.ini</code><a class="headerlink" href="#configconfigini" title="Permanent link">&para;</a></h3>
-<p>This file stores persistent scan settings in INI format.</p>
-<p>Current use:</p>
+<p>This file stores persistent scan settings in INI format. Current use:</p>
 <ul>
 <li>skip-pattern persistence for dataset scanning</li>
 </ul>
@@ -1298,8 +1296,7 @@
 <li>editing while the app is closed is acceptable if valid INI syntax is preserved</li>
 </ul>
 <h3 id="configplugin_selectionjson"><code>config/plugin_selection.json</code><a class="headerlink" href="#configplugin_selectionjson" title="Permanent link">&para;</a></h3>
-<p>This file stores the enabled plugin ids chosen in the startup selector.</p>
-<p>Payload characteristics:</p>
+<p>This file stores the enabled plugin ids chosen in the startup selector. Payload characteristics:</p>
 <ul>
 <li>JSON object</li>
 <li>includes a schema-version field</li>
@@ -1312,8 +1309,7 @@
 <li>dependency closure is resolved at load time, so the effective enabled set may be larger than the explicitly stored list</li>
 </ul>
 <h3 id="configui_stateini"><code>config/ui_state.ini</code><a class="headerlink" href="#configui_stateini" title="Permanent link">&para;</a></h3>
-<p>This file stores host-window UI state in INI format.</p>
-<p>Current use:</p>
+<p>This file stores host-window UI state in INI format. Current use:</p>
 <ul>
 <li>selected workflow workspace root and profile</li>
 <li>active workflow node id</li>
@@ -1328,8 +1324,7 @@
 <li>deleting it is safe; the app will recreate it from defaults</li>
 </ul>
 <h3 id="configacquisition_field_mappingjson"><code>config/acquisition_field_mapping.json</code><a class="headerlink" href="#configacquisition_field_mappingjson" title="Permanent link">&para;</a></h3>
-<p>This is the editable runtime mapping used by the Acquisition Datacard Wizard.</p>
-<p>It defines field metadata such as:</p>
+<p>This is the editable runtime mapping used by the Acquisition Datacard Wizard. It defines field metadata such as:</p>
 <ul>
 <li>dot-path keys</li>
 <li>labels</li>
@@ -1349,8 +1344,7 @@
 <li>this file is intended to be user-editable, but changes should be made while the app is closed unless you are explicitly reloading mapping state from the wizard</li>
 </ul>
 <h3 id="configebus_parameter_catalogjson"><code>config/ebus_parameter_catalog.json</code><a class="headerlink" href="#configebus_parameter_catalogjson" title="Permanent link">&para;</a></h3>
-<p>This is the editable runtime catalog used by the eBUS config tools.</p>
-<p>It defines eBUS parameter metadata such as:</p>
+<p>This is the editable runtime catalog used by the eBUS config tools. It defines eBUS parameter metadata such as:</p>
 <ul>
 <li>qualified eBUS keys</li>
 <li>labels and descriptions</li>
@@ -1367,8 +1361,7 @@
 <li>uncatalogued keys may still parse and compare, but they lose catalog-backed labeling and policy metadata</li>
 </ul>
 <h3 id="configworkflow_metadata_governancejson"><code>config/workflow_metadata_governance.json</code><a class="headerlink" href="#configworkflow_metadata_governancejson" title="Permanent link">&para;</a></h3>
-<p>This file stores optional profile-level governance overrides for workflow metadata.</p>
-<p>Typical use:</p>
+<p>This file stores optional profile-level governance overrides for workflow metadata. Typical use:</p>
 <ul>
 <li>promote an ad-hoc metadata field into a profile-defined field</li>
 <li>tighten or relax ad-hoc field/group policy per workflow profile</li>
@@ -1396,8 +1389,7 @@
 <h2 id="dataset-side-metadata-companion-files">Dataset-side metadata companion files<a class="headerlink" href="#dataset-side-metadata-companion-files" title="Permanent link">&para;</a></h2>
 <p>Some metadata files live next to datasets rather than under the global <code>config/</code> directory.</p>
 <h3 id="framelabnodecardjson"><code>.framelab/nodecard.json</code><a class="headerlink" href="#framelabnodecardjson" title="Permanent link">&para;</a></h3>
-<p>Generic workflow-node metadata file.</p>
-<p>Current runtime role:</p>
+<p>Generic workflow-node metadata file. Current runtime role:</p>
 <ul>
 <li>stores local metadata for workflow nodes such as workspace, trial, camera, campaign, or session levels</li>
 <li>participates in ancestry-based metadata inheritance</li>
@@ -1410,8 +1402,7 @@
 <li>nodecards can coexist with older campaign/session datacards while compatibility bridges remain in place</li>
 </ul>
 <h3 id="campaign_datacardjson"><code>campaign_datacard.json</code><a class="headerlink" href="#campaign_datacardjson" title="Permanent link">&para;</a></h3>
-<p>Campaign-level metadata file.</p>
-<p>Current runtime role:</p>
+<p>Campaign-level metadata file. Current runtime role:</p>
 <ul>
 <li>provides <code>campaign_defaults</code></li>
 <li>may also provide <code>instrument_defaults</code></li>
@@ -1422,8 +1413,7 @@
 <li>this is now a compatibility layer alongside <code>.framelab/nodecard.json</code>, not the preferred long-term higher-level metadata authoring target</li>
 </ul>
 <h3 id="session_datacardjson"><code>session_datacard.json</code><a class="headerlink" href="#session_datacardjson" title="Permanent link">&para;</a></h3>
-<p>Session-level metadata file.</p>
-<p>Current runtime role:</p>
+<p>Session-level metadata file. Current runtime role:</p>
 <ul>
 <li>provides <code>session_defaults</code></li>
 <li>can redefine the acquisitions root through <code>paths.acquisitions_root_rel</code></li>
@@ -1434,8 +1424,7 @@
 <li>session datacards remain important for acquisition/session tooling, but generic session metadata is moving toward <code>.framelab/nodecard.json</code></li>
 </ul>
 <h3 id="acquisition_datacardjson"><code>acquisition_datacard.json</code><a class="headerlink" href="#acquisition_datacardjson" title="Permanent link">&para;</a></h3>
-<p>Acquisition-level canonical metadata file.</p>
-<p>Current runtime role:</p>
+<p>Acquisition-level canonical metadata file. Current runtime role:</p>
 <ul>
 <li>provides acquisition <code>defaults</code></li>
 <li>provides frame-targeted <code>overrides</code></li>
@@ -1446,8 +1435,7 @@
 </code></pre></div>
 <p>Those overrides are the app-side acquisition-wide replacement layer used by effective eBUS resolution for eligible canonical fields.</p>
 <h3 id="acquisition-local-root-level-pvcfg">Acquisition-local root-level <code>.pvcfg</code><a class="headerlink" href="#acquisition-local-root-level-pvcfg" title="Permanent link">&para;</a></h3>
-<p>A dataset folder is treated as carrying a discoverable eBUS snapshot only when it contains exactly one readable root-level <code>.pvcfg</code> file.</p>
-<p>Important notes:</p>
+<p>A dataset folder is treated as carrying a discoverable eBUS snapshot only when it contains exactly one readable root-level <code>.pvcfg</code> file. Important notes:</p>
 <ul>
 <li>the app reads this file but does not edit it</li>
 <li>automatic discovery is based on root-level uniqueness, not on a special filename requirement</li>
@@ -1455,8 +1443,7 @@
 <li>app-side eBUS override values live in the datacard JSON, not in the raw <code>.pvcfg</code> file</li>
 </ul>
 <h2 id="migration-and-fallback-behavior">Migration and fallback behavior<a class="headerlink" href="#migration-and-fallback-behavior" title="Permanent link">&para;</a></h2>
-<p>The app uses local <code>config/</code> paths as the primary runtime location.</p>
-<p>When a current file is missing, the app may attempt limited migration from legacy locations before falling back to defaults. This is primarily intended to preserve older skip settings, plugin-selection state, and mapping files after the configuration model was moved into the app/project folder.</p>
+<p>The app uses local <code>config/</code> paths as the primary runtime location. When a current file is missing, the app may attempt limited migration from legacy locations before falling back to defaults. This is primarily intended to preserve older skip settings, plugin-selection state, and mapping files after the configuration model was moved into the app/project folder.</p>
 <h2 id="manual-edit-guidance">Manual-edit guidance<a class="headerlink" href="#manual-edit-guidance" title="Permanent link">&para;</a></h2>
 <p>General guidance:</p>
 <ul>

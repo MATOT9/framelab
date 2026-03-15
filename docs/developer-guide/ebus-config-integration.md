@@ -9,9 +9,7 @@ The app distinguishes between two different configuration spaces:
 - the **canonical acquisition metadata schema** used by the app and exposed by the datacard wizard
 - the much larger **eBUS parameter space** stored in `.pvcfg` snapshots
 
-These should not be collapsed into one file.
-
-Why:
+These should not be collapsed into one file. Why:
 
 - most eBUS parameters are not canonical app metadata fields
 - many are useful for compare or audit, but not as editable datacard defaults
@@ -54,9 +52,7 @@ There are two distinct source kinds in the current app.
 
 ### Standalone file source
 
-A path that points directly to one `.pvcfg` file is treated as a standalone snapshot source.
-
-Semantics:
+A path that points directly to one `.pvcfg` file is treated as a standalone snapshot source. Semantics:
 
 - parse the raw snapshot
 - no acquisition-root lookup is needed
@@ -64,9 +60,7 @@ Semantics:
 
 ### Acquisition-root source
 
-A dataset folder is treated as an acquisition eBUS source only when it contains exactly one readable root-level `.pvcfg` file.
-
-Semantics:
+A dataset folder is treated as an acquisition eBUS source only when it contains exactly one readable root-level `.pvcfg` file. Semantics:
 
 - parse the discovered raw snapshot
 - load any `external_sources.ebus.overrides` from the acquisition datacard
@@ -76,9 +70,7 @@ If several root-level `.pvcfg` files exist, discovery is intentionally ambiguous
 
 ## Immutable snapshot policy
 
-The app treats the raw `.pvcfg` file as an immutable baseline artifact.
-
-The app must not:
+The app treats the raw `.pvcfg` file as an immutable baseline artifact. The app must not:
 
 - rewrite the XML
 - normalize values back into the file
@@ -128,9 +120,7 @@ Do not document or design around automatic provenance-writing behavior unless th
 
 ## Why some wizard fields become read-only or stay editable
 
-When an acquisition has a readable acquisition-local eBUS snapshot, canonical fields marked `ebus_managed: true` stay visible in the datacard wizard.
-
-This is intentional. Without it, the user would have:
+When an acquisition has a readable acquisition-local eBUS snapshot, canonical fields marked `ebus_managed: true` stay visible in the datacard wizard. This is intentional. Without it, the user would have:
 
 - one acquisition-wide baseline path through the readable eBUS snapshot
 - one competing acquisition-wide edit path through wizard defaults
@@ -148,9 +138,7 @@ The compare dialog exposes two modes that intentionally answer different questio
 
 ### Raw compare
 
-Compares the raw normalized snapshots exactly as saved by eBUS.
-
-Use it for:
+Compares the raw normalized snapshots exactly as saved by eBUS. Use it for:
 
 - raw reproducibility checks
 - saved transport/device/stream differences
@@ -176,9 +164,7 @@ Important nuance:
 
 ## Optional wizard integration
 
-The eBUS data plugin does **not** hard-depend on the datacard wizard plugin.
-
-Reason:
+The eBUS data plugin does **not** hard-depend on the datacard wizard plugin. Reason:
 
 - inspect and compare workflows are useful even when the datacard wizard is disabled
 - forcing a dependency would make eBUS tooling unavailable unless the wizard were also enabled

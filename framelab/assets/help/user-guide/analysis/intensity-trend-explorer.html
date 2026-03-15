@@ -1352,8 +1352,7 @@
 
 
 <h1 id="intensity-trend-explorer">Intensity Trend Explorer<a class="headerlink" href="#intensity-trend-explorer" title="Permanent link">&para;</a></h1>
-<p><strong>Intensity Trend Explorer</strong> is the built-in analysis plugin for plotting measurement-stage quantities against exposure or iris position.</p>
-<p>Use it to answer questions such as:</p>
+<p><strong>Intensity Trend Explorer</strong> is the built-in analysis plugin for plotting measurement-stage quantities against exposure or iris position. Use it to answer questions such as:</p>
 <ul>
 <li>how does the measured signal vary with exposure?</li>
 <li>how does the measured signal vary with iris position?</li>
@@ -1459,8 +1458,7 @@
 </tr>
 </tbody>
 </table>
-<p>Use <strong>Std</strong> when you want to show spread. Use <strong>Std Err</strong> when you want uncertainty on the estimated mean.</p>
-<p>Practical note:</p>
+<p>Use <strong>Std</strong> when you want to show spread. Use <strong>Std Err</strong> when you want uncertainty on the estimated mean. Practical note:</p>
 <ul>
 <li>uncertainty bars are meaningful for mean-based and <code>DN/ms</code>-based quantities</li>
 <li><strong>Peak Intensity</strong> does not carry a dedicated uncertainty source in the current plugin, so error bars are not the main readout for that mode</li>
@@ -1521,23 +1519,14 @@
 <li>when X is exposure and no numeric iris value is available, the plugin falls back to the iris label or parent-folder label for series naming</li>
 </ul>
 <h3 id="point-aggregation">Point aggregation<a class="headerlink" href="#point-aggregation" title="Permanent link">&para;</a></h3>
-<p>When several records contribute to one plotted operating point, the plugin computes a summary point from those records.</p>
-<p>For values <span class="arithmatex">\(y_1, \dots, y_N\)</span>:</p>
-<div class="arithmatex">\[
-y_{ ext{point}} = rac{1}{N}\sum_{i=1}^{N} y_i
-\]</div>
-<div class="arithmatex">\[
-\sigma_{    ext{point}} = \mathrm{std}(y_1, \dots, y_N)
-\]</div>
-<div class="arithmatex">\[
-\mathrm{SEM}_{  ext{point}} = rac{\sigma_{ ext{point}}}{\sqrt{N}}
-\]</div>
+<p>When several records contribute to one plotted operating point, the plugin computes a summary point from those records. For values <span class="arithmatex">\(y_1, \dots, y_N\)</span>:</p>
+<div class="arithmatex">\[y_{   ext{point}} = \frac{1}{N}\sum_{i=1}^{N} y_i\]</div>
+<div class="arithmatex">\[\sigma_{  ext{point}} = \mathrm{std}(y_1, \dots, y_N)\]</div>
+<div class="arithmatex">\[\mathrm{SEM}_{    ext{point}} = \frac{\sigma_{    ext{point}}}{\sqrt{N}}\]</div>
 <p>Use the plotted point as a summary of the contributing records, not as the value of one individual row.</p>
 <h2 id="gain-interpretation">Gain interpretation<a class="headerlink" href="#gain-interpretation" title="Permanent link">&para;</a></h2>
 <p>In gain modes, the plotted value is relative to a reference point on the same series:</p>
-<div class="arithmatex">\[
-g_i = rac{y_i}{y_{ ext{ref}}}
-\]</div>
+<div class="arithmatex">\[g_i = \frac{y_i}{y_{  ext{ref}}}\]</div>
 <p>where:</p>
 <ul>
 <li><span class="arithmatex">\(g_i\)</span> is the gain at point <span class="arithmatex">\(i\)</span></li>
@@ -1547,42 +1536,35 @@ g_i = rac{y_i}{y_{ ext{ref}}}
 <p>Gain is therefore a relative quantity. It indicates how the signal changed with respect to one operating condition; it does not report absolute radiometric magnitude.</p>
 <h2 id="special-cases-that-matter-operationally">Special cases that matter operationally<a class="headerlink" href="#special-cases-that-matter-operationally" title="Permanent link">&para;</a></h2>
 <h3 id="iris-position-gain-uses-dnms">Iris-position gain uses <code>DN/ms</code><a class="headerlink" href="#iris-position-gain-uses-dnms" title="Permanent link">&para;</a></h3>
-<p>When <strong>X Axis = Iris Position</strong> and a gain mode is selected, the plugin builds gain from mean <code>DN/ms</code> at each iris position before applying the reference conversion.</p>
-<p>That means:</p>
+<p>When <strong>X Axis = Iris Position</strong> and a gain mode is selected, the plugin builds gain from mean <code>DN/ms</code> at each iris position before applying the reference conversion. That means:</p>
 <ul>
 <li>exposure metadata must be valid upstream</li>
 <li>the result is sensitive to correct <code>DN/ms</code> computation upstream</li>
 <li>the interpretation is relative optical-response change, not direct proof of constant throughput</li>
 </ul>
 <h3 id="exposure-axis-gain-uses-the-active-mean-metric">Exposure-axis gain uses the active mean metric<a class="headerlink" href="#exposure-axis-gain-uses-the-active-mean-metric" title="Permanent link">&para;</a></h3>
-<p>When <strong>X Axis = Exposure</strong> and a gain mode is selected, the plugin builds gain directly from the active mean metric rather than from <code>DN/ms</code>.</p>
-<p>That is why <strong>Intensity Rate</strong> is not offered as a separate Y mode when X is already exposure.</p>
+<p>When <strong>X Axis = Exposure</strong> and a gain mode is selected, the plugin builds gain directly from the active mean metric rather than from <code>DN/ms</code>. That is why <strong>Intensity Rate</strong> is not offered as a separate Y mode when X is already exposure.</p>
 <h3 id="iris-position-gain-locks-the-overlay-model">Iris-position gain locks the overlay model<a class="headerlink" href="#iris-position-gain-locks-the-overlay-model" title="Permanent link">&para;</a></h3>
-<p>When <strong>X Axis = Iris Position</strong> and gain is selected, the plugin forces the trend overlay to <strong>Mean by X</strong> and hides the raw series view.</p>
-<p>This is intentional. In that mode the plugin is emphasizing the aggregated gain-versus-iris result rather than exposure-separated raw series.</p>
+<p>When <strong>X Axis = Iris Position</strong> and gain is selected, the plugin forces the trend overlay to <strong>Mean by X</strong> and hides the raw series view. This is intentional. In that mode the plugin is emphasizing the aggregated gain-versus-iris result rather than exposure-separated raw series.</p>
 <h2 id="mean-by-x-overlay">Mean-by-X overlay<a class="headerlink" href="#mean-by-x-overlay" title="Permanent link">&para;</a></h2>
-<p>The <strong>Mean by X</strong> overlay collapses visible raw series into one weighted summary line.</p>
-<p>At each X value, visible raw points are combined using sample-count weighting:</p>
+<p>The <strong>Mean by X</strong> overlay collapses visible raw series into one weighted summary line. At each X value, visible raw points are combined using sample-count weighting:</p>
 <div class="arithmatex">\[
-ar{y}_w = rac{\sum_i w_i y_i}{\sum_i w_i}
+\bar{y}_w = \frac{\sum_i w_i y_i}{\sum_i w_i}
 \]</div>
-<p>where <span class="arithmatex">\(w_i\)</span> is the sample count associated with visible point <span class="arithmatex">\(i\)</span>.</p>
-<p>Use this overlay when you want one summary trend across the visible operating population instead of several separate raw series.</p>
+<p>where <span class="arithmatex">\(w_i\)</span> is the sample count associated with visible point <span class="arithmatex">\(i\)</span>. Use this overlay when you want one summary trend across the visible operating population instead of several separate raw series.</p>
 <h2 id="linear-fit-overlay">Linear fit overlay<a class="headerlink" href="#linear-fit-overlay" title="Permanent link">&para;</a></h2>
 <p>The <strong>Linear fit</strong> overlay applies a first-order model across all visible raw series points:</p>
 <div class="arithmatex">\[
 y = m x + b
 \]</div>
-<p>The plugin also reports <span class="arithmatex">\(R^2\)</span> as a compact goodness-of-fit descriptor.</p>
-<p>Use the fit as a descriptive trend aid, not as proof that the system is physically linear over the explored range.</p>
+<p>The plugin also reports <span class="arithmatex">\(R^2\)</span> as a compact goodness-of-fit descriptor. Use the fit as a descriptive trend aid, not as proof that the system is physically linear over the explored range.</p>
 <h2 id="plot-and-result-table">Plot and result table<a class="headerlink" href="#plot-and-result-table" title="Permanent link">&para;</a></h2>
 <p>The plugin page combines:</p>
 <ul>
 <li>a plot for trend inspection</li>
 <li>a table for exact values, uncertainty values, and contributing sample counts</li>
 </ul>
-<p>Use the plot to identify structure. Use the table to verify exact numbers before drawing conclusions.</p>
-<p>Read the table particularly carefully when:</p>
+<p>Use the plot to identify structure. Use the table to verify exact numbers before drawing conclusions. Read the table particularly carefully when:</p>
 <ul>
 <li>a curve looks flatter or noisier than expected</li>
 <li>a gain jump seems too large</li>
@@ -1614,7 +1596,7 @@ y = m x + b
 <h3 id="aggregated-uncertainty-from-existing-per-record-uncertainties">Aggregated uncertainty from existing per-record uncertainties<a class="headerlink" href="#aggregated-uncertainty-from-existing-per-record-uncertainties" title="Permanent link">&para;</a></h3>
 <p>When the plugin receives one uncertainty value per contributing record, it combines them as:</p>
 <div class="arithmatex">\[
-\sigma_{ar{y}} = rac{\sqrt{\sum_{i=1}^{N} e_i^2}}{N}
+\sigma_{\bar{y}} = \frac{\sqrt{\sum_{i=1}^{N} e_i^2}}{N}
 \]</div>
 <p>where <span class="arithmatex">\(e_i\)</span> is the uncertainty associated with record <span class="arithmatex">\(i\)</span>.</p>
 <h3 id="gain-uncertainty-propagation">Gain uncertainty propagation<a class="headerlink" href="#gain-uncertainty-propagation" title="Permanent link">&para;</a></h3>
@@ -1622,25 +1604,22 @@ y = m x + b
 <div class="arithmatex">\[
 \sigma_{g_i}
 =
-\left|g_i
-ight|
+\left| g_i \right|
 \sqrt{
-\left(rac{\sigma_i}{y_i}
-ight)^2
+\left(\frac{\sigma_i}{y_i}\right)^2
 +
-\left(rac{\sigma_{ ext{ref}}}{y_{  ext{ref}}}
-ight)^2
+\left(\frac{\sigma_{\text{ref}}}{y_{\text{ref}}}\right)^2
 }
 \]</div>
 <h3 id="linear-fit-goodness-of-fit">Linear-fit goodness of fit<a class="headerlink" href="#linear-fit-goodness-of-fit" title="Permanent link">&para;</a></h3>
 <p>For the fit overlay, the coefficient of determination is reported as:</p>
 <div class="arithmatex">\[
-R^2 = 1 - rac{SS_{ ext{res}}}{SS_{ ext{tot}}}
+R^2 = 1 - \frac{SS_{    ext{res}}}{SS_{ ext{tot}}}
 \]</div>
 <p>with:</p>
 <ul>
 <li><span class="arithmatex">\(SS_{    ext{res}} = \sum_i (y_i - \hat{y}_i)^2\)</span></li>
-<li><span class="arithmatex">\(SS_{    ext{tot}} = \sum_i (y_i - ar{y})^2\)</span></li>
+<li><span class="arithmatex">\(SS_{    ext{tot}} = \sum_i (y_i - \bar{y})^2\)</span></li>
 </ul>
 <h2 id="related-pages">Related pages<a class="headerlink" href="#related-pages" title="Permanent link">&para;</a></h2>
 <ul>

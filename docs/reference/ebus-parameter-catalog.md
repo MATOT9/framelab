@@ -1,8 +1,6 @@
 # eBUS Parameter Catalog
 
-The eBUS parameter catalog defines how `.pvcfg` parameters are labeled, classified, compared, and optionally made overridable in the app.
-
-It is **not** the same thing as the acquisition field mapping used by the datacard wizard.
+The eBUS parameter catalog defines how `.pvcfg` parameters are labeled, classified, compared, and optionally made overridable in the app. It is **not** the same thing as the acquisition field mapping used by the datacard wizard.
 
 ## File locations
 
@@ -11,9 +9,7 @@ It is **not** the same thing as the acquisition field mapping used by the dataca
 
 ## Why this file exists separately
 
-The eBUS parameter universe is much larger than the canonical app metadata schema.
-
-This catalog exists so the app can:
+The eBUS parameter universe is much larger than the canonical app metadata schema. This catalog exists so the app can:
 
 - inspect and compare many eBUS parameters without turning them all into wizard fields
 - decide which eBUS keys are safe to override in the app
@@ -39,9 +35,7 @@ This catalog exists so the app can:
 
 ### `overridable`
 
-This flag controls app-side edit eligibility.
-
-If `overridable` is `true`:
+This flag controls app-side edit eligibility. If `overridable` is `true`:
 
 - a canonical field bound to this key may stay editable in the datacard wizard Defaults tab when it is also eBUS-managed
 - the app may store an acquisition-wide override in `external_sources.ebus.overrides`
@@ -54,18 +48,14 @@ If `overridable` is `false`:
 
 ### `editable_in_ebus`
 
-This flag is an operator hint, not a parser rule.
-
-Use `editable_in_ebus: false` for fields where:
+This flag is an operator hint, not a parser rule. Use `editable_in_ebus: false` for fields where:
 
 - the raw eBUS snapshot value is known to be fixed, placeholder-like, or untrustworthy for your workflow
 - the app may need a manual supplement even though eBUS still emits a value
 
 ### Uncatalogued keys
 
-The parser can still read keys that are not catalogued.
-
-When a key is uncatalogued:
+The parser can still read keys that are not catalogued. When a key is uncatalogued:
 
 - it can still appear in inspect and compare flows
 - fallback section and label behavior are used
@@ -75,11 +65,7 @@ Cataloguing a key is therefore about classification and policy, not basic parser
 
 ## Canonical mapping ownership
 
-The eBUS catalog does **not** own the canonical mapping.
-
-Canonical mapping lives in `acquisition_field_mapping.json` through each canonical field's `ebus_label`.
-
-That means:
+The eBUS catalog does **not** own the canonical mapping. Canonical mapping lives in `acquisition_field_mapping.json` through each canonical field's `ebus_label`. That means:
 
 - `acquisition_field_mapping.json` defines which canonical app metadata fields are tied to eBUS keys
 - `ebus_parameter_catalog.json` defines how raw eBUS parameters are labeled, classified, compared, and made overridable
@@ -88,9 +74,7 @@ The app derives the reverse eBUS-to-canonical view at runtime instead of storing
 
 ## Current raw-snapshot + app-side override model
 
-The raw snapshot stays on disk as the immutable acquisition-local or standalone `.pvcfg` file.
-
-When an approved app-side replacement is needed, the current app stores it under:
+The raw snapshot stays on disk as the immutable acquisition-local or standalone `.pvcfg` file. When an approved app-side replacement is needed, the current app stores it under:
 
 ```text
 external_sources.ebus.overrides

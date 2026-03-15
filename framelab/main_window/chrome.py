@@ -8,7 +8,7 @@ from typing import Any, Optional
 from PySide6 import QtGui, QtWidgets as qtw
 from PySide6.QtCore import Qt, QSignalBlocker, QSize, QTimer
 
-from stylesheets import (
+from ..stylesheets import (
     DARK_THEME,
     LIGHT_THEME,
     build_dark_theme,

@@ -107,6 +107,26 @@ def load_app_icon() -> QtGui.QIcon:
     return icon
 
 
+def _apply_icon_to_widget(widget: object, icon: QtGui.QIcon) -> None:
+    """Apply the app icon to one widget and its native window handle when present."""
+
+    try:
+        widget.setWindowIcon(icon)
+    except Exception:
+        return
+
+    try:
+        handle = widget.windowHandle()
+    except Exception:
+        handle = None
+    if handle is None:
+        return
+    try:
+        handle.setIcon(icon)
+    except Exception:
+        return
+
+
 def apply_app_identity(
     app: qtw.QApplication,
     window: Optional[qtw.QWidget] = None,
@@ -125,5 +145,11 @@ def apply_app_identity(
         return
 
     app.setWindowIcon(icon)
+    widgets: list[object] = []
     if window is not None:
-        window.setWindowIcon(icon)
+        widgets.append(window)
+    for top_level in app.topLevelWidgets():
+        if top_level not in widgets:
+            widgets.append(top_level)
+    for widget in widgets:
+        _apply_icon_to_widget(widget, icon)

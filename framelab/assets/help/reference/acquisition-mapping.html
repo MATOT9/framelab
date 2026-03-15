@@ -1118,8 +1118,7 @@
 
 
 <h1 id="acquisition-mapping">Acquisition Mapping<a class="headerlink" href="#acquisition-mapping" title="Permanent link">&para;</a></h1>
-<p>The acquisition field mapping JSON defines which canonical datacard fields the wizard exposes and how those fields behave in the editor.</p>
-<p>This mapping is an editor/schema-definition file. It does not directly define measurement formulas or analysis behavior.</p>
+<p>The acquisition field mapping JSON defines which canonical datacard fields the wizard exposes and how those fields behave in the editor. This mapping is an editor/schema-definition file. It does not directly define measurement formulas or analysis behavior.</p>
 <h2 id="mapping-file-locations">Mapping file locations<a class="headerlink" href="#mapping-file-locations" title="Permanent link">&para;</a></h2>
 <ul>
 <li>editable runtime file: <code>config/acquisition_field_mapping.json</code></li>
@@ -1235,16 +1234,14 @@
 <h3 id="step">Step<a class="headerlink" href="#step" title="Permanent link">&para;</a></h3>
 <p><code>step</code> is an editor hint for numeric controls. It is not a measurement rule, not a required quantization, and not a guarantee that authored data changes only in that increment.</p>
 <h3 id="visibility-flags">Visibility flags<a class="headerlink" href="#visibility-flags" title="Permanent link">&para;</a></h3>
-<p><code>show_in_defaults</code> and <code>show_in_overrides</code> control <strong>UI visibility</strong>, not datacard payload validity.</p>
-<p>That means:</p>
+<p><code>show_in_defaults</code> and <code>show_in_overrides</code> control <strong>UI visibility</strong>, not datacard payload validity. That means:</p>
 <ul>
 <li>a hidden field is not automatically illegal in payloads</li>
 <li>a visible field is not automatically required in payloads</li>
 <li>these flags decide where the wizard exposes the field, not whether a hand-edited payload may contain it</li>
 </ul>
 <h3 id="ebus_label"><code>ebus_label</code><a class="headerlink" href="#ebus_label" title="Permanent link">&para;</a></h3>
-<p><code>ebus_label</code> links one canonical field to one qualified eBUS parameter key, for example <code>device.Exposure</code>.</p>
-<p>The reverse eBUS-to-canonical lookup is derived at runtime from this mapping. The eBUS catalog does not redundantly store canonical field keys.</p>
+<p><code>ebus_label</code> links one canonical field to one qualified eBUS parameter key, for example <code>device.Exposure</code>. The reverse eBUS-to-canonical lookup is derived at runtime from this mapping. The eBUS catalog does not redundantly store canonical field keys.</p>
 <h3 id="ebus_managed"><code>ebus_managed</code><a class="headerlink" href="#ebus_managed" title="Permanent link">&para;</a></h3>
 <p><code>ebus_managed: true</code> means:</p>
 <ul>
@@ -1275,8 +1272,7 @@
 <a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="p">}</span>
 </code></pre></div>
 <h2 id="operational-guidance">Operational guidance<a class="headerlink" href="#operational-guidance" title="Permanent link">&para;</a></h2>
-<p>Use the mapping file to define how canonical fields should be presented and validated in the authoring UI.</p>
-<p>Do not use it to encode:</p>
+<p>Use the mapping file to define how canonical fields should be presented and validated in the authoring UI. Do not use it to encode:</p>
 <ul>
 <li>workflow decisions that belong in the User Guide</li>
 <li>plugin-loading behavior</li>

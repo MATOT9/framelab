@@ -1286,12 +1286,9 @@
 
 
 <h1 id="datacard-wizard">Datacard Wizard<a class="headerlink" href="#datacard-wizard" title="Permanent link">&para;</a></h1>
-<p>Use the <strong>Acquisition Datacard Wizard</strong> to create, edit, validate, and save acquisition metadata for the currently selected dataset.</p>
-<p>This page documents the datacard model actually consumed by the app, not only the button sequence.</p>
+<p>Use the <strong>Acquisition Datacard Wizard</strong> to create, edit, validate, and save acquisition metadata for the currently selected dataset. This page documents the datacard model actually consumed by the app, not only the button sequence.</p>
 <h2 id="purpose">Purpose<a class="headerlink" href="#purpose" title="Permanent link">&para;</a></h2>
-<p>Use a datacard when folder names and file names are not sufficient to describe the acquisition reliably.</p>
-<p>The wizard edits the <strong>acquisition-level</strong> datacard. At runtime, those acquisition-level values can still sit on top of inherited session and campaign defaults when those broader datacards exist.</p>
-<p>Typical reasons include:</p>
+<p>Use a datacard when folder names and file names are not sufficient to describe the acquisition reliably. The wizard edits the <strong>acquisition-level</strong> datacard. At runtime, those acquisition-level values can still sit on top of inherited session and campaign defaults when those broader datacards exist. Typical reasons include:</p>
 <ul>
 <li>acquisition-wide defaults should be recorded explicitly</li>
 <li>exposure, iris position, or other mapped values vary by frame index</li>
@@ -1327,8 +1324,7 @@
 <p>For mapped acquisition values, <code>defaults</code> and <code>overrides[].changes</code> use the canonical dot-path structure defined by the acquisition field mapping.</p>
 <h2 id="wizard-tabs">Wizard tabs<a class="headerlink" href="#wizard-tabs" title="Permanent link">&para;</a></h2>
 <h3 id="1-target">1. Target<a class="headerlink" href="#1-target" title="Permanent link">&para;</a></h3>
-<p>Use this tab to load the acquisition folder, inspect frame-index discovery, and choose the frame-index base used for authored override rows.</p>
-<p>Use it to:</p>
+<p>Use this tab to load the acquisition folder, inspect frame-index discovery, and choose the frame-index base used for authored override rows. Use it to:</p>
 <ul>
 <li>choose the acquisition root</li>
 <li>load an existing datacard or initialize a new one</li>
@@ -1343,8 +1339,7 @@
 <li>override row ranges are inclusive at both ends</li>
 </ul>
 <h3 id="2-identity-paths-intent">2. Identity / Paths / Intent<a class="headerlink" href="#2-identity-paths-intent" title="Permanent link">&para;</a></h3>
-<p>Use this tab for acquisition identity and acquisition-wide descriptive context.</p>
-<p>Typical content includes:</p>
+<p>Use this tab for acquisition identity and acquisition-wide descriptive context. Typical content includes:</p>
 <ul>
 <li>camera, campaign, session, or acquisition identifiers</li>
 <li>frames-directory name</li>
@@ -1352,17 +1347,14 @@
 </ul>
 <p>This tab defines acquisition context, not frame-varying sweep values.</p>
 <h3 id="3-defaults">3. Defaults<a class="headerlink" href="#3-defaults" title="Permanent link">&para;</a></h3>
-<p>Use this tab to define acquisition-level baseline values.</p>
-<p>These defaults are layered on top of any inherited session or campaign defaults. Frame overrides later replace only the keys they explicitly provide.</p>
-<p>Recommended content:</p>
+<p>Use this tab to define acquisition-level baseline values. These defaults are layered on top of any inherited session or campaign defaults. Frame overrides later replace only the keys they explicitly provide. Recommended content:</p>
 <ul>
 <li>fixed exposure, if the whole acquisition used one exposure</li>
 <li>fixed iris position, if the whole acquisition used one setting</li>
 <li>stable instrument or configuration fields that should appear on every frame record</li>
 </ul>
 <h3 id="4-frame-mapping">4. Frame Mapping<a class="headerlink" href="#4-frame-mapping" title="Permanent link">&para;</a></h3>
-<p>Use this tab when metadata varies with frame index.</p>
-<p>The current wizard supports three authoring modes:</p>
+<p>Use this tab when metadata varies with frame index. The current wizard supports three authoring modes:</p>
 <ul>
 <li><strong>Defaults only (unknown duration)</strong></li>
 <li><strong>Generate rows</strong></li>
@@ -1383,8 +1375,7 @@
 </ul>
 <p>Only specify the fields that truly change. Leave all other fields blank so they continue to inherit from Defaults.</p>
 <h3 id="5-review-and-save">5. Review and Save<a class="headerlink" href="#5-review-and-save" title="Permanent link">&para;</a></h3>
-<p>Use this tab to validate the authored datacard, inspect the final payload, and save it to disk.</p>
-<p>Before saving, confirm:</p>
+<p>Use this tab to validate the authored datacard, inspect the final payload, and save it to disk. Before saving, confirm:</p>
 <ul>
 <li>the intended dataset folder is selected</li>
 <li>defaults reflect the acquisition-wide baseline</li>
@@ -1392,8 +1383,7 @@
 <li>no field was entered in overrides unless it is meant to replace the baseline</li>
 </ul>
 <h2 id="blank-values-and-inheritance">Blank values and inheritance<a class="headerlink" href="#blank-values-and-inheritance" title="Permanent link">&para;</a></h2>
-<p>This is the most important semantic rule in the current app.</p>
-<p>A blank field means:</p>
+<p>This is the most important semantic rule in the current app. A blank field means:</p>
 <ul>
 <li>do not set a new value here</li>
 <li>keep the inherited baseline if one exists</li>
@@ -1426,8 +1416,7 @@
 <li>verify the intended coverage before saving</li>
 </ul>
 <h2 id="ebus-managed-canonical-fields">eBUS-managed canonical fields<a class="headerlink" href="#ebus-managed-canonical-fields" title="Permanent link">&para;</a></h2>
-<p>When an acquisition has a readable root-level eBUS snapshot, some canonical fields can become <strong>eBUS-managed</strong> through the acquisition field mapping and eBUS catalog.</p>
-<p>Current behavior:</p>
+<p>When an acquisition has a readable root-level eBUS snapshot, some canonical fields can become <strong>eBUS-managed</strong> through the acquisition field mapping and eBUS catalog. Current behavior:</p>
 <ul>
 <li>the field stays visible in the wizard</li>
 <li>non-overridable fields become read-only in <strong>Defaults</strong></li>

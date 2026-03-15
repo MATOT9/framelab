@@ -1312,8 +1312,7 @@
 
 
 <h1 id="data-workflow">Data Workflow<a class="headerlink" href="#data-workflow" title="Permanent link">&para;</a></h1>
-<p>The <strong>Data</strong> tab is the intake and verification stage for the entire app.</p>
-<p>Use it to:</p>
+<p>The <strong>Data</strong> tab is the intake and verification stage for the entire app. Use it to:</p>
 <ul>
 <li>confirm the folder implied by the current workflow scope</li>
 <li>scan TIFF files recursively inside that scope</li>
@@ -1323,8 +1322,7 @@
 </ul>
 <p>If the Data tab is wrong, later measurements and plots can still look mathematically clean while being physically wrong.</p>
 <h2 id="before-scanning-confirm-the-scope">Before scanning: confirm the scope<a class="headerlink" href="#before-scanning-confirm-the-scope" title="Permanent link">&para;</a></h2>
-<p>In the workflow shell, the Data page is subordinate to the currently selected workflow node.</p>
-<p>That means the effective dataset root may come from:</p>
+<p>In the workflow shell, the Data page is subordinate to the currently selected workflow node. That means the effective dataset root may come from:</p>
 <ul>
 <li>the full workspace</li>
 <li>a camera subtree</li>
@@ -1338,8 +1336,7 @@
 <li>the breadcrumb/path row</li>
 <li>the folder path shown in the dataset field</li>
 </ul>
-<p>If the scope itself is wrong, scanning correctly will still produce the wrong dataset.</p>
-<p>For the expected filesystem layout, see <a href="workflow-structure.html">Workflow Structure and Required Folder Layout</a>.</p>
+<p>If the scope itself is wrong, scanning correctly will still produce the wrong dataset. For the expected filesystem layout, see <a href="workflow-structure.html">Workflow Structure and Required Folder Layout</a>.</p>
 <h2 id="recommended-operating-sequence">Recommended operating sequence<a class="headerlink" href="#recommended-operating-sequence" title="Permanent link">&para;</a></h2>
 <ol>
 <li>Confirm the workflow profile and active node scope.</li>
@@ -1383,8 +1380,7 @@
 </table>
 <p>Exact button text may differ slightly depending on whether you are in workflow mode or ordinary folder mode.</p>
 <h2 id="what-scanning-actually-does">What scanning actually does<a class="headerlink" href="#what-scanning-actually-does" title="Permanent link">&para;</a></h2>
-<p>A scan is not only file listing. It is the dataset intake pass used by the rest of the app.</p>
-<p>During scan, the app:</p>
+<p>A scan is not only file listing. It is the dataset intake pass used by the rest of the app. During scan, the app:</p>
 <ul>
 <li>recursively discovers supported <code>.tif</code> and <code>.tiff</code> files</li>
 <li>applies the current skip rules before loading</li>
@@ -1397,8 +1393,7 @@
 </ul>
 <p>Treat a scan as a dataset-state reset, not as a cosmetic refresh.</p>
 <h2 id="skip-rules">Skip rules<a class="headerlink" href="#skip-rules" title="Permanent link">&para;</a></h2>
-<p>Skip rules exclude files or folders from dataset intake.</p>
-<p>Use them to keep temporary exports, cache folders, thumbnails, or unrelated TIFFs out of the working dataset.</p>
+<p>Skip rules exclude files or folders from dataset intake. Use them to keep temporary exports, cache folders, thumbnails, or unrelated TIFFs out of the working dataset.</p>
 <h3 id="main-page-behavior">Main-page behavior<a class="headerlink" href="#main-page-behavior" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Edit Skip Rules...</strong> opens the dedicated editor.</li>
@@ -1417,16 +1412,14 @@
 <h2 id="metadata-source-selection">Metadata source selection<a class="headerlink" href="#metadata-source-selection" title="Permanent link">&para;</a></h2>
 <p>The chosen metadata source directly affects grouping, exposure-dependent metrics, and analysis-plugin inputs.</p>
 <h3 id="path-metadata">Path metadata<a class="headerlink" href="#path-metadata" title="Permanent link">&para;</a></h3>
-<p>Use <strong>Path</strong> when file names and folder structure already encode the experiment correctly.</p>
-<p>Typical examples include:</p>
+<p>Use <strong>Path</strong> when file names and folder structure already encode the experiment correctly. Typical examples include:</p>
 <ul>
 <li>exposure or iris embedded in the file name</li>
 <li>exposure or iris embedded in parent folders</li>
 <li>sweep grouping encoded directly in directory names</li>
 </ul>
 <h3 id="acquisition-json-metadata">Acquisition JSON metadata<a class="headerlink" href="#acquisition-json-metadata" title="Permanent link">&para;</a></h3>
-<p>Use <strong>Acquisition JSON</strong> when the acquisition-root JSON hierarchy is the authoritative source.</p>
-<p>In the current implementation, that source can combine:</p>
+<p>Use <strong>Acquisition JSON</strong> when the acquisition-root JSON hierarchy is the authoritative source. In the current implementation, that source can combine:</p>
 <ul>
 <li>acquisition defaults and frame-targeted overrides from <code>acquisition_datacard.json</code></li>
 <li>inherited session defaults from <code>session_datacard.json</code></li>
@@ -1436,11 +1429,9 @@
 </ul>
 <p>When the hierarchical JSON stack does not provide exposure or iris values, the app can still fall back to path-derived values for those specific fields. Treat that fallback as a mixed-source convenience, not as proof that the authored metadata is complete.</p>
 <h3 id="selection-rule">Selection rule<a class="headerlink" href="#selection-rule" title="Permanent link">&para;</a></h3>
-<p>Choose the source that best represents the true acquisition, then keep that source fixed for one interpretation pass.</p>
-<p>Do not switch metadata source mid-analysis unless you are intentionally comparing metadata strategies.</p>
+<p>Choose the source that best represents the true acquisition, then keep that source fixed for one interpretation pass. Do not switch metadata source mid-analysis unless you are intentionally comparing metadata strategies.</p>
 <h2 id="ebus-status-line">eBUS status line<a class="headerlink" href="#ebus-status-line" title="Permanent link">&para;</a></h2>
-<p>When the selected dataset folder contains exactly one readable root-level <code>.pvcfg</code> file, the Data page shows a compact eBUS status line.</p>
-<p>Use that status line as a cue that:</p>
+<p>When the selected dataset folder contains exactly one readable root-level <code>.pvcfg</code> file, the Data page shows a compact eBUS status line. Use that status line as a cue that:</p>
 <ul>
 <li>the acquisition carries an immutable raw eBUS baseline snapshot</li>
 <li>some canonical acquisition-wide metadata may now be driven by effective eBUS values if the datacard and field mapping declare them as eBUS-managed</li>
@@ -1448,8 +1439,7 @@
 </ul>
 <p>The status line does <strong>not</strong> mean the app will compare or modify the snapshot automatically. It only indicates that a discoverable acquisition-local snapshot exists.</p>
 <h2 id="metadata-table">Metadata table<a class="headerlink" href="#metadata-table" title="Permanent link">&para;</a></h2>
-<p>The Data table is the pre-flight check for the rest of the app.</p>
-<p>Inspect it for:</p>
+<p>The Data table is the pre-flight check for the rest of the app. Inspect it for:</p>
 <ul>
 <li>the expected number of image rows</li>
 <li>correct file identity and folder context</li>
@@ -1460,8 +1450,7 @@
 </ul>
 <p>If the table is wrong here, downstream plots inherit the error.</p>
 <h2 id="grouping">Grouping<a class="headerlink" href="#grouping" title="Permanent link">&para;</a></h2>
-<p>Grouping clusters rows by one selected field for table organization and operator review.</p>
-<p>Current behavior is fixed by the UI, not free-form:</p>
+<p>Grouping clusters rows by one selected field for table organization and operator review. Current behavior is fixed by the UI, not free-form:</p>
 <ul>
 <li>base choices are <strong>None</strong>, <strong>Parent Folder</strong>, and <strong>Grandparent Folder</strong></li>
 <li>plugins may expose additional grouping fields such as <strong>Iris Position</strong> and <strong>Exposure [ms]</strong></li>
@@ -1472,8 +1461,7 @@
 </ul>
 <p>Grouping is useful for visually checking sweep structure before measurement or analysis. It does not change row metadata.</p>
 <h2 id="structure-work-versus-data-verification">Structure work versus data verification<a class="headerlink" href="#structure-work-versus-data-verification" title="Permanent link">&para;</a></h2>
-<p>The Data tab is where you verify what will be measured. It is not the primary place to repair hierarchy.</p>
-<p>Use <strong>Workflow Explorer -&gt; Structure</strong> first when you still need to:</p>
+<p>The Data tab is where you verify what will be measured. It is not the primary place to repair hierarchy. Use <strong>Workflow Explorer -&gt; Structure</strong> first when you still need to:</p>
 <ul>
 <li>create a session under a campaign</li>
 <li>create one or more acquisitions under a session</li>

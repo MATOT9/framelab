@@ -1,8 +1,6 @@
 # Intensity Trend Explorer
 
-**Intensity Trend Explorer** is the built-in analysis plugin for plotting measurement-stage quantities against exposure or iris position.
-
-Use it to answer questions such as:
+**Intensity Trend Explorer** is the built-in analysis plugin for plotting measurement-stage quantities against exposure or iris position. Use it to answer questions such as:
 
 - how does the measured signal vary with exposure?
 - how does the measured signal vary with iris position?
@@ -62,9 +60,7 @@ Choose how uncertainty is displayed.
 | **Std** | Display standard deviation. |
 | **Std Err** | Display standard error of the mean. |
 
-Use **Std** when you want to show spread. Use **Std Err** when you want uncertainty on the estimated mean.
-
-Practical note:
+Use **Std** when you want to show spread. Use **Std Err** when you want uncertainty on the estimated mean. Practical note:
 
 - uncertainty bars are meaningful for mean-based and `DN/ms`-based quantities
 - **Peak Intensity** does not carry a dedicated uncertainty source in the current plugin, so error bars are not the main readout for that mode
@@ -99,21 +95,13 @@ Current series rules are:
 
 ### Point aggregation
 
-When several records contribute to one plotted operating point, the plugin computes a summary point from those records.
+When several records contribute to one plotted operating point, the plugin computes a summary point from those records. For values \(y_1, \dots, y_N\):
 
-For values \(y_1, \dots, y_N\):
+\[y_{	ext{point}} = \frac{1}{N}\sum_{i=1}^{N} y_i\]
 
-\[
-y_{	ext{point}} = rac{1}{N}\sum_{i=1}^{N} y_i
-\]
+\[\sigma_{	ext{point}} = \mathrm{std}(y_1, \dots, y_N)\]
 
-\[
-\sigma_{	ext{point}} = \mathrm{std}(y_1, \dots, y_N)
-\]
-
-\[
-\mathrm{SEM}_{	ext{point}} = rac{\sigma_{	ext{point}}}{\sqrt{N}}
-\]
+\[\mathrm{SEM}_{	ext{point}} = \frac{\sigma_{	ext{point}}}{\sqrt{N}}\]
 
 Use the plotted point as a summary of the contributing records, not as the value of one individual row.
 
@@ -121,9 +109,7 @@ Use the plotted point as a summary of the contributing records, not as the value
 
 In gain modes, the plotted value is relative to a reference point on the same series:
 
-\[
-g_i = rac{y_i}{y_{	ext{ref}}}
-\]
+\[g_i = \frac{y_i}{y_{	ext{ref}}}\]
 
 where:
 
@@ -137,9 +123,7 @@ Gain is therefore a relative quantity. It indicates how the signal changed with 
 
 ### Iris-position gain uses `DN/ms`
 
-When **X Axis = Iris Position** and a gain mode is selected, the plugin builds gain from mean `DN/ms` at each iris position before applying the reference conversion.
-
-That means:
+When **X Axis = Iris Position** and a gain mode is selected, the plugin builds gain from mean `DN/ms` at each iris position before applying the reference conversion. That means:
 
 - exposure metadata must be valid upstream
 - the result is sensitive to correct `DN/ms` computation upstream
@@ -147,29 +131,21 @@ That means:
 
 ### Exposure-axis gain uses the active mean metric
 
-When **X Axis = Exposure** and a gain mode is selected, the plugin builds gain directly from the active mean metric rather than from `DN/ms`.
-
-That is why **Intensity Rate** is not offered as a separate Y mode when X is already exposure.
+When **X Axis = Exposure** and a gain mode is selected, the plugin builds gain directly from the active mean metric rather than from `DN/ms`. That is why **Intensity Rate** is not offered as a separate Y mode when X is already exposure.
 
 ### Iris-position gain locks the overlay model
 
-When **X Axis = Iris Position** and gain is selected, the plugin forces the trend overlay to **Mean by X** and hides the raw series view.
-
-This is intentional. In that mode the plugin is emphasizing the aggregated gain-versus-iris result rather than exposure-separated raw series.
+When **X Axis = Iris Position** and gain is selected, the plugin forces the trend overlay to **Mean by X** and hides the raw series view. This is intentional. In that mode the plugin is emphasizing the aggregated gain-versus-iris result rather than exposure-separated raw series.
 
 ## Mean-by-X overlay
 
-The **Mean by X** overlay collapses visible raw series into one weighted summary line.
-
-At each X value, visible raw points are combined using sample-count weighting:
+The **Mean by X** overlay collapses visible raw series into one weighted summary line. At each X value, visible raw points are combined using sample-count weighting:
 
 \[
-ar{y}_w = rac{\sum_i w_i y_i}{\sum_i w_i}
+\bar{y}_w = \frac{\sum_i w_i y_i}{\sum_i w_i}
 \]
 
-where \(w_i\) is the sample count associated with visible point \(i\).
-
-Use this overlay when you want one summary trend across the visible operating population instead of several separate raw series.
+where \(w_i\) is the sample count associated with visible point \(i\). Use this overlay when you want one summary trend across the visible operating population instead of several separate raw series.
 
 ## Linear fit overlay
 
@@ -179,9 +155,7 @@ The **Linear fit** overlay applies a first-order model across all visible raw se
 y = m x + b
 \]
 
-The plugin also reports \(R^2\) as a compact goodness-of-fit descriptor.
-
-Use the fit as a descriptive trend aid, not as proof that the system is physically linear over the explored range.
+The plugin also reports \(R^2\) as a compact goodness-of-fit descriptor. Use the fit as a descriptive trend aid, not as proof that the system is physically linear over the explored range.
 
 ## Plot and result table
 
@@ -190,9 +164,7 @@ The plugin page combines:
 - a plot for trend inspection
 - a table for exact values, uncertainty values, and contributing sample counts
 
-Use the plot to identify structure. Use the table to verify exact numbers before drawing conclusions.
-
-Read the table particularly carefully when:
+Use the plot to identify structure. Use the table to verify exact numbers before drawing conclusions. Read the table particularly carefully when:
 
 - a curve looks flatter or noisier than expected
 - a gain jump seems too large
@@ -230,7 +202,7 @@ This appendix keeps the defining equations close to the operational guidance.
 When the plugin receives one uncertainty value per contributing record, it combines them as:
 
 \[
-\sigma_{ar{y}} = rac{\sqrt{\sum_{i=1}^{N} e_i^2}}{N}
+\sigma_{\bar{y}} = \frac{\sqrt{\sum_{i=1}^{N} e_i^2}}{N}
 \]
 
 where \(e_i\) is the uncertainty associated with record \(i\).
@@ -242,11 +214,11 @@ When gain uncertainty is enabled, the plugin uses first-order propagation:
 \[
 \sigma_{g_i}
 =
-\left|g_iight|
+\left| g_i \right|
 \sqrt{
-\left(rac{\sigma_i}{y_i}ight)^2
+\left(\frac{\sigma_i}{y_i}\right)^2
 +
-\left(rac{\sigma_{	ext{ref}}}{y_{	ext{ref}}}ight)^2
+\left(\frac{\sigma_{\text{ref}}}{y_{\text{ref}}}\right)^2
 }
 \]
 
@@ -255,13 +227,13 @@ When gain uncertainty is enabled, the plugin uses first-order propagation:
 For the fit overlay, the coefficient of determination is reported as:
 
 \[
-R^2 = 1 - rac{SS_{	ext{res}}}{SS_{	ext{tot}}}
+R^2 = 1 - \frac{SS_{	ext{res}}}{SS_{	ext{tot}}}
 \]
 
 with:
 
 - \(SS_{	ext{res}} = \sum_i (y_i - \hat{y}_i)^2\)
-- \(SS_{	ext{tot}} = \sum_i (y_i - ar{y})^2\)
+- \(SS_{	ext{tot}} = \sum_i (y_i - \bar{y})^2\)
 
 ## Related pages
 

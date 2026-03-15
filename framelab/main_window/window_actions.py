@@ -9,7 +9,7 @@ from pathlib import Path
 from PySide6 import QtWidgets as qtw
 from PySide6.QtCore import Qt
 
-from stylesheets import DARK_THEME, LIGHT_THEME
+from ..stylesheets import DARK_THEME, LIGHT_THEME
 from ..payload_utils import read_json_dict, write_json_dict
 from ..processing_failures import (
     ProcessingFailure,

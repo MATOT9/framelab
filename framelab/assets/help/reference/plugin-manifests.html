@@ -1050,16 +1050,14 @@
 
 
 <h1 id="plugin-manifests">Plugin Manifests<a class="headerlink" href="#plugin-manifests" title="Permanent link">&para;</a></h1>
-<p>Plugin manifests allow the app to discover plugin metadata before importing plugin code.</p>
-<p>This supports three important runtime behaviors:</p>
+<p>Plugin manifests allow the app to discover plugin metadata before importing plugin code. This supports three important runtime behaviors:</p>
 <ul>
 <li>startup selection without importing every plugin implementation</li>
 <li>dependency validation before launch</li>
 <li>enabled-only runtime imports after the user confirms the selection</li>
 </ul>
 <h2 id="discovery-rules">Discovery rules<a class="headerlink" href="#discovery-rules" title="Permanent link">&para;</a></h2>
-<p>Manifest discovery is page-scoped.</p>
-<p>The app searches under the plugin tree for files named:</p>
+<p>Manifest discovery is page-scoped. The app searches under the plugin tree for files named:</p>
 <ul>
 <li><code>plugin.json</code></li>
 <li><code>*.plugin.json</code></li>
@@ -1131,8 +1129,7 @@
 <a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="p">}</span>
 </code></pre></div>
 <h2 id="validation-rules">Validation rules<a class="headerlink" href="#validation-rules" title="Permanent link">&para;</a></h2>
-<p>The manifest layer is validated before runtime plugin imports.</p>
-<p>The current rules are:</p>
+<p>The manifest layer is validated before runtime plugin imports. The current rules are:</p>
 <ul>
 <li><code>plugin_id</code> must be present and non-empty</li>
 <li><code>display_name</code> must be present and non-empty</li>
@@ -1145,16 +1142,14 @@
 </ul>
 <p>If any of these checks fail, plugin discovery fails rather than partially loading a broken manifest set.</p>
 <h2 id="runtime-implication-of-dependencies">Runtime implication of dependencies<a class="headerlink" href="#runtime-implication-of-dependencies" title="Permanent link">&para;</a></h2>
-<p>Dependencies affect both persistence and launch-time resolution.</p>
-<p>Important consequences:</p>
+<p>Dependencies affect both persistence and launch-time resolution. Important consequences:</p>
 <ul>
 <li>the saved plugin-selection file may list only the directly chosen plugin ids</li>
 <li>the effective enabled set is closed over dependencies at load time</li>
 <li>disabling a plugin in the startup selector can also disable dependent plugins</li>
 </ul>
 <h2 id="registration-contract">Registration contract<a class="headerlink" href="#registration-contract" title="Permanent link">&para;</a></h2>
-<p>A valid manifest is necessary but not sufficient.</p>
-<p>After the enabled manifest set is imported:</p>
+<p>A valid manifest is necessary but not sufficient. After the enabled manifest set is imported:</p>
 <ul>
 <li>the plugin entrypoint module must import successfully</li>
 <li>the plugin implementation must register itself with the host registry</li>

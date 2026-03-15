@@ -1,6 +1,6 @@
 # Concepts and Limits
 
-Use this page to establish the engineering model behind the app before working tab by tab.
+Use this page to establish the model behind the app before working tab by tab.
 
 FrameLab is a TIFF-centric calibration and exploratory analysis tool. It turns image collections into comparable per-image metrics, then lets analysis plugins reorganize those metrics against acquisition variables such as exposure or iris position. It is intentionally useful for practical engineering studies, but it is not a substitute for a full radiometric calibration pipeline.
 
@@ -16,9 +16,7 @@ The app does not create physical meaning on its own. It helps you preserve metad
 
 ## Workflow hierarchy concepts
 
-For most work, the primary profile is **Calibration**.
-
-Its logical hierarchy is:
+For most work, the primary profile is **Calibration**. Its logical hierarchy is:
 
 ```text
 workspace -> camera -> campaign -> session -> acquisition
@@ -56,9 +54,7 @@ A **dataset** is the currently scanned folder context. All normalization, groupi
 
 ### Scope
 
-A **scope** is the workflow node currently driving the Data, Measure, and Analyze pages.
-
-Depending on what you opened, the scope may be:
+A **scope** is the workflow node currently driving the Data, Measure, and Analyze pages. Depending on what you opened, the scope may be:
 
 - the full workspace
 - one camera subtree
@@ -80,9 +76,7 @@ A **row** is one loaded image record. A row can carry:
 
 ### Group
 
-A **group** is a table-level cluster built from the currently selected grouping field.
-
-Current behavior is exact rather than fuzzy:
+A **group** is a table-level cluster built from the currently selected grouping field. Current behavior is exact rather than fuzzy:
 
 - grouping is only available for the fields exposed in the UI
 - token matching is string-based
@@ -94,9 +88,7 @@ Grouping is primarily for operator organization and pre-analysis sanity checking
 
 ### Plugin
 
-A **plugin** is an extension point loaded at startup.
-
-In the current shipped app, plugins appear in three roles:
+A **plugin** is an extension point loaded at startup. In the current shipped app, plugins appear in three roles:
 
 - **data plugins**, such as **Session Manager (Legacy)**, **Acquisition Datacard Wizard**, and **eBUS Config Tools**
 - **measure plugins**, such as **Background Correction**
@@ -110,9 +102,7 @@ The app can resolve metadata from more than one source. That choice matters beca
 
 ### Path metadata
 
-**Path metadata** means values inferred from the file name or folder names.
-
-Typical examples include:
+**Path metadata** means values inferred from the file name or folder names. Typical examples include:
 
 - exposure parsed from a file name or parent folder
 - iris position parsed from a parent folder, grandparent folder, or file stem
@@ -122,9 +112,7 @@ Path metadata is useful when the dataset layout already encodes the experiment c
 
 ### Acquisition JSON metadata
 
-The UI label **Acquisition JSON** refers to the hierarchical metadata stack anchored at the selected acquisition root.
-
-In the current implementation, that stack can combine:
+The UI label **Acquisition JSON** refers to the hierarchical metadata stack anchored at the selected acquisition root. In the current implementation, that stack can combine:
 
 - acquisition defaults and frame-targeted overrides from `acquisition_datacard.json`
 - inherited session defaults from `session_datacard.json`
@@ -154,9 +142,7 @@ When **Acquisition JSON** is selected, the app still falls back to path-derived 
 
 ## Measurement concepts
 
-The **Measure** workflow computes per-image quantities from the current **metric image**.
-
-The metric image is:
+The **Measure** workflow computes per-image quantities from the current **metric image**. The metric image is:
 
 - the raw image when background subtraction is off or no compatible reference exists
 - the background-corrected image when subtraction is enabled and a compatible reference is available
@@ -165,9 +151,7 @@ This distinction matters because saturation counts, max pixel, min non-zero, Top
 
 ### Digital Number (DN)
 
-**DN** means the numeric image intensity stored in the TIFF-derived image data. Mean intensity, peak intensity, ROI intensity, and Top-K intensity are all intensity quantities expressed in DN unless explicitly normalized.
-
-DN is not a physical radiometric unit by itself.
+**DN** means the numeric image intensity stored in the TIFF-derived image data. Mean intensity, peak intensity, ROI intensity, and Top-K intensity are all intensity quantities expressed in DN unless explicitly normalized. DN is not a physical radiometric unit by itself.
 
 ### Saturated-pixel count
 
@@ -206,9 +190,7 @@ When valid exposure metadata exists, the app computes a rate-like quantity from 
 DN/ms = mean_intensity / exposure_ms
 ```
 
-Dividing the measured intensity by exposure time normalizes the result by integration duration, allowing first-order comparison across images acquired with different exposure settings.
-
-`DN/ms` is useful for engineering comparison of relative trends, especially across exposure or iris studies. It is not, by itself, a radiometric quantity and should not be treated as proof of constant scene radiance, detector linearity, or invariant optical throughput.
+Dividing the measured intensity by exposure time normalizes the result by integration duration, allowing first-order comparison across images acquired with different exposure settings. `DN/ms` is useful for comparison of relative trends, especially across exposure or iris studies. It is not, by itself, a radiometric quantity and should not be treated as proof of constant scene radiance, detector linearity, or invariant optical throughput.
 
 ### Normalization
 
@@ -218,9 +200,7 @@ When normalization is enabled, intensity-like values are divided by the current 
 normalized_value = value / current_dataset_max_pixel
 ```
 
-In the current implementation, that scale is the maximum value in the current measure-stage **max pixel** array. Because that array follows the active metric image, background subtraction can change the normalization divisor.
-
-Important consequences:
+In the current implementation, that scale is the maximum value in the current measure-stage **max pixel** array. Because that array follows the active metric image, background subtraction can change the normalization divisor. Important consequences:
 
 - normalization does **not** rewrite TIFF source data on disk
 - normalization does affect displayed intensity-derived values
@@ -235,9 +215,7 @@ Background subtraction changes the metric image used for measurement:
 metric_image = image - background
 ```
 
-Optional negative clipping can then force negative residuals back to zero.
-
-This is not a cosmetic display effect. It changes the quantities later used for table metrics, normalization scale, and analysis-plugin inputs.
+Optional negative clipping can then force negative residuals back to zero. This is not a cosmetic display effect. It changes the quantities later used for table metrics, normalization scale, and analysis-plugin inputs.
 
 ## Analysis concepts
 
@@ -263,9 +241,7 @@ Gain is therefore a relative quantity. It describes change with respect to a ref
 
 ### Error bars
 
-Error bars depend on the selected plugin mode and available uncertainty source. They can reflect direct spread, SEM, or propagated uncertainty derived from upstream measurement-stage values.
-
-A clean plot with small error bars is only meaningful if metadata source, measurement mode, normalization state, and background handling were already correct upstream.
+Error bars depend on the selected plugin mode and available uncertainty source. They can reflect direct spread, SEM, or propagated uncertainty derived from upstream measurement-stage values. A clean plot with small error bars is only meaningful if metadata source, measurement mode, normalization state, and background handling were already correct upstream.
 
 ## What this app is good for
 

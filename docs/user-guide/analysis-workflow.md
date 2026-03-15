@@ -1,8 +1,6 @@
 # Analysis Workflow
 
-The **Analyze** tab is the final interpretation stage of the app. It uses the dataset and measurement results prepared upstream to build plots, derived tables, and comparison views through enabled analysis plugins.
-
-This page assumes the following are already correct:
+The **Analyze** tab is the final interpretation stage of the app. It uses the dataset and measurement results prepared upstream to build plots, derived tables, and comparison views through enabled analysis plugins. This page assumes the following are already correct:
 
 - the intended dataset has been scanned in **Data**
 - the metadata source and grouping are correct
@@ -43,9 +41,7 @@ The exact controls depend on the active analysis plugin, but the Analyze tab gen
 - a right-side workspace with the result table and plot
 - plugin-specific runtime actions in the **Plugins** menu
 
-The selector at the top of the page switches between analysis plugins that were already loaded for the current session. It is not a preset manager and it does not load disabled plugins after launch.
-
-The left rail is intentionally lightweight. If you need more horizontal room for the result table or plot, collapse the plugin controls band from the rail and keep the workspace open on the right.
+The selector at the top of the page switches between analysis plugins that were already loaded for the current session. It is not a preset manager and it does not load disabled plugins after launch. The left rail is intentionally lightweight. If you need more horizontal room for the result table or plot, collapse the plugin controls band from the rail and keep the workspace open on the right.
 
 ## Startup selector versus plugin selector
 
@@ -53,9 +49,7 @@ Two selectors are involved in analysis, and they serve different roles.
 
 ### Startup selector
 
-The **startup selector** appears before the main window opens. Its job is to determine which plugins exist in the session at all.
-
-If an analysis plugin is disabled here:
+The **startup selector** appears before the main window opens. Its job is to determine which plugins exist in the session at all. If an analysis plugin is disabled here:
 
 - its code is not loaded for the session
 - its widget is not created
@@ -64,15 +58,11 @@ If an analysis plugin is disabled here:
 
 ### Analyze-page plugin selector
 
-The **Analysis Plugin** selector inside the Analyze tab switches between analysis plugins that were already enabled at startup.
-
-Use it when you want to change the active analysis view without restarting the app.
+The **Analysis Plugin** selector inside the Analyze tab switches between analysis plugins that were already enabled at startup. Use it when you want to change the active analysis view without restarting the app.
 
 ## What analysis plugins receive
 
-Analysis plugins consume a prepared `AnalysisContext`, not raw TIFF files.
-
-That context already contains:
+Analysis plugins consume a prepared `AnalysisContext`, not raw TIFF files. That context already contains:
 
 - the active measurement mode
 - per-row metadata resolved from the selected metadata source
@@ -104,9 +94,7 @@ A plot alone is usually insufficient when you need to verify aggregation behavio
 
 ## Current built-in analysis plugin
 
-The current built-in analysis plugin is **Intensity Trend Explorer**.
-
-Use its dedicated page for plugin-specific details such as:
+The current built-in analysis plugin is **Intensity Trend Explorer**. Use its dedicated page for plugin-specific details such as:
 
 - axis options
 - gain semantics

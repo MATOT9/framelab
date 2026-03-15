@@ -1188,8 +1188,7 @@
 
 
 <h1 id="analysis-workflow">Analysis Workflow<a class="headerlink" href="#analysis-workflow" title="Permanent link">&para;</a></h1>
-<p>The <strong>Analyze</strong> tab is the final interpretation stage of the app. It uses the dataset and measurement results prepared upstream to build plots, derived tables, and comparison views through enabled analysis plugins.</p>
-<p>This page assumes the following are already correct:</p>
+<p>The <strong>Analyze</strong> tab is the final interpretation stage of the app. It uses the dataset and measurement results prepared upstream to build plots, derived tables, and comparison views through enabled analysis plugins. This page assumes the following are already correct:</p>
 <ul>
 <li>the intended dataset has been scanned in <strong>Data</strong></li>
 <li>the metadata source and grouping are correct</li>
@@ -1225,13 +1224,11 @@
 <li>a right-side workspace with the result table and plot</li>
 <li>plugin-specific runtime actions in the <strong>Plugins</strong> menu</li>
 </ul>
-<p>The selector at the top of the page switches between analysis plugins that were already loaded for the current session. It is not a preset manager and it does not load disabled plugins after launch.</p>
-<p>The left rail is intentionally lightweight. If you need more horizontal room for the result table or plot, collapse the plugin controls band from the rail and keep the workspace open on the right.</p>
+<p>The selector at the top of the page switches between analysis plugins that were already loaded for the current session. It is not a preset manager and it does not load disabled plugins after launch. The left rail is intentionally lightweight. If you need more horizontal room for the result table or plot, collapse the plugin controls band from the rail and keep the workspace open on the right.</p>
 <h2 id="startup-selector-versus-plugin-selector">Startup selector versus plugin selector<a class="headerlink" href="#startup-selector-versus-plugin-selector" title="Permanent link">&para;</a></h2>
 <p>Two selectors are involved in analysis, and they serve different roles.</p>
 <h3 id="startup-selector">Startup selector<a class="headerlink" href="#startup-selector" title="Permanent link">&para;</a></h3>
-<p>The <strong>startup selector</strong> appears before the main window opens. Its job is to determine which plugins exist in the session at all.</p>
-<p>If an analysis plugin is disabled here:</p>
+<p>The <strong>startup selector</strong> appears before the main window opens. Its job is to determine which plugins exist in the session at all. If an analysis plugin is disabled here:</p>
 <ul>
 <li>its code is not loaded for the session</li>
 <li>its widget is not created</li>
@@ -1239,11 +1236,9 @@
 <li>it cannot be selected later from the Analyze tab</li>
 </ul>
 <h3 id="analyze-page-plugin-selector">Analyze-page plugin selector<a class="headerlink" href="#analyze-page-plugin-selector" title="Permanent link">&para;</a></h3>
-<p>The <strong>Analysis Plugin</strong> selector inside the Analyze tab switches between analysis plugins that were already enabled at startup.</p>
-<p>Use it when you want to change the active analysis view without restarting the app.</p>
+<p>The <strong>Analysis Plugin</strong> selector inside the Analyze tab switches between analysis plugins that were already enabled at startup. Use it when you want to change the active analysis view without restarting the app.</p>
 <h2 id="what-analysis-plugins-receive">What analysis plugins receive<a class="headerlink" href="#what-analysis-plugins-receive" title="Permanent link">&para;</a></h2>
-<p>Analysis plugins consume a prepared <code>AnalysisContext</code>, not raw TIFF files.</p>
-<p>That context already contains:</p>
+<p>Analysis plugins consume a prepared <code>AnalysisContext</code>, not raw TIFF files. That context already contains:</p>
 <ul>
 <li>the active measurement mode</li>
 <li>per-row metadata resolved from the selected metadata source</li>
@@ -1271,8 +1266,7 @@
 </ul>
 <p>A plot alone is usually insufficient when you need to verify aggregation behavior or judge whether a trend is supported by enough samples.</p>
 <h2 id="current-built-in-analysis-plugin">Current built-in analysis plugin<a class="headerlink" href="#current-built-in-analysis-plugin" title="Permanent link">&para;</a></h2>
-<p>The current built-in analysis plugin is <strong>Intensity Trend Explorer</strong>.</p>
-<p>Use its dedicated page for plugin-specific details such as:</p>
+<p>The current built-in analysis plugin is <strong>Intensity Trend Explorer</strong>. Use its dedicated page for plugin-specific details such as:</p>
 <ul>
 <li>axis options</li>
 <li>gain semantics</li>

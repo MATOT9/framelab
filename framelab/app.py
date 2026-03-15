@@ -16,7 +16,7 @@ from .plugins.selection import (
     save_selected_plugin_ids,
 )
 from .window import FrameLabWindow
-from stylesheets import DARK_THEME
+from .stylesheets import DARK_THEME
 
 
 def main() -> int:

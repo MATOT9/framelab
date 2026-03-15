@@ -1485,8 +1485,7 @@
 </ul>
 <p>This stage should remain lightweight. Do not import heavy plugin UI or dataset logic here.</p>
 <h3 id="2-manifest-discovery-before-runtime-import">2. Manifest discovery before runtime import<a class="headerlink" href="#2-manifest-discovery-before-runtime-import" title="Permanent link">&para;</a></h3>
-<p>The app discovers plugin manifests before importing plugin implementation modules. This is a deliberate design choice.</p>
-<p>Why it matters:</p>
+<p>The app discovers plugin manifests before importing plugin implementation modules. This is a deliberate design choice. Why it matters:</p>
 <ul>
 <li>the startup selector can list plugins without importing them</li>
 <li>dependency closure can be resolved before the main window is created</li>
@@ -1504,15 +1503,12 @@
 </ul>
 <p>At this point the app still has not built the main workflow window.</p>
 <h3 id="4-workflow-profile-and-workspace-loading">4. Workflow profile and workspace loading<a class="headerlink" href="#4-workflow-profile-and-workspace-loading" title="Permanent link">&para;</a></h3>
-<p>The workflow shell is profile-driven. The built-in profiles currently live in <code>framelab/workflow/profiles.py</code>.</p>
-<p>Current built-in profiles:</p>
+<p>The workflow shell is profile-driven. The built-in profiles currently live in <code>framelab/workflow/profiles.py</code>. Current built-in profiles:</p>
 <ul>
 <li><code>calibration</code>: <code>workspace -&gt; camera -&gt; campaign -&gt; session -&gt; acquisition</code></li>
 <li><code>trials</code>: <code>workspace -&gt; trial -&gt; camera -&gt; session -&gt; acquisition</code></li>
 </ul>
-<p>The trials profile exists, but it should still be treated as experimental in operator documentation.</p>
-<p>Typed hierarchy loading is owned by <code>WorkflowStateController</code> in <code>framelab/workflow/state.py</code>.</p>
-<p>Important architectural point:</p>
+<p>The trials profile exists, but it should still be treated as experimental in operator documentation. Typed hierarchy loading is owned by <code>WorkflowStateController</code> in <code>framelab/workflow/state.py</code>. Important architectural point:</p>
 <ul>
 <li>the workflow tree is <strong>not</strong> loaded purely by folder depth</li>
 <li>node type is inferred from the active profile, explicit anchor choice, nodecards, and filesystem heuristics</li>
@@ -1522,9 +1518,7 @@
 </ul>
 <p>This means workflow behavior should be documented and maintained as a contract, not as a loose convention.</p>
 <h3 id="5-main-window-construction">5. Main window construction<a class="headerlink" href="#5-main-window-construction" title="Permanent link">&para;</a></h3>
-<p>The enabled plugin set can include both page-embedded plugins and dialog-style tools such as Session Manager, eBUS compare/inspect helpers, or Background Correction. The host window must therefore support both permanent page contributions and transient runtime actions from the same plugin system.</p>
-<p><code>FrameLabWindow</code> in <code>framelab/window.py</code> is then constructed with the enabled plugin ids.</p>
-<p>During initialization it:</p>
+<p>The enabled plugin set can include both page-embedded plugins and dialog-style tools such as Session Manager, eBUS compare/inspect helpers, or Background Correction. The host window must therefore support both permanent page contributions and transient runtime actions from the same plugin system. <code>FrameLabWindow</code> in <code>framelab/window.py</code> is then constructed with the enabled plugin ids. During initialization it:</p>
 <ul>
 <li>resolves the enabled plugin set again for safety</li>
 <li>groups enabled manifests by page</li>
@@ -1562,9 +1556,7 @@
 <li>it matches <code>acq-####</code> or <code>acq-####__label</code> and contains a <code>frames/</code> directory</li>
 </ul>
 <h3 id="session-management-strictness">Session-management strictness<a class="headerlink" href="#session-management-strictness" title="Permanent link">&para;</a></h3>
-<p>Session-management operations are intentionally stricter than workflow loading.</p>
-<p>They only manage acquisition folders matching the acquisition naming contract parsed by <code>framelab/acquisition_datacard.py</code>.</p>
-<p>That distinction is intentional:</p>
+<p>Session-management operations are intentionally stricter than workflow loading. They only manage acquisition folders matching the acquisition naming contract parsed by <code>framelab/acquisition_datacard.py</code>. That distinction is intentional:</p>
 <ul>
 <li>workflow loading tries to stay tolerant enough to open existing data</li>
 <li>structure-authoring tools try to keep the filesystem normalized and predictable</li>
@@ -1591,8 +1583,7 @@
 </ul>
 <p>Dataset discovery and image loading helpers live primarily in <code>framelab/main_window/dataset_loading.py</code>.</p>
 <h3 id="stage-2-metadata-resolution">Stage 2: metadata resolution<a class="headerlink" href="#stage-2-metadata-resolution" title="Permanent link">&para;</a></h3>
-<p>For each discovered image, metadata is resolved through <code>framelab/metadata.py</code>.</p>
-<p>This stage can combine:</p>
+<p>For each discovered image, metadata is resolved through <code>framelab/metadata.py</code>. This stage can combine:</p>
 <ul>
 <li>path-derived metadata</li>
 <li>workflow nodecards from <code>.framelab/nodecard.json</code></li>
@@ -1614,8 +1605,7 @@
 </ul>
 <p>These results are stored through <code>MetricsPipelineController</code>. Dynamic metric computation is delegated to worker classes in <code>framelab/workers.py</code> and orchestrated by <code>MetricsRuntimeMixin</code>, which applies worker results back into controller-owned state.</p>
 <h3 id="stage-4-analysis-context-build">Stage 4: analysis context build<a class="headerlink" href="#stage-4-analysis-context-build" title="Permanent link">&para;</a></h3>
-<p>The Analyze workflow does not re-measure images. It packages the current dataset and metric controller state into an <code>AnalysisContext</code> through <code>framelab/analysis_context.py</code>.</p>
-<p>That context is built from:</p>
+<p>The Analyze workflow does not re-measure images. It packages the current dataset and metric controller state into an <code>AnalysisContext</code> through <code>framelab/analysis_context.py</code>. That context is built from:</p>
 <ul>
 <li>measurement-mode-dependent mean/std/SEM values</li>
 <li>per-row metadata</li>

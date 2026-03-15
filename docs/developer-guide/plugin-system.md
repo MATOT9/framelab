@@ -1,8 +1,6 @@
 # Plugin System
 
-The plugin system is the app's extension boundary. It is designed so that plugin metadata can be discovered without importing plugin code, startup enablement can be resolved before the main window exists, and only the enabled entrypoints are imported at runtime.
-
-This page documents the maintainer-facing contract: discovery, validation, enablement, import, reload, and runtime class expectations.
+The plugin system is the app's extension boundary. It is designed so that plugin metadata can be discovered without importing plugin code, startup enablement can be resolved before the main window exists, and only the enabled entrypoints are imported at runtime. This page documents the maintainer-facing contract: discovery, validation, enablement, import, reload, and runtime class expectations.
 
 ## Why the plugin system is structured this way
 
@@ -60,9 +58,7 @@ The manifest's `page` value must match the page under which the manifest file wa
 
 ## Manifest validation
 
-Manifest parsing occurs before plugin import.
-
-Current validation guarantees:
+Manifest parsing occurs before plugin import. Current validation guarantees:
 
 - the manifest file must decode to a JSON object
 - `plugin_id` must be non-empty
@@ -73,9 +69,7 @@ Current validation guarantees:
 - duplicate `plugin_id` values across manifests are fatal
 - dependencies pointing to unknown plugin ids are fatal
 
-This is intentionally strict. Manifest errors are startup errors, not runtime warnings.
-
-For field-level reference details, see [Plugin Manifests](../reference/plugin-manifests.md).
+This is intentionally strict. Manifest errors are startup errors, not runtime warnings. For field-level reference details, see [Plugin Manifests](../reference/plugin-manifests.md).
 
 ## Startup selection and dependency closure
 
@@ -100,9 +94,7 @@ Dependency closure is based on manifest metadata, not on importing plugin code a
 
 ## Runtime import path
 
-After the startup dialog is accepted, the host window resolves the enabled ids again and loads plugin classes page by page.
-
-Runtime loading sequence:
+After the startup dialog is accepted, the host window resolves the enabled ids again and loads plugin classes page by page. Runtime loading sequence:
 
 1. group enabled manifests by page
 2. clear previously registered classes for the target page
@@ -151,9 +143,7 @@ Optional runtime menu integration may be provided through host/plugin menu hooks
 
 ## Analysis plugin contract
 
-Analysis plugins currently have the clearest formal interface in `framelab/plugins/analysis/_base.py`.
-
-An analysis plugin must implement:
+Analysis plugins currently have the clearest formal interface in `framelab/plugins/analysis/_base.py`. An analysis plugin must implement:
 
 - `create_widget(parent)`
 - `on_context_changed(context)`
@@ -167,9 +157,7 @@ The host owns plugin instantiation and stacked-widget placement. The plugin owns
 
 ## UI capability contract
 
-Plugins can expose lightweight UI-policy hints via `PluginUiCapabilities`.
-
-Current fields include:
+Plugins can expose lightweight UI-policy hints via `PluginUiCapabilities`. Current fields include:
 
 - `reveal_data_columns`
 - `reveal_measure_columns`
@@ -184,18 +172,14 @@ A plugin may request that certain controls or columns be revealed. It should not
 
 ## Reload behavior
 
-The Analyze page currently exposes a **Reload Plugins** action.
-
-Reload behavior is intentionally limited:
+The Analyze page currently exposes a **Reload Plugins** action. Reload behavior is intentionally limited:
 
 - manifests are rediscovered through the registry path
 - enabled entrypoint modules are re-imported or reloaded
 - registered classes are rebuilt for the page
 - plugin widgets are recreated by the host
 
-Reload should be treated as a development convenience, not a guarantee of complete hot-reload safety for arbitrary plugin-local global state.
-
-If a plugin caches external module state aggressively or depends on import-time side effects, a full app restart is still the safer path.
+Reload should be treated as a development convenience, not a guarantee of complete hot-reload safety for arbitrary plugin-local global state. If a plugin caches external module state aggressively or depends on import-time side effects, a full app restart is still the safer path.
 
 ## Manifest dependencies versus class dependencies
 
@@ -211,9 +195,7 @@ These are used before runtime import for:
 
 ### Class dependencies
 
-These are normalized at registration time and can be useful as a runtime declaration, but they do not replace manifest dependencies for startup selection.
-
-If the two declarations disagree, the manifest must be treated as the startup source of truth.
+These are normalized at registration time and can be useful as a runtime declaration, but they do not replace manifest dependencies for startup selection. If the two declarations disagree, the manifest must be treated as the startup source of truth.
 
 ## Authoring checklist for new plugins
 

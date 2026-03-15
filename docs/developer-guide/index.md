@@ -1,8 +1,6 @@
 # Developer Guide
 
-Use this section to maintain, extend, or package the FrameLab codebase.
-
-The goal of this guide is not only to describe which files exist. It is to document lifecycle, state ownership, subsystem boundaries, and extension contracts so changes can be made without breaking the operator-facing workflows.
+Use this section to maintain, extend, or package the FrameLab codebase. The goal of this guide is not only to describe which files exist. It is to document lifecycle, state ownership, subsystem boundaries, and extension contracts so changes can be made without breaking the operator-facing workflows.
 
 ## Recommended reading order
 

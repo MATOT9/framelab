@@ -1,0 +1,136 @@
+{
+  "schema_version": "1.0",
+  "entity": "campaign",
+  "identity": {
+    "camera_id": null,
+    "campaign_id": null,
+    "timezone": "America/Montreal",
+    "created_at_local": "2025-11-11T16:11:23",
+    "closed_at_local": null,
+    "status": "active",
+    "label": "radiometric+spectral"
+  },
+  "intent": {
+    "description": "Multi-day camera calibration campaign: radiometric response, gain/iris sweeps, spectral scan",
+    "tags": [
+      "calibration",
+      "radiometric",
+      "spectral",
+      "linearity"
+    ],
+    "deliverables": [
+      "master_dark",
+      "master_flat",
+      "gain_vs_iris_model",
+      "spectral_responsivity_curve",
+      "summary_report"
+    ]
+  },
+  "instrument_defaults": {
+    "optics": {
+      "lenses": [
+        {
+          "index": 1,
+          "model": "",
+          "make": "",
+          "focal_mm": null,
+          "f_number": null
+        }
+      ],
+      "filters": [
+        {
+          "index": 2,
+          "slot": "front",
+          "type": "",
+          "make": "",
+          "model": "",
+          "center_nm": null,
+          "fwhm_nm": null,
+          "cuton_nm": null,
+          "cutoff_nm": null
+        }
+      ],
+      "iris": {
+        "type": "manual_wheel",
+        "positions": [
+          {
+            "position": 1,
+            "label": "P1",
+            "gain": 1,
+            "effective_f_number": null
+          },
+          {
+            "position": 2,
+            "label": "P2",
+            "gain": null,
+            "effective_f_number": null
+          },
+          {
+            "position": 3,
+            "label": "P3",
+            "gain": null,
+            "effective_f_number": null
+          },
+          {
+            "position": 4,
+            "label": "P4",
+            "gain": null,
+            "effective_f_number": null
+          },
+          {
+            "position": 5,
+            "label": "P5",
+            "gain": null,
+            "effective_f_number": null
+          }
+        ]
+      }
+    },
+    "illumination": {
+      "bench_setup": "integrating_cube",
+      "source_id": "StellarNet_IC2",
+      "geometry_defaults": null
+    }
+  },
+  "campaign_defaults": {
+    "camera_settings": {
+      "mode_id": "mono12",
+      "exposure_us": 500,
+      "gain_db": 0.0,
+      "black_level": null,
+      "gamma": null,
+      "trigger": {
+        "mode": "free_run",
+        "source": null
+      },
+      "roi": null,
+      "binning": {
+        "x": 1,
+        "y": 1
+      }
+    },
+    "save_settings": {
+      "format": "tiff",
+      "compression": "none",
+      "naming": "f%06d.tiff"
+    }
+  },
+  "high_level_changes": [],
+  "outputs_index": {
+    "key_exports": null,
+    "key_products": null
+  },
+  "paths": {
+    "campaign_root_abs": null,
+    "sessions_root_rel": null,
+    "processed_root_rel": null,
+    "analysis_root_rel": null,
+    "exports_root_rel": null
+  },
+  "host_pc": {
+    "hostname": null,
+    "os": null,
+    "kernel": null,
+    "notes": null
+  }
+}

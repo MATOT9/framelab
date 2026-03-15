@@ -177,6 +177,7 @@ def test_workflow_explorer_dock_selection_updates_active_scope(
     assert isinstance(dock, WorkflowExplorerDock)
     assert dock.features() & qtw.QDockWidget.DockWidgetFloatable
     assert dock.allowedAreas() == Qt.AllDockWidgetAreas
+    assert not dock.windowIcon().isNull()
     assert dock.titleBarWidget() is not None
     assert dock.titleBarWidget().objectName() == "DockTitleBar"
     assert dock._tree.header().sectionResizeMode(0) == qtw.QHeaderView.Interactive

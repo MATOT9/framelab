@@ -1,0 +1,169 @@
+{
+  "schema_version": "1.0",
+  "entity": "acquisition",
+  "identity": {
+    "camera_id": null,
+    "campaign_id": null,
+    "session_id": null,
+    "acquisition_id": null,
+    "label": null,
+    "created_at_local": null,
+    "finalized_at_local": null,
+    "timezone": null
+  },
+  "paths": {
+    "acq_root_rel": null,
+    "frames_dir": "frames"
+  },
+  "intent": {
+    "capture_type": "calibration",
+    "subtype": "Exposure sweep at iris position 1",
+    "scene": "flat",
+    "tags": [
+      "calibration",
+      "flat",
+      "exposure_sweep",
+      "iris_position_1"
+    ]
+  },
+  "defaults": {
+    "camera_settings": null,
+    "instrument": {
+      "optics": {
+        "iris": {
+          "position": 1
+        }
+      }
+    },
+    "acquisition_settings": {
+      "n_frames_expected": null
+    }
+  },
+  "overrides": [
+    {
+      "selector": {
+        "frame_range": [
+          1,
+          1
+        ]
+      },
+      "changes": {
+        "camera_settings": {
+          "exposure_us": 1000
+        },
+        "instrument": {
+          "optics": {
+            "iris": {
+              "position": 1
+            }
+          }
+        },
+        "acquisition_settings": {
+          "n_frames_expected": null
+        }
+      },
+      "reason": "explicit frame state"
+    },
+    {
+      "selector": {
+        "frame_range": [
+          2,
+          2
+        ]
+      },
+      "changes": {
+        "camera_settings": {
+          "exposure_us": 1500
+        },
+        "instrument": {
+          "optics": {
+            "iris": {
+              "position": 1
+            }
+          }
+        },
+        "acquisition_settings": {
+          "n_frames_expected": null
+        }
+      },
+      "reason": "explicit frame state"
+    },
+    {
+      "selector": {
+        "frame_range": [
+          3,
+          3
+        ]
+      },
+      "changes": {
+        "camera_settings": {
+          "exposure_us": 2000
+        },
+        "instrument": {
+          "optics": {
+            "iris": {
+              "position": 1
+            }
+          }
+        },
+        "acquisition_settings": {
+          "n_frames_expected": null
+        }
+      },
+      "reason": "explicit frame state"
+    },
+    {
+      "selector": {
+        "frame_range": [
+          4,
+          4
+        ]
+      },
+      "changes": {
+        "camera_settings": {
+          "exposure_us": 3000
+        },
+        "instrument": {
+          "optics": {
+            "iris": {
+              "position": 1
+            }
+          }
+        },
+        "acquisition_settings": {
+          "n_frames_expected": null
+        }
+      },
+      "reason": "explicit frame state"
+    },
+    {
+      "selector": {
+        "frame_range": [
+          5,
+          5
+        ]
+      },
+      "changes": {
+        "camera_settings": {
+          "exposure_us": 5000
+        },
+        "instrument": {
+          "optics": {
+            "iris": {
+              "position": 1
+            }
+          }
+        },
+        "acquisition_settings": {
+          "n_frames_expected": null
+        }
+      },
+      "reason": "explicit frame state"
+    }
+  ],
+  "quality": {
+    "anomalies": [],
+    "dropped_frames": [],
+    "saturation_expected": false
+  }
+}

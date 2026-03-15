@@ -1,16 +1,10 @@
 # Datacard Wizard
 
-Use the **Acquisition Datacard Wizard** to create, edit, validate, and save acquisition metadata for the currently selected dataset.
-
-This page documents the datacard model actually consumed by the app, not only the button sequence.
+Use the **Acquisition Datacard Wizard** to create, edit, validate, and save acquisition metadata for the currently selected dataset. This page documents the datacard model actually consumed by the app, not only the button sequence.
 
 ## Purpose
 
-Use a datacard when folder names and file names are not sufficient to describe the acquisition reliably.
-
-The wizard edits the **acquisition-level** datacard. At runtime, those acquisition-level values can still sit on top of inherited session and campaign defaults when those broader datacards exist.
-
-Typical reasons include:
+Use a datacard when folder names and file names are not sufficient to describe the acquisition reliably. The wizard edits the **acquisition-level** datacard. At runtime, those acquisition-level values can still sit on top of inherited session and campaign defaults when those broader datacards exist. Typical reasons include:
 
 - acquisition-wide defaults should be recorded explicitly
 - exposure, iris position, or other mapped values vary by frame index
@@ -51,9 +45,7 @@ For mapped acquisition values, `defaults` and `overrides[].changes` use the cano
 
 ### 1. Target
 
-Use this tab to load the acquisition folder, inspect frame-index discovery, and choose the frame-index base used for authored override rows.
-
-Use it to:
+Use this tab to load the acquisition folder, inspect frame-index discovery, and choose the frame-index base used for authored override rows. Use it to:
 
 - choose the acquisition root
 - load an existing datacard or initialize a new one
@@ -69,9 +61,7 @@ Important details:
 
 ### 2. Identity / Paths / Intent
 
-Use this tab for acquisition identity and acquisition-wide descriptive context.
-
-Typical content includes:
+Use this tab for acquisition identity and acquisition-wide descriptive context. Typical content includes:
 
 - camera, campaign, session, or acquisition identifiers
 - frames-directory name
@@ -81,11 +71,7 @@ This tab defines acquisition context, not frame-varying sweep values.
 
 ### 3. Defaults
 
-Use this tab to define acquisition-level baseline values.
-
-These defaults are layered on top of any inherited session or campaign defaults. Frame overrides later replace only the keys they explicitly provide.
-
-Recommended content:
+Use this tab to define acquisition-level baseline values. These defaults are layered on top of any inherited session or campaign defaults. Frame overrides later replace only the keys they explicitly provide. Recommended content:
 
 - fixed exposure, if the whole acquisition used one exposure
 - fixed iris position, if the whole acquisition used one setting
@@ -93,9 +79,7 @@ Recommended content:
 
 ### 4. Frame Mapping
 
-Use this tab when metadata varies with frame index.
-
-The current wizard supports three authoring modes:
+Use this tab when metadata varies with frame index. The current wizard supports three authoring modes:
 
 - **Defaults only (unknown duration)**
 - **Generate rows**
@@ -118,9 +102,7 @@ Only specify the fields that truly change. Leave all other fields blank so they 
 
 ### 5. Review and Save
 
-Use this tab to validate the authored datacard, inspect the final payload, and save it to disk.
-
-Before saving, confirm:
+Use this tab to validate the authored datacard, inspect the final payload, and save it to disk. Before saving, confirm:
 
 - the intended dataset folder is selected
 - defaults reflect the acquisition-wide baseline
@@ -129,9 +111,7 @@ Before saving, confirm:
 
 ## Blank values and inheritance
 
-This is the most important semantic rule in the current app.
-
-A blank field means:
+This is the most important semantic rule in the current app. A blank field means:
 
 - do not set a new value here
 - keep the inherited baseline if one exists
@@ -167,9 +147,7 @@ When authoring frame-based sweeps:
 
 ## eBUS-managed canonical fields
 
-When an acquisition has a readable root-level eBUS snapshot, some canonical fields can become **eBUS-managed** through the acquisition field mapping and eBUS catalog.
-
-Current behavior:
+When an acquisition has a readable root-level eBUS snapshot, some canonical fields can become **eBUS-managed** through the acquisition field mapping and eBUS catalog. Current behavior:
 
 - the field stays visible in the wizard
 - non-overridable fields become read-only in **Defaults**

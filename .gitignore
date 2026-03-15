@@ -4,13 +4,14 @@
 # Local runtime UI state
 config/ui_state.ini
 config/config.ini
+config/plugin_selection.json
 
 # Samples and archives
 EbusData
 archived
 
 # vscode
-.vscode
+# .vscode
 
 # Documentation build artifacts
 .docs_build/

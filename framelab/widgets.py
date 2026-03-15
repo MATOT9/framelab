@@ -19,7 +19,7 @@ try:
 
     MATPLOTLIB_AVAILABLE = True
     try:
-        plt.style.use("LabReport.mplstyle")
+        plt.style.use("framelab/assets/LabReport.mplstyle")
     except Exception:
         pass
 except Exception:

@@ -1,8 +1,6 @@
 # Keyboard Shortcuts
 
-This page documents the current shortcut and pointer interaction contract.
-
-Shortcut usefulness depends on context. Some actions are app-wide menu commands, while others operate only on the currently focused table or plot.
+This page documents the current shortcut and pointer interaction contract. Shortcut usefulness depends on context. Some actions are app-wide menu commands, while others operate only on the currently focused table or plot.
 
 ## App-wide menu shortcuts
 
@@ -18,9 +16,7 @@ Shortcut usefulness depends on context. Some actions are app-wide menu commands,
 
 ### `Ctrl+C`
 
-`Ctrl+C` is meaningful only when a copy-capable table has focus or an active selection.
-
-Current supported contexts include:
+`Ctrl+C` is meaningful only when a copy-capable table has focus or an active selection. Current supported contexts include:
 
 - the main metrics tables
 - plugin result tables that implement copy behavior
@@ -45,9 +41,7 @@ On macOS, standard Qt shortcuts may appear with `Cmd` instead of `Ctrl` dependin
 
 ## Usage guidance
 
-Shortcuts are most useful after a dataset is already loaded and the intended table or plot has focus.
-
-If a shortcut appears inactive, first confirm:
+Shortcuts are most useful after a dataset is already loaded and the intended table or plot has focus. If a shortcut appears inactive, first confirm:
 
 - the relevant workflow page is open
 - the relevant widget has focus

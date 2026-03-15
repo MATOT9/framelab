@@ -1,0 +1,25 @@
+{
+  "schema_version": "1.0",
+  "entity": "session",
+  "identity": {
+    "camera_id": null,
+    "campaign_id": null,
+    "session_id": null,
+    "date_local": null,
+    "sess_number": null,
+    "start_time_local": null,
+    "end_time_local": null,
+    "timezone": null,
+    "label": "session"
+  },
+  "paths": {
+    "session_root_rel": null,
+    "acquisitions_root_rel": null,
+    "notes_rel": null
+  },
+  "session_defaults": {
+    "instrument": null,
+    "camera_settings": null
+  },
+  "notes": "Session datacard updated to template-compliant structure."
+}

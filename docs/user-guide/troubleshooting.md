@@ -1,8 +1,6 @@
 # Troubleshooting
 
-Use this page for operational issues encountered during normal use of the app.
-
-This page is organized by workflow stage so you can isolate whether the problem is in startup, workflow scope, dataset intake, session tools, eBUS inspection, measurement, or analysis.
+Use this page for operational issues encountered during normal use of the app. This page is organized by workflow stage so you can isolate whether the problem is in startup, workflow scope, dataset intake, session tools, eBUS inspection, measurement, or analysis.
 
 ## 1. App and startup issues
 

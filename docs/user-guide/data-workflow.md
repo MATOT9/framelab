@@ -1,8 +1,6 @@
 # Data Workflow
 
-The **Data** tab is the intake and verification stage for the entire app.
-
-Use it to:
+The **Data** tab is the intake and verification stage for the entire app. Use it to:
 
 - confirm the folder implied by the current workflow scope
 - scan TIFF files recursively inside that scope
@@ -14,9 +12,7 @@ If the Data tab is wrong, later measurements and plots can still look mathematic
 
 ## Before scanning: confirm the scope
 
-In the workflow shell, the Data page is subordinate to the currently selected workflow node.
-
-That means the effective dataset root may come from:
+In the workflow shell, the Data page is subordinate to the currently selected workflow node. That means the effective dataset root may come from:
 
 - the full workspace
 - a camera subtree
@@ -30,9 +26,7 @@ Before scanning, confirm:
 - the breadcrumb/path row
 - the folder path shown in the dataset field
 
-If the scope itself is wrong, scanning correctly will still produce the wrong dataset.
-
-For the expected filesystem layout, see [Workflow Structure and Required Folder Layout](workflow-structure.md).
+If the scope itself is wrong, scanning correctly will still produce the wrong dataset. For the expected filesystem layout, see [Workflow Structure and Required Folder Layout](workflow-structure.md).
 
 ## Recommended operating sequence
 
@@ -61,9 +55,7 @@ Exact button text may differ slightly depending on whether you are in workflow m
 
 ## What scanning actually does
 
-A scan is not only file listing. It is the dataset intake pass used by the rest of the app.
-
-During scan, the app:
+A scan is not only file listing. It is the dataset intake pass used by the rest of the app. During scan, the app:
 
 - recursively discovers supported `.tif` and `.tiff` files
 - applies the current skip rules before loading
@@ -78,9 +70,7 @@ Treat a scan as a dataset-state reset, not as a cosmetic refresh.
 
 ## Skip rules
 
-Skip rules exclude files or folders from dataset intake.
-
-Use them to keep temporary exports, cache folders, thumbnails, or unrelated TIFFs out of the working dataset.
+Skip rules exclude files or folders from dataset intake. Use them to keep temporary exports, cache folders, thumbnails, or unrelated TIFFs out of the working dataset.
 
 ### Main-page behavior
 
@@ -105,9 +95,7 @@ The chosen metadata source directly affects grouping, exposure-dependent metrics
 
 ### Path metadata
 
-Use **Path** when file names and folder structure already encode the experiment correctly.
-
-Typical examples include:
+Use **Path** when file names and folder structure already encode the experiment correctly. Typical examples include:
 
 - exposure or iris embedded in the file name
 - exposure or iris embedded in parent folders
@@ -115,9 +103,7 @@ Typical examples include:
 
 ### Acquisition JSON metadata
 
-Use **Acquisition JSON** when the acquisition-root JSON hierarchy is the authoritative source.
-
-In the current implementation, that source can combine:
+Use **Acquisition JSON** when the acquisition-root JSON hierarchy is the authoritative source. In the current implementation, that source can combine:
 
 - acquisition defaults and frame-targeted overrides from `acquisition_datacard.json`
 - inherited session defaults from `session_datacard.json`
@@ -129,15 +115,11 @@ When the hierarchical JSON stack does not provide exposure or iris values, the a
 
 ### Selection rule
 
-Choose the source that best represents the true acquisition, then keep that source fixed for one interpretation pass.
-
-Do not switch metadata source mid-analysis unless you are intentionally comparing metadata strategies.
+Choose the source that best represents the true acquisition, then keep that source fixed for one interpretation pass. Do not switch metadata source mid-analysis unless you are intentionally comparing metadata strategies.
 
 ## eBUS status line
 
-When the selected dataset folder contains exactly one readable root-level `.pvcfg` file, the Data page shows a compact eBUS status line.
-
-Use that status line as a cue that:
+When the selected dataset folder contains exactly one readable root-level `.pvcfg` file, the Data page shows a compact eBUS status line. Use that status line as a cue that:
 
 - the acquisition carries an immutable raw eBUS baseline snapshot
 - some canonical acquisition-wide metadata may now be driven by effective eBUS values if the datacard and field mapping declare them as eBUS-managed
@@ -147,9 +129,7 @@ The status line does **not** mean the app will compare or modify the snapshot au
 
 ## Metadata table
 
-The Data table is the pre-flight check for the rest of the app.
-
-Inspect it for:
+The Data table is the pre-flight check for the rest of the app. Inspect it for:
 
 - the expected number of image rows
 - correct file identity and folder context
@@ -162,9 +142,7 @@ If the table is wrong here, downstream plots inherit the error.
 
 ## Grouping
 
-Grouping clusters rows by one selected field for table organization and operator review.
-
-Current behavior is fixed by the UI, not free-form:
+Grouping clusters rows by one selected field for table organization and operator review. Current behavior is fixed by the UI, not free-form:
 
 - base choices are **None**, **Parent Folder**, and **Grandparent Folder**
 - plugins may expose additional grouping fields such as **Iris Position** and **Exposure [ms]**
@@ -177,9 +155,7 @@ Grouping is useful for visually checking sweep structure before measurement or a
 
 ## Structure work versus data verification
 
-The Data tab is where you verify what will be measured. It is not the primary place to repair hierarchy.
-
-Use **Workflow Explorer -> Structure** first when you still need to:
+The Data tab is where you verify what will be measured. It is not the primary place to repair hierarchy. Use **Workflow Explorer -> Structure** first when you still need to:
 
 - create a session under a campaign
 - create one or more acquisitions under a session

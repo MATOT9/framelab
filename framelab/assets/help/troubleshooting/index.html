@@ -1006,8 +1006,7 @@
 </ol>
 <h2 id="problem-categories">Problem categories<a class="headerlink" href="#problem-categories" title="Permanent link">&para;</a></h2>
 <h3 id="1-workflow-profile-hierarchy-and-scope-problems">1. Workflow profile, hierarchy, and scope problems<a class="headerlink" href="#1-workflow-profile-hierarchy-and-scope-problems" title="Permanent link">&para;</a></h3>
-<p>Use this branch when the wrong part of the filesystem was opened or when the workflow tree itself looks wrong.</p>
-<p>Typical symptoms:</p>
+<p>Use this branch when the wrong part of the filesystem was opened or when the workflow tree itself looks wrong. Typical symptoms:</p>
 <ul>
 <li>the loaded tree is missing sessions or acquisitions</li>
 <li>the selected folder opened as the wrong logical node type</li>
@@ -1029,8 +1028,7 @@
 <li><a href="../developer-guide/architecture.html">Architecture</a></li>
 </ul>
 <h3 id="2-dataset-intake-and-scan-failures">2. Dataset intake and scan failures<a class="headerlink" href="#2-dataset-intake-and-scan-failures" title="Permanent link">&para;</a></h3>
-<p>Use this branch when the dataset does not scan as expected or when the row count is clearly wrong.</p>
-<p>Typical symptoms:</p>
+<p>Use this branch when the dataset does not scan as expected or when the row count is clearly wrong. Typical symptoms:</p>
 <ul>
 <li>no TIFF files appear after scan</li>
 <li>too few or too many files are loaded</li>
@@ -1051,8 +1049,7 @@
 <li><a href="../reference/config-files.html">Config Files</a></li>
 </ul>
 <h3 id="3-metadata-datacard-and-ebus-resolution-problems">3. Metadata, datacard, and eBUS resolution problems<a class="headerlink" href="#3-metadata-datacard-and-ebus-resolution-problems" title="Permanent link">&para;</a></h3>
-<p>Use this branch when images load but exposure, iris position, grouping, or frame-linked metadata are missing or suspicious.</p>
-<p>Typical symptoms:</p>
+<p>Use this branch when images load but exposure, iris position, grouping, or frame-linked metadata are missing or suspicious. Typical symptoms:</p>
 <ul>
 <li>exposure or iris columns are blank</li>
 <li>JSON-backed metadata is missing even though a datacard exists</li>
@@ -1082,8 +1079,7 @@
 <li><a href="../developer-guide/ebus-config-integration.html">eBUS Config Integration</a></li>
 </ul>
 <h3 id="4-measurement-stage-problems">4. Measurement-stage problems<a class="headerlink" href="#4-measurement-stage-problems" title="Permanent link">&para;</a></h3>
-<p>Use this branch when the dataset scans correctly, but the numeric metrics look wrong, unstable, blank, or physically implausible.</p>
-<p>Typical symptoms:</p>
+<p>Use this branch when the dataset scans correctly, but the numeric metrics look wrong, unstable, blank, or physically implausible. Typical symptoms:</p>
 <ul>
 <li><code>DN/ms</code> is blank or appears only for some rows</li>
 <li>ROI metrics remain empty</li>
@@ -1107,8 +1103,7 @@
 <li><a href="../developer-guide/architecture.html">Architecture</a></li>
 </ul>
 <h3 id="5-analysis-and-plugin-loading-problems">5. Analysis and plugin-loading problems<a class="headerlink" href="#5-analysis-and-plugin-loading-problems" title="Permanent link">&para;</a></h3>
-<p>Use this branch when analysis controls, plots, or plugin-specific actions are missing or inconsistent.</p>
-<p>Typical symptoms:</p>
+<p>Use this branch when analysis controls, plots, or plugin-specific actions are missing or inconsistent. Typical symptoms:</p>
 <ul>
 <li>the <strong>Analyze</strong> tab is absent</li>
 <li>an expected plugin is missing from the selector</li>
@@ -1131,8 +1126,7 @@
 <li><a href="../developer-guide/plugin-system.html">Plugin System</a></li>
 </ul>
 <h3 id="6-offline-help-and-documentation-packaging-problems">6. Offline help and documentation packaging problems<a class="headerlink" href="#6-offline-help-and-documentation-packaging-problems" title="Permanent link">&para;</a></h3>
-<p>Use this branch when the app launches, but the Help system opens stale content, directory listings, or missing-page fallbacks.</p>
-<p>Typical symptoms:</p>
+<p>Use this branch when the app launches, but the Help system opens stale content, directory listings, or missing-page fallbacks. Typical symptoms:</p>
 <ul>
 <li>Help opens a directory listing instead of a page</li>
 <li>Help content is missing or outdated after doc edits</li>
@@ -1205,8 +1199,7 @@
 </tbody>
 </table>
 <h2 id="escalation-rule">Escalation rule<a class="headerlink" href="#escalation-rule" title="Permanent link">&para;</a></h2>
-<p>Do not jump directly into code changes unless the failure has already been localized.</p>
-<p>Use this rule of thumb:</p>
+<p>Do not jump directly into code changes unless the failure has already been localized. Use this rule of thumb:</p>
 <ul>
 <li>if the problem is visible during ordinary use, start in the <strong>User Guide</strong></li>
 <li>if the problem is about file locations, schema keys, or manifests, continue to <strong>Reference</strong></li>

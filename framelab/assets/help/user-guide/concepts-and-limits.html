@@ -1474,7 +1474,7 @@
 
 
 <h1 id="concepts-and-limits">Concepts and Limits<a class="headerlink" href="#concepts-and-limits" title="Permanent link">&para;</a></h1>
-<p>Use this page to establish the engineering model behind the app before working tab by tab.</p>
+<p>Use this page to establish the model behind the app before working tab by tab.</p>
 <p>FrameLab is a TIFF-centric calibration and exploratory analysis tool. It turns image collections into comparable per-image metrics, then lets analysis plugins reorganize those metrics against acquisition variables such as exposure or iris position. It is intentionally useful for practical engineering studies, but it is not a substitute for a full radiometric calibration pipeline.</p>
 <h2 id="workflow-model">Workflow model<a class="headerlink" href="#workflow-model" title="Permanent link">&para;</a></h2>
 <p>A reliable mental model is:</p>
@@ -1482,8 +1482,7 @@
 </code></pre></div>
 <p>The app does not create physical meaning on its own. It helps you preserve metadata context, compute repeatable image-level quantities, and inspect those quantities consistently.</p>
 <h2 id="workflow-hierarchy-concepts">Workflow hierarchy concepts<a class="headerlink" href="#workflow-hierarchy-concepts" title="Permanent link">&para;</a></h2>
-<p>For most work, the primary profile is <strong>Calibration</strong>.</p>
-<p>Its logical hierarchy is:</p>
+<p>For most work, the primary profile is <strong>Calibration</strong>. Its logical hierarchy is:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>workspace -&gt; camera -&gt; campaign -&gt; session -&gt; acquisition
 </code></pre></div>
 <p>The <strong>Trials</strong> profile uses:</p>
@@ -1502,8 +1501,7 @@
 <h3 id="dataset">Dataset<a class="headerlink" href="#dataset" title="Permanent link">&para;</a></h3>
 <p>A <strong>dataset</strong> is the currently scanned folder context. All normalization, grouping, row ordering, measurement tables, and analysis-plugin inputs are built from that currently loaded population.</p>
 <h3 id="scope">Scope<a class="headerlink" href="#scope" title="Permanent link">&para;</a></h3>
-<p>A <strong>scope</strong> is the workflow node currently driving the Data, Measure, and Analyze pages.</p>
-<p>Depending on what you opened, the scope may be:</p>
+<p>A <strong>scope</strong> is the workflow node currently driving the Data, Measure, and Analyze pages. Depending on what you opened, the scope may be:</p>
 <ul>
 <li>the full workspace</li>
 <li>one camera subtree</li>
@@ -1522,8 +1520,7 @@
 <li>grouping information used for table organization and downstream operator review</li>
 </ul>
 <h3 id="group">Group<a class="headerlink" href="#group" title="Permanent link">&para;</a></h3>
-<p>A <strong>group</strong> is a table-level cluster built from the currently selected grouping field.</p>
-<p>Current behavior is exact rather than fuzzy:</p>
+<p>A <strong>group</strong> is a table-level cluster built from the currently selected grouping field. Current behavior is exact rather than fuzzy:</p>
 <ul>
 <li>grouping is only available for the fields exposed in the UI</li>
 <li>token matching is string-based</li>
@@ -1533,8 +1530,7 @@
 </ul>
 <p>Grouping is primarily for operator organization and pre-analysis sanity checking. It does not rewrite metadata and it is not an arbitrary query system.</p>
 <h3 id="plugin">Plugin<a class="headerlink" href="#plugin" title="Permanent link">&para;</a></h3>
-<p>A <strong>plugin</strong> is an extension point loaded at startup.</p>
-<p>In the current shipped app, plugins appear in three roles:</p>
+<p>A <strong>plugin</strong> is an extension point loaded at startup. In the current shipped app, plugins appear in three roles:</p>
 <ul>
 <li><strong>data plugins</strong>, such as <strong>Session Manager (Legacy)</strong>, <strong>Acquisition Datacard Wizard</strong>, and <strong>eBUS Config Tools</strong></li>
 <li><strong>measure plugins</strong>, such as <strong>Background Correction</strong></li>
@@ -1544,8 +1540,7 @@
 <h2 id="metadata-concepts">Metadata concepts<a class="headerlink" href="#metadata-concepts" title="Permanent link">&para;</a></h2>
 <p>The app can resolve metadata from more than one source. That choice matters because measurement interpretation and analysis curves depend on the resolved values, not merely on file names.</p>
 <h3 id="path-metadata">Path metadata<a class="headerlink" href="#path-metadata" title="Permanent link">&para;</a></h3>
-<p><strong>Path metadata</strong> means values inferred from the file name or folder names.</p>
-<p>Typical examples include:</p>
+<p><strong>Path metadata</strong> means values inferred from the file name or folder names. Typical examples include:</p>
 <ul>
 <li>exposure parsed from a file name or parent folder</li>
 <li>iris position parsed from a parent folder, grandparent folder, or file stem</li>
@@ -1553,8 +1548,7 @@
 </ul>
 <p>Path metadata is useful when the dataset layout already encodes the experiment cleanly and consistently.</p>
 <h3 id="acquisition-json-metadata">Acquisition JSON metadata<a class="headerlink" href="#acquisition-json-metadata" title="Permanent link">&para;</a></h3>
-<p>The UI label <strong>Acquisition JSON</strong> refers to the hierarchical metadata stack anchored at the selected acquisition root.</p>
-<p>In the current implementation, that stack can combine:</p>
+<p>The UI label <strong>Acquisition JSON</strong> refers to the hierarchical metadata stack anchored at the selected acquisition root. In the current implementation, that stack can combine:</p>
 <ul>
 <li>acquisition defaults and frame-targeted overrides from <code>acquisition_datacard.json</code></li>
 <li>inherited session defaults from <code>session_datacard.json</code></li>
@@ -1579,16 +1573,14 @@
 <h3 id="metadata-source-fallback">Metadata-source fallback<a class="headerlink" href="#metadata-source-fallback" title="Permanent link">&para;</a></h3>
 <p>When <strong>Acquisition JSON</strong> is selected, the app still falls back to path-derived iris or exposure values if the hierarchical JSON stack does not supply them. In the table, that fallback is marked through source fields such as <code>path_fallback</code> rather than being silently treated as fully authored JSON metadata.</p>
 <h2 id="measurement-concepts">Measurement concepts<a class="headerlink" href="#measurement-concepts" title="Permanent link">&para;</a></h2>
-<p>The <strong>Measure</strong> workflow computes per-image quantities from the current <strong>metric image</strong>.</p>
-<p>The metric image is:</p>
+<p>The <strong>Measure</strong> workflow computes per-image quantities from the current <strong>metric image</strong>. The metric image is:</p>
 <ul>
 <li>the raw image when background subtraction is off or no compatible reference exists</li>
 <li>the background-corrected image when subtraction is enabled and a compatible reference is available</li>
 </ul>
 <p>This distinction matters because saturation counts, max pixel, min non-zero, Top-K, ROI statistics, normalization scale, and downstream analysis inputs all follow the metric image, not necessarily the raw TIFF values.</p>
 <h3 id="digital-number-dn">Digital Number (DN)<a class="headerlink" href="#digital-number-dn" title="Permanent link">&para;</a></h3>
-<p><strong>DN</strong> means the numeric image intensity stored in the TIFF-derived image data. Mean intensity, peak intensity, ROI intensity, and Top-K intensity are all intensity quantities expressed in DN unless explicitly normalized.</p>
-<p>DN is not a physical radiometric unit by itself.</p>
+<p><strong>DN</strong> means the numeric image intensity stored in the TIFF-derived image data. Mean intensity, peak intensity, ROI intensity, and Top-K intensity are all intensity quantities expressed in DN unless explicitly normalized. DN is not a physical radiometric unit by itself.</p>
 <h3 id="saturated-pixel-count">Saturated-pixel count<a class="headerlink" href="#saturated-pixel-count" title="Permanent link">&para;</a></h3>
 <p>The app counts how many pixels satisfy:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>pixel &gt;= threshold
@@ -1613,14 +1605,12 @@
 <p>When valid exposure metadata exists, the app computes a rate-like quantity from the active mean metric:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>DN/ms = mean_intensity / exposure_ms
 </code></pre></div>
-<p>Dividing the measured intensity by exposure time normalizes the result by integration duration, allowing first-order comparison across images acquired with different exposure settings.</p>
-<p><code>DN/ms</code> is useful for engineering comparison of relative trends, especially across exposure or iris studies. It is not, by itself, a radiometric quantity and should not be treated as proof of constant scene radiance, detector linearity, or invariant optical throughput.</p>
+<p>Dividing the measured intensity by exposure time normalizes the result by integration duration, allowing first-order comparison across images acquired with different exposure settings. <code>DN/ms</code> is useful for comparison of relative trends, especially across exposure or iris studies. It is not, by itself, a radiometric quantity and should not be treated as proof of constant scene radiance, detector linearity, or invariant optical throughput.</p>
 <h3 id="normalization">Normalization<a class="headerlink" href="#normalization" title="Permanent link">&para;</a></h3>
 <p>When normalization is enabled, intensity-like values are divided by the current dataset normalization scale:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>normalized_value = value / current_dataset_max_pixel
 </code></pre></div>
-<p>In the current implementation, that scale is the maximum value in the current measure-stage <strong>max pixel</strong> array. Because that array follows the active metric image, background subtraction can change the normalization divisor.</p>
-<p>Important consequences:</p>
+<p>In the current implementation, that scale is the maximum value in the current measure-stage <strong>max pixel</strong> array. Because that array follows the active metric image, background subtraction can change the normalization divisor. Important consequences:</p>
 <ul>
 <li>normalization does <strong>not</strong> rewrite TIFF source data on disk</li>
 <li>normalization does affect displayed intensity-derived values</li>
@@ -1631,8 +1621,7 @@
 <p>Background subtraction changes the metric image used for measurement:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>metric_image = image - background
 </code></pre></div>
-<p>Optional negative clipping can then force negative residuals back to zero.</p>
-<p>This is not a cosmetic display effect. It changes the quantities later used for table metrics, normalization scale, and analysis-plugin inputs.</p>
+<p>Optional negative clipping can then force negative residuals back to zero. This is not a cosmetic display effect. It changes the quantities later used for table metrics, normalization scale, and analysis-plugin inputs.</p>
 <h2 id="analysis-concepts">Analysis concepts<a class="headerlink" href="#analysis-concepts" title="Permanent link">&para;</a></h2>
 <p>Analysis plugins do not invent raw measurements. They reorganize, aggregate, and visualize quantities that already came from the measurement stage.</p>
 <h3 id="curve">Curve<a class="headerlink" href="#curve" title="Permanent link">&para;</a></h3>
@@ -1645,8 +1634,7 @@
 </code></pre></div>
 <p>Gain is therefore a relative quantity. It describes change with respect to a reference operating point, not absolute signal magnitude.</p>
 <h3 id="error-bars">Error bars<a class="headerlink" href="#error-bars" title="Permanent link">&para;</a></h3>
-<p>Error bars depend on the selected plugin mode and available uncertainty source. They can reflect direct spread, SEM, or propagated uncertainty derived from upstream measurement-stage values.</p>
-<p>A clean plot with small error bars is only meaningful if metadata source, measurement mode, normalization state, and background handling were already correct upstream.</p>
+<p>Error bars depend on the selected plugin mode and available uncertainty source. They can reflect direct spread, SEM, or propagated uncertainty derived from upstream measurement-stage values. A clean plot with small error bars is only meaningful if metadata source, measurement mode, normalization state, and background handling were already correct upstream.</p>
 <h2 id="what-this-app-is-good-for">What this app is good for<a class="headerlink" href="#what-this-app-is-good-for" title="Permanent link">&para;</a></h2>
 <p>FrameLab is well suited to:</p>
 <ul>

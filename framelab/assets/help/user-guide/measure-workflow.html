@@ -1364,8 +1364,7 @@
 
 
 <h1 id="measure-workflow">Measure Workflow<a class="headerlink" href="#measure-workflow" title="Permanent link">&para;</a></h1>
-<p>The <strong>Measure</strong> tab converts each loaded TIFF image into per-image metrics that can be inspected directly or reused by analysis plugins. This is where thresholding, average-mode selection, ROI-based measurement, optional background subtraction, normalization, and preview validation are brought into one workflow.</p>
-<p>A useful mental model is:</p>
+<p>The <strong>Measure</strong> tab converts each loaded TIFF image into per-image metrics that can be inspected directly or reused by analysis plugins. This is where thresholding, average-mode selection, ROI-based measurement, optional background subtraction, normalization, and preview validation are brought into one workflow. A useful mental model is:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>image -&gt; metric image -&gt; per-image statistics -&gt; downstream analysis inputs
 </code></pre></div>
 <p>If the measurement state is wrong on this page, later plots can still look mathematically clean while being physically misleading.</p>
@@ -1440,16 +1439,14 @@
 </table>
 <h2 id="choosing-the-average-mode">Choosing the average mode<a class="headerlink" href="#choosing-the-average-mode" title="Permanent link">&para;</a></h2>
 <h3 id="disabled">Disabled<a class="headerlink" href="#disabled" title="Permanent link">&para;</a></h3>
-<p>No average-based metric is computed.</p>
-<p>Use this mode when you only care about:</p>
+<p>No average-based metric is computed. Use this mode when you only care about:</p>
 <ul>
 <li>saturated-pixel counts</li>
 <li>peak-value inspection</li>
 <li>preview and histogram validation</li>
 </ul>
 <h3 id="top-k-mean">Top-K Mean<a class="headerlink" href="#top-k-mean" title="Permanent link">&para;</a></h3>
-<p>The app selects the <code>K</code> brightest pixels in each metric image and computes statistics only on that subset.</p>
-<p>Use <strong>Top-K Mean</strong> when:</p>
+<p>The app selects the <code>K</code> brightest pixels in each metric image and computes statistics only on that subset. Use <strong>Top-K Mean</strong> when:</p>
 <ul>
 <li>you want a bright-region proxy without drawing a fixed spatial mask</li>
 <li>the brightest feature may shift slightly between images</li>
@@ -1462,8 +1459,7 @@
 <li><code>K</code> changes between studies, because that changes the physical meaning of the reported mean</li>
 </ul>
 <h3 id="roi-mean">ROI Mean<a class="headerlink" href="#roi-mean" title="Permanent link">&para;</a></h3>
-<p>The app computes statistics only inside the current ROI rectangle.</p>
-<p>Use <strong>ROI Mean</strong> when:</p>
+<p>The app computes statistics only inside the current ROI rectangle. Use <strong>ROI Mean</strong> when:</p>
 <ul>
 <li>the same physical region must be compared across images</li>
 <li>spatial consistency matters more than automatic bright-pixel selection</li>
@@ -1476,8 +1472,7 @@
 <li><strong>Apply ROI to All Images</strong> becomes the batch-computation path for ROI statistics</li>
 </ul>
 <h2 id="how-to-choose-k">How to choose <code>K</code><a class="headerlink" href="#how-to-choose-k" title="Permanent link">&para;</a></h2>
-<p><code>K</code> is not just a UI parameter. It defines the pixel population used to build the Top-K statistics.</p>
-<p>General guidance:</p>
+<p><code>K</code> is not just a UI parameter. It defines the pixel population used to build the Top-K statistics. General guidance:</p>
 <ul>
 <li><strong>smaller <code>K</code></strong> emphasizes the brightest core and is more sensitive to hot pixels, clipping, and small spatial changes</li>
 <li><strong>larger <code>K</code></strong> is usually more stable, but it pulls in more surrounding structure and background</li>
@@ -1495,8 +1490,7 @@
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>Top-K std      = std(p_1 ... p_K)
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>Top-K std err  = Top-K std / sqrt(K)
 </code></pre></div>
-<p>The current implementation uses NumPy's population standard deviation (<code>ddof = 0</code>).</p>
-<p>If the requested <code>K</code> is larger than the number of pixels in the image, the app uses all available pixels.</p>
+<p>The current implementation uses NumPy's population standard deviation (<code>ddof = 0</code>). If the requested <code>K</code> is larger than the number of pixels in the image, the app uses all available pixels.</p>
 <h3 id="roi-metrics">ROI metrics<a class="headerlink" href="#roi-metrics" title="Permanent link">&para;</a></h3>
 <p>Let <code>r_1 ... r_N</code> be the pixels inside the selected ROI.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>ROI mean       = (1 / N) * sum(r_n)
@@ -1510,16 +1504,12 @@
 <a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>DN/ms std      = std_intensity / exposure_ms
 <a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>DN/ms std err  = std_err_intensity / exposure_ms
 </code></pre></div>
-<p>This is computed only when the active average mode is <strong>Top-K Mean</strong> or <strong>ROI Mean</strong>.</p>
-<p>Dividing the measured intensity by exposure time normalizes the result by integration duration, allowing first-order comparison across images acquired with different exposure settings.</p>
-<p><code>DN/ms</code> is useful for engineering analysis of relative trends, especially in exposure and iris sweeps. It is not a radiometric quantity and should not be interpreted, by itself, as evidence of constant scene radiance, detector linearity, or invariant optical throughput. Those conclusions require additional calibration and control of acquisition conditions.</p>
-<p>If exposure metadata is missing, non-finite, or non-positive, <code>DN/ms</code> remains unavailable for that image.</p>
+<p>This is computed only when the active average mode is <strong>Top-K Mean</strong> or <strong>ROI Mean</strong>. Dividing the measured intensity by exposure time normalizes the result by integration duration, allowing first-order comparison across images acquired with different exposure settings. <code>DN/ms</code> is useful for analysis of relative trends, especially in exposure and iris sweeps. It is not a radiometric quantity and should not be interpreted, by itself, as evidence of constant scene radiance, detector linearity, or invariant optical throughput. Those conclusions require additional calibration and control of acquisition conditions. If exposure metadata is missing, non-finite, or non-positive, <code>DN/ms</code> remains unavailable for that image.</p>
 <h3 id="normalization">Normalization<a class="headerlink" href="#normalization" title="Permanent link">&para;</a></h3>
 <p>When <strong>Normalize Intensity (0-1)</strong> is enabled, intensity-like values are divided by the current dataset normalization scale:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>normalized_value = value / current_dataset_max_pixel
 </code></pre></div>
-<p>In the current implementation, the divisor is the maximum value in the current <strong>max pixel</strong> array. Because that array follows the active metric image, the divisor can change when background subtraction changes the metric image population.</p>
-<p>Important consequences:</p>
+<p>In the current implementation, the divisor is the maximum value in the current <strong>max pixel</strong> array. Because that array follows the active metric image, the divisor can change when background subtraction changes the metric image population. Important consequences:</p>
 <ul>
 <li>normalization does <strong>not</strong> rewrite the TIFF data on disk</li>
 <li>normalization rescales displayed mean/std/SEM and <code>DN/ms</code></li>
@@ -1638,8 +1628,7 @@
 </code></pre></div>
 <p>The measurement statistics are then computed from <code>metric_image</code>, not from the raw image.</p>
 <h3 id="folder-library-matching-behavior">Folder-library matching behavior<a class="headerlink" href="#folder-library-matching-behavior" title="Permanent link">&para;</a></h3>
-<p>In <strong>Folder Library</strong> mode, background references are matched by exposure after metadata resolution.</p>
-<p>Current behavior:</p>
+<p>In <strong>Folder Library</strong> mode, background references are matched by exposure after metadata resolution. Current behavior:</p>
 <ul>
 <li>the match policy is <strong>require exact exposure-key match</strong></li>
 <li>exposure keys are canonicalized numerically before lookup</li>
@@ -1666,8 +1655,7 @@
 </ul>
 <p>Negative clipping is convenient, but it also biases statistics by removing negative residuals. Use it intentionally.</p>
 <h3 id="background-correction-plugin">Background Correction plugin<a class="headerlink" href="#background-correction-plugin" title="Permanent link">&para;</a></h3>
-<p>If the <strong>Background Correction</strong> plugin is enabled, the same host-owned background state can also be managed through <strong>Plugins -&gt; Open Background Correction...</strong>.</p>
-<p>Use that dialog when you want:</p>
+<p>If the <strong>Background Correction</strong> plugin is enabled, the same host-owned background state can also be managed through <strong>Plugins -&gt; Open Background Correction...</strong>. Use that dialog when you want:</p>
 <ul>
 <li>a focused background workflow without occupying the full Measure page</li>
 <li>a quick summary of current reference coverage</li>
@@ -1680,9 +1668,7 @@
 <li>the <strong>Image Metrics</strong> table on the left</li>
 <li>the <strong>Preview / Histogram</strong> panel on the right</li>
 </ul>
-<p>Use them together.</p>
-<p>The table tells you what the app computed. The preview and histogram tell you whether those numbers are physically plausible for the selected image.</p>
-<p>The mean/statistics headers depend on the active average mode:</p>
+<p>Use them together. The table tells you what the app computed. The preview and histogram tell you whether those numbers are physically plausible for the selected image. The mean/statistics headers depend on the active average mode:</p>
 <ul>
 <li><strong>Top-K</strong>, <strong>Top-K Std</strong>, <strong>Top-K Std Err</strong> in Top-K mode</li>
 <li><strong>ROI</strong>, <strong>ROI Std</strong>, <strong>ROI Std Err</strong> in ROI mode</li>

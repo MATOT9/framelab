@@ -1,8 +1,6 @@
 # Quick Start
 
-Use this page when you want the shortest reliable path from launch to interpretable results.
-
-This workflow assumes you already know which dataset you want to inspect and which acquisition variable you intend to compare.
+Use this page when you want the shortest reliable path from launch to interpretable results. This workflow assumes you already know which dataset you want to inspect and which acquisition variable you intend to compare.
 
 ## Recommended session flow
 
@@ -25,17 +23,13 @@ When time is limited, make these decisions in order.
 
 ### 1. Confirm the workflow profile and scope
 
-For most work, use the **Calibration** profile.
-
-Its intended logical hierarchy is:
+For most work, use the **Calibration** profile. Its intended logical hierarchy is:
 
 ```text
 workspace -> camera -> campaign -> session -> acquisition
 ```
 
-Use the **Trials** profile only when a trial-first layout is truly required. It is still experimental.
-
-Do not continue until you know whether you opened the full workspace or only a subtree such as one camera, campaign, session, or acquisition.
+Use the **Trials** profile only when a trial-first layout is truly required. It is still experimental. Do not continue until you know whether you opened the full workspace or only a subtree such as one camera, campaign, session, or acquisition.
 
 ### 2. Confirm the metadata source
 

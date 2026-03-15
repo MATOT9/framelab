@@ -1528,23 +1528,19 @@
 
 
 <h1 id="workflow-structure-and-required-folder-layout">Workflow Structure and Required Folder Layout<a class="headerlink" href="#workflow-structure-and-required-folder-layout" title="Permanent link">&para;</a></h1>
-<p>Use this page to decide <strong>how the filesystem should be organized before you start scanning TIFF data</strong>.</p>
-<p>This matters because the workflow shell is profile-driven. The app does not treat every directory tree as equivalent. Reliable workflow loading, session authoring, metadata inheritance, and acquisition-management tools all work best when the dataset follows the expected hierarchy.</p>
+<p>Use this page to decide <strong>how the filesystem should be organized before you start scanning TIFF data</strong>. This matters because the workflow shell is profile-driven. The app does not treat every directory tree as equivalent. Reliable workflow loading, session authoring, metadata inheritance, and acquisition-management tools all work best when the dataset follows the expected hierarchy.</p>
 <h2 id="recommended-mental-model">Recommended mental model<a class="headerlink" href="#recommended-mental-model" title="Permanent link">&para;</a></h2>
 <h3 id="camera">Camera<a class="headerlink" href="#camera" title="Permanent link">&para;</a></h3>
 <p>A <strong>camera</strong> is a long-lived asset. Keep one top-level camera folder per physical system or stable camera identity.</p>
 <h3 id="campaign">Campaign<a class="headerlink" href="#campaign" title="Permanent link">&para;</a></h3>
-<p>A <strong>campaign</strong> is one coherent calibration effort.</p>
-<p>A campaign can span multiple days. It is the right place to keep:</p>
+<p>A <strong>campaign</strong> is one coherent calibration effort. A campaign can span multiple days. It is the right place to keep:</p>
 <ul>
 <li>final outputs for that calibration effort</li>
 <li>derived products that combine several sessions</li>
 <li>campaign-level notes or workflow metadata</li>
 </ul>
 <h3 id="session">Session<a class="headerlink" href="#session" title="Permanent link">&para;</a></h3>
-<p>A <strong>session</strong> is one stable block of work.</p>
-<p>Create a new session when the setup changes meaningfully enough that you no longer want later acquisitions to inherit the same working context.</p>
-<p>Typical reasons to split sessions:</p>
+<p>A <strong>session</strong> is one stable block of work. Create a new session when the setup changes meaningfully enough that you no longer want later acquisitions to inherit the same working context. Typical reasons to split sessions:</p>
 <ul>
 <li>optics were changed</li>
 <li>camera configuration changed in a meaningful way</li>
@@ -1553,8 +1549,7 @@
 </ul>
 <p>Multiple sessions on the same day are supported and recommended when the setup really changed.</p>
 <h3 id="acquisition">Acquisition<a class="headerlink" href="#acquisition" title="Permanent link">&para;</a></h3>
-<p>An <strong>acquisition</strong> is one intent, one datacard, one block of frames.</p>
-<p>Keep acquisitions semantically narrow. Good examples are:</p>
+<p>An <strong>acquisition</strong> is one intent, one datacard, one block of frames. Keep acquisitions semantically narrow. Good examples are:</p>
 <ul>
 <li>one dark sweep</li>
 <li>one iris sweep</li>
@@ -1565,21 +1560,18 @@
 <p>Do not treat an acquisition as an entire day of unrelated captures.</p>
 <h2 id="built-in-workflow-profiles">Built-in workflow profiles<a class="headerlink" href="#built-in-workflow-profiles" title="Permanent link">&para;</a></h2>
 <h2 id="calibration">Calibration<a class="headerlink" href="#calibration" title="Permanent link">&para;</a></h2>
-<p>This is the primary structured workflow profile.</p>
-<p>Its logical hierarchy is:</p>
+<p>This is the primary structured workflow profile. Its logical hierarchy is:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>workspace -&gt; camera -&gt; campaign -&gt; session -&gt; acquisition
 </code></pre></div>
 <p>Use this profile for lab and calibration work where cameras are long-lived assets and campaigns collect several sessions over time.</p>
 <h2 id="trials">Trials<a class="headerlink" href="#trials" title="Permanent link">&para;</a></h2>
-<p>The Trials profile is available, but it should still be treated as <strong>experimental</strong>.</p>
-<p>Its logical hierarchy is:</p>
+<p>The Trials profile is available, but it should still be treated as <strong>experimental</strong>. Its logical hierarchy is:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>workspace -&gt; trial -&gt; camera -&gt; session -&gt; acquisition
 </code></pre></div>
 <p>Use it only when trial-first organization is genuinely the right fit and you accept that the calibration profile is the more mature path.</p>
 <h2 id="exact-folder-layout-expectations">Exact folder-layout expectations<a class="headerlink" href="#exact-folder-layout-expectations" title="Permanent link">&para;</a></h2>
 <h2 id="calibration-profile">Calibration profile<a class="headerlink" href="#calibration-profile" title="Permanent link">&para;</a></h2>
-<p>The calibration profile expects a workspace whose immediate children are camera folders.</p>
-<p>Recommended layout:</p>
+<p>The calibration profile expects a workspace whose immediate children are camera folders. Recommended layout:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>&lt;workspace_root&gt;/
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>  &lt;camera_id&gt;/
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    .framelab/nodecard.json                optional higher-level workflow metadata
@@ -1737,8 +1729,7 @@
 <li>support session tooling</li>
 </ul>
 <h3 id="acquisition_datacardjson"><code>acquisition_datacard.json</code><a class="headerlink" href="#acquisition_datacardjson" title="Permanent link">&para;</a></h3>
-<p>This is still the authoritative acquisition-local canonical metadata record.</p>
-<p>Use it for:</p>
+<p>This is still the authoritative acquisition-local canonical metadata record. Use it for:</p>
 <ul>
 <li>stable acquisition defaults</li>
 <li>frame-targeted overrides</li>

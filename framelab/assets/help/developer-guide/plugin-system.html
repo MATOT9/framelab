@@ -1526,8 +1526,7 @@
 
 
 <h1 id="plugin-system">Plugin System<a class="headerlink" href="#plugin-system" title="Permanent link">&para;</a></h1>
-<p>The plugin system is the app's extension boundary. It is designed so that plugin metadata can be discovered without importing plugin code, startup enablement can be resolved before the main window exists, and only the enabled entrypoints are imported at runtime.</p>
-<p>This page documents the maintainer-facing contract: discovery, validation, enablement, import, reload, and runtime class expectations.</p>
+<p>The plugin system is the app's extension boundary. It is designed so that plugin metadata can be discovered without importing plugin code, startup enablement can be resolved before the main window exists, and only the enabled entrypoints are imported at runtime. This page documents the maintainer-facing contract: discovery, validation, enablement, import, reload, and runtime class expectations.</p>
 <h2 id="why-the-plugin-system-is-structured-this-way">Why the plugin system is structured this way<a class="headerlink" href="#why-the-plugin-system-is-structured-this-way" title="Permanent link">&para;</a></h2>
 <p>The current design supports four goals:</p>
 <ul>
@@ -1565,8 +1564,7 @@
 <h3 id="location-and-declared-page-must-agree">Location and declared page must agree<a class="headerlink" href="#location-and-declared-page-must-agree" title="Permanent link">&para;</a></h3>
 <p>The manifest's <code>page</code> value must match the page under which the manifest file was discovered. If a manifest declares <code>analysis</code> but is located under <code>framelab/plugins/data/</code>, validation fails.</p>
 <h2 id="manifest-validation">Manifest validation<a class="headerlink" href="#manifest-validation" title="Permanent link">&para;</a></h2>
-<p>Manifest parsing occurs before plugin import.</p>
-<p>Current validation guarantees:</p>
+<p>Manifest parsing occurs before plugin import. Current validation guarantees:</p>
 <ul>
 <li>the manifest file must decode to a JSON object</li>
 <li><code>plugin_id</code> must be non-empty</li>
@@ -1577,8 +1575,7 @@
 <li>duplicate <code>plugin_id</code> values across manifests are fatal</li>
 <li>dependencies pointing to unknown plugin ids are fatal</li>
 </ul>
-<p>This is intentionally strict. Manifest errors are startup errors, not runtime warnings.</p>
-<p>For field-level reference details, see <a href="../reference/plugin-manifests.html">Plugin Manifests</a>.</p>
+<p>This is intentionally strict. Manifest errors are startup errors, not runtime warnings. For field-level reference details, see <a href="../reference/plugin-manifests.html">Plugin Manifests</a>.</p>
 <h2 id="startup-selection-and-dependency-closure">Startup selection and dependency closure<a class="headerlink" href="#startup-selection-and-dependency-closure" title="Permanent link">&para;</a></h2>
 <p>Startup selection lives in <code>framelab/plugins/selection.py</code>.</p>
 <h3 id="persisted-selection">Persisted selection<a class="headerlink" href="#persisted-selection" title="Permanent link">&para;</a></h3>
@@ -1593,8 +1590,7 @@
 <h3 id="important-design-point">Important design point<a class="headerlink" href="#important-design-point" title="Permanent link">&para;</a></h3>
 <p>Dependency closure is based on manifest metadata, not on importing plugin code and introspecting classes.</p>
 <h2 id="runtime-import-path">Runtime import path<a class="headerlink" href="#runtime-import-path" title="Permanent link">&para;</a></h2>
-<p>After the startup dialog is accepted, the host window resolves the enabled ids again and loads plugin classes page by page.</p>
-<p>Runtime loading sequence:</p>
+<p>After the startup dialog is accepted, the host window resolves the enabled ids again and loads plugin classes page by page. Runtime loading sequence:</p>
 <ol>
 <li>group enabled manifests by page</li>
 <li>clear previously registered classes for the target page</li>
@@ -1632,8 +1628,7 @@
 </ul>
 <p>Optional runtime menu integration may be provided through host/plugin menu hooks.</p>
 <h2 id="analysis-plugin-contract">Analysis plugin contract<a class="headerlink" href="#analysis-plugin-contract" title="Permanent link">&para;</a></h2>
-<p>Analysis plugins currently have the clearest formal interface in <code>framelab/plugins/analysis/_base.py</code>.</p>
-<p>An analysis plugin must implement:</p>
+<p>Analysis plugins currently have the clearest formal interface in <code>framelab/plugins/analysis/_base.py</code>. An analysis plugin must implement:</p>
 <ul>
 <li><code>create_widget(parent)</code></li>
 <li><code>on_context_changed(context)</code></li>
@@ -1645,8 +1640,7 @@
 </ul>
 <p>The host owns plugin instantiation and stacked-widget placement. The plugin owns the returned widget and its local rendering logic.</p>
 <h2 id="ui-capability-contract">UI capability contract<a class="headerlink" href="#ui-capability-contract" title="Permanent link">&para;</a></h2>
-<p>Plugins can expose lightweight UI-policy hints via <code>PluginUiCapabilities</code>.</p>
-<p>Current fields include:</p>
+<p>Plugins can expose lightweight UI-policy hints via <code>PluginUiCapabilities</code>. Current fields include:</p>
 <ul>
 <li><code>reveal_data_columns</code></li>
 <li><code>reveal_measure_columns</code></li>
@@ -1657,16 +1651,14 @@
 <h3 id="important-boundary">Important boundary<a class="headerlink" href="#important-boundary" title="Permanent link">&para;</a></h3>
 <p>A plugin may request that certain controls or columns be revealed. It should not directly mutate host tables outside its supported integration surface unless the host explicitly delegates that responsibility.</p>
 <h2 id="reload-behavior">Reload behavior<a class="headerlink" href="#reload-behavior" title="Permanent link">&para;</a></h2>
-<p>The Analyze page currently exposes a <strong>Reload Plugins</strong> action.</p>
-<p>Reload behavior is intentionally limited:</p>
+<p>The Analyze page currently exposes a <strong>Reload Plugins</strong> action. Reload behavior is intentionally limited:</p>
 <ul>
 <li>manifests are rediscovered through the registry path</li>
 <li>enabled entrypoint modules are re-imported or reloaded</li>
 <li>registered classes are rebuilt for the page</li>
 <li>plugin widgets are recreated by the host</li>
 </ul>
-<p>Reload should be treated as a development convenience, not a guarantee of complete hot-reload safety for arbitrary plugin-local global state.</p>
-<p>If a plugin caches external module state aggressively or depends on import-time side effects, a full app restart is still the safer path.</p>
+<p>Reload should be treated as a development convenience, not a guarantee of complete hot-reload safety for arbitrary plugin-local global state. If a plugin caches external module state aggressively or depends on import-time side effects, a full app restart is still the safer path.</p>
 <h2 id="manifest-dependencies-versus-class-dependencies">Manifest dependencies versus class dependencies<a class="headerlink" href="#manifest-dependencies-versus-class-dependencies" title="Permanent link">&para;</a></h2>
 <p>Both manifests and classes may declare dependencies, but they serve different purposes.</p>
 <h3 id="manifest-dependencies">Manifest dependencies<a class="headerlink" href="#manifest-dependencies" title="Permanent link">&para;</a></h3>
@@ -1677,8 +1669,7 @@
 <li>enabled-set resolution</li>
 </ul>
 <h3 id="class-dependencies">Class dependencies<a class="headerlink" href="#class-dependencies" title="Permanent link">&para;</a></h3>
-<p>These are normalized at registration time and can be useful as a runtime declaration, but they do not replace manifest dependencies for startup selection.</p>
-<p>If the two declarations disagree, the manifest must be treated as the startup source of truth.</p>
+<p>These are normalized at registration time and can be useful as a runtime declaration, but they do not replace manifest dependencies for startup selection. If the two declarations disagree, the manifest must be treated as the startup source of truth.</p>
 <h2 id="authoring-checklist-for-new-plugins">Authoring checklist for new plugins<a class="headerlink" href="#authoring-checklist-for-new-plugins" title="Permanent link">&para;</a></h2>
 <p>When adding a plugin:</p>
 <ol>

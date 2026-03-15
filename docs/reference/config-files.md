@@ -1,8 +1,6 @@
 # Config Files
 
-The app keeps its shareable runtime configuration in the project/app folder under `config/`.
-
-This page documents the file locations, ownership model, and runtime role of each configuration file.
+The app keeps its shareable runtime configuration in the project/app folder under `config/`. This page documents the file locations, ownership model, and runtime role of each configuration file.
 
 ## Main configuration files
 
@@ -22,9 +20,7 @@ This page documents the file locations, ownership model, and runtime role of eac
 
 ### `config/config.ini`
 
-This file stores persistent scan settings in INI format.
-
-Current use:
+This file stores persistent scan settings in INI format. Current use:
 
 - skip-pattern persistence for dataset scanning
 
@@ -37,9 +33,7 @@ Important notes:
 
 ### `config/plugin_selection.json`
 
-This file stores the enabled plugin ids chosen in the startup selector.
-
-Payload characteristics:
+This file stores the enabled plugin ids chosen in the startup selector. Payload characteristics:
 
 - JSON object
 - includes a schema-version field
@@ -53,9 +47,7 @@ Important notes:
 
 ### `config/ui_state.ini`
 
-This file stores host-window UI state in INI format.
-
-Current use:
+This file stores host-window UI state in INI format. Current use:
 
 - selected workflow workspace root and profile
 - active workflow node id
@@ -71,9 +63,7 @@ Important notes:
 
 ### `config/acquisition_field_mapping.json`
 
-This is the editable runtime mapping used by the Acquisition Datacard Wizard.
-
-It defines field metadata such as:
+This is the editable runtime mapping used by the Acquisition Datacard Wizard. It defines field metadata such as:
 
 - dot-path keys
 - labels
@@ -94,9 +84,7 @@ Important notes:
 
 ### `config/ebus_parameter_catalog.json`
 
-This is the editable runtime catalog used by the eBUS config tools.
-
-It defines eBUS parameter metadata such as:
+This is the editable runtime catalog used by the eBUS config tools. It defines eBUS parameter metadata such as:
 
 - qualified eBUS keys
 - labels and descriptions
@@ -114,9 +102,7 @@ Important notes:
 
 ### `config/workflow_metadata_governance.json`
 
-This file stores optional profile-level governance overrides for workflow metadata.
-
-Typical use:
+This file stores optional profile-level governance overrides for workflow metadata. Typical use:
 
 - promote an ad-hoc metadata field into a profile-defined field
 - tighten or relax ad-hoc field/group policy per workflow profile
@@ -149,9 +135,7 @@ Some metadata files live next to datasets rather than under the global `config/`
 
 ### `.framelab/nodecard.json`
 
-Generic workflow-node metadata file.
-
-Current runtime role:
+Generic workflow-node metadata file. Current runtime role:
 
 - stores local metadata for workflow nodes such as workspace, trial, camera, campaign, or session levels
 - participates in ancestry-based metadata inheritance
@@ -165,9 +149,7 @@ Important notes:
 
 ### `campaign_datacard.json`
 
-Campaign-level metadata file.
-
-Current runtime role:
+Campaign-level metadata file. Current runtime role:
 
 - provides `campaign_defaults`
 - may also provide `instrument_defaults`
@@ -179,9 +161,7 @@ Important note:
 
 ### `session_datacard.json`
 
-Session-level metadata file.
-
-Current runtime role:
+Session-level metadata file. Current runtime role:
 
 - provides `session_defaults`
 - can redefine the acquisitions root through `paths.acquisitions_root_rel`
@@ -193,9 +173,7 @@ Important note:
 
 ### `acquisition_datacard.json`
 
-Acquisition-level canonical metadata file.
-
-Current runtime role:
+Acquisition-level canonical metadata file. Current runtime role:
 
 - provides acquisition `defaults`
 - provides frame-targeted `overrides`
@@ -211,9 +189,7 @@ Those overrides are the app-side acquisition-wide replacement layer used by effe
 
 ### Acquisition-local root-level `.pvcfg`
 
-A dataset folder is treated as carrying a discoverable eBUS snapshot only when it contains exactly one readable root-level `.pvcfg` file.
-
-Important notes:
+A dataset folder is treated as carrying a discoverable eBUS snapshot only when it contains exactly one readable root-level `.pvcfg` file. Important notes:
 
 - the app reads this file but does not edit it
 - automatic discovery is based on root-level uniqueness, not on a special filename requirement
@@ -222,9 +198,7 @@ Important notes:
 
 ## Migration and fallback behavior
 
-The app uses local `config/` paths as the primary runtime location.
-
-When a current file is missing, the app may attempt limited migration from legacy locations before falling back to defaults. This is primarily intended to preserve older skip settings, plugin-selection state, and mapping files after the configuration model was moved into the app/project folder.
+The app uses local `config/` paths as the primary runtime location. When a current file is missing, the app may attempt limited migration from legacy locations before falling back to defaults. This is primarily intended to preserve older skip settings, plugin-selection state, and mapping files after the configuration model was moved into the app/project folder.
 
 ## Manual-edit guidance
 

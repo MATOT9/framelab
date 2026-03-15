@@ -1104,16 +1104,14 @@
 
 
 <h1 id="ebus-parameter-catalog">eBUS Parameter Catalog<a class="headerlink" href="#ebus-parameter-catalog" title="Permanent link">&para;</a></h1>
-<p>The eBUS parameter catalog defines how <code>.pvcfg</code> parameters are labeled, classified, compared, and optionally made overridable in the app.</p>
-<p>It is <strong>not</strong> the same thing as the acquisition field mapping used by the datacard wizard.</p>
+<p>The eBUS parameter catalog defines how <code>.pvcfg</code> parameters are labeled, classified, compared, and optionally made overridable in the app. It is <strong>not</strong> the same thing as the acquisition field mapping used by the datacard wizard.</p>
 <h2 id="file-locations">File locations<a class="headerlink" href="#file-locations" title="Permanent link">&para;</a></h2>
 <ul>
 <li>editable runtime file: <code>config/ebus_parameter_catalog.json</code></li>
 <li>bundled default file: <code>framelab/assets/ebus_parameter_catalog.default.json</code></li>
 </ul>
 <h2 id="why-this-file-exists-separately">Why this file exists separately<a class="headerlink" href="#why-this-file-exists-separately" title="Permanent link">&para;</a></h2>
-<p>The eBUS parameter universe is much larger than the canonical app metadata schema.</p>
-<p>This catalog exists so the app can:</p>
+<p>The eBUS parameter universe is much larger than the canonical app metadata schema. This catalog exists so the app can:</p>
 <ul>
 <li>inspect and compare many eBUS parameters without turning them all into wizard fields</li>
 <li>decide which eBUS keys are safe to override in the app</li>
@@ -1188,8 +1186,7 @@
 </table>
 <h2 id="important-semantics">Important semantics<a class="headerlink" href="#important-semantics" title="Permanent link">&para;</a></h2>
 <h3 id="overridable"><code>overridable</code><a class="headerlink" href="#overridable" title="Permanent link">&para;</a></h3>
-<p>This flag controls app-side edit eligibility.</p>
-<p>If <code>overridable</code> is <code>true</code>:</p>
+<p>This flag controls app-side edit eligibility. If <code>overridable</code> is <code>true</code>:</p>
 <ul>
 <li>a canonical field bound to this key may stay editable in the datacard wizard Defaults tab when it is also eBUS-managed</li>
 <li>the app may store an acquisition-wide override in <code>external_sources.ebus.overrides</code></li>
@@ -1201,15 +1198,13 @@
 <li>the app must not expose it for app-side override editing</li>
 </ul>
 <h3 id="editable_in_ebus"><code>editable_in_ebus</code><a class="headerlink" href="#editable_in_ebus" title="Permanent link">&para;</a></h3>
-<p>This flag is an operator hint, not a parser rule.</p>
-<p>Use <code>editable_in_ebus: false</code> for fields where:</p>
+<p>This flag is an operator hint, not a parser rule. Use <code>editable_in_ebus: false</code> for fields where:</p>
 <ul>
 <li>the raw eBUS snapshot value is known to be fixed, placeholder-like, or untrustworthy for your workflow</li>
 <li>the app may need a manual supplement even though eBUS still emits a value</li>
 </ul>
 <h3 id="uncatalogued-keys">Uncatalogued keys<a class="headerlink" href="#uncatalogued-keys" title="Permanent link">&para;</a></h3>
-<p>The parser can still read keys that are not catalogued.</p>
-<p>When a key is uncatalogued:</p>
+<p>The parser can still read keys that are not catalogued. When a key is uncatalogued:</p>
 <ul>
 <li>it can still appear in inspect and compare flows</li>
 <li>fallback section and label behavior are used</li>
@@ -1217,17 +1212,14 @@
 </ul>
 <p>Cataloguing a key is therefore about classification and policy, not basic parser visibility.</p>
 <h2 id="canonical-mapping-ownership">Canonical mapping ownership<a class="headerlink" href="#canonical-mapping-ownership" title="Permanent link">&para;</a></h2>
-<p>The eBUS catalog does <strong>not</strong> own the canonical mapping.</p>
-<p>Canonical mapping lives in <code>acquisition_field_mapping.json</code> through each canonical field's <code>ebus_label</code>.</p>
-<p>That means:</p>
+<p>The eBUS catalog does <strong>not</strong> own the canonical mapping. Canonical mapping lives in <code>acquisition_field_mapping.json</code> through each canonical field's <code>ebus_label</code>. That means:</p>
 <ul>
 <li><code>acquisition_field_mapping.json</code> defines which canonical app metadata fields are tied to eBUS keys</li>
 <li><code>ebus_parameter_catalog.json</code> defines how raw eBUS parameters are labeled, classified, compared, and made overridable</li>
 </ul>
 <p>The app derives the reverse eBUS-to-canonical view at runtime instead of storing the same mapping twice.</p>
 <h2 id="current-raw-snapshot-app-side-override-model">Current raw-snapshot + app-side override model<a class="headerlink" href="#current-raw-snapshot-app-side-override-model" title="Permanent link">&para;</a></h2>
-<p>The raw snapshot stays on disk as the immutable acquisition-local or standalone <code>.pvcfg</code> file.</p>
-<p>When an approved app-side replacement is needed, the current app stores it under:</p>
+<p>The raw snapshot stays on disk as the immutable acquisition-local or standalone <code>.pvcfg</code> file. When an approved app-side replacement is needed, the current app stores it under:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>external_sources.ebus.overrides
 </code></pre></div>
 <p>This means:</p>

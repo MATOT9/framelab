@@ -1193,8 +1193,7 @@
 <li>the <strong>canonical acquisition metadata schema</strong> used by the app and exposed by the datacard wizard</li>
 <li>the much larger <strong>eBUS parameter space</strong> stored in <code>.pvcfg</code> snapshots</li>
 </ul>
-<p>These should not be collapsed into one file.</p>
-<p>Why:</p>
+<p>These should not be collapsed into one file. Why:</p>
 <ul>
 <li>most eBUS parameters are not canonical app metadata fields</li>
 <li>many are useful for compare or audit, but not as editable datacard defaults</li>
@@ -1231,16 +1230,14 @@
 <h2 id="snapshot-discovery-rules">Snapshot discovery rules<a class="headerlink" href="#snapshot-discovery-rules" title="Permanent link">&para;</a></h2>
 <p>There are two distinct source kinds in the current app.</p>
 <h3 id="standalone-file-source">Standalone file source<a class="headerlink" href="#standalone-file-source" title="Permanent link">&para;</a></h3>
-<p>A path that points directly to one <code>.pvcfg</code> file is treated as a standalone snapshot source.</p>
-<p>Semantics:</p>
+<p>A path that points directly to one <code>.pvcfg</code> file is treated as a standalone snapshot source. Semantics:</p>
 <ul>
 <li>parse the raw snapshot</li>
 <li>no acquisition-root lookup is needed</li>
 <li>no acquisition-side eBUS override context is loaded automatically</li>
 </ul>
 <h3 id="acquisition-root-source">Acquisition-root source<a class="headerlink" href="#acquisition-root-source" title="Permanent link">&para;</a></h3>
-<p>A dataset folder is treated as an acquisition eBUS source only when it contains exactly one readable root-level <code>.pvcfg</code> file.</p>
-<p>Semantics:</p>
+<p>A dataset folder is treated as an acquisition eBUS source only when it contains exactly one readable root-level <code>.pvcfg</code> file. Semantics:</p>
 <ul>
 <li>parse the discovered raw snapshot</li>
 <li>load any <code>external_sources.ebus.overrides</code> from the acquisition datacard</li>
@@ -1248,8 +1245,7 @@
 </ul>
 <p>If several root-level <code>.pvcfg</code> files exist, discovery is intentionally ambiguous and the app does not guess.</p>
 <h2 id="immutable-snapshot-policy">Immutable snapshot policy<a class="headerlink" href="#immutable-snapshot-policy" title="Permanent link">&para;</a></h2>
-<p>The app treats the raw <code>.pvcfg</code> file as an immutable baseline artifact.</p>
-<p>The app must not:</p>
+<p>The app treats the raw <code>.pvcfg</code> file as an immutable baseline artifact. The app must not:</p>
 <ul>
 <li>rewrite the XML</li>
 <li>normalize values back into the file</li>
@@ -1291,8 +1287,7 @@
 </ul>
 <p>Do not document or design around automatic provenance-writing behavior unless that feature is actually implemented.</p>
 <h2 id="why-some-wizard-fields-become-read-only-or-stay-editable">Why some wizard fields become read-only or stay editable<a class="headerlink" href="#why-some-wizard-fields-become-read-only-or-stay-editable" title="Permanent link">&para;</a></h2>
-<p>When an acquisition has a readable acquisition-local eBUS snapshot, canonical fields marked <code>ebus_managed: true</code> stay visible in the datacard wizard.</p>
-<p>This is intentional. Without it, the user would have:</p>
+<p>When an acquisition has a readable acquisition-local eBUS snapshot, canonical fields marked <code>ebus_managed: true</code> stay visible in the datacard wizard. This is intentional. Without it, the user would have:</p>
 <ul>
 <li>one acquisition-wide baseline path through the readable eBUS snapshot</li>
 <li>one competing acquisition-wide edit path through wizard defaults</li>
@@ -1306,8 +1301,7 @@
 <h2 id="compare-semantics">Compare semantics<a class="headerlink" href="#compare-semantics" title="Permanent link">&para;</a></h2>
 <p>The compare dialog exposes two modes that intentionally answer different questions.</p>
 <h3 id="raw-compare">Raw compare<a class="headerlink" href="#raw-compare" title="Permanent link">&para;</a></h3>
-<p>Compares the raw normalized snapshots exactly as saved by eBUS.</p>
-<p>Use it for:</p>
+<p>Compares the raw normalized snapshots exactly as saved by eBUS. Use it for:</p>
 <ul>
 <li>raw reproducibility checks</li>
 <li>saved transport/device/stream differences</li>
@@ -1331,8 +1325,7 @@
 <li>the current dataset folder can be preloaded as an acquisition source when the compare dialog is launched from the main window and discovery succeeds</li>
 </ul>
 <h2 id="optional-wizard-integration">Optional wizard integration<a class="headerlink" href="#optional-wizard-integration" title="Permanent link">&para;</a></h2>
-<p>The eBUS data plugin does <strong>not</strong> hard-depend on the datacard wizard plugin.</p>
-<p>Reason:</p>
+<p>The eBUS data plugin does <strong>not</strong> hard-depend on the datacard wizard plugin. Reason:</p>
 <ul>
 <li>inspect and compare workflows are useful even when the datacard wizard is disabled</li>
 <li>forcing a dependency would make eBUS tooling unavailable unless the wizard were also enabled</li>

@@ -1,8 +1,6 @@
 # Plugin Manifests
 
-Plugin manifests allow the app to discover plugin metadata before importing plugin code.
-
-This supports three important runtime behaviors:
+Plugin manifests allow the app to discover plugin metadata before importing plugin code. This supports three important runtime behaviors:
 
 - startup selection without importing every plugin implementation
 - dependency validation before launch
@@ -10,9 +8,7 @@ This supports three important runtime behaviors:
 
 ## Discovery rules
 
-Manifest discovery is page-scoped.
-
-The app searches under the plugin tree for files named:
+Manifest discovery is page-scoped. The app searches under the plugin tree for files named:
 
 - `plugin.json`
 - `*.plugin.json`
@@ -51,9 +47,7 @@ Files under `__pycache__` are ignored.
 
 ## Validation rules
 
-The manifest layer is validated before runtime plugin imports.
-
-The current rules are:
+The manifest layer is validated before runtime plugin imports. The current rules are:
 
 - `plugin_id` must be present and non-empty
 - `display_name` must be present and non-empty
@@ -68,9 +62,7 @@ If any of these checks fail, plugin discovery fails rather than partially loadin
 
 ## Runtime implication of dependencies
 
-Dependencies affect both persistence and launch-time resolution.
-
-Important consequences:
+Dependencies affect both persistence and launch-time resolution. Important consequences:
 
 - the saved plugin-selection file may list only the directly chosen plugin ids
 - the effective enabled set is closed over dependencies at load time
@@ -78,9 +70,7 @@ Important consequences:
 
 ## Registration contract
 
-A valid manifest is necessary but not sufficient.
-
-After the enabled manifest set is imported:
+A valid manifest is necessary but not sufficient. After the enabled manifest set is imported:
 
 - the plugin entrypoint module must import successfully
 - the plugin implementation must register itself with the host registry
