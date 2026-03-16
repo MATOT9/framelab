@@ -31,6 +31,7 @@ class WorkflowExplorerDock(qtw.QDockWidget):
         self._pending_session_parent_node_id: str | None = None
         self._pending_session_item: qtw.QTreeWidgetItem | None = None
         self._pending_session_editor: qtw.QLineEdit | None = None
+        self._pending_child_type_id: str | None = None
         self._density_tokens = comfortable_density_tokens()
 
         self.setObjectName("WorkflowExplorerDock")
@@ -40,8 +41,10 @@ class WorkflowExplorerDock(qtw.QDockWidget):
             | qtw.QDockWidget.DockWidgetMovable
             | qtw.QDockWidget.DockWidgetFloatable,
         )
-        if not host_window.windowIcon().isNull():
-            self.setWindowIcon(host_window.windowIcon())
+        window_icon = host_window.windowIcon()
+        if window_icon.isNull():
+            window_icon = self.style().standardIcon(qtw.QStyle.SP_DirOpenIcon)
+        self.setWindowIcon(window_icon)
         self.setAttribute(Qt.WA_StyledBackground, True)
         self.setAutoFillBackground(True)
         self.setTitleBarWidget(DockTitleBar(self))
@@ -159,7 +162,7 @@ class WorkflowExplorerDock(qtw.QDockWidget):
         self._advanced_button.setToolTip("Open the selected folder or advanced workflow tools.")
         self._advanced_menu = qtw.QMenu(self._advanced_button)
         self._advanced_open_folder_action = self._advanced_menu.addAction(
-            "Open Scope Folder",
+            "Open in File Explorer",
         )
         self._advanced_open_folder_action.triggered.connect(self._open_selected_folder)
         self._advanced_menu.addSeparator()
@@ -714,77 +717,135 @@ class WorkflowExplorerDock(qtw.QDockWidget):
         if callable(handler):
             handler(node.node_id)
 
-    def _show_tree_context_menu(self, position: QtCore.QPoint) -> None:
-        """Show structure-authoring actions for the selected workflow node."""
+    def _new_context_node(self) -> None:
+        """Trigger the primary create action for the selected workflow node."""
 
-        item = self._tree.itemAt(position)
-        if item is not None:
-            self._tree.setCurrentItem(item)
+        state = self._structure_action_state()
+        if not bool(state.get("can_create_child", False)):
+            return
+        node = self._selected_node()
+        if node is None:
+            return
+        child_type_id = str(state.get("create_child_type_id", "") or "").strip().lower()
+        if child_type_id == "acquisition":
+            self._new_acquisition()
+            return
+        if child_type_id == "session":
+            self._begin_inline_session_creation(node.node_id)
+            return
+        if child_type_id:
+            self._begin_inline_child_creation(node.node_id, child_type_id)
+
+    def _delete_context_node(self) -> None:
+        """Trigger the primary delete action for the selected workflow node."""
+
+        node = self._selected_node()
+        if node is None:
+            return
+        handler = getattr(self._host_window, "_delete_workflow_node", None)
+        if callable(handler):
+            handler(node.node_id)
+
+    def _build_tree_context_menu(self) -> qtw.QMenu:
+        """Build the right-click menu for the current tree selection."""
+
         self._sync_structure_actions()
+        state = self._structure_action_state()
         menu = qtw.QMenu(self)
-        if self._new_session_action.isEnabled():
-            action = menu.addAction("New Session...")
-            action.triggered.connect(self._new_session)
-        if self._delete_session_action.isEnabled():
-            action = menu.addAction("Delete Session...")
-            action.triggered.connect(self._delete_session)
-        if (
-            not menu.isEmpty()
-            and (
-                self._new_acquisition_action.isEnabled()
-                or self._batch_create_action.isEnabled()
-                or self._reindex_action.isEnabled()
-            )
-        ):
+
+        new_action = menu.addAction(
+            str(state.get("create_action_text", "New...") or "New..."),
+        )
+        new_action.setEnabled(bool(state.get("can_create_child", False)))
+        new_action.triggered.connect(self._new_context_node)
+
+        has_secondary_actions = any(
+            (
+                self._batch_create_action.isEnabled(),
+                self._reindex_action.isEnabled(),
+                self._rename_acquisition_action.isEnabled(),
+            ),
+        )
+        if has_secondary_actions:
             menu.addSeparator()
-        if self._new_acquisition_action.isEnabled():
-            action = menu.addAction("New Acquisition...")
-            action.triggered.connect(self._new_acquisition)
         if self._batch_create_action.isEnabled():
             action = menu.addAction("Batch Create...")
             action.triggered.connect(self._batch_create_acquisitions)
         if self._reindex_action.isEnabled():
             action = menu.addAction("Normalize/Reindex...")
             action.triggered.connect(self._reindex_session)
-        if self._rename_acquisition_action.isEnabled() or self._delete_acquisition_action.isEnabled():
-            if not menu.isEmpty():
-                menu.addSeparator()
         if self._rename_acquisition_action.isEnabled():
             action = menu.addAction("Rename / Relabel...")
             action.triggered.connect(self._rename_acquisition)
-        if self._delete_acquisition_action.isEnabled():
-            action = menu.addAction("Delete Acquisition...")
-            action.triggered.connect(self._delete_acquisition)
-        if menu.isEmpty():
+
+        menu.addSeparator()
+        delete_action = menu.addAction(
+            str(state.get("delete_action_text", "Delete...") or "Delete..."),
+        )
+        delete_action.setEnabled(bool(state.get("can_delete_node", False)))
+        delete_action.triggered.connect(self._delete_context_node)
+
+        menu.addSeparator()
+        open_action = menu.addAction("Open in File Explorer")
+        open_action.setEnabled(bool(state.get("can_open_folder", False)))
+        open_action.triggered.connect(self._open_selected_folder)
+        return menu
+
+    def _show_tree_context_menu(self, position: QtCore.QPoint) -> None:
+        """Show structure-authoring actions for the selected workflow node."""
+
+        item = self._tree.itemAt(position)
+        if item is not None:
+            self._tree.setCurrentItem(item)
+        menu = self._build_tree_context_menu()
+        if not menu.actions():
             return
         menu.exec(self._tree.viewport().mapToGlobal(position))
 
-    def _begin_inline_session_creation(self, campaign_node_id: str) -> None:
-        """Add a temporary inline editor row under one campaign item."""
+    def _begin_inline_child_creation(
+        self,
+        parent_node_id: str,
+        child_type_id: str,
+    ) -> None:
+        """Add a temporary inline editor row under one workflow item."""
 
         self._clear_pending_session_creation(remove_item=True)
-        campaign_item = self._item_by_node_id.get(campaign_node_id)
-        if campaign_item is None:
+        parent_item = self._item_by_node_id.get(parent_node_id)
+        if parent_item is None:
             return
-        campaign_item.setExpanded(True)
+        parent_item.setExpanded(True)
+        child_label = child_type_id.replace("_", " ").title()
+        controller = getattr(self._host_window, "workflow_state_controller", None)
+        profile = controller.profile if controller is not None else None
+        if profile is not None:
+            try:
+                child_label = profile.node_type(child_type_id).display_name
+            except KeyError:
+                pass
 
-        pending_item = qtw.QTreeWidgetItem(["", "Session", "Pending"])
-        pending_item.setIcon(0, self._icon_for_type("session"))
-        pending_item.setToolTip(0, "Enter the new session folder label.")
-        campaign_item.addChild(pending_item)
+        pending_item = qtw.QTreeWidgetItem(["", child_label, "Pending"])
+        pending_item.setIcon(0, self._icon_for_type(child_type_id))
+        pending_item.setToolTip(0, f"Enter the new {child_label.lower()} folder label.")
+        parent_item.addChild(pending_item)
 
         editor = qtw.QLineEdit(self._tree)
-        editor.setPlaceholderText("New session folder")
+        editor.setPlaceholderText(f"New {child_label.lower()} folder")
         editor.editingFinished.connect(self._finalize_pending_session_creation)
         self._tree.setItemWidget(pending_item, 0, editor)
         self._tree.scrollToItem(pending_item, qtw.QAbstractItemView.PositionAtBottom)
 
-        self._pending_session_parent_node_id = campaign_node_id
+        self._pending_session_parent_node_id = parent_node_id
         self._pending_session_item = pending_item
         self._pending_session_editor = editor
+        self._pending_child_type_id = child_type_id
 
         editor.setFocus(Qt.OtherFocusReason)
         editor.selectAll()
+
+    def _begin_inline_session_creation(self, campaign_node_id: str) -> None:
+        """Add a temporary inline editor row for creating one session child."""
+
+        self._begin_inline_child_creation(campaign_node_id, "session")
 
     def _clear_pending_session_creation(self, *, remove_item: bool) -> None:
         """Tear down any active inline session-creation editor."""
@@ -794,6 +855,7 @@ class WorkflowExplorerDock(qtw.QDockWidget):
         self._pending_session_parent_node_id = None
         self._pending_session_editor = None
         self._pending_session_item = None
+        self._pending_child_type_id = None
 
         if editor is not None:
             try:
@@ -818,21 +880,26 @@ class WorkflowExplorerDock(qtw.QDockWidget):
         """Commit or cancel the active inline session-creation editor."""
 
         editor = self._pending_session_editor
-        campaign_node_id = self._pending_session_parent_node_id
-        if editor is None or not campaign_node_id:
+        parent_node_id = self._pending_session_parent_node_id
+        child_type_id = self._pending_child_type_id
+        if editor is None or not parent_node_id or not child_type_id:
             return
         folder_label = editor.text().strip()
         self._clear_pending_session_creation(remove_item=True)
         if not folder_label:
             return
 
-        handler = getattr(self._host_window, "_create_workflow_session", None)
+        handler = getattr(self._host_window, "_create_workflow_child_node", None)
         if not callable(handler):
             return
         try:
-            handler(campaign_node_id, folder_label)
+            handler(parent_node_id, folder_label)
         except Exception as exc:
-            qtw.QMessageBox.warning(self, "New Session", str(exc))
+            qtw.QMessageBox.warning(
+                self,
+                f"New {child_type_id.replace('_', ' ').title()}",
+                str(exc),
+            )
 
     def _open_selected_folder(self) -> None:
         """Open the selected node folder in the desktop file browser."""

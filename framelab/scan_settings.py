@@ -11,7 +11,7 @@ from shutil import copy2
 _SECTION = "scan"
 _OPTION_SKIP_PATTERNS = "skip_patterns"
 _CONFIG_DIR_NAME = "config"
-_CONFIG_FILE_NAME = "config.ini"
+_CONFIG_FILE_NAME = "ui_state.ini"
 
 
 def _unique_cleaned(values: list[str]) -> list[str]:
@@ -80,12 +80,12 @@ def app_config_path(
 
 
 def skip_config_path() -> Path:
-    """Return config file path used for FrameLab settings."""
+    """Return config file path used for persisted skip-pattern settings."""
     return app_config_path(
         _CONFIG_FILE_NAME,
         legacy_names=(
             "tiff_viewer.ini",
-            _CONFIG_FILE_NAME,
+            "config.ini",
         ),
     )
 

@@ -6,6 +6,7 @@ from configparser import ConfigParser
 from pathlib import Path
 
 import pytest
+import framelab.scan_settings as scan_settings_module
 from framelab.ui_settings import (
     DensityMode,
     RecentWorkflowEntry,
@@ -20,7 +21,7 @@ pytestmark = [pytest.mark.fast, pytest.mark.core]
 
 @pytest.fixture
 def config_path(tmp_path: Path) -> Path:
-    return tmp_path / "config.ini"
+    return tmp_path / "ui_state.ini"
 
 
 @pytest.fixture
@@ -242,3 +243,19 @@ def test_invalid_recent_workflow_entries_are_ignored(
             active_node_id="calibration:session",
         ),
     ]
+
+
+def test_skip_patterns_persist_in_ui_state_without_creating_legacy_config(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    repo_root = tmp_path / "repo"
+    monkeypatch.setattr(scan_settings_module, "_repo_root", lambda: repo_root)
+
+    scan_settings_module.save_skip_patterns(["*.bak", "notes"])
+
+    ui_state_path = repo_root / "config" / "ui_state.ini"
+    legacy_config_path = repo_root / "config" / "config.ini"
+    assert ui_state_path.is_file()
+    assert not legacy_config_path.exists()
+    assert scan_settings_module.load_skip_patterns() == ["*.bak", "notes"]

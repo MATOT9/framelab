@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Optional
 
 import numpy as np
@@ -196,6 +197,118 @@ class IrisGainPlotMixin:
             return
         qtw.QApplication.clipboard().setPixmap(pixmap)
 
+    @staticmethod
+    def _plot_export_suffix_for_filter(selected_filter: str) -> str:
+        """Return the preferred suffix for one save-dialog filter."""
+
+        lowered = str(selected_filter).strip().lower()
+        if "pdf" in lowered:
+            return ".pdf"
+        if "jpeg" in lowered or "jpg" in lowered:
+            return ".jpg"
+        return ".png"
+
+    @staticmethod
+    def _plot_export_format_for_path(path: Path) -> str:
+        """Return the matplotlib format key for one export path."""
+
+        suffix = path.suffix.lower()
+        if suffix == ".png":
+            return "png"
+        if suffix in {".jpg", ".jpeg"}:
+            return "jpeg"
+        if suffix == ".pdf":
+            return "pdf"
+        raise ValueError("Plot export format must be .png, .jpg, .jpeg, or .pdf.")
+
+    def _suggest_plot_export_path(self) -> Path:
+        """Return the default save path used by plot export."""
+
+        last_path = str(getattr(self, "_plot_export_last_path", "") or "").strip()
+        if last_path:
+            return Path(last_path).expanduser()
+
+        base_dir = Path.home()
+        context = getattr(self, "_context", None)
+        for raw_path in (
+            getattr(context, "active_node_path", None),
+            getattr(context, "dataset_scope_root", None),
+            getattr(context, "workflow_anchor_path", None),
+        ):
+            if not raw_path:
+                continue
+            candidate = Path(str(raw_path)).expanduser()
+            if candidate.exists():
+                base_dir = candidate if candidate.is_dir() else candidate.parent
+                break
+        return base_dir / "intensity-trend.png"
+
+    def _export_plot_to_file(
+        self,
+        export_path: str | Path,
+        *,
+        dpi: int,
+    ) -> Path:
+        """Export the current plot to one supported file path."""
+
+        if self._figure is None:
+            raise RuntimeError("Plot export is unavailable because matplotlib is not installed.")
+
+        path = Path(export_path).expanduser()
+        export_format = self._plot_export_format_for_path(path)
+        clean_dpi = max(36, int(dpi))
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if self._canvas is not None:
+            self._canvas.draw()
+        self._figure.savefig(
+            path,
+            format=export_format,
+            dpi=clean_dpi,
+            bbox_inches="tight",
+            facecolor=self._figure.get_facecolor(),
+            edgecolor=self._figure.get_edgecolor(),
+        )
+        self._plot_export_dpi = clean_dpi
+        self._plot_export_last_path = str(path)
+        return path
+
+    def _export_plot_dialog(self) -> None:
+        """Prompt for a plot-export path and dpi, then save the figure."""
+
+        if self._figure is None:
+            return
+        parent = self._root if self._root is not None else None
+        file_path, selected_filter = qtw.QFileDialog.getSaveFileName(
+            parent,
+            "Export Plot",
+            str(self._suggest_plot_export_path()),
+            "PNG Image (*.png);;JPEG Image (*.jpg *.jpeg);;PDF Document (*.pdf)",
+        )
+        if not file_path:
+            return
+
+        export_path = Path(file_path).expanduser()
+        if export_path.suffix.lower() not in {".png", ".jpg", ".jpeg", ".pdf"}:
+            export_path = export_path.with_suffix(
+                self._plot_export_suffix_for_filter(selected_filter),
+            )
+
+        dpi, accepted = qtw.QInputDialog.getInt(
+            parent,
+            "Export Plot",
+            "DPI:",
+            value=int(getattr(self, "_plot_export_dpi", 200)),
+            minValue=36,
+            maxValue=1200,
+            step=12,
+        )
+        if not accepted:
+            return
+        try:
+            self._export_plot_to_file(export_path, dpi=dpi)
+        except Exception as exc:
+            qtw.QMessageBox.warning(parent, "Export Plot", str(exc))
+
     def _show_plot_context_menu(self) -> None:
         """Open right-click context menu for plot actions."""
         parent = self._root if self._root is not None else None
@@ -204,6 +317,8 @@ class IrisGainPlotMixin:
         show_all_action = menu.addAction("Show All Curves")
         menu.addSeparator()
         copy_plot_action = menu.addAction("Copy Plot Image")
+        export_plot_action = menu.addAction("Export Plot...")
+        export_plot_action.setEnabled(self._figure is not None)
         chosen = menu.exec(QtGui.QCursor.pos())
         if chosen == reset_action:
             self._reset_plot_view()
@@ -213,6 +328,9 @@ class IrisGainPlotMixin:
             return
         if chosen == copy_plot_action:
             self._copy_plot_to_clipboard()
+            return
+        if chosen == export_plot_action:
+            self._export_plot_dialog()
 
     def _set_hover_annotation_style(
         self,
@@ -654,13 +772,19 @@ class IrisGainPlotMixin:
             fig_bg = "#1f2937"
             axes_bg = "#111827"
             text = "#e5e7eb"
-            grid = "#475569"
+            major_grid = "#64748b"
+            minor_grid = "#94a3b8"
+            major_grid_alpha = 0.42
+            minor_grid_alpha = 0.24
             edge = "#dbeafe"
         else:
             fig_bg = "#ffffff"
             axes_bg = "#f8fbff"
             text = "#1f2937"
-            grid = "#c7d6ea"
+            major_grid = "#c7d6ea"
+            minor_grid = "#dbe5f3"
+            major_grid_alpha = 0.62
+            minor_grid_alpha = 0.4
             edge = "#1e3a8a"
 
         palette = (
@@ -684,15 +808,30 @@ class IrisGainPlotMixin:
         ax.set_facecolor(axes_bg)
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
-        ax.spines["left"].set_color(grid)
-        ax.spines["bottom"].set_color(grid)
+        ax.spines["left"].set_color(major_grid)
+        ax.spines["bottom"].set_color(major_grid)
         ax.tick_params(which="both", colors=text)
         ax.xaxis.label.set_color(text)
         ax.yaxis.label.set_color(text)
         ax.set_xlabel(x_label)
         ax.set_ylabel(y_label)
-        ax.grid(True, color=grid, alpha=0.35, linewidth=0.8)
-        self._set_hover_annotation_style(text, axes_bg, grid)
+        ax.minorticks_on()
+        ax.grid(
+            True,
+            which="major",
+            color=major_grid,
+            alpha=major_grid_alpha,
+            linewidth=0.85,
+        )
+        ax.grid(
+            True,
+            which="minor",
+            color=minor_grid,
+            alpha=minor_grid_alpha,
+            linewidth=0.65,
+            linestyle=":",
+        )
+        self._set_hover_annotation_style(text, axes_bg, major_grid)
         self._set_fit_stats_text(None)
 
         if not curves:
@@ -1075,7 +1214,7 @@ class IrisGainPlotMixin:
             legend = ax.legend(loc="best", fontsize=8, frameon=True)
             legend_frame = legend.get_frame()
             legend_frame.set_facecolor(axes_bg)
-            legend_frame.set_edgecolor(grid)
+            legend_frame.set_edgecolor(major_grid)
             for text_item in legend.get_texts():
                 text_item.set_color(text)
             self._configure_legend_pick(

@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
 
-from .scan_settings import app_config_path, skip_config_path
+from .scan_settings import app_config_path
 
 _CONFIG_FILE_NAME = "ui_state.ini"
 _LEGACY_CONFIG_NAMES: tuple[str, ...] = ()
@@ -555,10 +555,6 @@ class UiStateStore:
         config = ConfigParser()
         if self.path.exists():
             config.read(self.path, encoding="utf-8")
-            return config
-        legacy_path = skip_config_path()
-        if legacy_path.exists() and legacy_path != self.path:
-            config.read(legacy_path, encoding="utf-8")
         return config
 
     def _write_config(self, config: ConfigParser) -> None:

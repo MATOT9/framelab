@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Iterable, Optional
 from collections import OrderedDict
+import shutil
 
 import numpy as np
 from PySide6 import QtGui, QtWidgets as qtw
@@ -50,6 +51,16 @@ def _controller_property(controller_name: str, state_name: str, doc: str) -> pro
         setattr(getattr(self, controller_name), state_name, value)
 
     return property(getter, setter, doc=doc)
+
+
+@dataclass(frozen=True)
+class WorkflowTreeMutationResult:
+    """Filesystem mutation summary for workflow-node create/delete actions."""
+
+    created_path: Path | None = None
+    created_paths: tuple[Path, ...] = ()
+    deleted_paths: tuple[Path, ...] = ()
+    renamed_paths: tuple[tuple[Path, Path], ...] = ()
 
 
 class FrameLabWindow(
@@ -588,6 +599,15 @@ class FrameLabWindow(
             node_id,
         )
         numbering_valid = session_index.numbering_valid if session_index is not None else False
+        create_parent_node, create_child_type_id = self._workflow_create_target(
+            node_id,
+        )
+        can_create_child = create_parent_node is not None and create_child_type_id is not None
+        if create_child_type_id == "acquisition":
+            can_create_child = session_node is not None and numbering_valid
+        can_delete_node = node is not None and node.type_id != "root"
+        if node is not None and node.type_id == "acquisition":
+            can_delete_node = selected_entry is not None and numbering_valid
         return {
             "node": node,
             "session_node": session_node,
@@ -600,8 +620,72 @@ class FrameLabWindow(
             "can_rename": selected_entry is not None,
             "can_delete": selected_entry is not None and numbering_valid,
             "can_reindex": session_index is not None and bool(session_index.entries),
+            "can_create_child": can_create_child,
+            "create_action_text": (
+                f"New {self._workflow_node_type_label(create_child_type_id)}..."
+                if create_child_type_id
+                else "New..."
+            ),
+            "create_child_type_id": create_child_type_id,
+            "can_delete_node": can_delete_node,
+            "delete_action_text": (
+                f"Delete {self._workflow_node_type_label(node.type_id)}..."
+                if node is not None
+                else "Delete..."
+            ),
+            "can_open_folder": node is not None,
             "warning_text": session_index.warning_text if session_index is not None else "",
         }
+
+    def _workflow_node_type_label(self, type_id: str | None) -> str:
+        """Return a human label for one workflow node type."""
+
+        clean = str(type_id or "").strip().lower()
+        if not clean:
+            return "Node"
+        profile = self.workflow_state_controller.profile
+        if profile is not None:
+            try:
+                return profile.node_type(clean).display_name
+            except KeyError:
+                pass
+        return clean.replace("_", " ").title()
+
+    def _workflow_create_target(
+        self,
+        node_id: str | None = None,
+    ) -> tuple[object | None, str | None]:
+        """Return the parent node and child type used for generic create actions."""
+
+        node, session_node, _session_index, _selected_entry = self._workflow_node_and_session_context(
+            node_id,
+        )
+        profile = self.workflow_state_controller.profile
+        if node is None or profile is None:
+            return (None, None)
+        if node.type_id == "acquisition":
+            return (session_node, "acquisition") if session_node is not None else (None, None)
+        try:
+            child_type_ids = profile.node_type(node.type_id).child_type_ids
+        except KeyError:
+            return (None, None)
+        if not child_type_ids:
+            return (None, None)
+        return (node, child_type_ids[0])
+
+    @staticmethod
+    def _clean_workflow_folder_label(
+        folder_label: str,
+        entity_label: str,
+    ) -> str:
+        """Validate and normalize one new workflow folder label."""
+
+        clean_label = str(folder_label).strip()
+        if not clean_label:
+            raise ValueError(f"{entity_label} folder label cannot be empty.")
+        if clean_label in {".", ".."} or "/" in clean_label or "\\" in clean_label:
+            raise ValueError(f"{entity_label} folder label cannot contain path separators.")
+        return clean_label
 
     def _apply_loaded_dataset_path_mutation(
         self,
@@ -693,11 +777,22 @@ class FrameLabWindow(
             active_node = controller.active_node()
             target_path = active_node.folder_path if active_node is not None else None
         target_path = self._map_path_through_workflow_mutation(target_path, result)
+        workspace_root = self._map_path_through_workflow_mutation(
+            controller.workspace_root,
+            result,
+        )
+        anchor_type_id = controller.anchor_type_id
+        if workspace_root is None:
+            workspace_root = target_path
+            anchor_type_id = None
+        if workspace_root is None:
+            self.set_workflow_context(None, None)
+            return
 
         self.set_workflow_context(
-            str(controller.workspace_root),
+            str(workspace_root),
             controller.profile_id,
-            anchor_type_id=controller.anchor_type_id,
+            anchor_type_id=anchor_type_id,
         )
         if target_path is not None:
             node_id = self.workflow_state_controller.resolve_node_id_for_path(target_path)
@@ -857,6 +952,33 @@ class FrameLabWindow(
             f"{loaded_note}"
         )
 
+    def _workflow_node_delete_confirmation_text(
+        self,
+        node_path: Path,
+        *,
+        node_label: str,
+        folder_name: str,
+    ) -> str:
+        """Return confirmation copy for a workflow subtree delete."""
+
+        loaded_folder = self._workflow_selected_folder()
+        loaded_note = ""
+        if loaded_folder is not None:
+            loaded_note = (
+                "\n\nA dataset is currently loaded. Confirming will trigger a full refresh."
+            )
+            if node_path in loaded_folder.parents or loaded_folder == node_path:
+                loaded_note = (
+                    "\n\nThe currently loaded dataset is inside this subtree. "
+                    "Confirming will unload it and refresh the UI."
+                )
+        node_text = node_label.lower()
+        return (
+            f"Delete {node_text} folder '{folder_name}'?\n"
+            f"This removes the entire {node_text} subtree and all descendants."
+            f"{loaded_note}"
+        )
+
     def _create_workflow_session(
         self,
         node_id: str | None,
@@ -878,6 +1000,50 @@ class FrameLabWindow(
             force_refresh_if_loaded=False,
         )
         return result.created_path
+
+    def _create_workflow_child_node(
+        self,
+        node_id: str | None,
+        folder_label: str,
+    ) -> Path | None:
+        """Create a direct workflow child under the selected node."""
+
+        parent_node, child_type_id = self._workflow_create_target(node_id)
+        if parent_node is None or child_type_id is None:
+            return None
+        if child_type_id == "session":
+            return self._create_workflow_session(
+                getattr(parent_node, "node_id", None),
+                folder_label,
+            )
+        if child_type_id == "acquisition":
+            self._open_workflow_acquisition_creation_dialog(
+                getattr(parent_node, "node_id", None),
+                batch=False,
+            )
+            return None
+
+        child_label = self._workflow_node_type_label(child_type_id)
+        clean_label = self._clean_workflow_folder_label(folder_label, child_label)
+        parent_path = Path(getattr(parent_node, "folder_path")).resolve()
+        created_path = parent_path.joinpath(clean_label)
+        if created_path.exists():
+            raise FileExistsError(f"{child_label} folder already exists: {created_path.name}")
+
+        created_path.mkdir(parents=True, exist_ok=False)
+        if child_type_id == "campaign":
+            created_path.joinpath("01_sessions").mkdir(parents=True, exist_ok=True)
+
+        result = WorkflowTreeMutationResult(
+            created_path=created_path,
+            created_paths=(created_path,),
+        )
+        self._refresh_workflow_after_structure_mutation(
+            result,
+            preferred_active_path=created_path,
+            force_refresh_if_loaded=False,
+        )
+        return created_path
 
     def _delete_workflow_session(
         self,
@@ -919,6 +1085,66 @@ class FrameLabWindow(
         )
         if campaign_node is not None:
             preferred_path = campaign_node.folder_path
+        elif node.folder_path.parent.name.lower() in {"01_sessions", "sessions"}:
+            preferred_path = node.folder_path.parent.parent
+        else:
+            preferred_path = node.folder_path.parent
+        self._refresh_workflow_after_structure_mutation(
+            result,
+            preferred_active_path=preferred_path,
+            force_refresh_if_loaded=True,
+        )
+
+    def _delete_workflow_node(
+        self,
+        node_id: str | None = None,
+    ) -> None:
+        """Delete the selected workflow node, dispatching by node type."""
+
+        controller = self.workflow_state_controller
+        node = controller.node(node_id) if node_id else controller.active_node()
+        if node is None or node.type_id == "root":
+            return
+        if node.type_id == "session":
+            self._delete_workflow_session(node.node_id)
+            return
+        if node.type_id == "acquisition":
+            self._delete_workflow_acquisition(node.node_id)
+            return
+
+        answer = qtw.QMessageBox.question(
+            self,
+            f"Delete {self._workflow_node_type_label(node.type_id)}",
+            self._workflow_node_delete_confirmation_text(
+                node.folder_path,
+                node_label=self._workflow_node_type_label(node.type_id),
+                folder_name=node.folder_path.name,
+            ),
+            qtw.QMessageBox.Yes | qtw.QMessageBox.No,
+            qtw.QMessageBox.No,
+        )
+        if answer != qtw.QMessageBox.Yes:
+            return
+
+        try:
+            shutil.rmtree(node.folder_path)
+        except Exception as exc:
+            qtw.QMessageBox.warning(
+                self,
+                f"Delete {self._workflow_node_type_label(node.type_id)}",
+                str(exc),
+            )
+            return
+
+        parent_node = controller.node(node.parent_id) if node.parent_id is not None else None
+        preferred_path = (
+            parent_node.folder_path
+            if parent_node is not None
+            else node.folder_path.parent
+        )
+        result = WorkflowTreeMutationResult(
+            deleted_paths=(node.folder_path,),
+        )
         self._refresh_workflow_after_structure_mutation(
             result,
             preferred_active_path=preferred_path,

@@ -131,6 +131,8 @@ class IrisGainAnalysisPlugin(
         self._plot_pan_state: Optional[
             tuple[float, float, tuple[float, float], tuple[float, float]]
         ] = None
+        self._plot_export_dpi = 200
+        self._plot_export_last_path: Optional[str] = None
 
     @classmethod
     def _plot_x_label_for_mode(cls, x_mode: str) -> str:

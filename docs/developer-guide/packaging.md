@@ -68,7 +68,7 @@ config/
 
 Typical runtime files include:
 
-- `config/config.ini`
+- `config/ui_state.ini`
 - `config/plugin_selection.json`
 - `config/acquisition_field_mapping.json` when a user saves a local mapping override
 - `config/ebus_parameter_catalog.json` when a user edits the local catalog

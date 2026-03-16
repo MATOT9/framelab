@@ -158,6 +158,35 @@ def _make_workspace_with_session_container(tmp_path: Path) -> tuple[Path, Path, 
     return workspace_root, campaign_root, campaign_node_id
 
 
+def _make_trials_workspace(tmp_path: Path) -> tuple[Path, str, str, str, str]:
+    workspace_root = tmp_path / "trials"
+    session_root = workspace_root / "trial-07" / "camera-a" / "2026-03-05__sess01"
+    acquisitions_root = session_root / "acquisitions"
+    acquisitions_root.mkdir(parents=True, exist_ok=True)
+    _write_session_datacard(session_root)
+
+    acquisition_root = acquisitions_root / "acq-0011__dark"
+    acquisition_root.mkdir(parents=True, exist_ok=True)
+    _write_acquisition_datacard(acquisition_root)
+    _write_frame(acquisition_root / "frames" / "f0.tiff", 10)
+
+    return (
+        workspace_root,
+        "trials:trial:trial-07",
+        "trials:camera:trial-07/camera-a",
+        "trials:session:trial-07/camera-a/2026-03-05__sess01",
+        "trials:acquisition:trial-07/camera-a/2026-03-05__sess01/acquisitions/acq-0011__dark",
+    )
+
+
+def _menu_action_state(menu: qtw.QMenu) -> dict[str, bool]:
+    return {
+        action.text(): action.isEnabled()
+        for action in menu.actions()
+        if not action.isSeparator()
+    }
+
+
 def test_workflow_explorer_dock_selection_updates_active_scope(
     tmp_path: Path,
     framelab_window_factory,
@@ -404,3 +433,147 @@ def test_workflow_explorer_dock_cancels_empty_inline_session_creation(
 
     assert not (workspace_root / "camera-a" / "campaign-2026" / "   ").exists()
     assert dock._pending_session_editor is None
+
+
+def test_workflow_explorer_context_menu_covers_every_calibration_level(
+    tmp_path: Path,
+    framelab_window_factory,
+    process_events,
+) -> None:
+    workspace_root, _session_root, _acquisition_root, session_node_id, acquisition_node_id = (
+        _make_workspace(tmp_path)
+    )
+    window = framelab_window_factory(enabled_plugin_ids=())
+    window.set_workflow_context(str(workspace_root), "calibration")
+    dock = window._workflow_explorer_dock
+
+    action_state_by_node_id = {
+        "calibration:root": {
+            "New Camera...": True,
+            "Delete Workspace...": False,
+            "Open in File Explorer": True,
+        },
+        "calibration:camera:camera-a": {
+            "New Campaign...": True,
+            "Delete Camera...": True,
+            "Open in File Explorer": True,
+        },
+        "calibration:campaign:camera-a/campaign-2026": {
+            "New Session...": True,
+            "Delete Campaign...": True,
+            "Open in File Explorer": True,
+        },
+        session_node_id: {
+            "New Acquisition...": True,
+            "Delete Session...": True,
+            "Open in File Explorer": True,
+        },
+        acquisition_node_id: {
+            "New Acquisition...": True,
+            "Delete Acquisition...": True,
+            "Open in File Explorer": True,
+        },
+    }
+
+    for node_id, expected_actions in action_state_by_node_id.items():
+        dock._tree.setCurrentItem(dock._item_by_node_id[node_id])
+        process_events()
+        actions = _menu_action_state(dock._build_tree_context_menu())
+        for action_text, expected_enabled in expected_actions.items():
+            assert actions[action_text] is expected_enabled
+
+
+def test_workflow_explorer_context_menu_covers_every_trials_level(
+    tmp_path: Path,
+    framelab_window_factory,
+    process_events,
+) -> None:
+    workspace_root, trial_node_id, camera_node_id, session_node_id, acquisition_node_id = (
+        _make_trials_workspace(tmp_path)
+    )
+    window = framelab_window_factory(enabled_plugin_ids=())
+    window.set_workflow_context(str(workspace_root), "trials")
+    dock = window._workflow_explorer_dock
+
+    action_state_by_node_id = {
+        "trials:root": {
+            "New Trial...": True,
+            "Delete Workspace...": False,
+            "Open in File Explorer": True,
+        },
+        trial_node_id: {
+            "New Camera...": True,
+            "Delete Trial...": True,
+            "Open in File Explorer": True,
+        },
+        camera_node_id: {
+            "New Session...": True,
+            "Delete Camera...": True,
+            "Open in File Explorer": True,
+        },
+        session_node_id: {
+            "New Acquisition...": True,
+            "Delete Session...": True,
+            "Open in File Explorer": True,
+        },
+        acquisition_node_id: {
+            "New Acquisition...": True,
+            "Delete Acquisition...": True,
+            "Open in File Explorer": True,
+        },
+    }
+
+    for node_id, expected_actions in action_state_by_node_id.items():
+        dock._tree.setCurrentItem(dock._item_by_node_id[node_id])
+        process_events()
+        actions = _menu_action_state(dock._build_tree_context_menu())
+        for action_text, expected_enabled in expected_actions.items():
+            assert actions[action_text] is expected_enabled
+
+
+def test_workflow_explorer_can_create_and_delete_campaign_from_context_actions(
+    tmp_path: Path,
+    framelab_window_factory,
+    monkeypatch,
+    process_events,
+) -> None:
+    workspace_root, _session_root, _acquisition_root, _session_node_id, _acquisition_node_id = (
+        _make_workspace(tmp_path)
+    )
+    camera_node_id = "calibration:camera:camera-a"
+    created_node_id = "calibration:campaign:camera-a/campaign-2027"
+    created_root = workspace_root / "camera-a" / "campaign-2027"
+
+    window = framelab_window_factory(enabled_plugin_ids=())
+    window.set_workflow_context(
+        str(workspace_root),
+        "calibration",
+        active_node_id=camera_node_id,
+    )
+    dock = window._workflow_explorer_dock
+
+    dock._tree.setCurrentItem(dock._item_by_node_id[camera_node_id])
+    process_events()
+    dock._new_context_node()
+    assert dock._pending_session_editor is not None
+    dock._pending_session_editor.setText("campaign-2027")
+    dock._finalize_pending_session_creation()
+    process_events()
+
+    assert created_root.is_dir()
+    assert created_root.joinpath("01_sessions").is_dir()
+    assert window.workflow_state_controller.active_node_id == created_node_id
+
+    monkeypatch.setattr(
+        qtw.QMessageBox,
+        "question",
+        lambda *args, **kwargs: qtw.QMessageBox.Yes,
+    )
+
+    dock._tree.setCurrentItem(dock._item_by_node_id[created_node_id])
+    process_events()
+    dock._delete_context_node()
+    process_events()
+
+    assert not created_root.exists()
+    assert window.workflow_state_controller.active_node_id == camera_node_id

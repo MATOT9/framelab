@@ -154,6 +154,21 @@ QPlainTextEdit#WizardReviewEditor {
     selection-background-color: $selection_bg;
     selection-color: $selection_fg;
 }
+QPlainTextEdit,
+QTextEdit {
+    background: $field_bg;
+    border: 1px solid $field_border;
+    border-radius: 8px;
+    padding: ${input_padding_v}px ${input_padding_h}px;
+    color: $text;
+    font-weight: 400;
+    selection-background-color: $selection_bg;
+    selection-color: $selection_fg;
+}
+QPlainTextEdit:focus,
+QTextEdit:focus {
+    border: 1px solid $focus_border;
+}
 QWidget#WizardReviewViewport {
     background: $canvas_bg;
 }

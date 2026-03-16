@@ -102,6 +102,7 @@ class AcquisitionAuthoringDialog(qtw.QDialog):
             "Single create: first line only.\n"
             "Batch create: each line applies to one row.",
         )
+        self._labels_edit.setMinimumHeight(92)
         self._labels_edit.setTabChangesFocus(True)
         self._labels_edit.textChanged.connect(self._refresh_preview)
         form_layout.addWidget(self._labels_edit, 1, 3, 2, 1)
@@ -124,12 +125,15 @@ class AcquisitionAuthoringDialog(qtw.QDialog):
         )
         self._preview_table.setEditTriggers(qtw.QAbstractItemView.NoEditTriggers)
         self._preview_table.setSelectionMode(qtw.QAbstractItemView.NoSelection)
+        self._preview_table.setWordWrap(False)
         self._preview_table.verticalHeader().setVisible(False)
-        self._preview_table.horizontalHeader().setStretchLastSection(True)
-        self._preview_table.horizontalHeader().setSectionResizeMode(
-            2,
-            qtw.QHeaderView.Stretch,
-        )
+        header = self._preview_table.horizontalHeader()
+        header.setStretchLastSection(False)
+        header.setSectionsMovable(False)
+        header.setSectionResizeMode(0, qtw.QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(1, qtw.QHeaderView.Stretch)
+        header.setSectionResizeMode(2, qtw.QHeaderView.Stretch)
+        header.setSectionResizeMode(3, qtw.QHeaderView.ResizeToContents)
         layout.addWidget(self._preview_table, 1)
 
         actions = qtw.QHBoxLayout()
@@ -271,7 +275,8 @@ class AcquisitionAuthoringDialog(qtw.QDialog):
                 self._preview_table.setItem(row, column, item)
             if entry.collision_exists:
                 collisions.append(entry.folder_name)
-        self._preview_table.resizeColumnsToContents()
+        self._preview_table.resizeColumnToContents(0)
+        self._preview_table.resizeColumnToContents(3)
 
         warnings: list[str] = []
         if not self._session_index.numbering_valid:

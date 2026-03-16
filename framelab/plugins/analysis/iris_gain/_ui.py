@@ -318,6 +318,11 @@ class IrisGainUiMixin:
         copy_plot_action.triggered.connect(
             lambda _checked=False: self._copy_plot_to_clipboard(),
         )
+        export_plot_action = menu.addAction("Export Plot...")
+        export_plot_action.setEnabled(self._figure is not None)
+        export_plot_action.triggered.connect(
+            lambda _checked=False: self._export_plot_dialog(),
+        )
 
     def set_theme(self, mode: str) -> None:
         """Set plugin plot theme and redraw current content."""

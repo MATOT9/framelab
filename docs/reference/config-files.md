@@ -6,8 +6,7 @@ The app keeps its shareable runtime configuration in the project/app folder unde
 
 | File | Created automatically | Intended editor | Purpose |
 | --- | --- | --- | --- |
-| `config/config.ini` | Yes | user or app | Persistent scan settings, currently used for skip-pattern storage |
-| `config/ui_state.ini` | Yes | app | Persisted UI state such as workflow selection, dock visibility, panel state, and splitter positions |
+| `config/ui_state.ini` | Yes | app | Persisted UI state such as workflow selection, dock visibility, panel state, splitter positions, and skip-pattern scan rules |
 | `config/plugin_selection.json` | Yes | app, optionally user | Persisted startup plugin-selection state |
 | `config/acquisition_field_mapping.json` | Yes, if missing | user or app | Editable field-definition mapping used by the Acquisition Datacard Wizard |
 | `config/ebus_parameter_catalog.json` | Yes, if missing | user or app | Editable eBUS parameter catalog used by inspect, compare, and eBUS-override eligibility rules |
@@ -17,19 +16,6 @@ The app keeps its shareable runtime configuration in the project/app folder unde
 | `framelab/assets/help/` | No, bundled build output | project source/build process | Offline documentation bundle opened from the Help menu |
 
 ## File details
-
-### `config/config.ini`
-
-This file stores persistent scan settings in INI format. Current use:
-
-- skip-pattern persistence for dataset scanning
-
-Important notes:
-
-- the file is created when settings are first saved
-- missing files are acceptable; defaults are used until saved
-- legacy config files may be migrated into the local `config/` directory when the current file is missing
-- editing while the app is closed is acceptable if valid INI syntax is preserved
 
 ### `config/plugin_selection.json`
 
@@ -54,11 +40,12 @@ This file stores host-window UI state in INI format. Current use:
 - recent workflow entries
 - dock visibility and panel disclosure state
 - splitter positions for workflow, analysis, and metadata surfaces
+- skip-pattern persistence for dataset scanning
 
 Important notes:
 
 - the file is created when UI state is first saved
-- it is intentionally separate from `config.ini` so tracked shareable config is not polluted by per-user runtime state
+- limited legacy config migration may still pull older skip-rule settings into this file when the current file is missing
 - deleting it is safe; the app will recreate it from defaults
 
 ### `config/acquisition_field_mapping.json`
@@ -198,13 +185,13 @@ A dataset folder is treated as carrying a discoverable eBUS snapshot only when i
 
 ## Migration and fallback behavior
 
-The app uses local `config/` paths as the primary runtime location. When a current file is missing, the app may attempt limited migration from legacy locations before falling back to defaults. This is primarily intended to preserve older skip settings, plugin-selection state, and mapping files after the configuration model was moved into the app/project folder.
+The app uses local `config/` paths as the primary runtime location. When a current file is missing, the app may attempt limited migration from legacy locations before falling back to defaults. This is primarily intended to preserve older UI-state and skip settings, plugin-selection state, and mapping files after the configuration model was moved into the app/project folder.
 
 ## Manual-edit guidance
 
 General guidance:
 
-- safe to edit while the app is closed: `config.ini`, `ui_state.ini`, `plugin_selection.json`, `acquisition_field_mapping.json`, `ebus_parameter_catalog.json`, `workflow_metadata_governance.json`
+- safe to edit while the app is closed: `ui_state.ini`, `plugin_selection.json`, `acquisition_field_mapping.json`, `ebus_parameter_catalog.json`, `workflow_metadata_governance.json`
 - safe to edit while the app is closed when you intentionally manage dataset metadata: `.framelab/nodecard.json`, `campaign_datacard.json`, `session_datacard.json`, `acquisition_datacard.json`
 - not intended for routine runtime editing: bundled asset files under `framelab/assets/`
 - if a file becomes invalid, the app will usually fall back to defaults rather than partially trusting malformed content
