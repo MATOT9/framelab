@@ -122,6 +122,40 @@ def test_visible_metadata_and_source_index_helpers_follow_loaded_paths(
     assert controller.source_index_for_path("/tmp/dataset/missing.tif") is None
 
 
+def test_incremental_metadata_update_and_subtree_lookup(
+    controller: DatasetStateController,
+) -> None:
+    controller.set_loaded_dataset(
+        "/tmp/dataset",
+        [
+            "/tmp/dataset/session-a/acq-001/frame-0.tif",
+            "/tmp/dataset/session-a/acq-002/frame-0.tif",
+        ],
+    )
+    controller.set_path_metadata(
+        {
+            "/tmp/dataset/session-a/acq-001/frame-0.tif": {"group": 1},
+            "/tmp/dataset/session-a/acq-002/frame-0.tif": {"group": 2},
+        },
+    )
+
+    controller.update_path_metadata(
+        {
+            "/tmp/dataset/session-a/acq-001/frame-0.tif": {"group": 9},
+        },
+    )
+
+    assert controller.metadata_for_path(
+        "/tmp/dataset/session-a/acq-001/frame-0.tif",
+    ) == {"group": 9}
+    assert controller.metadata_for_path(
+        "/tmp/dataset/session-a/acq-002/frame-0.tif",
+    ) == {"group": 2}
+    assert controller.paths_within_root("/tmp/dataset/session-a/acq-001") == [
+        "/tmp/dataset/session-a/acq-001/frame-0.tif",
+    ]
+
+
 def test_workflow_scope_snapshot_tracks_active_node_and_metadata_context(
     controller: DatasetStateController,
 ) -> None:

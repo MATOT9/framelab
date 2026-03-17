@@ -18,6 +18,7 @@ from ..datacard_labels import label_for_metadata_field
 from ..metadata import (
     clear_metadata_cache,
     extract_path_metadata,
+    invalidate_metadata_cache,
     path_has_json_metadata,
 )
 from ..node_metadata import NODECARD_DIR_NAME, NODECARD_FILE_NAME
@@ -946,24 +947,45 @@ class DataPageMixin:
         self._apply_dynamic_visibility_policy()
         self._set_status()
 
-    def _refresh_metadata_cache(self) -> None:
-        """Rebuild metadata mapping for currently loaded paths."""
-        clear_metadata_cache()
+    def _refresh_metadata_cache(
+        self,
+        *,
+        paths: list[str] | tuple[str, ...] | None = None,
+        invalidate_roots: tuple[str | Path, ...] = (),
+        clear_cache: bool = False,
+    ) -> list[str]:
+        """Refresh cached metadata for all loaded paths or one subtree subset."""
+
+        dataset = self.dataset_state
+        target_paths = (
+            list(dataset.paths)
+            if paths is None
+            else [str(path) for path in paths if dataset.source_index_for_path(path) is not None]
+        )
+        if not target_paths:
+            return []
+        if clear_cache:
+            clear_metadata_cache()
+        elif invalidate_roots:
+            invalidate_metadata_cache(tuple(invalidate_roots))
         boundary_root = (
-            self.dataset_state.scope_snapshot.root
-            if self.dataset_state.scope_snapshot.source == "workflow"
+            dataset.scope_snapshot.root
+            if dataset.scope_snapshot.source == "workflow"
             else None
         )
-        self.dataset_state.set_path_metadata(
-            {
-                path: extract_path_metadata(
-                    path,
-                    metadata_source=self.dataset_state.metadata_source_mode,
-                    metadata_boundary_root=boundary_root,
-                )
-                for path in self.dataset_state.paths
-            },
-        )
+        refreshed = {
+            path: extract_path_metadata(
+                path,
+                metadata_source=dataset.metadata_source_mode,
+                metadata_boundary_root=boundary_root,
+            )
+            for path in target_paths
+        }
+        if paths is None or len(target_paths) == dataset.path_count():
+            dataset.set_path_metadata(refreshed)
+        else:
+            dataset.update_path_metadata(refreshed)
+        return target_paths
 
     def _refresh_ebus_config_status(self, folder: Path | None = None) -> None:
         """Update compact status text for recursively discovered eBUS configs."""

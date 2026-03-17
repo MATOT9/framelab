@@ -20,6 +20,13 @@ from ..background import (
 )
 from ..image_io import is_supported_image, read_2d_image, supported_suffixes
 from ..metadata import clear_metadata_cache
+from ..metrics_cache import (
+    FileMetricIdentity,
+    MetricCacheWrite,
+    STATIC_METRIC_KIND,
+    build_file_metric_identity,
+    static_metric_signature_hash,
+)
 from ..processing_failures import (
     failure_reason_from_exception,
     make_processing_failure,
@@ -140,7 +147,7 @@ class DatasetLoadingMixin:
     def _scan_single_tiff(
         self,
         path: Path,
-    ) -> tuple[Optional[tuple[str, np.ndarray, int, int]], tuple[object, ...]]:
+    ) -> tuple[Optional[tuple[str, int, int]], tuple[object, ...]]:
         """Read a single TIFF and derive quick static metrics."""
         try:
             img = self._read_2d_image(path)
@@ -159,13 +166,14 @@ class DatasetLoadingMixin:
         non_zero = img[img != 0]
         min_non_zero = int(non_zero.min()) if non_zero.size > 0 else 0
         max_pixel = int(img.max())
-        return ((str(path), img, min_non_zero, max_pixel), ())
+        return ((str(path), min_non_zero, max_pixel), ())
 
     def _scan_tiffs_chunked_parallel(
         self,
         files: list[Path],
         *,
         update_status: bool = False,
+        dataset_root: Path | None = None,
     ) -> tuple[list[str], list[int], list[int], int, list[object]]:
         """Scan TIFF files in chunks and preserve source order."""
         if not files:
@@ -173,56 +181,116 @@ class DatasetLoadingMixin:
 
         chunk_size = self._chunk_size_for_scan(len(files))
         max_workers = self._scan_worker_count()
-        paths: list[str] = []
-        mins: list[int] = []
-        maxs: list[int] = []
         skipped = 0
         processed = 0
         failures: list[object] = []
+        cache = getattr(self, "metrics_cache", None)
+        static_signature = static_metric_signature_hash()
+        identities_by_path = self._metric_cache_identities(
+            files,
+            dataset_root=dataset_root,
+        )
+        cached_metrics: dict[str, tuple[int, int]] = {}
+        if cache is not None and identities_by_path:
+            cached_payloads = cache.fetch_entries(
+                identities_by_path.values(),
+                metric_kind=STATIC_METRIC_KIND,
+                signature_hash=static_signature,
+            )
+            cached_metrics = {
+                path: (
+                    int(payload.get("min_non_zero", 0)),
+                    int(payload.get("max_pixel", 0)),
+                )
+                for path, payload in cached_payloads.items()
+            }
+        processed = len(cached_metrics)
 
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            for start in range(0, len(files), chunk_size):
-                chunk = files[start:start + chunk_size]
-                future_to_index = {
-                    executor.submit(self._scan_single_tiff, path): i
-                    for i, path in enumerate(chunk)
-                }
-                chunk_results: list[
-                    tuple[Optional[tuple[str, np.ndarray, int, int]], tuple[object, ...]]
-                ] = [(None, ()) for _ in chunk]
+        uncached_files = [
+            path
+            for path in files
+            if str(path.resolve()) not in cached_metrics
+        ]
+        computed_metrics: dict[str, tuple[int, int]] = {}
+        cache_writes: list[MetricCacheWrite] = []
 
-                for future in as_completed(future_to_index):
-                    idx = future_to_index[future]
-                    try:
-                        chunk_results[idx] = future.result()
-                    except Exception as exc:
-                        chunk_results[idx] = (
-                            None,
-                            (
-                                make_processing_failure(
-                                    stage="scan",
-                                    path=chunk[idx],
-                                    reason=failure_reason_from_exception(exc),
+        if uncached_files:
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                for start in range(0, len(uncached_files), chunk_size):
+                    chunk = uncached_files[start:start + chunk_size]
+                    future_to_index = {
+                        executor.submit(self._scan_single_tiff, path): i
+                        for i, path in enumerate(chunk)
+                    }
+                    chunk_results: list[
+                        tuple[Optional[tuple[str, int, int]], tuple[object, ...]]
+                    ] = [(None, ()) for _ in chunk]
+
+                    for future in as_completed(future_to_index):
+                        idx = future_to_index[future]
+                        try:
+                            chunk_results[idx] = future.result()
+                        except Exception as exc:
+                            chunk_results[idx] = (
+                                None,
+                                (
+                                    make_processing_failure(
+                                        stage="scan",
+                                        path=chunk[idx],
+                                        reason=failure_reason_from_exception(exc),
+                                    ),
                                 ),
-                            ),
+                            )
+
+                    for result, chunk_failures in chunk_results:
+                        processed += 1
+                        failures.extend(chunk_failures)
+                        if result is None:
+                            skipped += 1
+                            continue
+                        path_str, min_non_zero, max_pixel = result
+                        resolved_path = str(Path(path_str).resolve())
+                        computed_metrics[resolved_path] = (
+                            min_non_zero,
+                            max_pixel,
+                        )
+                        identity = identities_by_path.get(resolved_path)
+                        if identity is not None:
+                            cache_writes.append(
+                                MetricCacheWrite(
+                                    identity=identity,
+                                    payload={
+                                        "min_non_zero": int(min_non_zero),
+                                        "max_pixel": int(max_pixel),
+                                    },
+                                ),
+                            )
+
+                    if update_status:
+                        self.statusBar().showMessage(
+                            f"Scanning TIFFs... {processed}/{len(files)}"
                         )
 
-                for result, chunk_failures in chunk_results:
-                    processed += 1
-                    failures.extend(chunk_failures)
-                    if result is None:
-                        skipped += 1
-                        continue
-                    path_str, img, min_non_zero, max_pixel = result
-                    paths.append(path_str)
-                    mins.append(min_non_zero)
-                    maxs.append(max_pixel)
-                    self._cache_image(path_str, img)
+        if cache is not None and cache_writes:
+            cache.store_entries(
+                cache_writes,
+                metric_kind=STATIC_METRIC_KIND,
+                signature_hash=static_signature,
+            )
 
-                if update_status:
-                    self.statusBar().showMessage(
-                        f"Scanning TIFFs... {processed}/{len(files)}"
-                    )
+        paths: list[str] = []
+        mins: list[int] = []
+        maxs: list[int] = []
+        for path in files:
+            resolved_path = str(path.resolve())
+            metrics = cached_metrics.get(resolved_path)
+            if metrics is None:
+                metrics = computed_metrics.get(resolved_path)
+            if metrics is None:
+                continue
+            paths.append(resolved_path)
+            mins.append(int(metrics[0]))
+            maxs.append(int(metrics[1]))
 
         return (paths, mins, maxs, skipped, failures)
 
@@ -230,14 +298,57 @@ class DatasetLoadingMixin:
         """Return whether a dataset is currently loaded."""
         return self.dataset_state.has_loaded_data()
 
+    def _metrics_cache_context(
+        self,
+        *,
+        dataset_root: Path | None = None,
+    ) -> dict[str, Path | None]:
+        """Return cache-key roots used to build portable file identities."""
+
+        active_dataset_root = dataset_root
+        if active_dataset_root is None:
+            controller = getattr(self, "dataset_state", None)
+            active_dataset_root = getattr(controller, "dataset_root", None)
+        workflow_controller = getattr(self, "workflow_state_controller", None)
+        workflow_root = getattr(workflow_controller, "workspace_root", None)
+        return {
+            "dataset_root": active_dataset_root,
+            "workspace_root": workflow_root,
+        }
+
+    def _metric_cache_identities(
+        self,
+        paths: list[Path | str],
+        *,
+        dataset_root: Path | None = None,
+    ) -> dict[str, FileMetricIdentity]:
+        """Build file identities for cache lookup/store where files still exist."""
+
+        context = self._metrics_cache_context(dataset_root=dataset_root)
+        identities: dict[str, FileMetricIdentity] = {}
+        for item in paths:
+            candidate = Path(item).expanduser()
+            if not candidate.exists():
+                continue
+            try:
+                identity = build_file_metric_identity(
+                    candidate,
+                    dataset_root=context["dataset_root"],
+                    workspace_root=context["workspace_root"],
+                )
+            except OSError:
+                continue
+            identities[str(candidate.resolve())] = identity
+        return identities
+
     def _invalidate_background_cache(self) -> None:
         """Invalidate corrected-image cache after background changes."""
         self.metrics_state.background_signature += 1
         self._corrected_cache.clear()
 
     def _background_library_snapshot(self) -> BackgroundLibrary:
-        """Return a copy used by worker threads for stable reads."""
-        return self.metrics_state.background_library.copy()
+        """Return a shared read-only view used by worker threads."""
+        return self.metrics_state.background_library.shared_snapshot()
 
     def _clear_image_cache(self) -> None:
         """Clear cached raw and corrected images."""
@@ -245,11 +356,8 @@ class DatasetLoadingMixin:
         self._corrected_cache.clear()
 
     def _cache_image(self, path: str, image: np.ndarray) -> None:
-        """Store a raw image in the LRU cache."""
-        self._image_cache[path] = image
-        self._image_cache.move_to_end(path)
-        while len(self._image_cache) > self._image_cache_capacity:
-            self._image_cache.popitem(last=False)
+        """Store one raw image under the configured byte budget."""
+        self._image_cache.put(path, image)
 
     def _cache_corrected_image(
         self,
@@ -258,10 +366,7 @@ class DatasetLoadingMixin:
     ) -> None:
         """Cache a background-corrected image for the active signature."""
         key = (path, self.metrics_state.background_signature)
-        self._corrected_cache[key] = image
-        self._corrected_cache.move_to_end(key)
-        while len(self._corrected_cache) > self._corrected_cache_capacity:
-            self._corrected_cache.popitem(last=False)
+        self._corrected_cache.put(key, image)
 
     def _get_image_by_index(self, index: int) -> Optional[np.ndarray]:
         """Return raw image data for a table row, using cache when possible."""
@@ -271,7 +376,6 @@ class DatasetLoadingMixin:
         path = dataset.paths[index]
         cached = self._image_cache.get(path)
         if cached is not None:
-            self._image_cache.move_to_end(path)
             return cached
 
         try:
@@ -340,7 +444,6 @@ class DatasetLoadingMixin:
         cache_key = (path, metrics.background_signature)
         cached = self._corrected_cache.get(cache_key)
         if cached is not None:
-            self._corrected_cache.move_to_end(cache_key)
             return (cached, True)
 
         reference = self._get_reference_for_path(path)
@@ -354,6 +457,7 @@ class DatasetLoadingMixin:
             reference,
             clip_negative=metrics.background_config.clip_negative,
         )
+        corrected = np.asarray(corrected, dtype=np.float32)
         self._cache_corrected_image(path, corrected)
         return (corrected, True)
 
@@ -410,6 +514,7 @@ class DatasetLoadingMixin:
         paths, mins, maxs, skipped, failures = self._scan_tiffs_chunked_parallel(
             files,
             update_status=True,
+            dataset_root=folder,
         )
         if hasattr(self, "_record_processing_failures"):
             self._record_processing_failures(failures, replace_stage="scan")
@@ -435,7 +540,7 @@ class DatasetLoadingMixin:
             or self._folder_has_json_metadata(folder)
         )
         self._update_metadata_source_options(has_json_metadata)
-        self._refresh_metadata_cache()
+        self._refresh_metadata_cache(clear_cache=True)
         self._refresh_metadata_table()
         metrics.initialize_loaded_dataset(len(paths))
         self.image_preview.set_roi_rect(None)
@@ -484,6 +589,7 @@ class DatasetLoadingMixin:
         path_list, mins, maxs, _skipped, _failures = self._scan_tiffs_chunked_parallel(
             file_paths,
             update_status=False,
+            dataset_root=dataset.dataset_root,
         )
         if not path_list:
             self.metrics_state.min_non_zero = np.zeros(

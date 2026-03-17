@@ -187,3 +187,62 @@ def test_analysis_plot_hint_visibility_follows_density_policy(
     assert plugin._plot_hint_label.isHidden()
     analysis_window._apply_ui_preferences(comfortable_prefs, persist=False)
     assert not plugin._plot_hint_label.isHidden()
+
+
+def test_analysis_context_stays_dirty_until_analysis_page_is_visible(
+    analysis_window: FrameLabWindow,
+    process_events,
+    monkeypatch,
+) -> None:
+    plugin = analysis_window._current_analysis_plugin()
+
+    assert plugin is not None
+    analysis_window.workflow_tabs.setCurrentIndex(0)
+    process_events()
+
+    calls: list[object] = []
+    original = plugin.on_context_changed
+
+    def _wrapped(context) -> None:
+        calls.append(context)
+        original(context)
+
+    monkeypatch.setattr(plugin, "on_context_changed", _wrapped)
+
+    analysis_window._on_normalize_intensity_toggled(True)
+    process_events()
+
+    assert calls == []
+    assert analysis_window._analysis_context_dirty
+
+    _show_analysis_page(analysis_window, process_events)
+
+    assert len(calls) == 1
+    assert not analysis_window._analysis_context_dirty
+    assert plugin._context is not None
+
+
+def test_visible_analysis_page_coalesces_multiple_context_invalidations(
+    analysis_window: FrameLabWindow,
+    process_events,
+    monkeypatch,
+) -> None:
+    _show_analysis_page(analysis_window, process_events)
+    plugin = analysis_window._current_analysis_plugin()
+
+    assert plugin is not None
+    calls: list[object] = []
+    original = plugin.on_context_changed
+
+    def _wrapped(context) -> None:
+        calls.append(context)
+        original(context)
+
+    monkeypatch.setattr(plugin, "on_context_changed", _wrapped)
+
+    analysis_window._on_normalize_intensity_toggled(True)
+    analysis_window._set_rounding_mode("std")
+    process_events()
+
+    assert len(calls) == 1
+    assert not analysis_window._analysis_context_dirty

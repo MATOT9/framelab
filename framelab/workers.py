@@ -34,6 +34,8 @@ class DynamicStatsWorker(QObject):
         *,
         job_id: int,
         paths: list[str],
+        source_indices: list[int] | None = None,
+        result_length: int | None = None,
         threshold_value: float,
         mode: str,
         avg_count_value: int,
@@ -41,6 +43,7 @@ class DynamicStatsWorker(QObject):
         background_config: Optional[BackgroundConfig] = None,
         background_library: Optional[BackgroundLibrary] = None,
         path_metadata: Optional[dict[str, dict[str, object]]] = None,
+        existing_sat_counts: Optional[np.ndarray] = None,
         existing_avg_topk: Optional[np.ndarray] = None,
         existing_avg_topk_std: Optional[np.ndarray] = None,
         existing_avg_topk_sem: Optional[np.ndarray] = None,
@@ -51,6 +54,12 @@ class DynamicStatsWorker(QObject):
         super().__init__()
         self._job_id = job_id
         self._paths = paths
+        self._source_indices = list(source_indices or range(len(paths)))
+        self._result_length = (
+            int(result_length)
+            if result_length is not None
+            else len(self._source_indices)
+        )
         self._threshold_value = threshold_value
         self._mode = mode
         self._avg_count_value = avg_count_value
@@ -60,6 +69,7 @@ class DynamicStatsWorker(QObject):
         self._background_config = background_config
         self._background_library = background_library
         self._path_metadata = path_metadata or {}
+        self._existing_sat_counts = existing_sat_counts
         self._existing_avg_topk = existing_avg_topk
         self._existing_avg_topk_std = existing_avg_topk_std
         self._existing_avg_topk_sem = existing_avg_topk_sem
@@ -119,11 +129,15 @@ class DynamicStatsWorker(QObject):
 
     def run(self) -> None:
         """Compute dynamic per-image stats (threshold/top-k/static)."""
-        n = len(self._paths)
-        sat_counts = np.zeros(n, dtype=np.int64)
+        n = max(0, self._result_length)
         failures = []
         threshold_only = self._update_kind == "threshold_only"
 
+        existing_sat_counts = (
+            np.asarray(self._existing_sat_counts, dtype=np.int64)
+            if self._existing_sat_counts is not None
+            else None
+        )
         existing_max_pixels = (
             np.asarray(self._existing_max_pixels, dtype=np.int64)
             if self._existing_max_pixels is not None
@@ -177,36 +191,51 @@ class DynamicStatsWorker(QObject):
             )
             threshold_only = static_ready and topk_ready
 
+        sat_counts = (
+            existing_sat_counts.copy()
+            if existing_sat_counts is not None and len(existing_sat_counts) == n
+            else np.zeros(n, dtype=np.int64)
+        )
         max_pixels = (
             existing_max_pixels.copy()
-            if threshold_only and existing_max_pixels is not None
+            if existing_max_pixels is not None and len(existing_max_pixels) == n
             else np.zeros(n, dtype=np.int64)
         )
         min_non_zero = (
             existing_min_non_zero.copy()
-            if threshold_only and existing_min_non_zero is not None
+            if existing_min_non_zero is not None and len(existing_min_non_zero) == n
             else np.zeros(n, dtype=np.int64)
         )
         bg_applied_mask = (
             existing_bg_applied_mask.copy()
-            if threshold_only and existing_bg_applied_mask is not None
+            if existing_bg_applied_mask is not None and len(existing_bg_applied_mask) == n
             else np.zeros(n, dtype=bool)
         )
         avg_topk = None
         avg_topk_std = None
         avg_topk_sem = None
         if self._mode == "topk":
-            if threshold_only and existing_avg_topk is not None:
+            if existing_avg_topk is not None and len(existing_avg_topk) == n:
                 avg_topk = existing_avg_topk.copy()
-                avg_topk_std = existing_avg_topk_std.copy()
-                avg_topk_sem = existing_avg_topk_sem.copy()
+                avg_topk_std = (
+                    existing_avg_topk_std.copy()
+                    if existing_avg_topk_std is not None
+                    and len(existing_avg_topk_std) == n
+                    else np.full(n, np.nan, dtype=np.float64)
+                )
+                avg_topk_sem = (
+                    existing_avg_topk_sem.copy()
+                    if existing_avg_topk_sem is not None
+                    and len(existing_avg_topk_sem) == n
+                    else np.full(n, np.nan, dtype=np.float64)
+                )
             else:
                 avg_topk = np.full(n, np.nan, dtype=np.float64)
                 avg_topk_std = np.full(n, np.nan, dtype=np.float64)
                 avg_topk_sem = np.full(n, np.nan, dtype=np.float64)
         thread = QThread.currentThread()
         try:
-            for i, path in enumerate(self._paths):
+            for source_index, path in zip(self._source_indices, self._paths):
                 if thread.isInterruptionRequested():
                     return
                 try:
@@ -236,11 +265,11 @@ class DynamicStatsWorker(QObject):
                     )
                     continue
                 if not threshold_only:
-                    bg_applied_mask[i] = bool(bg_applied)
+                    bg_applied_mask[source_index] = bool(bg_applied)
                     min_nz, max_px = self._compute_min_non_zero_and_max(metric_img)
-                    min_non_zero[i] = min_nz
-                    max_pixels[i] = max_px
-                sat_counts[i] = int(
+                    min_non_zero[source_index] = min_nz
+                    max_pixels[source_index] = max_px
+                sat_counts[source_index] = int(
                     np.count_nonzero(metric_img >= self._threshold_value),
                 )
 
@@ -255,11 +284,11 @@ class DynamicStatsWorker(QObject):
                 if top_k.size == 0:
                     continue
                 top_k_std = float(top_k.std())
-                avg_topk[i] = float(top_k.mean())
+                avg_topk[source_index] = float(top_k.mean())
                 if avg_topk_std is not None:
-                    avg_topk_std[i] = top_k_std
+                    avg_topk_std[source_index] = top_k_std
                 if avg_topk_sem is not None:
-                    avg_topk_sem[i] = top_k_std / math.sqrt(top_k.size)
+                    avg_topk_sem[source_index] = top_k_std / math.sqrt(top_k.size)
         except Exception as exc:
             self.failed.emit(self._job_id, str(exc))
             return
@@ -292,18 +321,32 @@ class RoiApplyWorker(QObject):
         *,
         job_id: int,
         paths: list[str],
+        source_indices: list[int] | None = None,
+        result_length: int | None = None,
         roi_rect: tuple[int, int, int, int],
         background_config: Optional[BackgroundConfig] = None,
         background_library: Optional[BackgroundLibrary] = None,
         path_metadata: Optional[dict[str, dict[str, object]]] = None,
+        existing_means: Optional[np.ndarray] = None,
+        existing_stds: Optional[np.ndarray] = None,
+        existing_sems: Optional[np.ndarray] = None,
     ) -> None:
         super().__init__()
         self._job_id = job_id
         self._paths = paths
+        self._source_indices = list(source_indices or range(len(paths)))
+        self._result_length = (
+            int(result_length)
+            if result_length is not None
+            else len(self._source_indices)
+        )
         self._roi_rect = roi_rect
         self._background_config = background_config
         self._background_library = background_library
         self._path_metadata = path_metadata or {}
+        self._existing_means = existing_means
+        self._existing_stds = existing_stds
+        self._existing_sems = existing_sems
 
     def _reference_for_path(self, path: str) -> Optional[np.ndarray]:
         config = self._background_config
@@ -333,17 +376,33 @@ class RoiApplyWorker(QObject):
 
     def run(self) -> None:
         """Compute ROI mean/std/stderr for each image."""
-        n = len(self._paths)
-        means = np.full(n, np.nan, dtype=np.float64)
-        stds = np.full(n, np.nan, dtype=np.float64)
-        sems = np.full(n, np.nan, dtype=np.float64)
-        valid_count = 0
+        n = max(0, self._result_length)
+        means = (
+            np.asarray(self._existing_means, dtype=np.float64).copy()
+            if self._existing_means is not None and len(self._existing_means) == n
+            else np.full(n, np.nan, dtype=np.float64)
+        )
+        stds = (
+            np.asarray(self._existing_stds, dtype=np.float64).copy()
+            if self._existing_stds is not None and len(self._existing_stds) == n
+            else np.full(n, np.nan, dtype=np.float64)
+        )
+        sems = (
+            np.asarray(self._existing_sems, dtype=np.float64).copy()
+            if self._existing_sems is not None and len(self._existing_sems) == n
+            else np.full(n, np.nan, dtype=np.float64)
+        )
+        valid_count = int(np.count_nonzero(np.isfinite(means)))
         failures = []
         thread = QThread.currentThread()
         x0, y0, x1, y1 = self._roi_rect
 
         try:
-            for i, path in enumerate(self._paths):
+            total = len(self._paths)
+            for processed_index, (source_index, path) in enumerate(
+                zip(self._source_indices, self._paths),
+                start=1,
+            ):
                 if thread.isInterruptionRequested():
                     self.cancelled.emit(self._job_id)
                     return
@@ -358,7 +417,7 @@ class RoiApplyWorker(QObject):
                             reason=failure_reason_from_exception(exc),
                         ),
                     )
-                    self.progress.emit(i + 1, n)
+                    self.progress.emit(processed_index, total)
                     continue
 
                 try:
@@ -374,17 +433,19 @@ class RoiApplyWorker(QObject):
                             ),
                         ),
                     )
-                    self.progress.emit(i + 1, n)
+                    self.progress.emit(processed_index, total)
                     continue
                 roi = metric_img[y0:y1, x0:x1]
                 if roi.size > 0:
                     roi_f = np.asarray(roi, dtype=np.float64)
-                    means[i] = float(roi_f.mean())
-                    stds[i] = float(roi_f.std())
-                    sems[i] = float(stds[i] / math.sqrt(roi.size))
+                    means[source_index] = float(roi_f.mean())
+                    stds[source_index] = float(roi_f.std())
+                    sems[source_index] = float(
+                        stds[source_index] / math.sqrt(roi.size),
+                    )
                     valid_count += 1
 
-                self.progress.emit(i + 1, n)
+                self.progress.emit(processed_index, total)
         except Exception as exc:
             self.failed.emit(self._job_id, str(exc))
             return

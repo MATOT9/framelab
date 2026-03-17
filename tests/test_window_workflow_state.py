@@ -10,6 +10,7 @@ import pytest
 from PySide6 import QtWidgets as qtw
 from tifffile import imwrite
 
+import framelab.main_window.data_page as data_page_module
 import framelab.window as window_module
 from framelab.ui_primitives import StatusChip
 from framelab.ui_settings import UiStateSnapshot, UiStateStore
@@ -362,6 +363,62 @@ def test_load_folder_uses_active_workflow_scope_and_resolves_entered_child_node(
     assert window.dataset_state.dataset_root == first.resolve()
     assert window.dataset_state.path_count() == 1
     assert window.folder_edit.text() == str(first.resolve())
+
+
+def test_metadata_context_change_refreshes_only_affected_loaded_subtree(
+    tmp_path: Path,
+    framelab_window_factory,
+    monkeypatch,
+) -> None:
+    workspace_root, _session_root, first, second, session_node_id, _acq_node_id = (
+        _make_calibration_workspace_with_frames(tmp_path)
+    )
+    window = framelab_window_factory(enabled_plugin_ids=())
+    window.set_workflow_context(
+        str(workspace_root),
+        "calibration",
+        active_node_id=session_node_id,
+    )
+    window.load_folder()
+
+    original_by_path = {
+        path: dict(window.dataset_state.metadata_for_path(path))
+        for path in window.dataset_state.paths
+    }
+    refreshed_paths: list[str] = []
+
+    def _fake_extract_path_metadata(
+        path: str,
+        metadata_source: str = "path",
+        *,
+        metadata_boundary_root=None,
+    ) -> dict[str, object]:
+        refreshed_paths.append(path)
+        updated = dict(original_by_path[path])
+        updated["refresh_marker"] = Path(path).parent.parent.name
+        updated["metadata_source_selected"] = metadata_source
+        updated["metadata_boundary_root"] = (
+            str(metadata_boundary_root)
+            if metadata_boundary_root is not None
+            else None
+        )
+        return updated
+
+    monkeypatch.setattr(
+        data_page_module,
+        "extract_path_metadata",
+        _fake_extract_path_metadata,
+    )
+
+    window._notify_metadata_context_changed(changed_root=first)
+
+    assert refreshed_paths == [window.dataset_state.paths[0]]
+    assert window.dataset_state.metadata_for_path(window.dataset_state.paths[0])[
+        "refresh_marker"
+    ] == first.name
+    assert "refresh_marker" not in window.dataset_state.metadata_for_path(
+        window.dataset_state.paths[1],
+    )
 
 
 def test_workflow_context_reframes_folder_actions_as_scope_actions(

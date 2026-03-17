@@ -5,7 +5,11 @@ from pathlib import Path
 
 import pytest
 
-from framelab.metadata import clear_metadata_cache, extract_path_metadata
+from framelab.metadata import (
+    clear_metadata_cache,
+    extract_path_metadata,
+    invalidate_metadata_cache,
+)
 from framelab.node_metadata import save_nodecard
 
 
@@ -683,5 +687,95 @@ def test_cache_requires_clear_for_datacard_changes_to_take_effect(
     assert float(stale["exposure_ms"]) == pytest.approx(1.0)
 
     clear_metadata_cache()
+    refreshed = extract_path_metadata(str(frame), metadata_source="json")
+    assert float(refreshed["exposure_ms"]) == pytest.approx(2.5)
+
+
+def test_incremental_invalidation_can_refresh_one_acquisition_subtree(
+    metadata_harness: _MetadataHarness,
+) -> None:
+    frame_a = metadata_harness.frame_path(
+        campaign=True,
+        session=True,
+        acquisition_name="acq-0011__dark",
+    )
+    frame_b = metadata_harness.frame_path(
+        campaign=True,
+        session=True,
+        acquisition_name="acq-0012__bright",
+    )
+    campaign_root = metadata_harness.repo / "campaign"
+    session_root = campaign_root / "01_sessions" / "2026-03-05__sess01"
+    acquisition_a_root = session_root / "acquisitions" / "acq-0011__dark"
+    acquisition_b_root = session_root / "acquisitions" / "acq-0012__bright"
+
+    metadata_harness.write_campaign(campaign_root)
+    metadata_harness.write_session(
+        session_root,
+        session_defaults={"camera_settings": {"exposure_us": 1000}},
+    )
+    metadata_harness.write_acquisition(acquisition_a_root)
+    metadata_harness.write_acquisition(acquisition_b_root)
+
+    first_a = extract_path_metadata(str(frame_a), metadata_source="json")
+    first_b = extract_path_metadata(str(frame_b), metadata_source="json")
+    assert float(first_a["exposure_ms"]) == pytest.approx(1.0)
+    assert float(first_b["exposure_ms"]) == pytest.approx(1.0)
+
+    metadata_harness.write_session(
+        session_root,
+        session_defaults={"camera_settings": {"exposure_us": 2500}},
+    )
+
+    invalidate_metadata_cache((acquisition_a_root,))
+    refreshed_a = extract_path_metadata(str(frame_a), metadata_source="json")
+    stale_b = extract_path_metadata(str(frame_b), metadata_source="json")
+    assert float(refreshed_a["exposure_ms"]) == pytest.approx(2.5)
+    assert float(stale_b["exposure_ms"]) == pytest.approx(1.0)
+
+    invalidate_metadata_cache((session_root,))
+    refreshed_b = extract_path_metadata(str(frame_b), metadata_source="json")
+    assert float(refreshed_b["exposure_ms"]) == pytest.approx(2.5)
+
+
+def test_incremental_invalidation_refreshes_cached_node_metadata_sources(
+    metadata_harness: _MetadataHarness,
+) -> None:
+    frame = metadata_harness.frame_path(
+        campaign=True,
+        session=True,
+        acquisition_name="acq-0011__nodecard",
+    )
+    session_root = (
+        metadata_harness.repo
+        / "campaign"
+        / "01_sessions"
+        / "2026-03-05__sess01"
+    )
+    acquisition_root = session_root / "acquisitions" / "acq-0011__nodecard"
+    metadata_harness.write_campaign(metadata_harness.repo / "campaign")
+    metadata_harness.write_session(session_root)
+    metadata_harness.write_acquisition(acquisition_root)
+    metadata_harness.write_node_metadata(
+        session_root,
+        {"camera_settings": {"exposure_us": 1000}},
+        profile_id="calibration",
+        node_type_id="session",
+    )
+
+    first = extract_path_metadata(str(frame), metadata_source="json")
+    assert float(first["exposure_ms"]) == pytest.approx(1.0)
+
+    metadata_harness.write_node_metadata(
+        session_root,
+        {"camera_settings": {"exposure_us": 2500}},
+        profile_id="calibration",
+        node_type_id="session",
+    )
+
+    stale = extract_path_metadata(str(frame), metadata_source="json")
+    assert float(stale["exposure_ms"]) == pytest.approx(1.0)
+
+    invalidate_metadata_cache((session_root,))
     refreshed = extract_path_metadata(str(frame), metadata_source="json")
     assert float(refreshed["exposure_ms"]) == pytest.approx(2.5)

@@ -27,6 +27,15 @@ from ..widgets import install_large_splitter_handle_cursors
 class AnalysisPageMixin:
     """Analysis-page construction and active plugin coordination."""
 
+    def _analysis_page_is_active(self) -> bool:
+        """Return whether the Analyze tab is currently selected."""
+
+        if not hasattr(self, "workflow_tabs"):
+            return False
+        return (
+            self.workflow_tabs.currentWidget() is getattr(self, "analysis_page", None)
+        )
+
     def _apply_analysis_page_density(self, tokens) -> None:
         """Apply density tokens to shared Analysis-page layouts."""
 
@@ -135,7 +144,7 @@ class AnalysisPageMixin:
             "Push latest metrics/metadata into the active plugin.",
         )
         refresh_button.clicked.connect(
-            lambda _checked=False: self._update_analysis_context(),
+            lambda _checked=False: self._update_analysis_context(force_push=True),
         )
         selector_actions.addWidget(refresh_button)
         selector_layout.addLayout(selector_actions)
@@ -237,7 +246,8 @@ class AnalysisPageMixin:
         self._sync_analysis_host_views(0)
         self._sync_analysis_tab_visibility()
         self._populate_plugins_menu_entries()
-        self._update_analysis_context()
+        self._analysis_context_delivered_generation_by_plugin.clear()
+        self._invalidate_analysis_context(refresh_visible_plugin=True)
         self._apply_dynamic_visibility_policy()
         self._refresh_analysis_summary()
 
@@ -246,6 +256,8 @@ class AnalysisPageMixin:
         if not (0 <= index < self.analysis_workspace_stack.count()):
             return
         self._sync_analysis_host_views(index)
+        if self._analysis_page_is_active():
+            self._ensure_analysis_context_current()
         self._populate_plugins_menu_entries()
         self._apply_dynamic_visibility_policy()
         self._refresh_analysis_summary()
@@ -590,18 +602,91 @@ class AnalysisPageMixin:
             normalization_scale=self._normalization_scale(),
         )
 
-    def _update_analysis_context(self) -> None:
-        """Push current dataset context to all loaded analysis plugins."""
+    def _invalidate_analysis_context(
+        self,
+        *,
+        refresh_visible_plugin: bool = True,
+    ) -> None:
+        """Mark analysis context dirty and refresh lazily when needed."""
+
+        self._analysis_context_dirty = True
+        if refresh_visible_plugin and self._analysis_page_is_active():
+            timer = getattr(self, "_analysis_context_refresh_timer", None)
+            if timer is not None:
+                timer.start()
+            else:
+                self._ensure_analysis_context_current()
+            return
+        self._refresh_analysis_summary()
+
+    def _flush_dirty_analysis_context_if_visible(self) -> None:
+        """Rebuild analysis context only when the Analyze page is visible."""
+
+        if not self._analysis_page_is_active():
+            return
+        self._ensure_analysis_context_current()
+
+    def _ensure_analysis_context_current(
+        self,
+        *,
+        force_push: bool = False,
+        force_rebuild: bool = False,
+    ) -> AnalysisContext | None:
+        """Ensure the active analysis plugin has the latest prepared context."""
+
         if not self._analysis_plugins:
             self._refresh_analysis_summary()
-            return
-        context = self._build_analysis_context()
-        for plugin in self._analysis_plugins:
-            try:
-                plugin.on_context_changed(context)
-            except Exception:
-                continue
+            return None
+
+        if (
+            force_rebuild
+            or self._analysis_context_dirty
+            or self._analysis_context_cache is None
+        ):
+            context = self._build_analysis_context()
+            self._analysis_context_cache = context
+            self._analysis_context_dirty = False
+            self._analysis_context_generation += 1
+        else:
+            context = self._analysis_context_cache
+
+        plugin = self._current_analysis_plugin()
+        if plugin is not None:
+            delivered_generation = self._analysis_context_delivered_generation_by_plugin.get(
+                plugin.plugin_id,
+            )
+            should_push = (
+                force_push
+                or delivered_generation != self._analysis_context_generation
+            )
+            if should_push:
+                try:
+                    plugin.on_context_changed(context)
+                except Exception:
+                    pass
+                else:
+                    self._analysis_context_delivered_generation_by_plugin[
+                        plugin.plugin_id
+                    ] = self._analysis_context_generation
+
         self._refresh_analysis_summary()
+        return context
+
+    def _update_analysis_context(
+        self,
+        *,
+        force_push: bool = False,
+        force_rebuild: bool = False,
+    ) -> None:
+        """Compatibility wrapper for pushing context into the active plugin."""
+
+        timer = getattr(self, "_analysis_context_refresh_timer", None)
+        if timer is not None and timer.isActive():
+            timer.stop()
+        self._ensure_analysis_context_current(
+            force_push=force_push,
+            force_rebuild=force_rebuild,
+        )
 
     def _refresh_analysis_summary(self) -> None:
         """Refresh analysis-page header chips and context summary strip."""

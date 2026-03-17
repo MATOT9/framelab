@@ -5,7 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Iterable, Optional
-from collections import OrderedDict
 import shutil
 
 import numpy as np
@@ -13,6 +12,7 @@ from PySide6 import QtGui, QtWidgets as qtw
 from PySide6.QtCore import Qt, QSignalBlocker, QThread, QTimer
 
 from .analysis_context import AnalysisContextController
+from .byte_budget_cache import ByteBudgetCache
 from .datacard_labels import label_for_metadata_field
 from .dataset_state import DatasetScopeNode, DatasetStateController
 from .main_window import (
@@ -24,7 +24,9 @@ from .main_window import (
     WindowChromeMixin,
     WindowActionsMixin,
 )
+from .metrics_cache import MetricsCache
 from .metrics_state import MetricsPipelineController
+from .metadata import clear_metadata_cache, invalidate_metadata_cache
 from .metadata_state import MetadataStateController
 from .plugins import (
     PAGE_IDS,
@@ -74,6 +76,9 @@ class FrameLabWindow(
     qtw.QMainWindow,
 ):
     """Main application window for image measurement and analysis."""
+
+    RAW_IMAGE_CACHE_BUDGET_BYTES = 256 * 1024 * 1024
+    CORRECTED_IMAGE_CACHE_BUDGET_BYTES = 256 * 1024 * 1024
 
     DATA_COLUMN_INDEX = {
         "path": 0,
@@ -153,7 +158,20 @@ class FrameLabWindow(
             self.metrics_state,
             background_reference_label_resolver=self._background_reference_label_for_path,
         )
+        self._analysis_context_cache = None
+        self._analysis_context_generation = 0
+        self._analysis_context_dirty = True
+        self._analysis_context_delivered_generation_by_plugin: dict[str, int] = {}
+        self._analysis_context_refresh_timer = QTimer(self)
+        self._analysis_context_refresh_timer.setSingleShot(True)
+        self._analysis_context_refresh_timer.setInterval(0)
+        self._analysis_context_refresh_timer.timeout.connect(
+            self._flush_dirty_analysis_context_if_visible,
+        )
         self._analysis_plugins: list[AnalysisPlugin] = []
+        self.metrics_cache = MetricsCache()
+        self._dynamic_cache_pending: dict[str, object] | None = None
+        self._roi_cache_pending: dict[str, object] | None = None
         self._enabled_plugin_ids = resolve_enabled_plugin_ids(enabled_plugin_ids)
         self._page_plugin_classes: dict[str, list[type[object]]] = {
             page: [] for page in PAGE_IDS
@@ -161,12 +179,12 @@ class FrameLabWindow(
         self._page_plugin_manifests: dict[str, list[PluginManifest]] = {
             page: [] for page in PAGE_IDS
         }
-        self._image_cache: OrderedDict[str, np.ndarray] = OrderedDict()
-        self._image_cache_capacity = 24
-        self._corrected_cache: OrderedDict[
-            tuple[str, int], np.ndarray
-        ] = OrderedDict()
-        self._corrected_cache_capacity = 24
+        self._image_cache = ByteBudgetCache[str](
+            self.RAW_IMAGE_CACHE_BUDGET_BYTES,
+        )
+        self._corrected_cache = ByteBudgetCache[tuple[str, int]](
+            self.CORRECTED_IMAGE_CACHE_BUDGET_BYTES,
+        )
         self._load_ui_state()
         self.workflow_state_controller = WorkflowStateController()
         self.metadata_state_controller = MetadataStateController(
@@ -399,21 +417,30 @@ class FrameLabWindow(
             self._refresh_measure_header_state()
         if hasattr(self, "_refresh_analysis_summary"):
             self._refresh_analysis_summary()
-        if self.dataset_state.has_loaded_data():
-            if hasattr(self, "_update_analysis_context"):
-                self._update_analysis_context()
-            elif hasattr(self, "_refresh_analysis_summary"):
-                self._refresh_analysis_summary()
+        if hasattr(self, "_invalidate_analysis_context"):
+            self._invalidate_analysis_context(refresh_visible_plugin=True)
+        elif hasattr(self, "_refresh_analysis_summary"):
+            self._refresh_analysis_summary()
         if hasattr(self, "_apply_dynamic_visibility_policy"):
             self._apply_dynamic_visibility_policy()
         if hasattr(self, "_set_status"):
             self._set_status()
         self._refresh_manager_dialogs()
 
-    def _notify_metadata_context_changed(self) -> None:
+    def _notify_metadata_context_changed(
+        self,
+        changed_root: str | Path | None = None,
+    ) -> None:
         """Refresh derived metadata state after node metadata is edited."""
 
-        self.metadata_state_controller.clear_cache()
+        if changed_root is None:
+            self.metadata_state_controller.clear_cache()
+            clear_metadata_cache()
+            affected_paths: list[str] | None = None
+        else:
+            self.metadata_state_controller.invalidate_paths((changed_root,))
+            invalidate_metadata_cache((changed_root,))
+            affected_paths = self.dataset_state.paths_within_root(changed_root)
         if self.workflow_state_controller.active_node() is not None:
             self._sync_dataset_scope_to_workflow(
                 update_folder_edit=False,
@@ -421,7 +448,10 @@ class FrameLabWindow(
             )
         if self.dataset_state.has_loaded_data():
             if hasattr(self, "_refresh_metadata_cache"):
-                self._refresh_metadata_cache()
+                self._refresh_metadata_cache(
+                    paths=affected_paths,
+                    invalidate_roots=(),
+                )
             if hasattr(self, "_refresh_metadata_table"):
                 self._refresh_metadata_table()
             if hasattr(self, "_refresh_table"):

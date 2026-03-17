@@ -13,6 +13,23 @@ import pytest
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 
+@pytest.fixture(scope="session", autouse=True)
+def isolated_metrics_cache(tmp_path_factory: pytest.TempPathFactory) -> Iterator[None]:
+    """Route the persisted metrics cache to one temp location for this session."""
+
+    cache_root = tmp_path_factory.mktemp("metrics-cache")
+    cache_path = cache_root / "metrics.sqlite"
+    previous = os.environ.get("FRAMELAB_METRICS_CACHE_PATH")
+    os.environ["FRAMELAB_METRICS_CACHE_PATH"] = str(cache_path)
+    try:
+        yield
+    finally:
+        if previous is None:
+            os.environ.pop("FRAMELAB_METRICS_CACHE_PATH", None)
+        else:
+            os.environ["FRAMELAB_METRICS_CACHE_PATH"] = previous
+
+
 @pytest.fixture(scope="session")
 def qapp():
     """Return one shared QApplication instance for pytest-managed tests."""

@@ -9,7 +9,12 @@ import numpy as np
 from PySide6 import QtGui, QtWidgets as qtw
 from PySide6.QtCore import Qt, QModelIndex, QSignalBlocker
 
-from ..background import BackgroundConfig, BackgroundLibrary, canonical_exposure_key
+from ..background import (
+    BackgroundConfig,
+    BackgroundLibrary,
+    canonical_exposure_key,
+    freeze_background_array,
+)
 from ..formatting import format_metric_triplet
 from ..metadata import extract_path_metadata
 from ..processing_failures import (
@@ -128,10 +133,6 @@ class InspectPageMixin:
         self._measure_metrics_layout = metrics_layout
         metrics_layout.setContentsMargins(14, 12, 14, 12)
         metrics_layout.setSpacing(8)
-
-        metrics_title = qtw.QLabel("Primary Controls")
-        metrics_title.setObjectName("SectionTitle")
-        metrics_layout.addWidget(metrics_title)
 
         metrics_row = qtw.QHBoxLayout()
         self._measure_metrics_row = metrics_row
@@ -470,16 +471,6 @@ class InspectPageMixin:
         )
         hist_layout.addWidget(self.histogram_widget, 1)
 
-        self.histogram_help_label = qtw.QLabel(
-            "Histogram for the selected image after active preprocessing."
-        )
-        self.histogram_help_label.setObjectName("MutedLabel")
-        self.histogram_help_label.setWordWrap(True)
-        self.histogram_help_label.setToolTip(
-            "Histogram uses the currently selected image and active preprocessing.",
-        )
-        hist_layout.addWidget(self.histogram_help_label)
-
         self.preview_pages.addTab(image_page, "Image")
         self.preview_pages.addTab(hist_page, "Histogram")
         layout.addWidget(self.preview_pages, 1)
@@ -579,10 +570,6 @@ class InspectPageMixin:
             self.preview_help_label.setVisible(
                 bool(visible) and bool(self.show_image_preview),
             )
-        if hasattr(self, "histogram_help_label"):
-            self.histogram_help_label.setVisible(
-                bool(visible) and bool(self.show_histogram_preview),
-            )
 
     def _update_preview_page_visibility(self) -> None:
         show_any = self.show_image_preview or self.show_histogram_preview
@@ -597,7 +584,6 @@ class InspectPageMixin:
             self.image_preview.set_intensity_image(None)
 
         if not self.show_histogram_preview:
-            self.histogram_help_label.hide()
             self.histogram_widget.clear_histogram()
 
         if not show_any:
@@ -686,7 +672,7 @@ class InspectPageMixin:
             and 0 <= dataset.selected_index < dataset.path_count()
         ):
             self._display_image(dataset.selected_index)
-        self._update_analysis_context()
+        self._invalidate_analysis_context(refresh_visible_plugin=True)
         self._sync_measure_display_menu_state()
 
     def _normalization_scale(self) -> float:
@@ -817,7 +803,7 @@ class InspectPageMixin:
             and 0 <= dataset.selected_index < dataset.path_count()
         ):
             self._display_image(dataset.selected_index)
-        self._update_analysis_context()
+        self._invalidate_analysis_context(refresh_visible_plugin=True)
         self._sync_measure_display_menu_state()
         self._refresh_measure_header_state()
 
@@ -1206,7 +1192,7 @@ class InspectPageMixin:
             return False
         try:
             ref_image = self._read_2d_image(source_path).astype(
-                np.float64,
+                np.float32,
                 copy=False,
             )
         except Exception as exc:
@@ -1226,8 +1212,10 @@ class InspectPageMixin:
                 f"Could not read background TIFF:\n{exc}",
             )
             return False
-
-        metrics.background_library = BackgroundLibrary(global_ref=ref_image.copy())
+        metrics.background_library = BackgroundLibrary(
+            global_ref=freeze_background_array(ref_image),
+            global_source_path=str(source_path.resolve()),
+        )
         if hasattr(self, "_record_processing_failures"):
             self._record_processing_failures([], replace_stage="background")
         return True
@@ -1251,6 +1239,7 @@ class InspectPageMixin:
             return False
 
         grouped: dict[float, list[np.ndarray]] = {}
+        grouped_source_paths: dict[float, list[str]] = {}
         shape_by_key: dict[float, tuple[int, int]] = {}
         label_by_key: dict[float, str] = {}
         skipped_no_exposure = 0
@@ -1276,7 +1265,7 @@ class InspectPageMixin:
                 continue
             try:
                 img = self._read_2d_image(file_path).astype(
-                    np.float64,
+                    np.float32,
                     copy=False,
                 )
             except Exception as exc:
@@ -1305,7 +1294,10 @@ class InspectPageMixin:
                 )
                 continue
             shape_by_key[key] = shape
-            grouped.setdefault(key, []).append(img.copy())
+            grouped.setdefault(key, []).append(img)
+            grouped_source_paths.setdefault(key, []).append(
+                str(file_path.resolve()),
+            )
             label_by_key[key] = f"{key:g} ms"
 
         if hasattr(self, "_record_processing_failures"):
@@ -1324,15 +1316,21 @@ class InspectPageMixin:
         refs_by_exposure: dict[float, np.ndarray] = {}
         for key, images in grouped.items():
             if len(images) == 1:
-                refs_by_exposure[key] = images[0]
+                refs_by_exposure[key] = freeze_background_array(images[0])
                 continue
             stack = np.stack(images, axis=0)
-            refs_by_exposure[key] = np.median(stack, axis=0)
+            refs_by_exposure[key] = freeze_background_array(
+                np.median(stack, axis=0),
+            )
 
         metrics.background_library = BackgroundLibrary(
             global_ref=None,
             refs_by_exposure_ms=refs_by_exposure,
             label_by_exposure_ms=label_by_key,
+            source_paths_by_exposure_ms={
+                key: tuple(paths)
+                for key, paths in grouped_source_paths.items()
+            },
         )
 
         skipped_total = skipped_no_exposure + skipped_unreadable + skipped_shape

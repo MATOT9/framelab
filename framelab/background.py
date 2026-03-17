@@ -28,14 +28,20 @@ class BackgroundLibrary:
     """Loaded background references used for subtraction."""
 
     global_ref: Optional[np.ndarray] = None
+    global_source_path: str | None = None
     refs_by_exposure_ms: dict[float, np.ndarray] = field(default_factory=dict)
     label_by_exposure_ms: dict[float, str] = field(default_factory=dict)
+    source_paths_by_exposure_ms: dict[float, tuple[str, ...]] = field(
+        default_factory=dict,
+    )
 
     def clear(self) -> None:
         """Clear all loaded references."""
         self.global_ref = None
+        self.global_source_path = None
         self.refs_by_exposure_ms.clear()
         self.label_by_exposure_ms.clear()
+        self.source_paths_by_exposure_ms.clear()
 
     def has_any_reference(self) -> bool:
         """Return ``True`` if any reference is available."""
@@ -49,17 +55,36 @@ class BackgroundLibrary:
         global_copy = (
             None
             if self.global_ref is None
-            else np.asarray(self.global_ref, dtype=np.float64).copy()
+            else np.array(self.global_ref, copy=True, order="C")
         )
         refs_copy = {
-            key: np.asarray(value, dtype=np.float64).copy()
+            key: np.array(value, copy=True, order="C")
             for key, value in self.refs_by_exposure_ms.items()
         }
         return BackgroundLibrary(
             global_ref=global_copy,
+            global_source_path=self.global_source_path,
             refs_by_exposure_ms=refs_copy,
             label_by_exposure_ms=dict(self.label_by_exposure_ms),
+            source_paths_by_exposure_ms=dict(self.source_paths_by_exposure_ms),
         )
+
+    def shared_snapshot(self) -> BackgroundLibrary:
+        """Return a lightweight snapshot that reuses the loaded arrays."""
+        return BackgroundLibrary(
+            global_ref=self.global_ref,
+            global_source_path=self.global_source_path,
+            refs_by_exposure_ms=dict(self.refs_by_exposure_ms),
+            label_by_exposure_ms=dict(self.label_by_exposure_ms),
+            source_paths_by_exposure_ms=dict(self.source_paths_by_exposure_ms),
+        )
+
+
+def freeze_background_array(array: np.ndarray) -> np.ndarray:
+    """Return a contiguous float32 background array marked read-only."""
+    frozen = np.asarray(array, dtype=np.float32, order="C")
+    frozen.setflags(write=False)
+    return frozen
 
 
 def canonical_exposure_key(exposure_ms: object) -> Optional[float]:
@@ -135,10 +160,8 @@ def apply_background(
     numpy.ndarray
         Background-corrected image array.
     """
-    corrected = (
-        np.asarray(image, dtype=np.float64)
-        - np.asarray(reference, dtype=np.float64)
-    )
+    corrected = np.array(image, dtype=np.float32, copy=True, order="C")
+    corrected -= np.asarray(reference, dtype=np.float32)
     if clip_negative:
         np.maximum(corrected, 0.0, out=corrected)
     return corrected

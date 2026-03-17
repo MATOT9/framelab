@@ -214,6 +214,42 @@ def test_dynamic_worker_reports_unreadable_images_and_continues(
     assert "InvalidImageError" in result.failures[0].reason
 
 
+def test_dynamic_worker_fills_only_missing_source_indices(
+    qapp,
+    write_tiff,
+) -> None:
+    path = write_tiff("img.tif", np.array([[1, 4], [5, 0]], dtype=np.uint16))
+    worker = DynamicStatsWorker(
+        job_id=56,
+        paths=[path],
+        source_indices=[1],
+        result_length=3,
+        threshold_value=4,
+        mode="topk",
+        avg_count_value=2,
+        existing_sat_counts=np.array([7, 0, 9], dtype=np.int64),
+        existing_avg_topk=np.array([10.0, np.nan, 30.0]),
+        existing_avg_topk_std=np.array([1.0, np.nan, 3.0]),
+        existing_avg_topk_sem=np.array([0.5, np.nan, 1.5]),
+        existing_max_pixels=np.array([11, 0, 33], dtype=np.int64),
+        existing_min_non_zero=np.array([2, 0, 4], dtype=np.int64),
+        existing_bg_applied_mask=np.array([True, False, True]),
+    )
+    result = _run_dynamic_worker(worker)
+
+    np.testing.assert_array_equal(result.sat_counts, np.array([7, 2, 9], dtype=np.int64))
+    np.testing.assert_allclose(result.avg_topk, np.array([10.0, 4.5, 30.0]))
+    np.testing.assert_allclose(result.avg_topk_std, np.array([1.0, 0.5, 3.0]))
+    np.testing.assert_allclose(
+        result.avg_topk_sem,
+        np.array([0.5, 0.5 / math.sqrt(2.0), 1.5]),
+    )
+    np.testing.assert_array_equal(result.max_pixels, np.array([11, 5, 33], dtype=np.int64))
+    np.testing.assert_array_equal(result.min_non_zero, np.array([2, 1, 4], dtype=np.int64))
+    np.testing.assert_array_equal(result.bg_applied_mask, np.array([True, False, True]))
+    assert tuple(result.failures) == ()
+
+
 def test_roi_worker_computes_mean_std_and_sem(qapp, write_tiff) -> None:
     path = write_tiff("img.tif", np.array([[1, 2], [3, 4]], dtype=np.uint16))
     worker = RoiApplyWorker(
@@ -300,3 +336,40 @@ def test_roi_worker_reports_unreadable_images_and_continues(
     assert finished.failures[0].stage == "roi"
     assert finished.failures[0].path == missing_path
     assert "InvalidImageError" in finished.failures[0].reason
+
+
+def test_roi_worker_fills_only_missing_source_indices(
+    qapp,
+    write_tiff,
+) -> None:
+    path = write_tiff("img.tif", np.array([[1, 2], [3, 4]], dtype=np.uint16))
+    worker = RoiApplyWorker(
+        job_id=96,
+        paths=[path],
+        source_indices=[1],
+        result_length=3,
+        roi_rect=(0, 0, 2, 2),
+        existing_means=np.array([10.0, np.nan, 30.0]),
+        existing_stds=np.array([1.0, np.nan, 3.0]),
+        existing_sems=np.array([0.5, np.nan, 1.5]),
+    )
+    progress, finished, _failed = _run_roi_worker(worker)
+
+    assert progress == [(1, 1)]
+    assert finished.valid_count == 3
+    np.testing.assert_allclose(finished.means, np.array([10.0, 2.5, 30.0]))
+    np.testing.assert_allclose(
+        finished.stds,
+        np.array([1.0, np.std(np.array([1.0, 2.0, 3.0, 4.0])), 3.0]),
+    )
+    np.testing.assert_allclose(
+        finished.sems,
+        np.array(
+            [
+                0.5,
+                np.std(np.array([1.0, 2.0, 3.0, 4.0])) / math.sqrt(4.0),
+                1.5,
+            ],
+        ),
+    )
+    assert tuple(finished.failures) == ()

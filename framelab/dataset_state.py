@@ -7,6 +7,25 @@ from pathlib import Path
 from typing import Any, Iterable
 
 
+def _is_same_or_child_path(path: Path, root: Path) -> bool:
+    """Return whether ``path`` is the same as or below ``root``."""
+
+    try:
+        path.resolve().relative_to(root.resolve())
+    except ValueError:
+        return False
+    return True
+
+
+def _normalize_subtree_root(root: str | Path) -> Path:
+    """Normalize a subtree root, accepting either folder or file paths."""
+
+    candidate = Path(root).expanduser()
+    if candidate.exists():
+        return (candidate if candidate.is_dir() else candidate.parent).resolve()
+    return (candidate.parent if candidate.suffix else candidate).resolve()
+
+
 @dataclass(frozen=True, slots=True)
 class DatasetScopeNode:
     """One node in the active workflow ancestry chain."""
@@ -204,6 +223,19 @@ class DatasetStateController:
             for path, payload in mapping.items()
         }
 
+    def update_path_metadata(
+        self,
+        mapping: dict[str, dict[str, object]],
+    ) -> None:
+        """Merge refreshed metadata for a subset of already loaded paths."""
+
+        if not mapping:
+            return
+        merged = dict(self.path_metadata)
+        for path, payload in mapping.items():
+            merged[str(path)] = dict(payload)
+        self.path_metadata = merged
+
     def set_metadata_visible_paths(self, paths: Iterable[str]) -> None:
         """Store current metadata-table visible row ordering."""
         self.metadata_visible_paths = [str(path) for path in paths]
@@ -224,6 +256,19 @@ class DatasetStateController:
     def metadata_for_path(self, path: str) -> dict[str, object]:
         """Return cached metadata for one loaded path."""
         return self.path_metadata.get(str(path), {})
+
+    def paths_within_root(self, root: str | Path | None) -> list[str]:
+        """Return loaded paths that sit within one filesystem subtree."""
+
+        if root is None:
+            return list(self.paths)
+        resolved_root = _normalize_subtree_root(root)
+        matched: list[str] = []
+        for path in self.paths:
+            candidate = Path(path).expanduser()
+            if _is_same_or_child_path(candidate, resolved_root):
+                matched.append(str(path))
+        return matched
 
     def set_selected_index(
         self,

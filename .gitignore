@@ -8,6 +8,9 @@ EbusData
 archived
 json_templates
 
+# Software cache
+.framelab
+
 # vscode
 /.vscode/
 

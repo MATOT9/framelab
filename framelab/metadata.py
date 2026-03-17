@@ -30,6 +30,7 @@ from .frame_indexing import parse_frame_name, resolve_frame_index_map
 from .metadata_state import (
     MetadataFieldSource,
     clear_metadata_state_cache,
+    invalidate_metadata_state_cache,
     resolve_path_node_metadata,
 )
 from .node_metadata import path_has_nodecard
@@ -77,13 +78,53 @@ class _AcquisitionDatacard:
     ebus_attached: bool = False
 
 
-_ACQ_CARD_CACHE: dict[str, Optional[_AcquisitionDatacard]] = {}
+_ACQ_CARD_CACHE: dict[tuple[Path, Path | None], Optional[_AcquisitionDatacard]] = {}
 
 
 def clear_metadata_cache() -> None:
     """Clear per-acquisition metadata cache used by extraction helpers."""
     _ACQ_CARD_CACHE.clear()
     clear_metadata_state_cache()
+
+
+def _is_same_or_child_path(path: Path, root: Path) -> bool:
+    """Return whether ``path`` is the same as or below ``root``."""
+
+    try:
+        path.resolve().relative_to(root.resolve())
+    except ValueError:
+        return False
+    return True
+
+
+def _normalize_cache_root(root: str | Path) -> Path:
+    """Normalize cache invalidation roots from either file or folder input."""
+
+    candidate = Path(root).expanduser()
+    if candidate.exists():
+        return (candidate if candidate.is_dir() else candidate.parent).resolve()
+    return (candidate.parent if candidate.suffix else candidate).resolve()
+
+
+def invalidate_metadata_cache(
+    changed_roots: tuple[str | Path, ...] = (),
+) -> None:
+    """Invalidate cached metadata derived from one or more edited roots."""
+
+    normalized_roots = tuple(
+        _normalize_cache_root(root)
+        for root in changed_roots
+    )
+    if not normalized_roots:
+        return
+    invalidate_metadata_state_cache(normalized_roots)
+    for key in tuple(_ACQ_CARD_CACHE):
+        acquisition_root, _boundary_root = key
+        if any(
+            _is_same_or_child_path(acquisition_root, root)
+            for root in normalized_roots
+        ):
+            _ACQ_CARD_CACHE.pop(key, None)
 
 
 def _normalize_metadata_boundary_root(
@@ -310,7 +351,7 @@ def _load_acquisition_datacard(
         acq_root,
         metadata_boundary_root,
     )
-    key = f"{acq_root.resolve()}|{boundary_root or ''}"
+    key = (acq_root.resolve(), boundary_root)
     if key in _ACQ_CARD_CACHE:
         return _ACQ_CARD_CACHE[key]
 

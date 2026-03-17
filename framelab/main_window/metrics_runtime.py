@@ -7,6 +7,14 @@ from pathlib import Path
 import numpy as np
 from PySide6.QtCore import QThread
 
+from ..metrics_cache import (
+    DYNAMIC_METRIC_KIND,
+    ROI_METRIC_KIND,
+    MetricCacheWrite,
+    background_signature_payload,
+    dynamic_metric_signature_hash,
+    roi_metric_signature_hash,
+)
 from ..metrics_state import DynamicStatsResult, RoiApplyResult
 from ..processing_failures import make_processing_failure
 from ..workers import DynamicStatsWorker, RoiApplyWorker
@@ -14,6 +22,339 @@ from ..workers import DynamicStatsWorker, RoiApplyWorker
 
 class MetricsRuntimeMixin:
     """Live metric computation and preview refresh helpers."""
+
+    @staticmethod
+    def _build_preview_rgb(
+        image: np.ndarray,
+        *,
+        threshold_value: float,
+    ) -> np.ndarray:
+        """Build one RGB preview buffer with thresholded pixels highlighted."""
+        metric_arr = np.asarray(image)
+        imgf = np.array(metric_arr, dtype=np.float32, copy=True, order="C")
+        mn = float(imgf.min()) if imgf.size > 0 else 0.0
+        mx = float(imgf.max()) if imgf.size > 0 else 0.0
+        if mx > mn:
+            imgf -= mn
+            imgf *= 255.0 / (mx - mn)
+            np.clip(imgf, 0.0, 255.0, out=imgf)
+            gray = imgf.astype(np.uint8)
+        else:
+            gray = np.zeros(metric_arr.shape, dtype=np.uint8)
+
+        rgb = np.empty((*gray.shape, 3), dtype=np.uint8)
+        rgb[..., 0] = gray
+        rgb[..., 1] = gray
+        rgb[..., 2] = gray
+
+        hot_mask = metric_arr >= threshold_value
+        rgb[..., 0][hot_mask] = 255
+        rgb[..., 1][hot_mask] = 0
+        rgb[..., 2][hot_mask] = 0
+        return rgb
+
+    def _background_signature_payload(self) -> dict[str, object]:
+        """Return the stable background-input payload used for cache keys."""
+
+        dataset = self.dataset_state
+        workflow = getattr(self, "workflow_state_controller", None)
+        return background_signature_payload(
+            self.metrics_state.background_library,
+            self._background_config_snapshot(),
+            dataset_root=dataset.dataset_root,
+            workspace_root=getattr(workflow, "workspace_root", None),
+        )
+
+    def _dynamic_metric_signature_hash(self, mode: str) -> str:
+        """Return cache signature for the current dynamic row-metric settings."""
+
+        metrics = self.metrics_state
+        return dynamic_metric_signature_hash(
+            mode=mode,
+            threshold_value=metrics.threshold_value,
+            avg_count_value=metrics.avg_count_value,
+            background_payload=self._background_signature_payload(),
+        )
+
+    def _roi_metric_signature_hash(self) -> str | None:
+        """Return cache signature for the current ROI settings."""
+
+        roi_rect = self.metrics_state.roi_rect
+        if roi_rect is None:
+            return None
+        return roi_metric_signature_hash(
+            roi_rect=roi_rect,
+            background_payload=self._background_signature_payload(),
+        )
+
+    def _cached_dynamic_payloads(
+        self,
+        signature_hash: str,
+    ) -> tuple[dict[str, object], dict[str, dict[str, object]]]:
+        """Load cached dynamic metric payloads for the current dataset."""
+
+        cache = getattr(self, "metrics_cache", None)
+        dataset = self.dataset_state
+        identities = self._metric_cache_identities(
+            [Path(path) for path in dataset.paths],
+            dataset_root=dataset.dataset_root,
+        )
+        if cache is None or not identities:
+            return (identities, {})
+        cached = cache.fetch_entries(
+            identities.values(),
+            metric_kind=DYNAMIC_METRIC_KIND,
+            signature_hash=signature_hash,
+        )
+        return (identities, cached)
+
+    def _cached_roi_payloads(
+        self,
+        signature_hash: str,
+    ) -> tuple[dict[str, object], dict[str, dict[str, object]]]:
+        """Load cached ROI payloads for the current dataset."""
+
+        cache = getattr(self, "metrics_cache", None)
+        dataset = self.dataset_state
+        identities = self._metric_cache_identities(
+            [Path(path) for path in dataset.paths],
+            dataset_root=dataset.dataset_root,
+        )
+        if cache is None or not identities:
+            return (identities, {})
+        cached = cache.fetch_entries(
+            identities.values(),
+            metric_kind=ROI_METRIC_KIND,
+            signature_hash=signature_hash,
+        )
+        return (identities, cached)
+
+    def _prefill_dynamic_metric_arrays(
+        self,
+        *,
+        mode: str,
+        update_kind: str,
+        cached_payloads: dict[str, dict[str, object]],
+    ) -> tuple[
+        np.ndarray,
+        np.ndarray | None,
+        np.ndarray | None,
+        np.ndarray | None,
+        np.ndarray,
+        np.ndarray,
+        np.ndarray,
+        list[int],
+    ]:
+        """Build partially cached dynamic metric arrays and return miss indices."""
+
+        dataset = self.dataset_state
+        metrics = self.metrics_state
+        n = dataset.path_count()
+        cached_sat_counts = np.zeros(n, dtype=np.int64)
+        cached_max_pixels = np.zeros(n, dtype=np.int64)
+        cached_min_non_zero = np.zeros(n, dtype=np.int64)
+        cached_bg_applied = np.zeros(n, dtype=bool)
+        cached_avg_topk = (
+            np.full(n, np.nan, dtype=np.float64)
+            if mode == "topk"
+            else None
+        )
+        cached_avg_topk_std = (
+            np.full(n, np.nan, dtype=np.float64)
+            if mode == "topk"
+            else None
+        )
+        cached_avg_topk_sem = (
+            np.full(n, np.nan, dtype=np.float64)
+            if mode == "topk"
+            else None
+        )
+        hit_indices: set[int] = set()
+        for index, path in enumerate(dataset.paths):
+            payload = cached_payloads.get(path)
+            if payload is None:
+                continue
+            hit_indices.add(index)
+            cached_sat_counts[index] = int(payload.get("sat_count", 0))
+            cached_max_pixels[index] = int(payload.get("max_pixel", 0))
+            cached_min_non_zero[index] = int(payload.get("min_non_zero", 0))
+            cached_bg_applied[index] = bool(payload.get("bg_applied", False))
+            if mode == "topk" and cached_avg_topk is not None:
+                cached_avg_topk[index] = float(payload.get("avg_topk", np.nan))
+                if cached_avg_topk_std is not None:
+                    cached_avg_topk_std[index] = float(
+                        payload.get("avg_topk_std", np.nan),
+                    )
+                if cached_avg_topk_sem is not None:
+                    cached_avg_topk_sem[index] = float(
+                        payload.get("avg_topk_sem", np.nan),
+                    )
+
+        if update_kind == "threshold_only":
+            existing_max_pixels = (
+                np.asarray(metrics.maxs, dtype=np.int64)
+                if metrics.maxs is not None and len(metrics.maxs) == n
+                else cached_max_pixels
+            )
+            existing_min_non_zero = (
+                np.asarray(metrics.min_non_zero, dtype=np.int64)
+                if metrics.min_non_zero is not None and len(metrics.min_non_zero) == n
+                else cached_min_non_zero
+            )
+            existing_bg_applied = (
+                np.asarray(metrics.bg_applied_mask, dtype=bool)
+                if metrics.bg_applied_mask is not None and len(metrics.bg_applied_mask) == n
+                else cached_bg_applied
+            )
+            existing_avg_topk = (
+                np.asarray(metrics.avg_maxs, dtype=np.float64)
+                if mode == "topk"
+                and metrics.avg_maxs is not None
+                and len(metrics.avg_maxs) == n
+                else cached_avg_topk
+            )
+            existing_avg_topk_std = (
+                np.asarray(metrics.avg_maxs_std, dtype=np.float64)
+                if mode == "topk"
+                and metrics.avg_maxs_std is not None
+                and len(metrics.avg_maxs_std) == n
+                else cached_avg_topk_std
+            )
+            existing_avg_topk_sem = (
+                np.asarray(metrics.avg_maxs_sem, dtype=np.float64)
+                if mode == "topk"
+                and metrics.avg_maxs_sem is not None
+                and len(metrics.avg_maxs_sem) == n
+                else cached_avg_topk_sem
+            )
+        else:
+            existing_max_pixels = cached_max_pixels
+            existing_min_non_zero = cached_min_non_zero
+            existing_bg_applied = cached_bg_applied
+            existing_avg_topk = cached_avg_topk
+            existing_avg_topk_std = cached_avg_topk_std
+            existing_avg_topk_sem = cached_avg_topk_sem
+
+        missing_indices = [
+            index
+            for index in range(n)
+            if index not in hit_indices
+        ]
+        return (
+            cached_sat_counts,
+            existing_avg_topk,
+            existing_avg_topk_std,
+            existing_avg_topk_sem,
+            existing_max_pixels,
+            existing_min_non_zero,
+            existing_bg_applied,
+            missing_indices,
+        )
+
+    def _store_cached_dynamic_metrics(
+        self,
+        result: DynamicStatsResult,
+    ) -> None:
+        """Persist newly computed dynamic metric rows into the SQLite cache."""
+
+        pending = getattr(self, "_dynamic_cache_pending", None)
+        self._dynamic_cache_pending = None
+        if not pending:
+            return
+        cache = getattr(self, "metrics_cache", None)
+        if cache is None:
+            return
+        identities = pending["identities"]
+        source_indices = pending["source_indices"]
+        mode = pending["mode"]
+        writes: list[MetricCacheWrite] = []
+        for index in source_indices:
+            path = self.dataset_state.paths[index]
+            identity = identities.get(path)
+            if identity is None:
+                continue
+            payload = {
+                "sat_count": int(result.sat_counts[index]),
+                "max_pixel": int(result.max_pixels[index]),
+                "min_non_zero": int(result.min_non_zero[index]),
+                "bg_applied": bool(result.bg_applied_mask[index]),
+            }
+            if mode == "topk" and result.avg_topk is not None:
+                payload["avg_topk"] = float(result.avg_topk[index])
+                if result.avg_topk_std is not None:
+                    payload["avg_topk_std"] = float(result.avg_topk_std[index])
+                if result.avg_topk_sem is not None:
+                    payload["avg_topk_sem"] = float(result.avg_topk_sem[index])
+            writes.append(MetricCacheWrite(identity=identity, payload=payload))
+        cache.store_entries(
+            writes,
+            metric_kind=DYNAMIC_METRIC_KIND,
+            signature_hash=str(pending["signature_hash"]),
+        )
+
+    def _prefill_roi_metric_arrays(
+        self,
+        cached_payloads: dict[str, dict[str, object]],
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, list[int]]:
+        """Build partially cached ROI arrays and return miss indices."""
+
+        dataset = self.dataset_state
+        n = dataset.path_count()
+        means = np.full(n, np.nan, dtype=np.float64)
+        stds = np.full(n, np.nan, dtype=np.float64)
+        sems = np.full(n, np.nan, dtype=np.float64)
+        hit_indices: set[int] = set()
+        for index, path in enumerate(dataset.paths):
+            payload = cached_payloads.get(path)
+            if payload is None:
+                continue
+            hit_indices.add(index)
+            means[index] = float(payload.get("mean", np.nan))
+            stds[index] = float(payload.get("std", np.nan))
+            sems[index] = float(payload.get("sem", np.nan))
+        missing_indices = [
+            index
+            for index in range(n)
+            if index not in hit_indices
+        ]
+        return (means, stds, sems, missing_indices)
+
+    def _store_cached_roi_metrics(
+        self,
+        result: RoiApplyResult,
+    ) -> None:
+        """Persist newly computed ROI rows into the SQLite cache."""
+
+        pending = getattr(self, "_roi_cache_pending", None)
+        self._roi_cache_pending = None
+        if not pending:
+            return
+        cache = getattr(self, "metrics_cache", None)
+        if cache is None:
+            return
+        identities = pending["identities"]
+        source_indices = pending["source_indices"]
+        writes: list[MetricCacheWrite] = []
+        for index in source_indices:
+            path = self.dataset_state.paths[index]
+            identity = identities.get(path)
+            if identity is None:
+                continue
+            writes.append(
+                MetricCacheWrite(
+                    identity=identity,
+                    payload={
+                        "mean": float(result.means[index]),
+                        "std": float(result.stds[index]),
+                        "sem": float(result.sems[index]),
+                    },
+                ),
+            )
+        cache.store_entries(
+            writes,
+            metric_kind=ROI_METRIC_KIND,
+            signature_hash=str(pending["signature_hash"]),
+        )
 
     def _start_threshold_summary_animation(self) -> None:
         """Start the light pulse used while threshold counts are recomputing."""
@@ -48,6 +389,7 @@ class MetricsRuntimeMixin:
         """Stop any in-flight dynamic metrics worker."""
         metrics = self.metrics_state
         thread = self._stats_thread
+        self._dynamic_cache_pending = None
         metrics.finish_stats_job()
         self._stop_threshold_summary_animation()
         if thread is None:
@@ -87,11 +429,45 @@ class MetricsRuntimeMixin:
         )
         mode = self._current_average_mode()
         dataset = self.dataset_state
+        signature_hash = self._dynamic_metric_signature_hash(mode)
+        identities, cached_payloads = self._cached_dynamic_payloads(signature_hash)
+        (
+            existing_sat_counts,
+            existing_avg_topk,
+            existing_avg_topk_std,
+            existing_avg_topk_sem,
+            existing_max_pixels,
+            existing_min_non_zero,
+            existing_bg_applied,
+            missing_indices,
+        ) = self._prefill_dynamic_metric_arrays(
+            mode=mode,
+            update_kind=update_kind,
+            cached_payloads=cached_payloads,
+        )
+
+        if not missing_indices:
+            self._dynamic_cache_pending = None
+            self._on_dynamic_stats_finished(
+                DynamicStatsResult(
+                    job_id=job_id,
+                    sat_counts=existing_sat_counts,
+                    avg_topk=existing_avg_topk,
+                    avg_topk_std=existing_avg_topk_std,
+                    avg_topk_sem=existing_avg_topk_sem,
+                    max_pixels=existing_max_pixels,
+                    min_non_zero=existing_min_non_zero,
+                    bg_applied_mask=existing_bg_applied,
+                ),
+            )
+            return
 
         thread = QThread(self)
         worker = DynamicStatsWorker(
             job_id=job_id,
-            paths=list(dataset.paths),
+            paths=[dataset.paths[index] for index in missing_indices],
+            source_indices=missing_indices,
+            result_length=dataset.path_count(),
             threshold_value=metrics.threshold_value,
             mode=mode,
             avg_count_value=metrics.avg_count_value,
@@ -99,12 +475,13 @@ class MetricsRuntimeMixin:
             background_config=self._background_config_snapshot(),
             background_library=self._background_library_snapshot(),
             path_metadata=dict(dataset.path_metadata),
-            existing_avg_topk=metrics.avg_maxs,
-            existing_avg_topk_std=metrics.avg_maxs_std,
-            existing_avg_topk_sem=metrics.avg_maxs_sem,
-            existing_max_pixels=metrics.maxs,
-            existing_min_non_zero=metrics.min_non_zero,
-            existing_bg_applied_mask=metrics.bg_applied_mask,
+            existing_sat_counts=existing_sat_counts,
+            existing_avg_topk=existing_avg_topk,
+            existing_avg_topk_std=existing_avg_topk_std,
+            existing_avg_topk_sem=existing_avg_topk_sem,
+            existing_max_pixels=existing_max_pixels,
+            existing_min_non_zero=existing_min_non_zero,
+            existing_bg_applied_mask=existing_bg_applied,
         )
         worker.moveToThread(thread)
 
@@ -119,6 +496,12 @@ class MetricsRuntimeMixin:
 
         self._stats_thread = thread
         self._stats_worker = worker
+        self._dynamic_cache_pending = {
+            "signature_hash": signature_hash,
+            "identities": identities,
+            "source_indices": missing_indices,
+            "mode": mode,
+        }
         if metrics.stats_update_kind == "threshold_only":
             self._start_threshold_summary_animation()
         else:
@@ -142,6 +525,7 @@ class MetricsRuntimeMixin:
                 list(result.failures),
                 replace_stage="metrics",
             )
+        self._store_cached_dynamic_metrics(result)
         metrics.finish_stats_job()
         self._stop_threshold_summary_animation()
         self._refresh_table(
@@ -156,6 +540,7 @@ class MetricsRuntimeMixin:
         metrics = self.metrics_state
         if job_id != metrics.stats_job_id:
             return
+        self._dynamic_cache_pending = None
         metrics.finish_stats_job()
         self._stop_threshold_summary_animation()
         self._update_background_status_label()
@@ -228,14 +613,39 @@ class MetricsRuntimeMixin:
 
         dataset = self.dataset_state
         job_id = metrics.begin_roi_apply(dataset.path_count())
+        signature_hash = self._roi_metric_signature_hash()
+        if signature_hash is None:
+            return
+        identities, cached_payloads = self._cached_roi_payloads(signature_hash)
+        existing_means, existing_stds, existing_sems, missing_indices = (
+            self._prefill_roi_metric_arrays(cached_payloads)
+        )
+        if not missing_indices:
+            self._roi_cache_pending = None
+            self._on_roi_apply_finished(
+                RoiApplyResult(
+                    job_id=job_id,
+                    means=existing_means,
+                    stds=existing_stds,
+                    sems=existing_sems,
+                    valid_count=int(np.count_nonzero(np.isfinite(existing_means))),
+                ),
+            )
+            return
+
         thread = QThread(self)
         worker = RoiApplyWorker(
             job_id=job_id,
-            paths=list(dataset.paths),
+            paths=[dataset.paths[index] for index in missing_indices],
+            source_indices=missing_indices,
+            result_length=dataset.path_count(),
             roi_rect=self.metrics_state.roi_rect,
             background_config=self._background_config_snapshot(),
             background_library=self._background_library_snapshot(),
             path_metadata=dict(dataset.path_metadata),
+            existing_means=existing_means,
+            existing_stds=existing_stds,
+            existing_sems=existing_sems,
         )
         worker.moveToThread(thread)
 
@@ -253,6 +663,11 @@ class MetricsRuntimeMixin:
 
         self._roi_apply_thread = thread
         self._roi_apply_worker = worker
+        self._roi_cache_pending = {
+            "signature_hash": signature_hash,
+            "identities": identities,
+            "source_indices": missing_indices,
+        }
         self.roi_apply_progress.setRange(0, max(1, metrics.roi_apply_total))
         self.roi_apply_progress.setValue(0)
         self.roi_apply_progress.setFormat("ROI apply %v/%m")
@@ -289,6 +704,7 @@ class MetricsRuntimeMixin:
                 list(result.failures),
                 replace_stage="roi",
             )
+        self._store_cached_roi_metrics(result)
 
         means = np.asarray(result.means, dtype=np.float64)
         if result.valid_count <= 0 or not np.any(np.isfinite(means)):
@@ -307,6 +723,7 @@ class MetricsRuntimeMixin:
         """Handle ROI apply cancellation."""
         if job_id != self.metrics_state.roi_apply_job_id:
             return
+        self._roi_cache_pending = None
         self._finish_roi_apply_ui()
         self._set_status("ROI apply cancelled")
 
@@ -314,6 +731,7 @@ class MetricsRuntimeMixin:
         """Handle ROI apply worker failure."""
         if job_id != self.metrics_state.roi_apply_job_id:
             return
+        self._roi_cache_pending = None
         self._finish_roi_apply_ui()
         self._set_status("ROI apply failed")
         if hasattr(self, "_record_processing_failures"):
@@ -430,7 +848,7 @@ class MetricsRuntimeMixin:
             metrics.bg_total_count = 0
             metrics.bg_unmatched_count = 0
             if update_analysis:
-                self._update_analysis_context()
+                self._invalidate_analysis_context(refresh_visible_plugin=True)
             self._update_background_status_label()
             self._apply_dynamic_visibility_policy()
             if hasattr(self, "_refresh_measure_header_state"):
@@ -494,13 +912,13 @@ class MetricsRuntimeMixin:
         if self._is_multi_cell_selection():
             self._pause_preview_updates = True
             if update_analysis:
-                self._update_analysis_context()
+                self._invalidate_analysis_context(refresh_visible_plugin=True)
             self._update_background_status_label()
             return
         self._pause_preview_updates = False
         self._display_image(target_index)
         if update_analysis:
-            self._update_analysis_context()
+            self._invalidate_analysis_context(refresh_visible_plugin=True)
         self._update_background_status_label()
         if hasattr(self, "_refresh_measure_header_state"):
             self._refresh_measure_header_state()
@@ -571,25 +989,22 @@ class MetricsRuntimeMixin:
                 self._refresh_measure_header_state()
             return
 
+        metric_arr = np.asarray(metric_img)
         if self.show_image_preview:
-            imgf = np.asarray(metric_img, dtype=np.float32)
-            mn, mx = float(imgf.min()), float(imgf.max())
-            if mx > mn:
-                gray = ((imgf - mn) / (mx - mn) * 255.0).astype(np.uint8)
-            else:
-                gray = np.zeros_like(imgf, dtype=np.uint8)
-
-            rgb = np.repeat(gray[..., None], 3, axis=2)
-            rgb[metric_img >= metrics.threshold_value] = [255, 0, 0]
-            self.image_preview.set_rgb_image(rgb)
-            self.image_preview.set_intensity_image(np.asarray(metric_img))
+            self.image_preview.set_rgb_image(
+                self._build_preview_rgb(
+                    metric_arr,
+                    threshold_value=metrics.threshold_value,
+                ),
+            )
+            self.image_preview.set_intensity_image(metric_arr)
             self.image_preview.set_roi_rect(metrics.roi_rect)
         else:
             self.image_preview.clear_image()
             self.image_preview.set_intensity_image(None)
 
         if self.show_histogram_preview:
-            self.histogram_widget.set_image(np.asarray(metric_img))
+            self.histogram_widget.set_image(metric_arr, exact=False)
         else:
             self.histogram_widget.clear_histogram()
         self._update_average_controls()
@@ -681,6 +1096,30 @@ class MetricsRuntimeMixin:
         if not (0 <= index < dataset.path_count()):
             return (np.nan, np.nan, np.nan)
 
+        signature_hash = self._roi_metric_signature_hash()
+        path = dataset.paths[index]
+        cache = getattr(self, "metrics_cache", None)
+        identity = None
+        if signature_hash is not None:
+            identities = self._metric_cache_identities(
+                [Path(path)],
+                dataset_root=dataset.dataset_root,
+            )
+            identity = identities.get(str(Path(path).resolve()))
+            if cache is not None and identity is not None:
+                cached = cache.fetch_entries(
+                    [identity],
+                    metric_kind=ROI_METRIC_KIND,
+                    signature_hash=signature_hash,
+                )
+                cached_payload = cached.get(str(Path(path).resolve()))
+                if cached_payload is not None:
+                    return (
+                        float(cached_payload.get("mean", np.nan)),
+                        float(cached_payload.get("std", np.nan)),
+                        float(cached_payload.get("sem", np.nan)),
+                    )
+
         metric_img, _bg_applied = self._get_metric_image_by_index(index)
         if metric_img is None:
             return (np.nan, np.nan, np.nan)
@@ -691,7 +1130,27 @@ class MetricsRuntimeMixin:
             return (np.nan, np.nan, np.nan)
         roi_std = float(roi.std())
         roi_sem = float(roi_std / np.sqrt(roi.size))
-        return (float(roi.mean()), roi_std, roi_sem)
+        roi_mean = float(roi.mean())
+        if (
+            cache is not None
+            and identity is not None
+            and signature_hash is not None
+        ):
+            cache.store_entries(
+                [
+                    MetricCacheWrite(
+                        identity=identity,
+                        payload={
+                            "mean": roi_mean,
+                            "std": roi_std,
+                            "sem": roi_sem,
+                        },
+                    ),
+                ],
+                metric_kind=ROI_METRIC_KIND,
+                signature_hash=signature_hash,
+            )
+        return (roi_mean, roi_std, roi_sem)
 
     def _on_average_mode_changed(self) -> None:
         """Respond to average-mode UI changes."""

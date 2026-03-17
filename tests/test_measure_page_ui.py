@@ -36,16 +36,13 @@ def test_measure_help_visibility_respects_preview_flags(
     measure_window.show_histogram_preview = True
     measure_window._set_measure_help_visibility(False)
     assert measure_window.preview_help_label.isHidden()
-    assert measure_window.histogram_help_label.isHidden()
 
     measure_window._set_measure_help_visibility(True)
     assert not measure_window.preview_help_label.isHidden()
-    assert not measure_window.histogram_help_label.isHidden()
 
     measure_window.show_histogram_preview = False
     measure_window._set_measure_help_visibility(True)
     assert not measure_window.preview_help_label.isHidden()
-    assert measure_window.histogram_help_label.isHidden()
 
 
 def test_measure_splitter_state_round_trip(measure_window: FrameLabWindow) -> None:

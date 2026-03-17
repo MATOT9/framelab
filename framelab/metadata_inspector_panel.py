@@ -691,7 +691,7 @@ class MetadataInspectorPanel(qtw.QWidget):
         )
         notify = getattr(host, "_notify_metadata_context_changed", None)
         if callable(notify):
-            notify()
+            notify(changed_root=active_node.folder_path)
         self.sync_from_host()
 
     def _apply_template(self) -> None:
@@ -713,7 +713,7 @@ class MetadataInspectorPanel(qtw.QWidget):
             return
         notify = getattr(host, "_notify_metadata_context_changed", None)
         if callable(notify):
-            notify()
+            notify(changed_root=active_node.folder_path)
         self.sync_from_host()
 
     def _selected_metadata_key(self) -> str | None:

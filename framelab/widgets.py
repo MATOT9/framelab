@@ -376,6 +376,7 @@ class ImagePreviewLabel(qtw.QLabel):
         self.setMinimumSize(320, 260)
         self.setObjectName("ImagePreview")
         self._source_pixmap: Optional[QtGui.QPixmap] = None
+        self._rgb_buffer: Optional[np.ndarray] = None
         self._image_size: Optional[tuple[int, int]] = None
         self._intensity_image: Optional[np.ndarray] = None
         self._roi_mode_enabled = False
@@ -401,6 +402,7 @@ class ImagePreviewLabel(qtw.QLabel):
     def clear_image(self) -> None:
         """Clear preview content and reset interaction state."""
         self._source_pixmap = None
+        self._rgb_buffer = None
         self._image_size = None
         self._intensity_image = None
         self._roi_rect = None
@@ -425,9 +427,14 @@ class ImagePreviewLabel(qtw.QLabel):
 
         h, w, _ = rgb.shape
         bytes_per_line = 3 * w
+        self._rgb_buffer = np.ascontiguousarray(rgb, dtype=np.uint8)
         image = QtGui.QImage(
-            rgb.data, w, h, bytes_per_line, QtGui.QImage.Format_RGB888
-        ).copy()
+            self._rgb_buffer.data,
+            w,
+            h,
+            bytes_per_line,
+            QtGui.QImage.Format_RGB888,
+        )
         self._source_pixmap = QtGui.QPixmap.fromImage(image)
         self._image_size = (w, h)
         self.setText("")
@@ -1071,6 +1078,9 @@ class ImagePreviewLabel(qtw.QLabel):
 class HistogramWidget(qtw.QWidget):
     """Displays histogram of pixel intensity occurrences using matplotlib."""
 
+    _APPROXIMATE_SAMPLE_LIMIT = 200_000
+    _EXACT_DEBOUNCE_MS = 140
+
     def __init__(self, parent: Optional[qtw.QWidget] = None) -> None:
         super().__init__(parent)
         self.setMinimumHeight(280)
@@ -1081,6 +1091,11 @@ class HistogramWidget(qtw.QWidget):
         self._x_min = 0.0
         self._x_max = 1.0
         self._theme_mode = "light"
+        self._pending_image: Optional[np.ndarray] = None
+        self._exact_timer = QtCore.QTimer(self)
+        self._exact_timer.setSingleShot(True)
+        self._exact_timer.setInterval(self._EXACT_DEBOUNCE_MS)
+        self._exact_timer.timeout.connect(self._render_pending_image_exact)
 
         layout = qtw.QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -1097,6 +1112,12 @@ class HistogramWidget(qtw.QWidget):
             and FigureCanvasQTAgg is not None
         ):
             self._figure = Figure()
+            self._figure.subplots_adjust(
+                left=0.12,
+                right=0.985,
+                top=0.955,
+                bottom=0.16,
+            )
             self._canvas = FigureCanvasQTAgg(self._figure)
             self._axes = self._figure.add_subplot(111)
             layout.addWidget(self._canvas, 1)
@@ -1128,27 +1149,64 @@ class HistogramWidget(qtw.QWidget):
 
     def clear_histogram(self) -> None:
         """Clear current histogram data and redraw empty state."""
+        self._exact_timer.stop()
+        self._pending_image = None
         self._counts = None
         self._edges = None
         self._x_min = 0.0
         self._x_max = 1.0
         self._redraw()
 
-    def set_image(self, image: np.ndarray) -> None:
+    def set_image(self, image: np.ndarray, *, exact: bool = True) -> None:
         """Build histogram data from a 2D intensity image.
 
         Parameters
         ----------
         image : numpy.ndarray
             Two-dimensional array of pixel intensities.
+        exact : bool, default=True
+            When ``False``, render a fast approximate histogram first and
+            promote it to an exact one after a short debounce.
         """
         arr = np.asarray(image)
         if arr.ndim != 2 or arr.size == 0:
             self.clear_histogram()
             return
+        if exact or arr.size <= self._APPROXIMATE_SAMPLE_LIMIT:
+            self._exact_timer.stop()
+            self._pending_image = None
+            self._set_histogram_data(arr, sample_limit=None)
+            return
 
-        arrf = arr.astype(np.float64, copy=False).ravel()
-        arrf = arrf[np.isfinite(arrf)]
+        self._pending_image = arr
+        self._set_histogram_data(
+            arr,
+            sample_limit=self._APPROXIMATE_SAMPLE_LIMIT,
+        )
+        self._exact_timer.start()
+
+    def _render_pending_image_exact(self) -> None:
+        image = self._pending_image
+        self._pending_image = None
+        if image is None:
+            return
+        self._set_histogram_data(image, sample_limit=None)
+
+    def _set_histogram_data(
+        self,
+        image: np.ndarray,
+        *,
+        sample_limit: int | None,
+    ) -> None:
+        arr = np.asarray(image)
+        flat = arr.ravel()
+        if sample_limit is not None and flat.size > sample_limit:
+            stride = max(1, int(np.ceil(float(flat.size) / float(sample_limit))))
+            flat = flat[::stride]
+
+        arrf = flat.astype(np.float64, copy=False)
+        if np.issubdtype(arrf.dtype, np.floating):
+            arrf = arrf[np.isfinite(arrf)]
         if arrf.size == 0:
             self.clear_histogram()
             return

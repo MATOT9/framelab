@@ -655,6 +655,8 @@ class WindowChromeMixin:
                 self._apply_dynamic_visibility_policy()
             if engaged and hasattr(self, "_restore_visible_analysis_layout"):
                 QTimer.singleShot(0, self._restore_visible_analysis_layout)
+            if engaged and hasattr(self, "_flush_dirty_analysis_context_if_visible"):
+                QTimer.singleShot(0, self._flush_dirty_analysis_context_if_visible)
         self.context_hint = self._workflow_hint_for_index(index)
         self._set_status()
 

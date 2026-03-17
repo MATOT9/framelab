@@ -30,6 +30,15 @@ def _is_same_or_child_path(path: Path, boundary: Path) -> bool:
     return True
 
 
+def _normalize_cache_path_root(path: str | Path) -> Path:
+    """Normalize a cache-invalidation root from either file or folder input."""
+
+    candidate = Path(path).expanduser()
+    if candidate.exists():
+        return (candidate if candidate.is_dir() else candidate.parent).resolve()
+    return (candidate.parent if candidate.suffix else candidate).resolve()
+
+
 def _merge_inherit(base: Any, override: Any) -> Any:
     """Merge nested dictionaries using metadata inheritance semantics."""
 
@@ -176,6 +185,29 @@ class MetadataStateController:
         """Clear cached nodecard payloads."""
 
         self._nodecard_cache.clear()
+
+    def invalidate_paths(
+        self,
+        paths: tuple[str | Path, ...] = (),
+        *,
+        recursive: bool = False,
+    ) -> None:
+        """Drop cached nodecards for one or more specific filesystem roots."""
+
+        normalized = tuple(
+            _normalize_cache_path_root(path)
+            for path in paths
+        )
+        if not normalized:
+            return
+        for cached_path in tuple(self._nodecard_cache):
+            if any(
+                _is_same_or_child_path(cached_path, root)
+                if recursive
+                else cached_path == root
+                for root in normalized
+            ):
+                self._nodecard_cache.pop(cached_path, None)
 
     def schema_for_profile(
         self,
@@ -611,6 +643,16 @@ def clear_metadata_state_cache() -> None:
     """Clear module-level cached nodecard payloads."""
 
     _DEFAULT_METADATA_STATE.clear_cache()
+
+
+def invalidate_metadata_state_cache(
+    paths: tuple[str | Path, ...] = (),
+    *,
+    recursive: bool = False,
+) -> None:
+    """Invalidate module-level nodecard cache entries for selected roots."""
+
+    _DEFAULT_METADATA_STATE.invalidate_paths(paths, recursive=recursive)
 
 
 def resolve_path_node_metadata(
