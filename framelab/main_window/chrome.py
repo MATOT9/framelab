@@ -133,15 +133,6 @@ class WindowChromeMixin:
         self._workflow_context_row_layout = context_layout
         self._workflow_context_breadcrumb = WorkflowBreadcrumbBar(compact=True)
         context_layout.addWidget(self._workflow_context_breadcrumb, 1)
-        self._workflow_context_select_button = qtw.QPushButton("Select Workflow...")
-        self._workflow_context_select_button.clicked.connect(
-            self._open_workflow_selection_dialog,
-        )
-        context_layout.addWidget(
-            self._workflow_context_select_button,
-            0,
-            Qt.AlignTop,
-        )
         root_layout.addWidget(context_row, 0)
         self.workflow_tabs.addTab(self._build_data_page(), "1. Data")
         self.workflow_tabs.addTab(self._build_inspect_page(), "2. Measure")
@@ -178,6 +169,45 @@ class WindowChromeMixin:
         menu_bar = self.menuBar()
 
         file_menu = menu_bar.addMenu("&File")
+        open_workspace_action = QtGui.QAction("Open Workspace File...", self)
+        open_workspace_action.setShortcut(QtGui.QKeySequence.Open)
+        self._apply_help_text(
+            open_workspace_action,
+            "Open a saved FrameLab workspace document.",
+            status="Restore workflow, scan, ROI, background, and UI state from a .framelab file.",
+        )
+        open_workspace_action.triggered.connect(self._open_workspace_document_from_dialog)
+        file_menu.addAction(open_workspace_action)
+        self.file_open_workspace_action = open_workspace_action
+
+        save_workspace_action = QtGui.QAction("Save Workspace", self)
+        save_workspace_action.setShortcut(QtGui.QKeySequence.Save)
+        self._apply_help_text(
+            save_workspace_action,
+            "Save the current FrameLab workspace document.",
+            status="Write the current reopenable session state to the active .framelab file.",
+        )
+        save_workspace_action.triggered.connect(
+            lambda _checked=False: self._save_workspace_document(),
+        )
+        file_menu.addAction(save_workspace_action)
+        self.file_save_workspace_action = save_workspace_action
+
+        save_workspace_as_action = QtGui.QAction("Save Workspace As...", self)
+        save_workspace_as_action.setShortcut(QtGui.QKeySequence("Ctrl+Shift+S"))
+        self._apply_help_text(
+            save_workspace_as_action,
+            "Save the current session to a new FrameLab workspace document.",
+            status="Choose where to write a .framelab workspace file for the current session.",
+        )
+        save_workspace_as_action.triggered.connect(
+            lambda _checked=False: self._save_workspace_document_as(),
+        )
+        file_menu.addAction(save_workspace_as_action)
+        self.file_save_workspace_as_action = save_workspace_as_action
+
+        file_menu.addSeparator()
+
         open_workflow_action = QtGui.QAction("Open Workflow...", self)
         open_workflow_action.setShortcut(QtGui.QKeySequence("Ctrl+Shift+O"))
         self._apply_help_text(
@@ -190,7 +220,6 @@ class WindowChromeMixin:
         self.file_open_workflow_action = open_workflow_action
 
         open_folder_action = QtGui.QAction("Open Folder...", self)
-        open_folder_action.setShortcut(QtGui.QKeySequence.Open)
         self._apply_help_text(
             open_folder_action,
             "Open a dataset folder from disk.",
@@ -471,6 +500,7 @@ class WindowChromeMixin:
         toolbar.setFloatable(False)
         toolbar.setIconSize(QSize(18, 18))
         self.addToolBar(Qt.TopToolBarArea, toolbar)
+        self._main_toolbar = toolbar
 
         self.toolbar_workflow_action = QtGui.QAction(
             self.style().standardIcon(qtw.QStyle.SP_FileDialogContentsView),
@@ -612,8 +642,35 @@ class WindowChromeMixin:
         if hasattr(self, "_view_menu"):
             toggle_action = dock.toggleViewAction()
             toggle_action.setText("Workflow Explorer")
+            toggle_action.setIcon(
+                self.style().standardIcon(qtw.QStyle.SP_FileDialogListView),
+            )
+            toggle_action.setShortcut(QtGui.QKeySequence("Ctrl+Shift+W"))
+            toggle_action.setShortcutContext(Qt.ApplicationShortcut)
+            self._apply_help_text(
+                toggle_action,
+                "Show or hide the Workflow Explorer dock.",
+                status="Toggle the primary workflow-navigation dock.",
+            )
             self._view_menu.addAction(toggle_action)
+            toggle_action.setChecked(not dock.isHidden())
+            toggle_action.toggled.connect(
+                lambda _checked=False: self._sync_workflow_context_row_visibility(),
+            )
             self.view_workflow_explorer_action = toggle_action
+            self.toolbar_workflow_explorer_action = toggle_action
+
+        toolbar = getattr(self, "_main_toolbar", None)
+        if (
+            toolbar is not None
+            and hasattr(self, "toolbar_open_action")
+            and hasattr(self, "view_workflow_explorer_action")
+        ):
+            toolbar.insertAction(
+                self.toolbar_open_action,
+                self.view_workflow_explorer_action,
+            )
+        self._sync_workflow_context_row_visibility()
 
     def _build_metadata_inspector_dock(self) -> None:
         """Create the persistent right metadata inspector dock."""
@@ -635,6 +692,7 @@ class WindowChromeMixin:
             toggle_action = dock.toggleViewAction()
             toggle_action.setText("Metadata Inspector")
             self._view_menu.addAction(toggle_action)
+            toggle_action.setChecked(not dock.isHidden())
             self.view_metadata_inspector_action = toggle_action
 
     def _workflow_hint_for_index(self, index: int) -> str:
@@ -658,6 +716,7 @@ class WindowChromeMixin:
             if engaged and hasattr(self, "_flush_dirty_analysis_context_if_visible"):
                 QTimer.singleShot(0, self._flush_dirty_analysis_context_if_visible)
         self.context_hint = self._workflow_hint_for_index(index)
+        self._refresh_workspace_document_dirty_state()
         self._set_status()
 
     def _copy_table_selection(self) -> None:
@@ -1090,23 +1149,25 @@ class WindowChromeMixin:
             empty_text="No workflow selected",
         )
         has_workflow = bool(profile is not None)
-        self._workflow_context_select_button.setText(
-            "Switch Workflow..." if has_workflow else "Select Workflow...",
-        )
-        tooltip = (
-            (
-                f"Active workspace: {controller.workspace_root}\n"
-                f"Open As: {controller.anchor_summary_label()}"
-            )
-            if has_workflow and controller is not None and controller.workspace_root is not None
-            else "Choose the workflow profile and workspace root."
-        )
-        self._workflow_context_select_button.setToolTip(tooltip)
-        self._workflow_context_select_button.setStatusTip(tooltip)
         if hasattr(self, "file_clear_workflow_action"):
             self.file_clear_workflow_action.setEnabled(has_workflow)
         self._sync_scope_action_labels()
         self._ensure_primary_workflow_surfaces(has_workflow)
+        self._sync_workflow_context_row_visibility()
+
+    def _sync_workflow_context_row_visibility(self) -> None:
+        """Show the fallback workflow breadcrumb only when the explorer is hidden."""
+
+        row = getattr(self, "_workflow_context_row", None)
+        if row is None:
+            return
+        toggle_action = getattr(self, "view_workflow_explorer_action", None)
+        if isinstance(toggle_action, QtGui.QAction) and toggle_action.isCheckable():
+            show_row = not toggle_action.isChecked()
+        else:
+            dock = getattr(self, "_workflow_explorer_dock", None)
+            show_row = dock is None or dock.isHidden()
+        row.setVisible(show_row)
 
     def _sync_scope_action_labels(self) -> None:
         """Keep folder/scope affordances subordinate to workflow context."""

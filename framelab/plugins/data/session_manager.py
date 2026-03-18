@@ -29,7 +29,7 @@ from ...session_manager import (
 )
 from ...ui_primitives import ChipSpec, SummaryItem, build_page_header, build_summary_strip
 from ...widgets import install_large_header_resize_cursor
-from ...window_drag import configure_secondary_window
+from ...window_drag import apply_secondary_window_geometry, configure_secondary_window
 
 
 def _selected_folder(host_window: qtw.QWidget) -> Path | None:
@@ -102,7 +102,6 @@ class SessionManagerDialog(qtw.QDialog):
         self.setModal(False)
         self.setWindowModality(Qt.NonModal)
         self.setAttribute(Qt.WA_DeleteOnClose, True)
-        self.resize(1180, 760)
         self.setMinimumSize(980, 640)
 
         layout = qtw.QVBoxLayout(self)
@@ -235,6 +234,11 @@ class SessionManagerDialog(qtw.QDialog):
         layout.addLayout(close_row)
 
         self.apply_initial_session_root(initial_session_root)
+        apply_secondary_window_geometry(
+            self,
+            preferred_size=(1180, 760),
+            host_window=host_window,
+        )
 
     def _browse_session(self) -> None:
         """Browse to one session folder."""
@@ -615,7 +619,7 @@ class SessionManagerDialog(qtw.QDialog):
             return
         from .acquisition_datacard_wizard import AcquisitionDatacardWizardDialog
 
-        dialog = AcquisitionDatacardWizardDialog(None, str(entry.path))
+        dialog = AcquisitionDatacardWizardDialog(self._host_window, str(entry.path))
         if hasattr(dialog, "place_near_host"):
             dialog.place_near_host(self._host_window)
         dialog.exec()

@@ -22,7 +22,7 @@ from ..ui_primitives import (
     build_summary_strip,
     make_status_chip,
 )
-from ..window_drag import configure_secondary_window
+from ..window_drag import apply_secondary_window_geometry, configure_secondary_window
 
 _SELECTION_CONFIG_FILE = "plugin_selection.json"
 _SELECTION_SCHEMA_VERSION = "1.0"
@@ -116,10 +116,9 @@ class PluginStartupDialog(qtw.QDialog):
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Select Plugins")
-        configure_secondary_window(self)
+        configure_secondary_window(self, standalone=True)
         self.setModal(True)
         self.setWindowModality(QtCore.Qt.ApplicationModal)
-        self.resize(680, 520)
         self.setMinimumSize(560, 420)
 
         self._manifests = sorted(
@@ -201,6 +200,11 @@ class PluginStartupDialog(qtw.QDialog):
 
         self._apply_initial_selection(selected_plugin_ids)
         self._refresh_summary()
+        apply_secondary_window_geometry(
+            self,
+            preferred_size=(680, 520),
+            host_window=parent,
+        )
 
     def _build_plugin_row(self, manifest: PluginManifest) -> qtw.QWidget:
         """Create one plugin row with checkbox and muted details."""

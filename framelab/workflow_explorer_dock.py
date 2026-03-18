@@ -7,7 +7,7 @@ from pathlib import Path
 from PySide6 import QtCore, QtGui, QtWidgets as qtw
 from PySide6.QtCore import Qt
 
-from .dock_title_bar import DockTitleBar
+from .dock_title_bar import DockTitleBar, should_use_custom_dock_title_bar
 from .ui_density import DensityTokens, comfortable_density_tokens
 from .ui_primitives import make_status_chip
 from .workflow_widgets import WorkflowLineageEntry, WorkflowLineageRail
@@ -47,7 +47,8 @@ class WorkflowExplorerDock(qtw.QDockWidget):
         self.setWindowIcon(window_icon)
         self.setAttribute(Qt.WA_StyledBackground, True)
         self.setAutoFillBackground(True)
-        self.setTitleBarWidget(DockTitleBar(self))
+        if should_use_custom_dock_title_bar():
+            self.setTitleBarWidget(DockTitleBar(self))
 
         container = qtw.QWidget()
         container.setObjectName("WorkflowExplorerDockContent")
@@ -923,6 +924,13 @@ class WorkflowExplorerDock(qtw.QDockWidget):
         remember = getattr(self._host_window, "_remember_panel_state", None)
         if callable(remember):
             remember(self.PANEL_STATE_KEY, bool(visible))
+        sync_shell = getattr(
+            self._host_window,
+            "_sync_workflow_context_row_visibility",
+            None,
+        )
+        if callable(sync_shell):
+            sync_shell()
 
     def _restore_pending_scroll_position(self) -> None:
         """Restore the tree viewport after host-driven selection sync."""

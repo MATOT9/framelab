@@ -17,7 +17,7 @@ class IrisGainPlotMixin:
 
     def _apply_plot_layout(self) -> None:
         """Keep plot margins stable across empty and populated states."""
-        if self._figure is None:
+        if self._figure is None or self._axes is None or self._canvas is None:
             return
         self._figure.subplots_adjust(
             left=0.115,
@@ -25,6 +25,40 @@ class IrisGainPlotMixin:
             bottom=0.16,
             top=0.965,
         )
+        try:
+            self._canvas.draw()
+            renderer = self._canvas.get_renderer()
+        except Exception:
+            return
+        if renderer is None:
+            return
+        try:
+            figure_bbox = self._figure.get_window_extent(renderer)
+            axes_bbox = self._axes.get_window_extent(renderer)
+            tight_bbox = self._axes.get_tightbbox(renderer)
+        except Exception:
+            return
+        if (
+            figure_bbox.width <= 0.0
+            or axes_bbox.width <= 0.0
+            or tight_bbox.width <= 0.0
+        ):
+            return
+        desired_left = (
+            max(0.0, float(axes_bbox.x0) - float(tight_bbox.x0) + 8.0)
+            / float(figure_bbox.width)
+        )
+        # Split-pane layouts can leave the plot canvas much narrower than the
+        # main window. Allow a substantially larger left inset so the y-axis
+        # label and wide tick labels stay inside the rendered figure.
+        bounded_left = min(max(0.115, desired_left), 0.75)
+        if abs(bounded_left - float(self._figure.subplotpars.left)) >= 0.002:
+            self._figure.subplots_adjust(
+                left=bounded_left,
+                right=0.985,
+                bottom=0.16,
+                top=0.965,
+            )
 
     @staticmethod
     def _finite_range(values: np.ndarray) -> Optional[tuple[float, float]]:
@@ -163,6 +197,7 @@ class IrisGainPlotMixin:
         if self._axes is None or self._canvas is None:
             return
         self._autoscale_visible_series()
+        self._apply_plot_layout()
         self._canvas.draw_idle()
 
     def _show_all_curves(self) -> None:
@@ -702,6 +737,7 @@ class IrisGainPlotMixin:
         self._axes.set_xlim(x0, x1)
         self._axes.set_ylim(y0, y1)
         self._hide_hover_annotation()
+        self._apply_plot_layout()
         self._canvas.draw_idle()
 
     def _on_plot_motion(self, event: object) -> None:
@@ -721,6 +757,7 @@ class IrisGainPlotMixin:
             self._axes.set_xlim(start_xlim[0] - delta_x, start_xlim[1] - delta_x)
             self._axes.set_ylim(start_ylim[0] - delta_y, start_ylim[1] - delta_y)
             self._hide_hover_annotation()
+            self._apply_plot_layout()
             self._canvas.draw_idle()
             return
 

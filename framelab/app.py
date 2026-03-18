@@ -48,6 +48,8 @@ def main() -> int:
         manifests,
         selected_plugin_ids=selected_ids,
     )
+    apply_app_identity(app, selector)
+    QTimer.singleShot(0, lambda: apply_app_identity(app, selector))
     if selector.exec() != qtw.QDialog.Accepted:
         return 0
 

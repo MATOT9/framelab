@@ -465,10 +465,6 @@ class InspectPageMixin:
         hist_layout.setSpacing(6)
 
         self.histogram_widget = HistogramWidget()
-        self.histogram_widget.setContextMenuPolicy(Qt.CustomContextMenu)
-        self.histogram_widget.customContextMenuRequested.connect(
-            self._show_preview_context_menu,
-        )
         hist_layout.addWidget(self.histogram_widget, 1)
 
         self.preview_pages.addTab(image_page, "Image")
@@ -655,6 +651,7 @@ class InspectPageMixin:
             self.image_preview.set_intensity_image(None)
         if hasattr(self, "_apply_dynamic_visibility_policy"):
             self._apply_dynamic_visibility_policy()
+        self._refresh_workspace_document_dirty_state()
 
     def _set_rounding_mode(self, mode: str) -> None:
         """Update scientific rounding mode from compact display controls."""
@@ -674,6 +671,7 @@ class InspectPageMixin:
             self._display_image(dataset.selected_index)
         self._invalidate_analysis_context(refresh_visible_plugin=True)
         self._sync_measure_display_menu_state()
+        self._refresh_workspace_document_dirty_state()
 
     def _normalization_scale(self) -> float:
         """Return positive intensity scale used for 0-1 normalization."""
@@ -806,6 +804,7 @@ class InspectPageMixin:
         self._invalidate_analysis_context(refresh_visible_plugin=True)
         self._sync_measure_display_menu_state()
         self._refresh_measure_header_state()
+        self._refresh_workspace_document_dirty_state()
 
     def _background_config_snapshot(self) -> BackgroundConfig:
         """Return immutable snapshot used by background workers."""
@@ -1081,6 +1080,7 @@ class InspectPageMixin:
         background_config.source_mode = self._background_source_mode(mode)
         self._update_background_input_hint(mode=background_config.source_mode)
         self._update_background_status_label()
+        self._refresh_workspace_document_dirty_state()
         return background_config.source_mode
 
     def _on_background_enabled_toggled(self, enabled: bool) -> None:
@@ -1097,6 +1097,7 @@ class InspectPageMixin:
                 metrics.bg_unmatched_count = 0
                 self._apply_live_update()
             self._update_background_status_label()
+            self._refresh_workspace_document_dirty_state()
             self._set_status()
             return
 
@@ -1111,6 +1112,7 @@ class InspectPageMixin:
                 metrics.bg_total_count - np.count_nonzero(metrics.bg_applied_mask),
             )
         self._update_background_status_label()
+        self._refresh_workspace_document_dirty_state()
         self._set_status()
 
     def _browse_background_source(
@@ -1148,6 +1150,7 @@ class InspectPageMixin:
             target = getattr(self, "background_path_edit", None)
             if isinstance(target, qtw.QLineEdit):
                 target.setText(selected[0])
+            self._refresh_workspace_document_dirty_state()
             return selected[0]
 
         dialog = qtw.QFileDialog(dialog_parent, "Select background TIFF", initial)
@@ -1168,9 +1171,15 @@ class InspectPageMixin:
         target = getattr(self, "background_path_edit", None)
         if isinstance(target, qtw.QLineEdit):
             target.setText(selected[0])
+        self._refresh_workspace_document_dirty_state()
         return selected[0]
 
-    def _load_single_background_reference(self, source_path: Path) -> bool:
+    def _load_single_background_reference(
+        self,
+        source_path: Path,
+        *,
+        quiet: bool = False,
+    ) -> bool:
         """Load one TIFF as global background reference."""
         metrics = self.metrics_state
         if not source_path.is_file():
@@ -1185,10 +1194,11 @@ class InspectPageMixin:
                     ],
                     replace_stage="background",
                 )
-            self._show_error(
-                "Invalid background file",
-                "Select a valid TIFF file.",
-            )
+            if not quiet:
+                self._show_error(
+                    "Invalid background file",
+                    "Select a valid TIFF file.",
+                )
             return False
         try:
             ref_image = self._read_2d_image(source_path).astype(
@@ -1207,10 +1217,11 @@ class InspectPageMixin:
                     ],
                     replace_stage="background",
                 )
-            self._show_error(
-                "Background load failed",
-                f"Could not read background TIFF:\n{exc}",
-            )
+            if not quiet:
+                self._show_error(
+                    "Background load failed",
+                    f"Could not read background TIFF:\n{exc}",
+                )
             return False
         metrics.background_library = BackgroundLibrary(
             global_ref=freeze_background_array(ref_image),
@@ -1220,22 +1231,29 @@ class InspectPageMixin:
             self._record_processing_failures([], replace_stage="background")
         return True
 
-    def _load_folder_background_references(self, folder: Path) -> bool:
+    def _load_folder_background_references(
+        self,
+        folder: Path,
+        *,
+        quiet: bool = False,
+    ) -> bool:
         """Load folder-based per-exposure background references."""
         metrics = self.metrics_state
         if not folder.is_dir():
-            self._show_error(
-                "Invalid background folder",
-                "Select a valid folder containing TIFF files.",
-            )
+            if not quiet:
+                self._show_error(
+                    "Invalid background folder",
+                    "Select a valid folder containing TIFF files.",
+                )
             return False
 
         files = self._find_tiffs(folder, apply_skip_patterns=False)
         if not files:
-            self._show_error(
-                "No TIFF files",
-                "No TIFF background files were found in this folder.",
-            )
+            if not quiet:
+                self._show_error(
+                    "No TIFF files",
+                    "No TIFF background files were found in this folder.",
+                )
             return False
 
         grouped: dict[float, list[np.ndarray]] = {}
@@ -1310,7 +1328,8 @@ class InspectPageMixin:
             message = (
                 "No valid exposure-matched background references found."
             )
-            self._show_error("Background load failed", message)
+            if not quiet:
+                self._show_error("Background load failed", message)
             return False
 
         refs_by_exposure: dict[float, np.ndarray] = {}
@@ -1348,6 +1367,7 @@ class InspectPageMixin:
         *,
         source_text: str | None = None,
         mode: object | None = None,
+        quiet: bool = False,
     ) -> bool:
         """Load background reference(s) from one selected source path."""
         dataset = self.dataset_state
@@ -1358,10 +1378,11 @@ class InspectPageMixin:
                 source_text = candidate.text().strip()
         source_text = (source_text or "").strip()
         if not source_text:
-            self._show_error(
-                "Missing background source",
-                "Choose a background file or folder first.",
-            )
+            if not quiet:
+                self._show_error(
+                    "Missing background source",
+                    "Choose a background file or folder first.",
+                )
             return False
 
         source_path = Path(source_text).expanduser()
@@ -1370,9 +1391,15 @@ class InspectPageMixin:
         metrics.background_config.source_mode = resolved_mode
 
         if resolved_mode == "folder_library":
-            loaded = self._load_folder_background_references(source_path)
+            loaded = self._load_folder_background_references(
+                source_path,
+                quiet=quiet,
+            )
         else:
-            loaded = self._load_single_background_reference(source_path)
+            loaded = self._load_single_background_reference(
+                source_path,
+                quiet=quiet,
+            )
 
         if not loaded:
             self._update_background_status_label()
@@ -1389,6 +1416,7 @@ class InspectPageMixin:
                     self._display_image(dataset.selected_index)
         else:
             self._update_background_status_label()
+        self._refresh_workspace_document_dirty_state()
         self._set_status("Background reference loaded")
         return True
 
@@ -1409,6 +1437,7 @@ class InspectPageMixin:
             elif dataset.selected_index is not None:
                 self._display_image(dataset.selected_index)
         self._update_background_status_label("cleared")
+        self._refresh_workspace_document_dirty_state()
         self._set_status("Background reference cleared")
 
     def _update_measure_contextual_controls_visibility(self) -> None:

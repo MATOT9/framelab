@@ -11,6 +11,7 @@ from tifffile import imwrite
 
 import framelab.acquisition_authoring_dialog as acquisition_authoring_dialog_module
 import framelab.window as window_module
+from framelab.dock_title_bar import should_use_custom_dock_title_bar
 from framelab.ui_settings import UiStateSnapshot, UiStateStore
 from framelab.workflow_explorer_dock import WorkflowExplorerDock
 
@@ -207,8 +208,11 @@ def test_workflow_explorer_dock_selection_updates_active_scope(
     assert dock.features() & qtw.QDockWidget.DockWidgetFloatable
     assert dock.allowedAreas() == Qt.AllDockWidgetAreas
     assert not dock.windowIcon().isNull()
-    assert dock.titleBarWidget() is not None
-    assert dock.titleBarWidget().objectName() == "DockTitleBar"
+    if should_use_custom_dock_title_bar():
+        assert dock.titleBarWidget() is not None
+        assert dock.titleBarWidget().objectName() == "DockTitleBar"
+    else:
+        assert dock.titleBarWidget() is None
     assert dock._tree.header().sectionResizeMode(0) == qtw.QHeaderView.Interactive
 
     item = dock._item_by_node_id[acquisition_node_id]

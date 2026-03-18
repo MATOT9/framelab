@@ -41,11 +41,11 @@ The main shell is a tabbed workflow:
 
 The Analyze tab is conditional. It is only shown when at least one analysis plugin has been loaded. Around those tabs, the shell now also owns:
 
-- a compact workflow breadcrumb/path bar above the tabs
 - a left **Workflow Explorer** dock for active-node selection and session-structure authoring
+- a compact workflow breadcrumb/path bar above the tabs that acts as a fallback-only context strip when the explorer is hidden
 - a right **Metadata Inspector** dock for node-metadata editing and provenance review
 
-The explorer intentionally carries a small active-lineage rail so the current path reads as structure, not just as another badge row. The metadata inspector keeps provenance compact through source badges plus a source-node column instead of large explanation-heavy panels. This is an important UI policy detail: tab visibility is partly derived from plugin availability, not only from hard-coded shell structure.
+The explorer is the primary workflow context surface. The breadcrumb row is intentionally subordinate to it and should stay hidden while the explorer dock is visible. The explorer intentionally carries a small active-lineage rail so the current path reads as structure, not just as another badge row. The metadata inspector keeps provenance compact through source badges plus a source-node column instead of large explanation-heavy panels. This is an important UI policy detail: tab visibility is partly derived from plugin availability, not only from hard-coded shell structure.
 
 ## Mixin responsibilities
 
@@ -56,7 +56,8 @@ This mixin owns shell-level UI concerns:
 - menu bar
 - toolbar
 - status bar
-- workflow breadcrumb row
+- Workflow Explorer toggle affordances and shortcut wiring
+- workflow breadcrumb fallback row
 - workflow and metadata dock construction
 - theme application
 - Help menu actions

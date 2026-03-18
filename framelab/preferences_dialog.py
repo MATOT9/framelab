@@ -9,7 +9,7 @@ from PySide6.QtCore import Qt, Signal
 
 from .ui_primitives import build_page_header
 from .ui_settings import DensityMode, UiPreferences, UiStateSnapshot
-from .window_drag import configure_secondary_window
+from .window_drag import apply_secondary_window_geometry, configure_secondary_window
 
 
 class PreferencesDialog(qtw.QDialog):
@@ -26,7 +26,6 @@ class PreferencesDialog(qtw.QDialog):
         self.setWindowTitle("Preferences")
         configure_secondary_window(self)
         self.setModal(True)
-        self.resize(760, 520)
         self.setMinimumSize(680, 460)
 
         self._initial_preferences = replace(state_snapshot.preferences)
@@ -130,6 +129,11 @@ class PreferencesDialog(qtw.QDialog):
         self._set_preferences(self._initial_preferences)
         self._connect_live_preview_controls()
         self._nav_list.setCurrentRow(0)
+        apply_secondary_window_geometry(
+            self,
+            preferred_size=(760, 520),
+            host_window=parent,
+        )
 
     def current_preferences(self) -> UiPreferences:
         """Return the current preference selections."""

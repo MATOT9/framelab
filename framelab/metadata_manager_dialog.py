@@ -6,7 +6,7 @@ from PySide6 import QtWidgets as qtw
 from PySide6.QtCore import Qt
 
 from .metadata_inspector_panel import MetadataInspectorPanel
-from .window_drag import configure_secondary_window
+from .window_drag import apply_secondary_window_geometry, configure_secondary_window
 
 
 class MetadataManagerDialog(qtw.QDialog):
@@ -21,7 +21,6 @@ class MetadataManagerDialog(qtw.QDialog):
         self.setModal(False)
         self.setWindowModality(Qt.NonModal)
         self.setAttribute(Qt.WA_DeleteOnClose, True)
-        self.resize(1180, 760)
         self.setMinimumSize(980, 640)
 
         layout = qtw.QVBoxLayout(self)
@@ -74,6 +73,11 @@ class MetadataManagerDialog(qtw.QDialog):
         self._remove_selected_local_rows = self._panel._remove_selected_local_rows
         self._collect_local_metadata = self._panel._collect_local_metadata
         self._save_local_metadata = self._panel._save_local_metadata
+        apply_secondary_window_geometry(
+            self,
+            preferred_size=(1180, 760),
+            host_window=host_window,
+        )
 
     def sync_from_host(self) -> None:
         """Refresh effective and local metadata from the active workflow node."""

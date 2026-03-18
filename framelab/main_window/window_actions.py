@@ -23,6 +23,52 @@ from ..window_drag import configure_secondary_window
 class WindowActionsMixin:
     """Window-level actions that do not belong to a single page builder."""
 
+    def _apply_roi_rect_to_current_dataset(
+        self,
+        rect: tuple[int, int, int, int] | object,
+        *,
+        status_message: str | None = None,
+    ) -> bool:
+        """Validate and apply one ROI rectangle to the current dataset state."""
+
+        metrics = self.metrics_state
+        dataset = self.dataset_state
+        if not self._has_loaded_data():
+            return False
+        if not isinstance(rect, tuple) or len(rect) != 4:
+            return False
+
+        idx = dataset.selected_index if dataset.selected_index is not None else 0
+        metric_img, _bg_applied = self._get_metric_image_by_index(idx)
+        if metric_img is None or metric_img.ndim != 2:
+            return False
+
+        img_h, img_w = int(metric_img.shape[0]), int(metric_img.shape[1])
+        try:
+            x0, y0, x1, y1 = (int(value) for value in rect)
+        except (TypeError, ValueError):
+            return False
+        if not (0 <= x0 < x1 <= img_w and 0 <= y0 < y1 <= img_h):
+            return False
+
+        metrics.roi_rect = (x0, y0, x1, y1)
+        self.image_preview.set_roi_rect(metrics.roi_rect)
+        self._reset_roi_metrics()
+
+        if dataset.selected_index is not None:
+            roi_mean, roi_std, roi_sem = self._compute_roi_stats_for_index(
+                dataset.selected_index,
+            )
+            metrics.roi_means[dataset.selected_index] = roi_mean
+            metrics.roi_stds[dataset.selected_index] = roi_std
+            metrics.roi_sems[dataset.selected_index] = roi_sem
+
+        self._update_average_controls()
+        self._refresh_table()
+        self._refresh_workspace_document_dirty_state()
+        self._set_status(status_message)
+        return True
+
     def _build_processing_failure_banner(self, page_label: str) -> qtw.QWidget:
         """Build a compact warning banner for aggregated processing issues."""
         banner = qtw.QFrame()
@@ -301,21 +347,10 @@ class WindowActionsMixin:
             )
             return
 
-        metrics.roi_rect = rect
-        self.image_preview.set_roi_rect(metrics.roi_rect)
-        self._reset_roi_metrics()
-
-        if dataset.selected_index is not None:
-            roi_mean, roi_std, roi_sem = self._compute_roi_stats_for_index(
-                dataset.selected_index,
-            )
-            metrics.roi_means[dataset.selected_index] = roi_mean
-            metrics.roi_stds[dataset.selected_index] = roi_std
-            metrics.roi_sems[dataset.selected_index] = roi_sem
-
-        self._update_average_controls()
-        self._refresh_table()
-        self._set_status(f"Loaded ROI from {path.name}")
+        self._apply_roi_rect_to_current_dataset(
+            rect,
+            status_message=f"Loaded ROI from {path.name}",
+        )
 
     def _clear_roi(self) -> None:
         """Clear current ROI state and ROI-derived metrics."""
@@ -325,6 +360,7 @@ class WindowActionsMixin:
         self._update_average_controls()
         if self._has_loaded_data():
             self._refresh_table()
+        self._refresh_workspace_document_dirty_state()
         self._set_status("ROI cleared")
 
     def _set_status(self, warning: str | None = None) -> None:
@@ -539,6 +575,14 @@ class WindowActionsMixin:
 
     def closeEvent(self, event) -> None:  # type: ignore[override]
         """Ensure background threads are stopped before window closes."""
+        maybe_save = getattr(
+            self,
+            "_maybe_save_workspace_document_before_destructive_action",
+            None,
+        )
+        if callable(maybe_save) and not maybe_save():
+            event.ignore()
+            return
         if hasattr(self, "_save_ui_state"):
             try:
                 self._save_ui_state()

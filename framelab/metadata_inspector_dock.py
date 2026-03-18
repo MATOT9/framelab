@@ -5,7 +5,7 @@ from __future__ import annotations
 from PySide6 import QtWidgets as qtw
 from PySide6.QtCore import Qt
 
-from .dock_title_bar import DockTitleBar
+from .dock_title_bar import DockTitleBar, should_use_custom_dock_title_bar
 from .metadata_inspector_panel import MetadataInspectorPanel
 from .ui_density import DensityTokens, comfortable_density_tokens
 
@@ -28,11 +28,14 @@ class MetadataInspectorDock(qtw.QDockWidget):
             | qtw.QDockWidget.DockWidgetMovable
             | qtw.QDockWidget.DockWidgetFloatable,
         )
-        if not host_window.windowIcon().isNull():
-            self.setWindowIcon(host_window.windowIcon())
+        window_icon = host_window.windowIcon()
+        if window_icon.isNull():
+            window_icon = self.style().standardIcon(qtw.QStyle.SP_FileDialogDetailedView)
+        self.setWindowIcon(window_icon)
         self.setAttribute(Qt.WA_StyledBackground, True)
         self.setAutoFillBackground(True)
-        self.setTitleBarWidget(DockTitleBar(self))
+        if should_use_custom_dock_title_bar():
+            self.setTitleBarWidget(DockTitleBar(self))
 
         self._panel = MetadataInspectorPanel(
             host_window,

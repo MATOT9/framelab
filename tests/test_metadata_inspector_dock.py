@@ -8,6 +8,7 @@ import pytest
 import framelab.window as window_module
 from PySide6 import QtWidgets as qtw
 from PySide6.QtCore import Qt
+from framelab.dock_title_bar import should_use_custom_dock_title_bar
 from framelab.metadata_inspector_dock import MetadataInspectorDock
 from framelab.node_metadata import load_nodecard, save_nodecard
 from framelab.ui_settings import UiStateSnapshot, UiStateStore
@@ -119,8 +120,11 @@ def test_metadata_inspector_dock_displays_effective_and_local_metadata(
     assert dock.features() & qtw.QDockWidget.DockWidgetFloatable
     assert dock.allowedAreas() == Qt.AllDockWidgetAreas
     assert not dock.windowIcon().isNull()
-    assert dock.titleBarWidget() is not None
-    assert dock.titleBarWidget().objectName() == "DockTitleBar"
+    if should_use_custom_dock_title_bar():
+        assert dock.titleBarWidget() is not None
+        assert dock.titleBarWidget().objectName() == "DockTitleBar"
+    else:
+        assert dock.titleBarWidget() is None
     assert dock.widget().objectName() == "MetadataInspectorDockContent"
 
     exposure_row = _row_for_key(dock._effective_table, "camera_settings.exposure_us")

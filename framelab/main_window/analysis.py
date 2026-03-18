@@ -261,6 +261,7 @@ class AnalysisPageMixin:
         self._populate_plugins_menu_entries()
         self._apply_dynamic_visibility_policy()
         self._refresh_analysis_summary()
+        self._refresh_workspace_document_dirty_state()
 
     def _current_analysis_plugin(self) -> Optional[AnalysisPlugin]:
         """Return currently selected analysis plugin instance, if available."""
@@ -462,11 +463,11 @@ class AnalysisPageMixin:
             return True
         left_ratio = int(sizes[0]) / total
         right_ratio = int(sizes[1]) / total
-        return left_ratio < 0.4 or right_ratio < 0.4
+        return left_ratio < 0.25 or right_ratio < 0.25
 
     @staticmethod
     def _set_equal_analysis_workspace_split(splitter: object | None) -> None:
-        """Set the Analysis table/plot workspace to an equal-width split."""
+        """Set the Analysis table/plot workspace to a plot-favored split."""
 
         if splitter is None or not hasattr(splitter, "setSizes") or not hasattr(
             splitter,
@@ -475,10 +476,10 @@ class AnalysisPageMixin:
             return
         total_width = max(int(splitter.size().width()), 0)
         if total_width > 0:
-            left_width = max(total_width // 2, 1)
+            left_width = max(int(total_width * 0.32), 1)
             splitter.setSizes([left_width, max(total_width - left_width, 1)])
             return
-        splitter.setSizes([1, 1])
+        splitter.setSizes([1, 2])
 
     def _sync_analysis_host_views(self, index: int) -> None:
         """Keep analysis side-rail and workspace stacks aligned."""

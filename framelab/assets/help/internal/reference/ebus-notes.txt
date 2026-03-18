@@ -1,0 +1,1 @@
+The file name of the saved image or video files contains the image index and the image timestamp. The timestamp reflects the number of milliseconds that have elapsed since the computer was started.

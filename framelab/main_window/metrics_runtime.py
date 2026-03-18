@@ -717,6 +717,7 @@ class MetricsRuntimeMixin:
 
         self.metrics_state.apply_roi_result(result)
         self._refresh_table()
+        self._refresh_workspace_document_dirty_state()
         self._set_status("ROI applied to all images")
 
     def _on_roi_apply_cancelled(self, job_id: int) -> None:
@@ -774,6 +775,7 @@ class MetricsRuntimeMixin:
         """Apply UI-driven metric settings to the loaded dataset."""
         if not self._has_loaded_data():
             self._update_average_controls()
+            self._refresh_workspace_document_dirty_state()
             self._set_status()
             return
 
@@ -790,6 +792,7 @@ class MetricsRuntimeMixin:
             refresh_analysis=True,
         )
         self._update_average_controls()
+        self._refresh_workspace_document_dirty_state()
         self._set_status()
 
     def _apply_threshold_update(self) -> None:
@@ -801,6 +804,7 @@ class MetricsRuntimeMixin:
 
         if not self._has_loaded_data():
             self._update_average_controls()
+            self._refresh_workspace_document_dirty_state()
             self._set_status()
             return
 
@@ -810,6 +814,7 @@ class MetricsRuntimeMixin:
                 and 0 <= self.dataset_state.selected_index < self.dataset_state.path_count()
             ):
                 self._display_image(self.dataset_state.selected_index)
+            self._refresh_workspace_document_dirty_state()
             self._set_status()
             return
 
@@ -823,6 +828,7 @@ class MetricsRuntimeMixin:
             and 0 <= self.dataset_state.selected_index < self.dataset_state.path_count()
         ):
             self._display_image(self.dataset_state.selected_index)
+        self._refresh_workspace_document_dirty_state()
         self._set_status("Updating saturation counts")
 
     def _refresh_table(self, *, update_analysis: bool = True) -> None:
@@ -963,6 +969,7 @@ class MetricsRuntimeMixin:
         self._pause_preview_updates = False
         dataset.set_selected_index(row, path_count=dataset.path_count())
         self._display_image(row)
+        self._refresh_workspace_document_dirty_state()
 
     def _display_image(self, idx: int) -> None:
         """Refresh image preview, histogram, and info text for a row."""
@@ -1160,31 +1167,11 @@ class MetricsRuntimeMixin:
 
     def _on_roi_selected(self, rect: object) -> None:
         """Store current ROI selection and refresh ROI metrics."""
-        selected_index = self.dataset_state.selected_index
-        if not self._has_loaded_data() or selected_index is None:
+        if not self._has_loaded_data() or self.dataset_state.selected_index is None:
             return
         if self._current_average_mode() != "roi":
             return
-        if not isinstance(rect, tuple) or len(rect) != 4:
-            return
-
-        metrics = self.metrics_state
-        metrics.roi_rect = (
-            int(rect[0]),
-            int(rect[1]),
-            int(rect[2]),
-            int(rect[3]),
-        )
-        self._reset_roi_metrics()
-        roi_mean, roi_std, roi_sem = self._compute_roi_stats_for_index(
-            selected_index,
-        )
-        metrics.roi_means[selected_index] = roi_mean
-        metrics.roi_stds[selected_index] = roi_std
-        metrics.roi_sems[selected_index] = roi_sem
-        self._update_average_controls()
-        self._refresh_table()
-        self._set_status()
+        self._apply_roi_rect_to_current_dataset(rect, status_message=None)
 
     def _apply_roi_to_all_images(self) -> None:
         """Start ROI propagation across all loaded images."""

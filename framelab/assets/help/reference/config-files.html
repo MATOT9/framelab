@@ -809,13 +809,6 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#configconfigini" class="md-nav__link">
-    config/config.ini
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#configplugin_selectionjson" class="md-nav__link">
     config/plugin_selection.json
   </a>
@@ -1083,13 +1076,6 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#configconfigini" class="md-nav__link">
-    config/config.ini
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#configplugin_selectionjson" class="md-nav__link">
     config/plugin_selection.json
   </a>
@@ -1227,16 +1213,10 @@
 </thead>
 <tbody>
 <tr>
-<td><code>config/config.ini</code></td>
-<td>Yes</td>
-<td>user or app</td>
-<td>Persistent scan settings, currently used for skip-pattern storage</td>
-</tr>
-<tr>
 <td><code>config/ui_state.ini</code></td>
 <td>Yes</td>
 <td>app</td>
-<td>Persisted UI state such as workflow selection, dock visibility, panel state, and splitter positions</td>
+<td>Persisted UI state such as workflow selection, dock visibility, panel state, splitter positions, and skip-pattern scan rules</td>
 </tr>
 <tr>
 <td><code>config/plugin_selection.json</code></td>
@@ -1283,18 +1263,6 @@
 </tbody>
 </table>
 <h2 id="file-details">File details<a class="headerlink" href="#file-details" title="Permanent link">&para;</a></h2>
-<h3 id="configconfigini"><code>config/config.ini</code><a class="headerlink" href="#configconfigini" title="Permanent link">&para;</a></h3>
-<p>This file stores persistent scan settings in INI format. Current use:</p>
-<ul>
-<li>skip-pattern persistence for dataset scanning</li>
-</ul>
-<p>Important notes:</p>
-<ul>
-<li>the file is created when settings are first saved</li>
-<li>missing files are acceptable; defaults are used until saved</li>
-<li>legacy config files may be migrated into the local <code>config/</code> directory when the current file is missing</li>
-<li>editing while the app is closed is acceptable if valid INI syntax is preserved</li>
-</ul>
 <h3 id="configplugin_selectionjson"><code>config/plugin_selection.json</code><a class="headerlink" href="#configplugin_selectionjson" title="Permanent link">&para;</a></h3>
 <p>This file stores the enabled plugin ids chosen in the startup selector. Payload characteristics:</p>
 <ul>
@@ -1316,11 +1284,12 @@
 <li>recent workflow entries</li>
 <li>dock visibility and panel disclosure state</li>
 <li>splitter positions for workflow, analysis, and metadata surfaces</li>
+<li>skip-pattern persistence for dataset scanning</li>
 </ul>
 <p>Important notes:</p>
 <ul>
 <li>the file is created when UI state is first saved</li>
-<li>it is intentionally separate from <code>config.ini</code> so tracked shareable config is not polluted by per-user runtime state</li>
+<li>limited legacy config migration may still pull older skip-rule settings into this file when the current file is missing</li>
 <li>deleting it is safe; the app will recreate it from defaults</li>
 </ul>
 <h3 id="configacquisition_field_mappingjson"><code>config/acquisition_field_mapping.json</code><a class="headerlink" href="#configacquisition_field_mappingjson" title="Permanent link">&para;</a></h3>
@@ -1443,11 +1412,11 @@
 <li>app-side eBUS override values live in the datacard JSON, not in the raw <code>.pvcfg</code> file</li>
 </ul>
 <h2 id="migration-and-fallback-behavior">Migration and fallback behavior<a class="headerlink" href="#migration-and-fallback-behavior" title="Permanent link">&para;</a></h2>
-<p>The app uses local <code>config/</code> paths as the primary runtime location. When a current file is missing, the app may attempt limited migration from legacy locations before falling back to defaults. This is primarily intended to preserve older skip settings, plugin-selection state, and mapping files after the configuration model was moved into the app/project folder.</p>
+<p>The app uses local <code>config/</code> paths as the primary runtime location. When a current file is missing, the app may attempt limited migration from legacy locations before falling back to defaults. This is primarily intended to preserve older UI-state and skip settings, plugin-selection state, and mapping files after the configuration model was moved into the app/project folder.</p>
 <h2 id="manual-edit-guidance">Manual-edit guidance<a class="headerlink" href="#manual-edit-guidance" title="Permanent link">&para;</a></h2>
 <p>General guidance:</p>
 <ul>
-<li>safe to edit while the app is closed: <code>config.ini</code>, <code>ui_state.ini</code>, <code>plugin_selection.json</code>, <code>acquisition_field_mapping.json</code>, <code>ebus_parameter_catalog.json</code>, <code>workflow_metadata_governance.json</code></li>
+<li>safe to edit while the app is closed: <code>ui_state.ini</code>, <code>plugin_selection.json</code>, <code>acquisition_field_mapping.json</code>, <code>ebus_parameter_catalog.json</code>, <code>workflow_metadata_governance.json</code></li>
 <li>safe to edit while the app is closed when you intentionally manage dataset metadata: <code>.framelab/nodecard.json</code>, <code>campaign_datacard.json</code>, <code>session_datacard.json</code>, <code>acquisition_datacard.json</code></li>
 <li>not intended for routine runtime editing: bundled asset files under <code>framelab/assets/</code></li>
 <li>if a file becomes invalid, the app will usually fall back to defaults rather than partially trusting malformed content</li>

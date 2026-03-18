@@ -61,6 +61,7 @@ class DatasetLoadingMixin:
             self.image_preview.set_roi_rect(None)
             self.image_preview.reset_view()
         self._refresh_table()
+        self._refresh_workspace_document_dirty_state()
         self._set_status()
 
     def browse_folder(self) -> None:
@@ -569,6 +570,7 @@ class DatasetLoadingMixin:
         self._apply_live_update()
         self._update_background_status_label()
         self._apply_dynamic_visibility_policy()
+        self._refresh_workspace_document_dirty_state()
 
     def _compute_static_stats(
         self,

@@ -2,6 +2,8 @@
 
 The app keeps its shareable runtime configuration in the project/app folder under `config/`. This page documents the file locations, ownership model, and runtime role of each configuration file.
 
+FrameLab also supports user-created workspace documents with the `.framelab` extension. Those files are not part of the automatic `config/` directory, but they matter here because they complement `ui_state.ini`: `ui_state.ini` keeps app-level defaults and recents, while `.framelab` files capture one reopenable working session.
+
 ## Main configuration files
 
 | File | Created automatically | Intended editor | Purpose |
@@ -45,8 +47,26 @@ This file stores host-window UI state in INI format. Current use:
 Important notes:
 
 - the file is created when UI state is first saved
+- this file stores app-level defaults and last-session convenience state, not the full reopenable session document
+- workflow, scan root, ROI, background source, selection, and page state can instead be saved explicitly into a user-managed `.framelab` workspace file from the File menu
 - limited legacy config migration may still pull older skip-rule settings into this file when the current file is missing
 - deleting it is safe; the app will recreate it from defaults
+
+### `*.framelab`
+
+Workspace document created explicitly by the user from the File menu. Current runtime role:
+
+- restores workflow context and active node
+- restores the scanned dataset root and selected image
+- restores Measure-page state such as threshold, average mode, ROI, and background source
+- restores page/plugin selection, preview visibility, dock disclosure, and splitter positions relevant to the current session
+
+Important notes:
+
+- this is a local reopen file, not a portable dataset bundle
+- paths are stored as filesystem paths and are expected to be valid on the same machine
+- the file is JSON-backed even though it uses the custom `.framelab` extension
+- global preferences such as theme and density still live in `config/ui_state.ini`
 
 ### `config/acquisition_field_mapping.json`
 

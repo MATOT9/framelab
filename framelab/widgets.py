@@ -16,6 +16,7 @@ try:
     from matplotlib.figure import Figure
     from matplotlib import pyplot as plt
     from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
+    from matplotlib.patches import Rectangle
 
     MATPLOTLIB_AVAILABLE = True
     try:
@@ -25,6 +26,7 @@ try:
 except Exception:
     FigureCanvasQTAgg = None  # type: ignore[assignment]
     Figure = None  # type: ignore[assignment]
+    Rectangle = None  # type: ignore[assignment]
     MATPLOTLIB_AVAILABLE = False
 
 
@@ -1092,6 +1094,19 @@ class HistogramWidget(qtw.QWidget):
         self._x_max = 1.0
         self._theme_mode = "light"
         self._pending_image: Optional[np.ndarray] = None
+        self._view_limits: Optional[tuple[float, float, float, float]] = None
+        self._is_plot_panning = False
+        self._is_plot_selecting = False
+        self._plot_pan_state: Optional[
+            tuple[
+                float,
+                float,
+                tuple[float, float],
+                tuple[float, float],
+            ]
+        ] = None
+        self._plot_select_state: Optional[tuple[float, float]] = None
+        self._selection_rect_artist = None
         self._exact_timer = QtCore.QTimer(self)
         self._exact_timer.setSingleShot(True)
         self._exact_timer.setInterval(self._EXACT_DEBOUNCE_MS)
@@ -1120,6 +1135,10 @@ class HistogramWidget(qtw.QWidget):
             )
             self._canvas = FigureCanvasQTAgg(self._figure)
             self._axes = self._figure.add_subplot(111)
+            self._canvas.mpl_connect("scroll_event", self._on_plot_scroll)
+            self._canvas.mpl_connect("button_press_event", self._on_plot_press)
+            self._canvas.mpl_connect("button_release_event", self._on_plot_release)
+            self._canvas.mpl_connect("motion_notify_event", self._on_plot_motion)
             layout.addWidget(self._canvas, 1)
         else:
             self._fallback_label = qtw.QLabel(
@@ -1155,6 +1174,12 @@ class HistogramWidget(qtw.QWidget):
         self._edges = None
         self._x_min = 0.0
         self._x_max = 1.0
+        self._view_limits = None
+        self._is_plot_panning = False
+        self._is_plot_selecting = False
+        self._plot_pan_state = None
+        self._plot_select_state = None
+        self._selection_rect_artist = None
         self._redraw()
 
     def set_image(self, image: np.ndarray, *, exact: bool = True) -> None:
@@ -1172,6 +1197,12 @@ class HistogramWidget(qtw.QWidget):
         if arr.ndim != 2 or arr.size == 0:
             self.clear_histogram()
             return
+        self._view_limits = None
+        self._is_plot_panning = False
+        self._is_plot_selecting = False
+        self._plot_pan_state = None
+        self._plot_select_state = None
+        self._selection_rect_artist = None
         if exact or arr.size <= self._APPROXIMATE_SAMPLE_LIMIT:
             self._exact_timer.stop()
             self._pending_image = None
@@ -1257,9 +1288,360 @@ class HistogramWidget(qtw.QWidget):
         self._x_max = float(range_max)
         self._redraw()
 
+    def reset_view(self) -> None:
+        """Reset histogram axes to the full current histogram extent."""
+
+        self._view_limits = None
+        self._clear_plot_selection_overlay()
+        self._redraw()
+
+    def zoom_to_x_range(
+        self,
+        range_min: float,
+        range_max: float,
+        *,
+        autoscale_y: bool = True,
+    ) -> bool:
+        """Zoom the histogram to one requested x-range."""
+
+        if self._counts is None or self._edges is None or self._axes is None:
+            return False
+        full_x0 = float(self._edges[0])
+        full_x1 = float(self._edges[-1])
+        if not np.isfinite(range_min) or not np.isfinite(range_max):
+            return False
+        x0 = max(full_x0, min(float(range_min), full_x1))
+        x1 = max(full_x0, min(float(range_max), full_x1))
+        if x1 <= x0:
+            span = max(1e-9, full_x1 - full_x0)
+            center = max(full_x0, min((x0 + x1) / 2.0, full_x1))
+            half = span * 0.01
+            x0 = max(full_x0, center - half)
+            x1 = min(full_x1, center + half)
+            if x1 <= x0:
+                x0 = full_x0
+                x1 = full_x1
+
+        current_limits = (
+            self._view_limits
+            if self._view_limits is not None
+            else self._full_view_limits()
+        )
+        y0 = current_limits[2]
+        y1 = current_limits[3]
+        if autoscale_y:
+            y0, y1 = self._visible_y_limits(x0, x1)
+        self._view_limits = (x0, x1, y0, y1)
+        self._apply_view_limits()
+        self._canvas.draw_idle()
+        return True
+
+    def zoom_to_view_rect(
+        self,
+        x0: float,
+        y0: float,
+        x1: float,
+        y1: float,
+    ) -> bool:
+        """Zoom the histogram to one rectangular selection in plot space."""
+
+        if self._counts is None or self._edges is None or self._axes is None:
+            return False
+        full_x0, full_x1, full_y0, full_y1 = self._full_view_limits()
+        left = max(full_x0, min(min(float(x0), float(x1)), full_x1))
+        right = max(full_x0, min(max(float(x0), float(x1)), full_x1))
+        bottom = max(full_y0, min(min(float(y0), float(y1)), full_y1))
+        top = max(full_y0, min(max(float(y0), float(y1)), full_y1))
+
+        if right <= left:
+            return False
+
+        min_y_span = max(1e-9, (full_y1 - full_y0) * 0.01)
+        if top - bottom < min_y_span:
+            bottom, top = self._visible_y_limits(left, right)
+
+        self._view_limits = (left, right, bottom, top)
+        self._apply_view_limits()
+        self._canvas.draw_idle()
+        return True
+
+    def _full_view_limits(self) -> tuple[float, float, float, float]:
+        if self._counts is None or self._edges is None:
+            return (0.0, 1.0, 0.0, 1.0)
+        y1 = float(np.max(self._counts)) if self._counts.size else 1.0
+        y1 = max(1.0, y1 * 1.08)
+        return (float(self._edges[0]), float(self._edges[-1]), 0.0, y1)
+
+    def _visible_y_limits(self, x0: float, x1: float) -> tuple[float, float]:
+        if self._counts is None or self._edges is None or self._counts.size == 0:
+            return (0.0, 1.0)
+        left_edges = self._edges[:-1]
+        right_edges = self._edges[1:]
+        mask = (left_edges < x1) & (right_edges > x0)
+        if not np.any(mask):
+            visible_max = float(np.max(self._counts))
+        else:
+            visible_max = float(np.max(self._counts[mask]))
+        return (0.0, max(1.0, visible_max * 1.08))
+
+    def _apply_view_limits(self) -> None:
+        if self._axes is None:
+            return
+        x0, x1, y0, y1 = (
+            self._view_limits
+            if self._view_limits is not None
+            else self._full_view_limits()
+        )
+        self._axes.set_xlim(x0, x1)
+        self._axes.set_ylim(y0, y1)
+
+    def _plot_spans(self) -> tuple[float, float]:
+        full_x0, full_x1, _full_y0, full_y1 = self._full_view_limits()
+        return (max(1e-9, full_x1 - full_x0), max(1e-9, full_y1))
+
+    def _remember_current_view_limits(self) -> None:
+        if self._axes is None:
+            return
+        xlim = tuple(self._axes.get_xlim())
+        ylim = tuple(self._axes.get_ylim())
+        self._view_limits = (
+            float(xlim[0]),
+            float(xlim[1]),
+            float(ylim[0]),
+            float(ylim[1]),
+        )
+
+    def _clamped_event_plot_point(self, event: object) -> Optional[tuple[float, float]]:
+        """Return plot-space event coordinates clamped to the axes bounds."""
+
+        if self._axes is None:
+            return None
+        x_data = getattr(event, "xdata", None)
+        y_data = getattr(event, "ydata", None)
+        if x_data is not None and y_data is not None:
+            return (float(x_data), float(y_data))
+
+        pixel_x = getattr(event, "x", None)
+        pixel_y = getattr(event, "y", None)
+        if pixel_x is None or pixel_y is None:
+            return None
+        try:
+            bbox = self._axes.bbox
+            clamped_x = min(max(float(pixel_x), float(bbox.x0)), float(bbox.x1))
+            clamped_y = min(max(float(pixel_y), float(bbox.y0)), float(bbox.y1))
+            data_x, data_y = self._axes.transData.inverted().transform(
+                (clamped_x, clamped_y),
+            )
+        except Exception:
+            return None
+        return (float(data_x), float(data_y))
+
+    def _show_plot_context_menu(self) -> None:
+        """Open right-click actions for histogram navigation."""
+
+        menu = qtw.QMenu(self)
+        reset_action = menu.addAction("Reset View")
+        chosen = self._exec_plot_context_menu(menu)
+        if chosen == reset_action:
+            self.reset_view()
+
+    def _exec_plot_context_menu(self, menu: qtw.QMenu) -> object | None:
+        """Execute the histogram context menu.
+
+        Split out for deterministic test patching around the blocking Qt call.
+        """
+
+        return menu.exec(QtGui.QCursor.pos())
+
+    def _on_plot_press(self, event: object) -> None:
+        """Handle reset, context menu, drag-zoom selection, and pan start."""
+
+        if self._axes is None or self._canvas is None:
+            return
+        if getattr(event, "inaxes", None) is not self._axes:
+            return
+        if bool(getattr(event, "dblclick", False)):
+            self.reset_view()
+            return
+        if getattr(event, "button", None) == 3:
+            self._show_plot_context_menu()
+            return
+        if getattr(event, "button", None) not in (1, 2):
+            return
+        x_data = getattr(event, "xdata", None)
+        y_data = getattr(event, "ydata", None)
+        if x_data is None or y_data is None:
+            return
+        if getattr(event, "button", None) == 1:
+            self._is_plot_selecting = True
+            self._plot_select_state = (float(x_data), float(y_data))
+            self._ensure_plot_selection_overlay(
+                float(x_data),
+                float(y_data),
+                float(x_data),
+                float(y_data),
+            )
+            self._canvas.setCursor(Qt.CrossCursor)
+            return
+        self._is_plot_panning = True
+        self._plot_pan_state = (
+            float(x_data),
+            float(y_data),
+            tuple(self._axes.get_xlim()),
+            tuple(self._axes.get_ylim()),
+        )
+        self._canvas.setCursor(Qt.ClosedHandCursor)
+
+    def _on_plot_release(self, event: object) -> None:
+        """Finish drag-pan mode or apply one zoom-selection rectangle."""
+
+        if self._canvas is None:
+            return
+        if self._is_plot_selecting and self._plot_select_state is not None:
+            start_x, start_y = self._plot_select_state
+            end_point = self._clamped_event_plot_point(event)
+            self._clear_plot_selection_overlay()
+            self._canvas.setCursor(Qt.ArrowCursor)
+            if end_point is not None:
+                self.zoom_to_view_rect(start_x, start_y, end_point[0], end_point[1])
+            return
+        self._is_plot_panning = False
+        self._plot_pan_state = None
+        self._canvas.setCursor(Qt.ArrowCursor)
+
+    def _on_plot_scroll(self, event: object) -> None:
+        """Zoom the histogram around the pointer location."""
+
+        if self._axes is None or self._canvas is None:
+            return
+        if getattr(event, "inaxes", None) is not self._axes:
+            return
+        x_data = getattr(event, "xdata", None)
+        y_data = getattr(event, "ydata", None)
+        if x_data is None or y_data is None:
+            return
+
+        xlim = tuple(self._axes.get_xlim())
+        ylim = tuple(self._axes.get_ylim())
+        if xlim[0] == xlim[1] or ylim[0] == ylim[1]:
+            return
+
+        button = str(getattr(event, "button", "up"))
+        zoom_scale = 0.92 if button == "up" else 1.08
+        x_span = float(xlim[1] - xlim[0])
+        y_span = float(ylim[1] - ylim[0])
+        x_ratio = (float(x_data) - float(xlim[0])) / x_span
+        y_ratio = (float(y_data) - float(ylim[0])) / y_span
+        data_x_span, data_y_span = self._plot_spans()
+
+        min_x_span = max(1e-9, data_x_span * 1e-6)
+        min_y_span = max(1e-9, data_y_span * 1e-6)
+        max_x_span = max(min_x_span * 10.0, data_x_span * 20.0)
+        max_y_span = max(min_y_span * 10.0, data_y_span * 20.0)
+
+        new_x_span = min(max(x_span * zoom_scale, min_x_span), max_x_span)
+        new_y_span = min(max(y_span * zoom_scale, min_y_span), max_y_span)
+        x0 = float(x_data) - x_ratio * new_x_span
+        x1 = x0 + new_x_span
+        y0 = max(0.0, float(y_data) - y_ratio * new_y_span)
+        y1 = y0 + new_y_span
+        self._axes.set_xlim(x0, x1)
+        self._axes.set_ylim(y0, y1)
+        self._remember_current_view_limits()
+        self._canvas.draw_idle()
+
+    def _on_plot_motion(self, event: object) -> None:
+        """Pan the histogram while dragging."""
+
+        if self._axes is None or self._canvas is None:
+            return
+        if self._is_plot_selecting and self._plot_select_state is not None:
+            current_point = self._clamped_event_plot_point(event)
+            if current_point is None:
+                return
+            start_x, start_y = self._plot_select_state
+            self._ensure_plot_selection_overlay(
+                start_x,
+                start_y,
+                current_point[0],
+                current_point[1],
+            )
+            self._canvas.draw_idle()
+            return
+        if (
+            not self._is_plot_panning
+            or self._plot_pan_state is None
+            or getattr(event, "inaxes", None) is not self._axes
+            or getattr(event, "xdata", None) is None
+            or getattr(event, "ydata", None) is None
+        ):
+            return
+
+        start_x, start_y, start_xlim, start_ylim = self._plot_pan_state
+        delta_x = float(getattr(event, "xdata")) - start_x
+        delta_y = float(getattr(event, "ydata")) - start_y
+        y0 = max(0.0, start_ylim[0] - delta_y)
+        y1 = y0 + float(start_ylim[1] - start_ylim[0])
+        self._axes.set_xlim(start_xlim[0] - delta_x, start_xlim[1] - delta_x)
+        self._axes.set_ylim(y0, y1)
+        self._remember_current_view_limits()
+        self._canvas.draw_idle()
+
+    def _clear_plot_selection_overlay(self) -> None:
+        """Remove the transient histogram zoom-selection overlay."""
+
+        artist = self._selection_rect_artist
+        self._selection_rect_artist = None
+        self._is_plot_selecting = False
+        self._plot_select_state = None
+        if artist is None:
+            return
+        try:
+            artist.remove()
+        except Exception:
+            pass
+
+    def _ensure_plot_selection_overlay(
+        self,
+        x0: float,
+        y0: float,
+        x1: float,
+        y1: float,
+    ) -> None:
+        """Create or update the transient histogram zoom-selection rectangle."""
+
+        if self._axes is None or Rectangle is None:
+            return
+        left = min(float(x0), float(x1))
+        bottom = min(float(y0), float(y1))
+        width = abs(float(x1) - float(x0))
+        height = abs(float(y1) - float(y0))
+        if self._selection_rect_artist is None:
+            edge = "#93c5fd" if self._theme_mode == "dark" else "#1d4ed8"
+            fill = "#60a5fa" if self._theme_mode == "dark" else "#3b82f6"
+            self._selection_rect_artist = Rectangle(
+                (left, bottom),
+                width,
+                height,
+                fill=True,
+                facecolor=fill,
+                edgecolor=edge,
+                linewidth=1.1,
+                linestyle="--",
+                alpha=0.18,
+            )
+            self._axes.add_patch(self._selection_rect_artist)
+            return
+        self._selection_rect_artist.set_xy((left, bottom))
+        self._selection_rect_artist.set_width(width)
+        self._selection_rect_artist.set_height(height)
+
     def _redraw(self) -> None:
         if self._axes is None or self._canvas is None or self._figure is None:
             return
+        self._is_plot_selecting = False
+        self._plot_select_state = None
+        self._selection_rect_artist = None
 
         if self._theme_mode == "dark":
             fig_bg = "#1f2937"
@@ -1281,6 +1663,12 @@ class HistogramWidget(qtw.QWidget):
         self._figure.patch.set_facecolor(fig_bg)
         self._figure.patch.set_edgecolor(fig_bg)
         ax.set_facecolor(axes_bg)
+        self._figure.subplots_adjust(
+            left=0.12,
+            right=0.985,
+            top=0.955,
+            bottom=0.16,
+        )
         if self._canvas is not None:
             self._canvas.setStyleSheet(
                 f"background-color: {fig_bg}; border: none;",
@@ -1325,5 +1713,6 @@ class HistogramWidget(qtw.QWidget):
                 linewidth=0.65,
             )
             ax.margins(x=0)
+            self._apply_view_limits()
 
         self._canvas.draw_idle()

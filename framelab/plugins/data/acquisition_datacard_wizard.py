@@ -37,7 +37,11 @@ from ...ui_primitives import (
     build_page_header,
     build_summary_strip,
 )
-from ...window_drag import configure_secondary_window
+from ...window_drag import (
+    apply_secondary_window_geometry,
+    configure_secondary_window,
+    place_secondary_window,
+)
 
 
 @dataclass(slots=True)
@@ -110,7 +114,6 @@ class AcquisitionDatacardWizardDialog(qtw.QDialog):
         self.setWindowTitle("Acquisition Datacard Wizard")
         configure_secondary_window(self, draggable=True)
         self.setModal(True)
-        self.resize(1120, 760)
         self.setMinimumSize(980, 640)
 
         self._mapping: FieldMapping = load_field_mapping()
@@ -177,6 +180,11 @@ class AcquisitionDatacardWizardDialog(qtw.QDialog):
             self._folder_edit.setText(initial_folder)
         self._load_target()
         self._refresh_wizard_header_state()
+        apply_secondary_window_geometry(
+            self,
+            preferred_size=(1120, 760),
+            host_window=host_window,
+        )
 
     def _field_spec_by_key(self) -> dict[str, FieldSpec]:
         return self._mapping.by_key()
@@ -881,11 +889,7 @@ class AcquisitionDatacardWizardDialog(qtw.QDialog):
         editor.viewport().setAutoFillBackground(True)
 
     def place_near_host(self, host_window: Optional[qtw.QWidget]) -> None:
-        if host_window is None or not host_window.isVisible():
-            return
-        host_geometry = host_window.frameGeometry()
-        target = host_geometry.center() - self.rect().center()
-        self.move(max(target.x(), 0), max(target.y(), 0))
+        place_secondary_window(self, host_window=host_window)
 
     @staticmethod
     def _set_collapsible_section_state(
@@ -2063,7 +2067,7 @@ class AcquisitionDatacardWizardPlugin:
         folder_edit = getattr(host_window, "folder_edit", None)
         if isinstance(folder_edit, qtw.QLineEdit):
             initial = folder_edit.text().strip()
-        dialog = AcquisitionDatacardWizardDialog(None, initial_folder=initial)
+        dialog = AcquisitionDatacardWizardDialog(host_window, initial_folder=initial)
         dialog.place_near_host(host_window)
         dialog.exec()
 

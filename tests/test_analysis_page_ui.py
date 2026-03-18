@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+import numpy as np
 import pytest
 from PySide6 import QtWidgets as qtw
 
+from framelab.plugins.analysis.iris_gain._shared import _CurveSeries
 from framelab.ui_settings import DensityMode
 from framelab.window import FrameLabWindow
 
@@ -161,7 +163,8 @@ def test_pathological_saved_workspace_split_is_rebalanced(
     restored_sizes = splitter.sizes()
 
     assert len(restored_sizes) == 2
-    assert abs(restored_sizes[0] - restored_sizes[1]) <= 1
+    assert restored_sizes[1] > restored_sizes[0]
+    assert not analysis_window._analysis_workspace_split_is_pathological(restored_sizes)
 
 
 def test_analysis_plot_hint_visibility_follows_density_policy(
@@ -179,6 +182,58 @@ def test_analysis_plot_hint_visibility_follows_density_policy(
     analysis_window._apply_ui_preferences(comfortable_prefs, persist=False)
     assert not plugin._plot_hint_label.isHidden()
 
+
+def test_analysis_plot_layout_expands_for_wide_y_tick_labels(
+    analysis_window: FrameLabWindow,
+    process_events,
+) -> None:
+    _show_analysis_page(analysis_window, process_events)
+    plugin = analysis_window._current_analysis_plugin()
+
+    assert plugin is not None
+
+    def _curve(values: list[float]) -> _CurveSeries:
+        return _CurveSeries(
+            curve_id=1,
+            label="Series A",
+            x_values=[1.0, 2.0, 3.0],
+            y_values=values,
+            std_values=[0.0, 0.0, 0.0],
+            sem_values=[0.0, 0.0, 0.0],
+            error_values=[0.0, 0.0, 0.0],
+            point_counts=[1, 1, 1],
+        )
+
+    plugin._update_plot([_curve([1.0, 2.0, 3.0])], "Exposure", "Mean Intensity", "off", [], False, "off")
+    plugin._axes.ticklabel_format(style="plain", axis="y", useOffset=False)
+    plugin._apply_plot_layout()
+    plugin._canvas.draw()
+    process_events()
+    compact_left = float(plugin._figure.subplotpars.left)
+
+    plugin._update_plot(
+        [_curve([1234567.0, 2345678.0, 3456789.0])],
+        "Exposure",
+        "Mean Intensity",
+        "off",
+        [],
+        False,
+        "off",
+    )
+    plugin._axes.ticklabel_format(style="plain", axis="y", useOffset=False)
+    plugin._apply_plot_layout()
+    plugin._canvas.draw()
+    process_events()
+
+    renderer = plugin._canvas.get_renderer()
+    tight_bbox = plugin._axes.get_tightbbox(renderer)
+    assert float(plugin._figure.subplotpars.left) > compact_left
+    assert float(tight_bbox.x0) >= -1.0
+
+    comfortable_prefs = replace(
+        analysis_window.ui_preferences,
+        density_mode=DensityMode.COMFORTABLE,
+    )
     compact_prefs = replace(
         analysis_window.ui_preferences,
         density_mode=DensityMode.COMPACT,

@@ -7,7 +7,7 @@ from PySide6.QtCore import QSignalBlocker
 
 from ..registry import register_page_plugin
 from ...ui_primitives import SummaryItem, build_page_header, build_summary_strip
-from ...window_drag import configure_secondary_window
+from ...window_drag import apply_secondary_window_geometry, configure_secondary_window
 
 
 class BackgroundCorrectionDialog(qtw.QDialog):
@@ -20,7 +20,6 @@ class BackgroundCorrectionDialog(qtw.QDialog):
         self.setWindowTitle("Background Correction")
         configure_secondary_window(self, draggable=True)
         self.setModal(True)
-        self.resize(900, 360)
         self.setMinimumSize(760, 320)
 
         layout = qtw.QVBoxLayout(self)
@@ -115,6 +114,11 @@ class BackgroundCorrectionDialog(qtw.QDialog):
         layout.addLayout(close_row)
 
         self._sync_from_host()
+        apply_secondary_window_geometry(
+            self,
+            preferred_size=(900, 360),
+            host_window=host_window,
+        )
 
     def _current_mode(self) -> str:
         """Return the current normalized source mode from the mode combo."""

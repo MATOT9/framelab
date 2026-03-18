@@ -7,7 +7,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from PySide6 import QtWidgets as qtw
+from PySide6 import QtGui, QtWidgets as qtw
 from tifffile import imwrite
 
 import framelab.main_window.data_page as data_page_module
@@ -335,6 +335,35 @@ def test_partial_workflow_shell_breadcrumb_shows_anchor_scope(
     assert window.dataset_state.scope_summary_value() == (
         "Acquisition: acq-0011__dark (Session subtree)"
     )
+
+
+def test_workflow_explorer_toggle_action_controls_fallback_breadcrumb(
+    framelab_window_factory,
+    process_events,
+) -> None:
+    window = framelab_window_factory(enabled_plugin_ids=())
+
+    assert not hasattr(window, "_workflow_context_select_button")
+    assert window.view_workflow_explorer_action is window.toolbar_workflow_explorer_action
+    assert (
+        window.view_workflow_explorer_action.shortcut().toString()
+        == QtGui.QKeySequence("Ctrl+Shift+W").toString()
+    )
+    assert window.view_workflow_explorer_action in window._main_toolbar.actions()
+    assert not window._workflow_explorer_dock.isHidden()
+    assert window._workflow_context_row.isHidden()
+
+    window.view_workflow_explorer_action.trigger()
+    process_events()
+
+    assert window._workflow_explorer_dock.isHidden()
+    assert not window._workflow_context_row.isHidden()
+
+    window.view_workflow_explorer_action.trigger()
+    process_events()
+
+    assert not window._workflow_explorer_dock.isHidden()
+    assert window._workflow_context_row.isHidden()
 
 
 def test_load_folder_uses_active_workflow_scope_and_resolves_entered_child_node(

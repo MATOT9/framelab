@@ -9,7 +9,7 @@ from PySide6.QtCore import Qt
 
 from .ui_primitives import ChipSpec, SummaryItem, build_page_header, build_summary_strip
 from .ui_settings import RecentWorkflowEntry
-from .window_drag import configure_secondary_window
+from .window_drag import apply_secondary_window_geometry, configure_secondary_window
 from .workflow import workflow_profile_by_id
 from .workflow_widgets import WorkflowBreadcrumbBar
 
@@ -25,7 +25,6 @@ class WorkflowSelectionDialog(qtw.QDialog):
         self.setWindowTitle("Select Workflow")
         configure_secondary_window(self, draggable=True)
         self.setModal(True)
-        self.resize(840, 620)
         self.setMinimumSize(700, 520)
 
         layout = qtw.QVBoxLayout(self)
@@ -146,6 +145,11 @@ class WorkflowSelectionDialog(qtw.QDialog):
 
         self._populate_profiles()
         self.sync_from_host()
+        apply_secondary_window_geometry(
+            self,
+            preferred_size=(840, 620),
+            host_window=host_window,
+        )
 
     def _populate_profiles(self) -> None:
         """Populate known workflow profiles from the host controller."""

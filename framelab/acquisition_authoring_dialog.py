@@ -13,7 +13,7 @@ from .session_manager import (
     preview_acquisition_batch,
 )
 from .ui_primitives import ChipSpec, SummaryItem, build_page_header, build_summary_strip
-from .window_drag import configure_secondary_window
+from .window_drag import apply_secondary_window_geometry, configure_secondary_window
 
 
 class AcquisitionAuthoringDialog(qtw.QDialog):
@@ -36,7 +36,6 @@ class AcquisitionAuthoringDialog(qtw.QDialog):
         self.setWindowTitle("Create Acquisitions")
         configure_secondary_window(self)
         self.setModal(True)
-        self.resize(860, 640)
         self.setMinimumSize(760, 560)
 
         layout = qtw.QVBoxLayout(self)
@@ -155,6 +154,11 @@ class AcquisitionAuthoringDialog(qtw.QDialog):
         self._starting_number_spin.setValue(self._default_starting_number())
         self._refresh_summary()
         self._on_mode_changed()
+        apply_secondary_window_geometry(
+            self,
+            preferred_size=(860, 640),
+            host_window=parent,
+        )
 
     def _default_starting_number(self) -> int:
         if self._session_index.entries:

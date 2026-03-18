@@ -30,7 +30,7 @@ from ..ui_primitives import (
     build_summary_strip,
     make_status_chip,
 )
-from ..window_drag import configure_secondary_window
+from ..window_drag import apply_secondary_window_geometry, configure_secondary_window
 from ..widgets import install_large_header_resize_cursor
 
 
@@ -43,7 +43,6 @@ class _SkipRulesEditorDialog(qtw.QDialog):
         self.setWindowTitle("Edit Skip Rules")
         configure_secondary_window(self)
         self.setAttribute(Qt.WA_DeleteOnClose, True)
-        self.resize(920, 360)
         self.setMinimumSize(720, 280)
 
         layout = qtw.QVBoxLayout(self)
@@ -109,6 +108,11 @@ class _SkipRulesEditorDialog(qtw.QDialog):
         close_button.clicked.connect(self.close)
         button_row.addWidget(close_button)
         layout.addLayout(button_row)
+        apply_secondary_window_geometry(
+            self,
+            preferred_size=(920, 360),
+            host_window=host if isinstance(host, qtw.QWidget) else None,
+        )
 
 
 class DataPageMixin:

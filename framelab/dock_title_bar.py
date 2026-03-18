@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import sys
+
 from PySide6 import QtCore, QtGui, QtWidgets as qtw
 from PySide6.QtCore import Qt
 from shiboken6 import isValid
@@ -161,3 +163,9 @@ class DockTitleBar(qtw.QWidget):
         """Return whether one wrapped Qt object is still alive."""
 
         return obj is not None and isValid(obj)
+
+
+def should_use_custom_dock_title_bar() -> bool:
+    """Return whether the shell should install the custom dock title bar."""
+
+    return not sys.platform.startswith("win")

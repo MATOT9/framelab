@@ -15,6 +15,7 @@ from .analysis_context import AnalysisContextController
 from .byte_budget_cache import ByteBudgetCache
 from .datacard_labels import label_for_metadata_field
 from .dataset_state import DatasetScopeNode, DatasetStateController
+from .icons import apply_app_identity
 from .main_window import (
     AnalysisPageMixin,
     DataPageMixin,
@@ -39,6 +40,15 @@ from .plugins.analysis import AnalysisPlugin
 from .ui_density import AdaptiveUiContext, UiDensityResolver
 from .scan_settings import load_skip_patterns, skip_config_path
 from .ui_settings import RecentWorkflowEntry, UiStateSnapshot, UiStateStore
+from .workspace_document import (
+    WorkspaceDocumentBackgroundState,
+    WorkspaceDocumentDatasetState,
+    WorkspaceDocumentMeasureState,
+    WorkspaceDocumentSnapshot,
+    WorkspaceDocumentStore,
+    WorkspaceDocumentUiState,
+    WorkspaceDocumentWorkflowState,
+)
 from .workflow import WorkflowStateController
 from .workers import DynamicStatsWorker, RoiApplyWorker
 
@@ -185,6 +195,12 @@ class FrameLabWindow(
         self._corrected_cache = ByteBudgetCache[tuple[str, int]](
             self.CORRECTED_IMAGE_CACHE_BUDGET_BYTES,
         )
+        self.workspace_document_store = WorkspaceDocumentStore()
+        self._workspace_document_path: Path | None = None
+        self._workspace_document_reference_payload: dict[str, object] | None = None
+        self._workspace_document_dirty = False
+        self._workspace_document_tracking_enabled = False
+        self._workspace_document_restore_depth = 0
         self._load_ui_state()
         self.workflow_state_controller = WorkflowStateController()
         self.metadata_state_controller = MetadataStateController(
@@ -258,6 +274,19 @@ class FrameLabWindow(
         self._apply_theme(self.ui_preferences.theme_mode)
         self._restore_persisted_ui_state()
         self._set_status()
+        self._initialize_workspace_document_tracking()
+
+    def showEvent(self, event: QtGui.QShowEvent) -> None:
+        """Re-apply app identity once the main window is a native top level."""
+
+        super().showEvent(event)
+        app = qtw.QApplication.instance()
+        if not isinstance(app, qtw.QApplication):
+            return
+        QTimer.singleShot(
+            0,
+            lambda app=app, window=self: apply_app_identity(app, window),
+        )
 
     def _load_ui_state(self) -> None:
         """Load persisted UI preferences and last-session workspace state."""
@@ -513,6 +542,7 @@ class FrameLabWindow(
             )
             self._set_manual_dataset_scope(current_folder)
             self._notify_workflow_scope_changed()
+            self._refresh_workspace_document_dirty_state()
             return None
 
         load_result = self.workflow_state_controller.load_workspace(
@@ -538,6 +568,7 @@ class FrameLabWindow(
                 unload_mismatched_dataset=True,
             )
         self._notify_workflow_scope_changed()
+        self._refresh_workspace_document_dirty_state()
         return load_result.active_node_id
 
     def set_active_workflow_node(
@@ -567,6 +598,7 @@ class FrameLabWindow(
                 unload_mismatched_dataset=unload_mismatched_dataset,
             )
         self._notify_workflow_scope_changed()
+        self._refresh_workspace_document_dirty_state()
         return self.ui_state_snapshot.workflow_active_node_id
 
     def recent_workflow_entries(self) -> tuple[RecentWorkflowEntry, ...]:
@@ -1278,6 +1310,672 @@ class FrameLabWindow(
             return None
         return text
 
+    def _initialize_workspace_document_tracking(self) -> None:
+        """Start document tracking from the current live session state."""
+
+        self._workspace_document_tracking_enabled = False
+        self._workspace_document_path = None
+        try:
+            self._workspace_document_reference_payload = (
+                self._capture_workspace_document_snapshot().to_payload()
+            )
+        except Exception:
+            self._workspace_document_reference_payload = None
+        self._workspace_document_dirty = False
+        self._workspace_document_tracking_enabled = True
+        self._update_workspace_document_window_title()
+
+    def _workspace_document_restore_active(self) -> bool:
+        """Return whether document restore is currently mutating live state."""
+
+        return self._workspace_document_restore_depth > 0
+
+    @staticmethod
+    def _sanitize_workspace_document_label(label: object | None) -> str:
+        """Return a filesystem-safe base name for suggested document paths."""
+
+        text = str(label or "").strip()
+        if not text:
+            return "workspace"
+        safe = "".join(
+            character
+            if character.isalnum() or character in {"-", "_", "."}
+            else "_"
+            for character in text
+        ).strip("._")
+        while "__" in safe:
+            safe = safe.replace("__", "_")
+        return safe or "workspace"
+
+    def _suggest_workspace_document_path(self) -> Path:
+        """Return a reasonable default path for Save Workspace As."""
+
+        if self._workspace_document_path is not None:
+            return self._workspace_document_path
+
+        workflow_root = self.workflow_state_controller.workspace_root
+        dataset_root = self.dataset_state.dataset_root
+        active_node = self.workflow_state_controller.active_node()
+        scope_label = (
+            active_node.display_name
+            if active_node is not None
+            else self.dataset_state.scope_snapshot.label
+        )
+        base_name = self._sanitize_workspace_document_label(
+            scope_label
+            or (workflow_root.name if workflow_root is not None else None)
+            or (dataset_root.name if dataset_root is not None else None)
+            or "workspace",
+        )
+        directory = (
+            workflow_root
+            or dataset_root
+            or Path.home()
+        )
+        return Path(directory).expanduser() / f"{base_name}.framelab"
+
+    def _update_workspace_document_window_title(self) -> None:
+        """Refresh the main window title from the active document state."""
+
+        label = (
+            self._workspace_document_path.name
+            if self._workspace_document_path is not None
+            else "Untitled"
+        )
+        modified = "*" if self._workspace_document_dirty else ""
+        self.setWindowTitle(f"FrameLab - {label}{modified}")
+
+    def _refresh_workspace_document_dirty_state(self) -> None:
+        """Recompute the modified flag from the current serialized session."""
+
+        if (
+            not self._workspace_document_tracking_enabled
+            or self._workspace_document_restore_active()
+            or self._workspace_document_reference_payload is None
+        ):
+            return
+        try:
+            current_payload = self._capture_workspace_document_snapshot().to_payload()
+        except Exception:
+            return
+        dirty = current_payload != self._workspace_document_reference_payload
+        if dirty == self._workspace_document_dirty:
+            return
+        self._workspace_document_dirty = dirty
+        self._update_workspace_document_window_title()
+
+    def _capture_workspace_document_snapshot(self) -> WorkspaceDocumentSnapshot:
+        """Capture the current reopenable session as one workspace document."""
+
+        workflow = self.workflow_state_controller
+        dataset = self.dataset_state
+        metrics = self.metrics_state
+        selected_image_path: str | None = None
+        if (
+            dataset.selected_index is not None
+            and 0 <= dataset.selected_index < dataset.path_count()
+        ):
+            selected_image_path = dataset.paths[dataset.selected_index]
+
+        panel_states = {
+            str(key).strip().lower(): bool(value)
+            for key, value in self.ui_state_snapshot.panel_states.items()
+            if str(key).strip()
+        }
+        workflow_dock = getattr(self, "_workflow_explorer_dock", None)
+        if workflow_dock is not None:
+            panel_states["workflow.explorer_dock"] = workflow_dock.isVisible()
+        metadata_dock = getattr(self, "_metadata_inspector_dock", None)
+        if metadata_dock is not None:
+            panel_states["metadata.inspector_dock"] = metadata_dock.isVisible()
+        data_toggle = getattr(self, "data_advanced_toggle", None)
+        if data_toggle is not None:
+            panel_states["data.advanced_row"] = bool(data_toggle.isChecked())
+        analysis_toggle = getattr(self, "analysis_plugin_controls_toggle", None)
+        if analysis_toggle is not None:
+            panel_states["analysis.plugin_controls"] = bool(
+                analysis_toggle.isChecked(),
+            )
+
+        splitter_sizes = {
+            str(key).strip().lower(): [int(size) for size in value]
+            for key, value in self.ui_state_snapshot.splitter_sizes.items()
+            if str(key).strip()
+        }
+        measure_splitter = getattr(self, "measure_main_splitter", None)
+        if measure_splitter is not None and hasattr(measure_splitter, "sizes"):
+            splitter_sizes["measure.main_splitter"] = [
+                int(size) for size in measure_splitter.sizes()
+            ]
+        analysis_splitter = getattr(self, "analysis_main_splitter", None)
+        if analysis_splitter is not None and hasattr(analysis_splitter, "sizes"):
+            splitter_sizes[self._analysis_main_splitter_key()] = [
+                int(size) for size in analysis_splitter.sizes()
+            ]
+        analysis_plugin = self._current_analysis_plugin()
+        if analysis_plugin is not None:
+            workspace_splitter = analysis_plugin.workspace_splitter()
+            if workspace_splitter is not None and hasattr(workspace_splitter, "sizes"):
+                splitter_sizes[self._analysis_workspace_splitter_key(analysis_plugin)] = [
+                    int(size) for size in workspace_splitter.sizes()
+                ]
+
+        metadata_panel = getattr(getattr(self, "_metadata_inspector_dock", None), "_panel", None)
+        metadata_splitter = getattr(metadata_panel, "_splitter", None)
+        if metadata_splitter is not None and hasattr(metadata_splitter, "sizes"):
+            splitter_sizes["metadata.inspector_splitter.v1"] = [
+                int(size) for size in metadata_splitter.sizes()
+            ]
+
+        scan_root = (
+            str(dataset.dataset_root)
+            if dataset.dataset_root is not None
+            else None
+        )
+        scope_source = dataset.scope_snapshot.source
+        if not scan_root and dataset.scope_snapshot.root is None:
+            scope_source = None
+
+        return WorkspaceDocumentSnapshot(
+            workflow=WorkspaceDocumentWorkflowState(
+                workspace_root=(
+                    str(workflow.workspace_root)
+                    if workflow.workspace_root is not None
+                    else None
+                ),
+                profile_id=workflow.profile_id,
+                anchor_type_id=workflow.anchor_type_id,
+                active_node_id=workflow.active_node_id,
+            ),
+            dataset=WorkspaceDocumentDatasetState(
+                scope_source=scope_source,
+                scan_root=scan_root,
+                selected_image_path=selected_image_path,
+            ),
+            measure=WorkspaceDocumentMeasureState(
+                average_mode=self._current_average_mode(),
+                threshold_value=float(
+                    self.threshold_spin.value()
+                    if hasattr(self, "threshold_spin")
+                    else metrics.threshold_value
+                ),
+                avg_count_value=int(
+                    self.avg_spin.value()
+                    if hasattr(self, "avg_spin")
+                    else metrics.avg_count_value
+                ),
+                rounding_mode=str(metrics.rounding_mode or "off"),
+                normalize_intensity_values=bool(metrics.normalize_intensity_values),
+                roi_rect=(
+                    tuple(int(value) for value in metrics.roi_rect)
+                    if metrics.roi_rect is not None
+                    else None
+                ),
+                roi_applied_to_all=bool(metrics.roi_applied_to_all),
+            ),
+            background=WorkspaceDocumentBackgroundState(
+                enabled=bool(metrics.background_config.enabled),
+                source_mode=str(metrics.background_config.source_mode),
+                clip_negative=bool(metrics.background_config.clip_negative),
+                exposure_policy=str(metrics.background_config.exposure_policy),
+                no_match_policy=str(metrics.background_config.no_match_policy),
+                source_path=str(metrics.background_source_text).strip() or None,
+            ),
+            ui=WorkspaceDocumentUiState(
+                active_page=self._current_active_page_id(),
+                analysis_plugin_id=self._current_analysis_plugin_id(),
+                show_image_preview=bool(self.show_image_preview),
+                show_histogram_preview=bool(self.show_histogram_preview),
+                panel_states=panel_states,
+                splitter_sizes=splitter_sizes,
+            ),
+        )
+
+    def _apply_workspace_document_panel_states(
+        self,
+        panel_states: dict[str, bool],
+    ) -> None:
+        """Apply saved dock and disclosure states from a workspace document."""
+
+        workflow_dock = getattr(self, "_workflow_explorer_dock", None)
+        if workflow_dock is not None and "workflow.explorer_dock" in panel_states:
+            blocker = QSignalBlocker(workflow_dock)
+            workflow_dock.setVisible(bool(panel_states["workflow.explorer_dock"]))
+            del blocker
+            toggle_action = getattr(self, "view_workflow_explorer_action", None)
+            if toggle_action is not None:
+                toggle_action.setChecked(bool(panel_states["workflow.explorer_dock"]))
+
+        metadata_dock = getattr(self, "_metadata_inspector_dock", None)
+        if metadata_dock is not None and "metadata.inspector_dock" in panel_states:
+            blocker = QSignalBlocker(metadata_dock)
+            metadata_dock.setVisible(bool(panel_states["metadata.inspector_dock"]))
+            del blocker
+            toggle_action = getattr(self, "view_metadata_inspector_action", None)
+            if toggle_action is not None:
+                toggle_action.setChecked(bool(panel_states["metadata.inspector_dock"]))
+
+        if "data.advanced_row" in panel_states:
+            self._set_data_advanced_row_expanded(bool(panel_states["data.advanced_row"]))
+        if "analysis.plugin_controls" in panel_states:
+            self._set_analysis_plugin_controls_expanded(
+                bool(panel_states["analysis.plugin_controls"]),
+            )
+
+    def _apply_workspace_document_splitter_states(self) -> None:
+        """Restore splitter sizes after document panel state has been loaded."""
+
+        if hasattr(self, "_restore_splitter_state"):
+            self._restore_splitter_state(
+                "measure.main_splitter",
+                getattr(self, "measure_main_splitter", None),
+            )
+        if hasattr(self, "_restore_visible_analysis_layout"):
+            self._restore_visible_analysis_layout()
+        metadata_panel = getattr(getattr(self, "_metadata_inspector_dock", None), "_panel", None)
+        restore_metadata_splitter = getattr(
+            metadata_panel,
+            "_restore_splitter_state_if_needed",
+            None,
+        )
+        if callable(restore_metadata_splitter):
+            restore_metadata_splitter()
+
+    def _restore_workspace_document_selection(
+        self,
+        selected_image_path: str | None,
+        warnings: list[str],
+    ) -> None:
+        """Restore the selected image by persisted path."""
+
+        dataset = self.dataset_state
+        if not self._has_loaded_data() or not selected_image_path:
+            return
+        normalized = str(Path(selected_image_path).expanduser())
+        index = -1
+        for candidate_index, candidate_path in enumerate(dataset.paths):
+            if str(Path(candidate_path).expanduser()) == normalized:
+                index = candidate_index
+                break
+        if index < 0:
+            warnings.append(
+                "Selected image path is no longer present in the restored dataset: "
+                f"{selected_image_path}",
+            )
+            return
+        dataset.set_selected_index(index, path_count=dataset.path_count())
+        self._set_table_current_source_row(index)
+        self._display_image(index)
+
+    def _restore_workspace_document_snapshot(
+        self,
+        snapshot: WorkspaceDocumentSnapshot,
+    ) -> list[str]:
+        """Apply one workspace-document snapshot to the live window state."""
+
+        warnings: list[str] = []
+        self._workspace_document_restore_depth += 1
+        try:
+            self._session_panel_overrides.clear()
+            self.ui_state_snapshot.panel_states = {
+                str(key).strip().lower(): bool(value)
+                for key, value in snapshot.ui.panel_states.items()
+                if str(key).strip()
+            }
+            self.ui_state_snapshot.splitter_sizes = {
+                str(key).strip().lower(): [max(0, int(size)) for size in value]
+                for key, value in snapshot.ui.splitter_sizes.items()
+                if str(key).strip() and value
+            }
+
+            workflow_state = snapshot.workflow
+            workflow_loaded = False
+            if workflow_state.workspace_root and workflow_state.profile_id:
+                workflow_root = Path(workflow_state.workspace_root).expanduser()
+                if workflow_root.exists():
+                    self.set_workflow_context(
+                        str(workflow_root),
+                        workflow_state.profile_id,
+                        anchor_type_id=workflow_state.anchor_type_id,
+                        active_node_id=workflow_state.active_node_id,
+                    )
+                    workflow_loaded = True
+                else:
+                    warnings.append(
+                        f"Workflow root is missing: {workflow_state.workspace_root}",
+                    )
+                    self.set_workflow_context(None, None)
+            else:
+                self.set_workflow_context(None, None)
+
+            dataset_state = snapshot.dataset
+            scan_root_text = (dataset_state.scan_root or "").strip()
+            scan_root = Path(scan_root_text).expanduser() if scan_root_text else None
+            if not scan_root_text:
+                if self._has_loaded_data():
+                    self.unload_folder(clear_folder_edit=False)
+                if workflow_loaded:
+                    self._sync_dataset_scope_to_workflow(
+                        update_folder_edit=True,
+                        unload_mismatched_dataset=False,
+                    )
+            else:
+                if dataset_state.scope_source == "manual":
+                    self._set_manual_dataset_scope(scan_root)
+                if hasattr(self, "_set_folder_edit_text"):
+                    self._set_folder_edit_text(str(scan_root))
+                if scan_root is not None and scan_root.is_dir():
+                    self.load_folder()
+                else:
+                    warnings.append(
+                        f"Dataset scan root is missing: {scan_root_text}",
+                    )
+                    if self._has_loaded_data():
+                        self.unload_folder(clear_folder_edit=False)
+
+            background_state = snapshot.background
+            metrics = self.metrics_state
+            metrics.background_library.clear()
+            self._invalidate_background_cache()
+            metrics.background_config.enabled = bool(background_state.enabled)
+            metrics.background_config.source_mode = str(background_state.source_mode)
+            metrics.background_config.clip_negative = bool(
+                background_state.clip_negative,
+            )
+            metrics.background_config.exposure_policy = str(
+                background_state.exposure_policy,
+            )
+            metrics.background_config.no_match_policy = str(
+                background_state.no_match_policy,
+            )
+            metrics.background_source_text = background_state.source_path or ""
+            if background_state.source_path:
+                source_path = Path(background_state.source_path).expanduser()
+                if source_path.exists():
+                    loaded = self._load_background_reference(
+                        source_text=str(source_path),
+                        mode=background_state.source_mode,
+                        quiet=True,
+                    )
+                    if not loaded:
+                        warnings.append(
+                            "Background source could not be loaded: "
+                            f"{background_state.source_path}",
+                        )
+                else:
+                    warnings.append(
+                        "Background source is missing: "
+                        f"{background_state.source_path}",
+                    )
+            else:
+                self._update_background_status_label()
+
+            measure_state = snapshot.measure
+            if hasattr(self, "avg_mode_combo"):
+                blocker = QSignalBlocker(self.avg_mode_combo)
+                mode_index = self.avg_mode_combo.findData(measure_state.average_mode)
+                self.avg_mode_combo.setCurrentIndex(max(0, mode_index))
+                del blocker
+            if hasattr(self, "threshold_spin"):
+                blocker = QSignalBlocker(self.threshold_spin)
+                self.threshold_spin.setValue(float(measure_state.threshold_value))
+                del blocker
+            if hasattr(self, "avg_spin"):
+                blocker = QSignalBlocker(self.avg_spin)
+                self.avg_spin.setValue(max(1, int(measure_state.avg_count_value)))
+                del blocker
+            metrics.threshold_value = float(measure_state.threshold_value)
+            metrics.avg_count_value = max(1, int(measure_state.avg_count_value))
+            metrics.rounding_mode = str(measure_state.rounding_mode)
+            metrics.normalize_intensity_values = bool(
+                measure_state.normalize_intensity_values,
+            )
+            if hasattr(self, "table_model"):
+                self.table_model.set_rounding_mode(metrics.rounding_mode)
+            if hasattr(self, "_sync_measure_display_menu_state"):
+                self._sync_measure_display_menu_state()
+            if self._has_loaded_data():
+                self._apply_live_update()
+
+            roi_rect = measure_state.roi_rect
+            if roi_rect is not None:
+                applied = self._apply_roi_rect_to_current_dataset(
+                    roi_rect,
+                    status_message=None,
+                )
+                if not applied:
+                    warnings.append(
+                        "Saved ROI no longer fits the restored dataset image bounds.",
+                    )
+            else:
+                metrics.roi_rect = None
+                if hasattr(self, "image_preview"):
+                    self.image_preview.set_roi_rect(None)
+                self._reset_roi_metrics()
+
+            metrics.roi_applied_to_all = bool(measure_state.roi_applied_to_all)
+            if (
+                self._has_loaded_data()
+                and measure_state.average_mode == "roi"
+                and metrics.roi_rect is not None
+                and metrics.roi_applied_to_all
+            ):
+                self._start_roi_apply_job()
+
+            self.show_image_preview = bool(snapshot.ui.show_image_preview)
+            self.show_histogram_preview = bool(snapshot.ui.show_histogram_preview)
+            self._on_preview_visibility_changed()
+
+            analysis_plugin_id = snapshot.ui.analysis_plugin_id
+            if analysis_plugin_id and hasattr(self, "analysis_profile_combo"):
+                index = self.analysis_profile_combo.findData(analysis_plugin_id)
+                if index >= 0:
+                    self.analysis_profile_combo.setCurrentIndex(index)
+                else:
+                    warnings.append(
+                        "Saved analysis plugin is not currently available: "
+                        f"{analysis_plugin_id}",
+                    )
+
+            page_id = snapshot.ui.active_page
+            if hasattr(self, "workflow_tabs"):
+                target_index = 0
+                if page_id == "measure":
+                    target_index = 1 if self.workflow_tabs.count() > 1 else 0
+                elif page_id == "analysis":
+                    target_index = self.workflow_tabs.indexOf(
+                        getattr(self, "analysis_page", None),
+                    )
+                if target_index >= 0:
+                    self.workflow_tabs.setCurrentIndex(target_index)
+                elif page_id == "analysis":
+                    warnings.append(
+                        "Saved Analyze tab could not be restored because no "
+                        "analysis page is available.",
+                    )
+
+            self._apply_dynamic_visibility_policy()
+            self._apply_workspace_document_panel_states(snapshot.ui.panel_states)
+            self._apply_workspace_document_splitter_states()
+            self._restore_workspace_document_selection(
+                snapshot.dataset.selected_image_path,
+                warnings,
+            )
+            self._refresh_manager_dialogs()
+            self._set_status()
+        finally:
+            self._workspace_document_restore_depth = max(
+                0,
+                self._workspace_document_restore_depth - 1,
+            )
+        return warnings
+
+    def _select_workspace_document_path_to_open(self) -> Path | None:
+        """Prompt for one workspace-document path to open."""
+
+        initial_dir = (
+            str(self._workspace_document_path.parent)
+            if self._workspace_document_path is not None
+            else str(self._suggest_workspace_document_path().parent)
+        )
+        dialog = qtw.QFileDialog(self, "Open Workspace File", initial_dir)
+        dialog.setFileMode(qtw.QFileDialog.ExistingFile)
+        dialog.setNameFilters(
+            ("FrameLab Workspace (*.framelab)", "All files (*)"),
+        )
+        dialog.selectNameFilter("FrameLab Workspace (*.framelab)")
+        dialog.setOption(qtw.QFileDialog.DontUseNativeDialog, True)
+        if not dialog.exec():
+            return None
+        selected = dialog.selectedFiles()
+        if not selected:
+            return None
+        return Path(selected[0]).expanduser()
+
+    def _select_workspace_document_path_to_save(self) -> Path | None:
+        """Prompt for one workspace-document path to save."""
+
+        initial_path = self._suggest_workspace_document_path()
+        dialog = qtw.QFileDialog(
+            self,
+            "Save Workspace File",
+            str(initial_path),
+        )
+        dialog.setAcceptMode(qtw.QFileDialog.AcceptSave)
+        dialog.setNameFilters(
+            ("FrameLab Workspace (*.framelab)", "All files (*)"),
+        )
+        dialog.selectNameFilter("FrameLab Workspace (*.framelab)")
+        dialog.setDefaultSuffix("framelab")
+        dialog.setOption(qtw.QFileDialog.DontUseNativeDialog, True)
+        if not dialog.exec():
+            return None
+        selected = dialog.selectedFiles()
+        if not selected:
+            return None
+        candidate = Path(selected[0]).expanduser()
+        if candidate.suffix.lower() != ".framelab":
+            candidate = candidate.with_suffix(".framelab")
+        return candidate
+
+    def _save_workspace_document_to_path(self, path: Path | str) -> bool:
+        """Write the current session to one workspace-document path."""
+
+        try:
+            snapshot = self._capture_workspace_document_snapshot()
+            final_path = self.workspace_document_store.save(path, snapshot)
+        except Exception as exc:
+            self._show_error("Save Workspace failed", str(exc))
+            return False
+
+        self._workspace_document_path = final_path
+        self._workspace_document_reference_payload = snapshot.to_payload()
+        self._workspace_document_dirty = False
+        self._update_workspace_document_window_title()
+        self._set_status(f"Saved workspace file to {final_path.name}")
+        return True
+
+    def _save_workspace_document(self) -> bool:
+        """Save the current workspace document, prompting for a path if needed."""
+
+        if self._workspace_document_path is None:
+            return self._save_workspace_document_as()
+        return self._save_workspace_document_to_path(self._workspace_document_path)
+
+    def _save_workspace_document_as(self) -> bool:
+        """Prompt for a destination and save the current workspace document."""
+
+        selected_path = self._select_workspace_document_path_to_save()
+        if selected_path is None:
+            return False
+        return self._save_workspace_document_to_path(selected_path)
+
+    def _maybe_save_workspace_document_before_destructive_action(self) -> bool:
+        """Prompt to save the current document before open/close when dirty."""
+
+        app = qtw.QApplication.instance()
+        if (
+            not self._workspace_document_dirty
+            or not self.isVisible()
+            or (
+                isinstance(app, qtw.QApplication)
+                and app.platformName().strip().lower() == "offscreen"
+            )
+        ):
+            return True
+
+        dialog = qtw.QMessageBox(self)
+        dialog.setOption(qtw.QMessageBox.DontUseNativeDialog, True)
+        dialog.setIcon(qtw.QMessageBox.Warning)
+        dialog.setWindowTitle("Unsaved Workspace Changes")
+        dialog.setText(
+            "Save changes to the current workspace document before continuing?",
+        )
+        dialog.setInformativeText(
+            "Workflow, scan, ROI, background, and UI-state changes will be lost "
+            "if you discard them.",
+        )
+        dialog.setStandardButtons(
+            qtw.QMessageBox.Save
+            | qtw.QMessageBox.Discard
+            | qtw.QMessageBox.Cancel,
+        )
+        dialog.setDefaultButton(qtw.QMessageBox.Save)
+        theme_sheet = (
+            self._current_theme_stylesheet()
+            if hasattr(self, "_current_theme_stylesheet")
+            else ""
+        )
+        if theme_sheet:
+            dialog.setStyleSheet(theme_sheet)
+        answer = dialog.exec()
+        if answer == qtw.QMessageBox.Cancel:
+            return False
+        if answer == qtw.QMessageBox.Discard:
+            return True
+        return self._save_workspace_document()
+
+    def _open_workspace_document(self, path: Path | str) -> bool:
+        """Load and restore one workspace document from disk."""
+
+        try:
+            snapshot = self.workspace_document_store.load(path)
+        except Exception as exc:
+            self._show_error("Open Workspace failed", str(exc))
+            return False
+
+        try:
+            warnings = self._restore_workspace_document_snapshot(snapshot)
+        except Exception as exc:
+            self._show_error("Open Workspace failed", str(exc))
+            return False
+
+        try:
+            reference_payload = self._capture_workspace_document_snapshot().to_payload()
+        except Exception:
+            reference_payload = snapshot.to_payload()
+        self._workspace_document_path = Path(path).expanduser()
+        self._workspace_document_reference_payload = reference_payload
+        self._workspace_document_dirty = False
+        self._update_workspace_document_window_title()
+        self._set_status(f"Opened workspace file {self._workspace_document_path.name}")
+        if warnings:
+            self._show_info(
+                "Workspace File Opened With Warnings",
+                "\n".join(warnings),
+            )
+        return True
+
+    def _open_workspace_document_from_dialog(self) -> None:
+        """Prompt for and open a workspace document."""
+
+        if not self._maybe_save_workspace_document_before_destructive_action():
+            return
+        selected_path = self._select_workspace_document_path_to_open()
+        if selected_path is None:
+            return
+        self._open_workspace_document(selected_path)
+
     def _save_ui_state(self) -> None:
         """Persist current UI preferences and workspace selection state."""
 
@@ -1375,6 +2073,7 @@ class FrameLabWindow(
         value = bool(expanded)
         self._session_panel_overrides[clean_key] = value
         self.ui_state_snapshot.panel_states[clean_key] = value
+        self._refresh_workspace_document_dirty_state()
 
     def _persist_splitter_state(self, key: str, splitter: object | None) -> None:
         """Store the latest splitter sizes in the current UI snapshot."""
@@ -1390,6 +2089,7 @@ class FrameLabWindow(
         if not sizes:
             return
         self.ui_state_snapshot.splitter_sizes[clean_key] = sizes
+        self._refresh_workspace_document_dirty_state()
 
     def _restore_splitter_state(self, key: str, splitter: object | None) -> None:
         """Apply persisted splitter sizes when restore behavior is enabled."""

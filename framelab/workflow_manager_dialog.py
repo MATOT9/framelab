@@ -8,7 +8,7 @@ from PySide6 import QtCore, QtGui, QtWidgets as qtw
 from PySide6.QtCore import Qt
 
 from .ui_primitives import ChipSpec, SummaryItem, build_page_header, build_summary_strip
-from .window_drag import configure_secondary_window
+from .window_drag import apply_secondary_window_geometry, configure_secondary_window
 from .workflow import workflow_profile_by_id
 from .workflow_widgets import WorkflowBreadcrumbBar
 
@@ -26,7 +26,6 @@ class WorkflowManagerDialog(qtw.QDialog):
         self.setModal(False)
         self.setWindowModality(Qt.NonModal)
         self.setAttribute(Qt.WA_DeleteOnClose, True)
-        self.resize(1080, 760)
         self.setMinimumSize(920, 620)
 
         layout = qtw.QVBoxLayout(self)
@@ -167,6 +166,11 @@ class WorkflowManagerDialog(qtw.QDialog):
 
         self._populate_profiles()
         self.sync_from_host()
+        apply_secondary_window_geometry(
+            self,
+            preferred_size=(1080, 760),
+            host_window=host_window,
+        )
 
     def _populate_profiles(self) -> None:
         """Populate the profile picker from the host workflow controller."""

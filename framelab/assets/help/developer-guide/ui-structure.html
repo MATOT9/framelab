@@ -1453,11 +1453,11 @@
 </ol>
 <p>The Analyze tab is conditional. It is only shown when at least one analysis plugin has been loaded. Around those tabs, the shell now also owns:</p>
 <ul>
-<li>a compact workflow breadcrumb/path bar above the tabs</li>
 <li>a left <strong>Workflow Explorer</strong> dock for active-node selection and session-structure authoring</li>
+<li>a compact workflow breadcrumb/path bar above the tabs that acts as a fallback-only context strip when the explorer is hidden</li>
 <li>a right <strong>Metadata Inspector</strong> dock for node-metadata editing and provenance review</li>
 </ul>
-<p>The explorer intentionally carries a small active-lineage rail so the current path reads as structure, not just as another badge row. The metadata inspector keeps provenance compact through source badges plus a source-node column instead of large explanation-heavy panels. This is an important UI policy detail: tab visibility is partly derived from plugin availability, not only from hard-coded shell structure.</p>
+<p>The explorer is the primary workflow context surface. The breadcrumb row is intentionally subordinate to it and should stay hidden while the explorer dock is visible. The explorer intentionally carries a small active-lineage rail so the current path reads as structure, not just as another badge row. The metadata inspector keeps provenance compact through source badges plus a source-node column instead of large explanation-heavy panels. This is an important UI policy detail: tab visibility is partly derived from plugin availability, not only from hard-coded shell structure.</p>
 <h2 id="mixin-responsibilities">Mixin responsibilities<a class="headerlink" href="#mixin-responsibilities" title="Permanent link">&para;</a></h2>
 <h3 id="windowchromemixin"><code>WindowChromeMixin</code><a class="headerlink" href="#windowchromemixin" title="Permanent link">&para;</a></h3>
 <p>This mixin owns shell-level UI concerns:</p>
@@ -1465,7 +1465,8 @@
 <li>menu bar</li>
 <li>toolbar</li>
 <li>status bar</li>
-<li>workflow breadcrumb row</li>
+<li>Workflow Explorer toggle affordances and shortcut wiring</li>
+<li>workflow breadcrumb fallback row</li>
 <li>workflow and metadata dock construction</li>
 <li>theme application</li>
 <li>Help menu actions</li>

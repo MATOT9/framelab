@@ -50,6 +50,7 @@ class MetricsPipelineController:
         self.roi_means: np.ndarray | None = None
         self.roi_stds: np.ndarray | None = None
         self.roi_sems: np.ndarray | None = None
+        self.roi_applied_to_all = False
         self.dn_per_ms_values: np.ndarray | None = None
         self.dn_per_ms_stds: np.ndarray | None = None
         self.dn_per_ms_sems: np.ndarray | None = None
@@ -98,6 +99,7 @@ class MetricsPipelineController:
     def reset_roi_metrics(self, path_count: int) -> None:
         """Reset ROI-derived arrays to NaN-filled buffers for one dataset size."""
         count = max(0, int(path_count))
+        self.roi_applied_to_all = False
         self.roi_means = np.full(count, np.nan, dtype=np.float64)
         self.roi_stds = np.full(count, np.nan, dtype=np.float64)
         self.roi_sems = np.full(count, np.nan, dtype=np.float64)
@@ -186,6 +188,7 @@ class MetricsPipelineController:
 
     def apply_roi_result(self, result: RoiApplyResult) -> None:
         """Store one structured ROI-apply worker result."""
+        self.roi_applied_to_all = True
         self.roi_means = np.asarray(result.means, dtype=np.float64)
         self.roi_stds = np.asarray(result.stds, dtype=np.float64)
         self.roi_sems = np.asarray(result.sems, dtype=np.float64)
