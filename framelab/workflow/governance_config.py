@@ -57,11 +57,14 @@ def _parse_field_rule(item: dict[str, Any]) -> MetadataFieldRule | None:
         )
 
     options = _tuple_of_strings(item.get("options"))
+    raw_source_kind = str(item.get("source_kind", "")).strip().lower()
+    source_kind = raw_source_kind if raw_source_kind in {"core", "profile", "ad_hoc"} else None
     return MetadataFieldRule(
         key=key,
         label=label,
         group=group,
         value_type=str(item.get("value_type", item.get("type", "any"))).strip() or "any",
+        source_kind=source_kind,
         options=options,
         required_node_types=_tuple_of_strings(item.get("required_node_types")),
         template_node_types=_tuple_of_strings(item.get("template_node_types")),
@@ -148,6 +151,7 @@ def promote_field_rule(
     label: str,
     group: str,
     value_type: str = "string",
+    source_kind: str | None = "profile",
     options: tuple[str, ...] = (),
 ) -> Path:
     """Promote one field into the user-editable profile governance overlay."""
@@ -181,6 +185,9 @@ def promote_field_rule(
         "group": str(group).strip() or clean_key.split(".", 1)[0].title(),
         "value_type": str(value_type).strip() or "string",
     }
+    clean_source_kind = str(source_kind or "").strip().lower()
+    if clean_source_kind in {"core", "profile", "ad_hoc"}:
+        promoted_payload["source_kind"] = clean_source_kind
     if options:
         promoted_payload["options"] = [str(option) for option in options]
 
@@ -193,6 +200,54 @@ def promote_field_rule(
         break
     else:
         fields.append(promoted_payload)
+
+    write_json_dict(path, payload)
+    return path
+
+
+def demote_field_rule(
+    profile_id: str,
+    *,
+    key: str,
+) -> Path | None:
+    """Remove one user-editable profile field override when present."""
+
+    clean_profile_id = str(profile_id).strip().lower()
+    clean_key = str(key).strip()
+    if not clean_profile_id or not clean_key:
+        raise ValueError("profile_id and key are required to demote a field rule")
+
+    path = governance_config_path()
+    payload = read_json_dict(path)
+    if not isinstance(payload, dict):
+        return None
+    profiles = payload.get("profiles")
+    if not isinstance(profiles, dict):
+        return None
+    profile_payload = profiles.get(clean_profile_id)
+    if not isinstance(profile_payload, dict):
+        return None
+    fields = profile_payload.get("fields")
+    if not isinstance(fields, list):
+        return None
+
+    retained = [
+        entry
+        for entry in fields
+        if not isinstance(entry, dict)
+        or str(entry.get("key", "")).strip() != clean_key
+    ]
+    if len(retained) == len(fields):
+        return None
+
+    if retained:
+        profile_payload["fields"] = retained
+    else:
+        profile_payload.pop("fields", None)
+    if not profile_payload:
+        profiles.pop(clean_profile_id, None)
+    if not profiles:
+        payload["profiles"] = {}
 
     write_json_dict(path, payload)
     return path

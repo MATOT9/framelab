@@ -116,6 +116,13 @@ def test_metadata_manager_displays_effective_and_local_metadata(
     assert dialog.windowTitle() == "Advanced Metadata Tools"
     assert dialog._advanced_button.isHidden()
     assert not dialog._add_field_button.isHidden()
+    assert not dialog._demote_field_button.isHidden()
+    assert dialog._add_field_button.toolTip()
+    assert dialog._add_group_button.toolTip()
+    assert dialog._apply_template_button.toolTip()
+    assert dialog._promote_field_button.toolTip()
+    assert dialog._demote_field_button.toolTip()
+    assert dialog._save_button.toolTip()
 
     exposure_row = _row_for_key(dialog._effective_table, "camera_settings.exposure_us")
     iris_row = _row_for_key(dialog._effective_table, "instrument.optics.iris.position")

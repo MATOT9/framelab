@@ -222,7 +222,64 @@ def test_workflow_explorer_dock_selection_updates_active_scope(
     assert window.workflow_state_controller.active_node_id == acquisition_node_id
     assert window.folder_edit.text() == str(acquisition_root.resolve())
     assert window.dataset_state.scope_snapshot.active_node_id == acquisition_node_id
+    assert not dock._lineage_scroll.isHidden()
     assert dock._lineage_rail.entry_labels()[-1] == acquisition_root.name
+
+
+def test_workflow_explorer_keeps_active_path_visible_without_loaded_workflow(
+    framelab_window_factory,
+    process_events,
+) -> None:
+    window = framelab_window_factory(enabled_plugin_ids=(), show=True, width=520, height=780)
+    window.set_workflow_context(None, None)
+    dock = window._workflow_explorer_dock
+    process_events()
+
+    labels = [
+        label.text()
+        for label in dock.findChildren(qtw.QLabel)
+        if label.text().strip()
+    ]
+
+    assert not dock._lineage_scroll.isHidden()
+    assert not dock._lineage_rail.isHidden()
+    assert dock._lineage_rail.entry_labels() == ()
+    assert "Active Path" in labels
+    assert not any(
+        text.startswith("Select a node, then scan it")
+        for text in labels
+    )
+
+
+def test_workflow_explorer_prioritizes_tree_space_and_caps_active_path_growth(
+    tmp_path: Path,
+    framelab_window_factory,
+    process_events,
+) -> None:
+    workspace_root, _session_root, _acquisition_root, session_node_id, acquisition_node_id = (
+        _make_workspace(tmp_path)
+    )
+    window = framelab_window_factory(enabled_plugin_ids=(), show=True, width=520, height=780)
+    window.set_workflow_context(
+        str(workspace_root),
+        "calibration",
+        active_node_id=session_node_id,
+    )
+    dock = window._workflow_explorer_dock
+    process_events()
+
+    dock._tree.setCurrentItem(dock._item_by_node_id["calibration:root"])
+    process_events()
+    root_height_cap = dock._lineage_scroll.maximumHeight()
+
+    dock._tree.setCurrentItem(dock._item_by_node_id[acquisition_node_id])
+    process_events()
+    deep_height_cap = dock._lineage_scroll.maximumHeight()
+    splitter_sizes = dock._main_splitter.sizes()
+
+    assert root_height_cap == deep_height_cap
+    assert splitter_sizes[1] > splitter_sizes[0]
+    assert dock._tree.minimumHeight() >= 240
 
 
 def test_workflow_explorer_dock_visibility_restores_from_ui_state(

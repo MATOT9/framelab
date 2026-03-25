@@ -62,6 +62,7 @@ class MetadataManagerDialog(qtw.QDialog):
         self._add_group_button = self._panel._add_group_button
         self._apply_template_button = self._panel._apply_template_button
         self._promote_field_button = self._panel._promote_field_button
+        self._demote_field_button = self._panel._demote_field_button
         self._remove_field_button = self._panel._remove_field_button
         self._revert_button = self._panel._revert_button
         self._refresh_button = self._panel._refresh_button
@@ -70,6 +71,7 @@ class MetadataManagerDialog(qtw.QDialog):
         self._add_ad_hoc_group = self._panel._add_ad_hoc_group
         self._apply_template = self._panel._apply_template
         self._promote_selected_field = self._panel._promote_selected_field
+        self._demote_selected_field = self._panel._demote_selected_field
         self._remove_selected_local_rows = self._panel._remove_selected_local_rows
         self._collect_local_metadata = self._panel._collect_local_metadata
         self._save_local_metadata = self._panel._save_local_metadata

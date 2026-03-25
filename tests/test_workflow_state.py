@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from framelab.node_metadata import save_nodecard
 from framelab.workflow import WorkflowStateController, workflow_profile_by_id
 
 
@@ -69,13 +70,52 @@ def _make_acquisition(parent: Path, name: str) -> Path:
 def test_built_in_profiles_cover_calibration_and_trials() -> None:
     calibration = workflow_profile_by_id("calibration")
     trials = workflow_profile_by_id("trials")
+    custom = workflow_profile_by_id("custom")
 
     assert calibration is not None
     assert trials is not None
+    assert custom is not None
     assert calibration.node_type("root").child_type_ids == ("camera",)
     assert calibration.node_type("session").child_type_ids == ("acquisition",)
     assert trials.node_type("root").child_type_ids == ("trial",)
     assert trials.node_type("session").discovery_mode == "session_acquisitions"
+    assert custom.node_type("root").child_type_ids == ()
+
+
+def test_empty_root_nodecard_registers_structured_workspace_in_place(
+    tmp_path: Path,
+) -> None:
+    calibration_root = tmp_path / "empty-calibration"
+    trials_root = tmp_path / "empty-trials"
+    calibration_root.mkdir()
+    trials_root.mkdir()
+    save_nodecard(
+        calibration_root,
+        {},
+        profile_id="calibration",
+        node_type_id="root",
+    )
+    save_nodecard(
+        trials_root,
+        {},
+        profile_id="trials",
+        node_type_id="root",
+    )
+
+    controller = WorkflowStateController()
+
+    assert controller.supports_load_path(
+        calibration_root,
+        "calibration",
+        anchor_type_id="root",
+    )
+    assert controller.supports_load_path(
+        trials_root,
+        "trials",
+        anchor_type_id="root",
+    )
+    assert controller.infer_anchor_type(calibration_root, "calibration") == "root"
+    assert controller.infer_anchor_type(trials_root, "trials") == "root"
 
 
 def test_controller_loads_calibration_workspace_with_session_acquisitions(
@@ -221,6 +261,27 @@ def test_controller_can_load_camera_subtree_with_explicit_anchor(
     assert session_node_id == "calibration:session:campaign-2026/session-1"
 
 
+def test_controller_falls_back_to_custom_for_unstructured_folder(
+    tmp_path: Path,
+) -> None:
+    folder = tmp_path / "loose-tiffs"
+    folder.mkdir()
+    (folder / "image_0001.tiff").touch()
+
+    controller = WorkflowStateController()
+    result = controller.load_workspace(folder, "calibration")
+
+    assert result.profile_id == "custom"
+    assert result.anchor_type_id == "root"
+    assert controller.profile_id == "custom"
+    assert controller.is_custom_workspace()
+    assert controller.anchor_summary_label() == "Custom folder"
+    assert controller.root_node_id == "custom:root"
+    assert controller.active_node_id == "custom:root"
+    assert result.warnings
+    assert "custom workflow" in result.warnings[0].lower()
+
+
 def test_refresh_preserves_active_node_when_workspace_changes(
     tmp_path: Path,
 ) -> None:
@@ -271,7 +332,7 @@ def test_invalid_active_node_falls_back_to_root(tmp_path: Path) -> None:
     assert controller.active_node_id == controller.root_node_id
 
 
-def test_controller_rejects_parent_folder_above_supported_workspace_root(
+def test_controller_warns_and_falls_back_for_parent_folder_above_supported_workspace_root(
     tmp_path: Path,
 ) -> None:
     workspace_root = tmp_path / "calibration"
@@ -286,7 +347,11 @@ def test_controller_rejects_parent_folder_above_supported_workspace_root(
     assert not controller.supports_load_path(tmp_path, "calibration")
     warning = controller.unsupported_load_message(tmp_path, "calibration")
     assert warning is not None
-    assert "full workspace root" in warning.lower()
+    assert "custom workflow" in warning.lower()
+
+    result = controller.load_workspace(tmp_path, "calibration")
+
+    assert result.profile_id == "custom"
 
 
 def test_controller_loads_campaign_with_nested_01_sessions_container(
@@ -331,3 +396,24 @@ def test_controller_treats_01_sessions_folder_as_campaign_anchor(
     assert controller.anchor_summary_label() == "Campaign subtree"
     root_children = controller.children_of(controller.root_node_id)
     assert [node.type_id for node in root_children] == ["session"]
+
+
+def test_detect_supported_workspace_walks_up_from_frames_dir(
+    tmp_path: Path,
+) -> None:
+    workspace_root = tmp_path / "trials"
+    session_root = workspace_root / "trial-alpha" / "camera-a" / "session-1"
+    acquisitions_root = session_root / "acquisitions"
+    acquisition_root = acquisitions_root / "acq-0011__scene"
+    frames_root = acquisition_root / "frames"
+    frames_root.mkdir(parents=True, exist_ok=True)
+    _write_session_datacard(session_root)
+    _make_acquisition(acquisitions_root, "acq-0012")
+
+    controller = WorkflowStateController()
+    detection = controller.detect_supported_workspace(frames_root)
+
+    assert detection is not None
+    assert detection.profile_id == "trials"
+    assert detection.anchor_type_id == "acquisition"
+    assert detection.workspace_root == acquisition_root.resolve()

@@ -318,31 +318,29 @@ class WorkflowManagerDialog(qtw.QDialog):
         if not workspace_root or not profile_id:
             self._warning_label.setText("Choose both a workflow profile and a workspace root.")
             return
-        controller = getattr(self._host_window, "workflow_state_controller", None)
-        warning_text = (
-            controller.unsupported_load_message(
-                workspace_root,
-                str(profile_id),
-                anchor_type_id=self._current_anchor_type_id(),
-            )
-            if controller is not None
-            else None
+        resolve_load = getattr(self._host_window, "_resolve_workflow_load_request", None)
+        if not callable(resolve_load):
+            self._warning_label.setText("Host window does not support workflow loading.")
+            return
+        resolution = resolve_load(
+            workspace_root,
+            str(profile_id),
+            anchor_type_id=self._current_anchor_type_id(),
+            prompt_parent=self,
         )
-        if warning_text:
-            self._warning_label.setText(warning_text)
-            qtw.QMessageBox.warning(self, "Unsupported Workflow Level", warning_text)
+        if resolution is None:
             return
         try:
             self._host_window.set_workflow_context(
                 workspace_root,
-                str(profile_id),
-                anchor_type_id=self._current_anchor_type_id(),
+                resolution.profile_id,
+                anchor_type_id=resolution.anchor_type_id,
             )
         except Exception as exc:
             self._warning_label.setText(f"Could not load workflow: {exc}")
             return
-        self._warning_label.setText("")
         self.sync_from_host()
+        self._warning_label.setText(resolution.info_text)
 
     def _refresh_workflow(self) -> None:
         """Reload the currently selected workflow workspace."""

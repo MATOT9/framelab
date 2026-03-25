@@ -31,6 +31,8 @@ def test_initialize_loaded_dataset_resets_dataset_dependent_arrays(
     np.testing.assert_array_equal(state.bg_applied_mask, np.zeros(3, dtype=bool))
     assert state.bg_total_count == 3
     assert state.bg_unmatched_count == 3
+    assert state.roi_maxs.shape == (3,)
+    assert np.isnan(state.roi_maxs).all()
     assert state.roi_means.shape == (3,)
     assert np.isnan(state.roi_means).all()
 
@@ -48,6 +50,7 @@ def test_prepare_for_live_update_sizes_topk_roi_and_background_arrays(
     assert state.avg_maxs.shape == (2,)
     assert state.avg_maxs_std.shape == (2,)
     assert state.avg_maxs_sem.shape == (2,)
+    assert state.roi_maxs.shape == (2,)
     assert state.roi_means.shape == (2,)
 
     state.prepare_for_live_update(path_count=2, mode="none")
@@ -84,6 +87,7 @@ def test_apply_dynamic_stats_result_updates_latest_metric_snapshot(
 def test_apply_roi_result_updates_roi_arrays(state: MetricsPipelineController) -> None:
     result = RoiApplyResult(
         job_id=9,
+        maxs=np.array([4.0, np.nan]),
         means=np.array([2.0, np.nan]),
         stds=np.array([1.0, np.nan]),
         sems=np.array([0.5, np.nan]),
@@ -92,6 +96,8 @@ def test_apply_roi_result_updates_roi_arrays(state: MetricsPipelineController) -
 
     state.apply_roi_result(result)
 
+    np.testing.assert_allclose(state.roi_maxs[:1], np.array([4.0]))
+    assert np.isnan(state.roi_maxs[1])
     np.testing.assert_allclose(state.roi_means[:1], np.array([2.0]))
     assert np.isnan(state.roi_means[1])
     np.testing.assert_allclose(state.roi_stds[:1], np.array([1.0]))
@@ -129,3 +135,20 @@ def test_job_state_helpers_track_stats_and_roi_lifecycle(
     assert not state.is_roi_applying
     assert state.roi_apply_done == 0
     assert state.roi_apply_total == 0
+
+
+def test_low_signal_mask_and_count_follow_applied_threshold(
+    state: MetricsPipelineController,
+) -> None:
+    state.maxs = np.array([3, 8, 11], dtype=np.int64)
+    state.low_signal_threshold_value = 8
+
+    mask = state.low_signal_mask(path_count=3)
+
+    assert mask is not None
+    np.testing.assert_array_equal(mask, np.array([True, True, False], dtype=bool))
+    assert state.low_signal_image_count(path_count=3) == 2
+
+    state.low_signal_threshold_value = 0
+    assert state.low_signal_mask(path_count=3) is None
+    assert state.low_signal_image_count(path_count=3) == 0

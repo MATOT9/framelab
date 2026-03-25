@@ -2,15 +2,77 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from PySide6 import QtCore, QtGui, QtWidgets as qtw
 from PySide6.QtCore import Qt
 
 from .dock_title_bar import DockTitleBar, should_use_custom_dock_title_bar
+from .metadata_inspector_panel import METADATA_FIELD_MIME_TYPE
 from .ui_density import DensityTokens, comfortable_density_tokens
 from .ui_primitives import make_status_chip
 from .workflow_widgets import WorkflowLineageEntry, WorkflowLineageRail
+
+
+class WorkflowExplorerTree(qtw.QTreeWidget):
+    """Workflow tree that accepts metadata-field drops from the inspector."""
+
+    def __init__(self, dock: "WorkflowExplorerDock") -> None:
+        super().__init__(dock)
+        self._dock = dock
+        self.setAcceptDrops(True)
+        self.setDropIndicatorShown(True)
+        self.setDragDropMode(qtw.QAbstractItemView.DropOnly)
+
+    @staticmethod
+    def _decode_metadata_payload(event) -> dict[str, object] | None:
+        mime = event.mimeData()
+        if mime is None or not mime.hasFormat(METADATA_FIELD_MIME_TYPE):
+            return None
+        raw_payload = bytes(mime.data(METADATA_FIELD_MIME_TYPE))
+        if not raw_payload:
+            return None
+        try:
+            payload = json.loads(raw_payload.decode("utf-8"))
+        except Exception:
+            return None
+        return payload if isinstance(payload, dict) else None
+
+    def dragEnterEvent(self, event: QtGui.QDragEnterEvent) -> None:
+        payload = self._decode_metadata_payload(event)
+        if payload is None:
+            super().dragEnterEvent(event)
+            return
+        event.acceptProposedAction()
+
+    def dragMoveEvent(self, event: QtGui.QDragMoveEvent) -> None:
+        payload = self._decode_metadata_payload(event)
+        item = self.itemAt(event.position().toPoint())
+        if payload is None or item is None:
+            event.ignore()
+            return
+        self.setCurrentItem(item)
+        event.acceptProposedAction()
+
+    def dropEvent(self, event: QtGui.QDropEvent) -> None:
+        payload = self._decode_metadata_payload(event)
+        item = self.itemAt(event.position().toPoint())
+        if payload is None or item is None:
+            event.ignore()
+            return
+        node_id = item.data(0, Qt.UserRole)
+        if not node_id:
+            event.ignore()
+            return
+        handled = self._dock._handle_metadata_field_drop(
+            payload,
+            str(node_id),
+        )
+        if handled:
+            event.acceptProposedAction()
+            return
+        event.ignore()
 
 
 class WorkflowExplorerDock(qtw.QDockWidget):
@@ -57,6 +119,21 @@ class WorkflowExplorerDock(qtw.QDockWidget):
         layout = qtw.QVBoxLayout(container)
         self._layout = layout
 
+        self._main_splitter = qtw.QSplitter(Qt.Vertical)
+        self._main_splitter.setObjectName("WorkflowExplorerSplitter")
+        self._main_splitter.setChildrenCollapsible(False)
+        self._main_splitter.setOpaqueResize(False)
+        self._main_splitter.setHandleWidth(10)
+        layout.addWidget(self._main_splitter, 1)
+
+        overview = qtw.QWidget()
+        overview.setObjectName("WorkflowExplorerOverview")
+        overview.setAttribute(Qt.WA_StyledBackground, True)
+        overview.setAutoFillBackground(True)
+        overview_layout = qtw.QVBoxLayout(overview)
+        self._overview_widget = overview
+        self._overview_layout = overview_layout
+
         summary_panel = qtw.QFrame()
         summary_panel.setObjectName("SubtlePanel")
         summary_layout = qtw.QHBoxLayout(summary_panel)
@@ -83,7 +160,7 @@ class WorkflowExplorerDock(qtw.QDockWidget):
         summary_layout.addWidget(self._workspace_chip)
         summary_layout.addWidget(self._active_chip)
         summary_layout.addStretch(1)
-        layout.addWidget(summary_panel)
+        overview_layout.addWidget(summary_panel)
 
         controls = qtw.QFrame()
         controls.setObjectName("CommandBar")
@@ -176,24 +253,31 @@ class WorkflowExplorerDock(qtw.QDockWidget):
         self._advanced_button.setMenu(self._advanced_menu)
         controls_layout.addWidget(self._advanced_button, 1, 2)
 
-        layout.addWidget(controls)
-
-        self._hint_label = qtw.QLabel(
-            "Select a node, then scan it, inspect metadata, or open structure actions.",
-        )
-        self._hint_label.setObjectName("MutedLabel")
-        self._hint_label.setWordWrap(True)
-        layout.addWidget(self._hint_label)
+        overview_layout.addWidget(controls)
 
         self._warning_label = qtw.QLabel("")
         self._warning_label.setObjectName("MutedLabel")
         self._warning_label.setWordWrap(True)
-        layout.addWidget(self._warning_label)
+        self._warning_label.setVisible(False)
+        overview_layout.addWidget(self._warning_label)
 
-        self._lineage_rail = WorkflowLineageRail(self)
-        layout.addWidget(self._lineage_rail)
+        self._lineage_scroll = qtw.QScrollArea()
+        self._lineage_scroll.setObjectName("WorkflowActivePathScroll")
+        self._lineage_scroll.setFrameShape(qtw.QFrame.NoFrame)
+        self._lineage_scroll.setWidgetResizable(True)
+        self._lineage_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self._lineage_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self._lineage_scroll.setSizePolicy(
+            qtw.QSizePolicy.Preferred,
+            qtw.QSizePolicy.Fixed,
+        )
+        self._lineage_rail = WorkflowLineageRail(self._lineage_scroll)
+        self._lineage_scroll.setWidget(self._lineage_rail)
+        self._lineage_scroll.setVisible(False)
+        overview_layout.addWidget(self._lineage_scroll)
+        overview_layout.addStretch(1)
 
-        self._tree = qtw.QTreeWidget()
+        self._tree = WorkflowExplorerTree(self)
         self._tree.setObjectName("WorkflowTree")
         self._tree.setHeaderLabels(["Workflow", "Kind", "Flags"])
         self._tree.setAlternatingRowColors(True)
@@ -214,10 +298,20 @@ class WorkflowExplorerDock(qtw.QDockWidget):
         self._tree.itemDoubleClicked.connect(
             lambda _item, _column: self._scan_scope(),
         )
-        layout.addWidget(self._tree, 1)
+        self._tree.setMinimumHeight(240)
+        self._tree.setSizePolicy(
+            qtw.QSizePolicy.Expanding,
+            qtw.QSizePolicy.Expanding,
+        )
         self._tree.setColumnWidth(0, 280)
         self._tree.setColumnWidth(1, 120)
         self._tree.setColumnWidth(2, 150)
+
+        self._main_splitter.addWidget(overview)
+        self._main_splitter.addWidget(self._tree)
+        self._main_splitter.setStretchFactor(0, 0)
+        self._main_splitter.setStretchFactor(1, 1)
+        self._main_splitter.setSizes([240, 640])
 
         self.setWidget(container)
         self.visibilityChanged.connect(self._on_visibility_changed)
@@ -235,6 +329,8 @@ class WorkflowExplorerDock(qtw.QDockWidget):
             tokens.panel_margin_v,
         )
         self._layout.setSpacing(tokens.panel_spacing)
+        self._overview_layout.setContentsMargins(0, 0, 0, 0)
+        self._overview_layout.setSpacing(tokens.panel_spacing)
         self._summary_layout.setContentsMargins(
             tokens.panel_margin_h,
             tokens.panel_margin_v,
@@ -251,6 +347,16 @@ class WorkflowExplorerDock(qtw.QDockWidget):
         self._controls_layout.setHorizontalSpacing(tokens.command_bar_spacing)
         self._controls_layout.setVerticalSpacing(tokens.command_bar_spacing)
         self._tree.setIndentation(max(16, tokens.panel_margin_h + 8))
+        lineage_min_height = max(96, 72 + tokens.panel_spacing * 3)
+        lineage_max_height = max(
+            lineage_min_height,
+            92 + tokens.panel_spacing * 7,
+        )
+        self._lineage_scroll.setMinimumHeight(lineage_min_height)
+        self._lineage_scroll.setMaximumHeight(lineage_max_height)
+        self._overview_widget.setMinimumHeight(
+            max(188, lineage_min_height + tokens.panel_spacing * 5),
+        )
         if hasattr(self._lineage_rail, "apply_density"):
             self._lineage_rail.apply_density(tokens)
 
@@ -289,7 +395,9 @@ class WorkflowExplorerDock(qtw.QDockWidget):
             level="success" if active_node is not None else "neutral",
             tooltip=str(active_node.folder_path) if active_node is not None else "No active workflow node",
         )
-        self._warning_label.setText("\n".join(warnings[:2]))
+        warning_text = "\n".join(warnings[:2]).strip()
+        self._warning_label.setText(warning_text)
+        self._warning_label.setVisible(bool(warning_text))
         self._select_workflow_button.setText("Workflow")
         ancestry = (
             controller.ancestry_for(active_node.node_id)
@@ -318,6 +426,7 @@ class WorkflowExplorerDock(qtw.QDockWidget):
             ),
             empty_text="Load a workflow and choose an active node to see the current path.",
         )
+        self._lineage_scroll.setVisible(not self._lineage_rail.isHidden())
         tree_signature = self._tree_signature(controller)
         if tree_signature != self._tree_structure_signature:
             self._populate_tree()
@@ -802,6 +911,30 @@ class WorkflowExplorerDock(qtw.QDockWidget):
         if not menu.actions():
             return
         menu.exec(self._tree.viewport().mapToGlobal(position))
+
+    def _handle_metadata_field_drop(
+        self,
+        payload: dict[str, object],
+        target_node_id: str,
+    ) -> bool:
+        """Move one metadata field onto the dropped workflow-tree target."""
+
+        mover = getattr(
+            self._host_window,
+            "_move_metadata_field_to_workflow_node_payload",
+            None,
+        )
+        if not callable(mover):
+            return False
+        try:
+            return bool(mover(payload, target_node_id))
+        except Exception as exc:
+            qtw.QMessageBox.warning(
+                self,
+                "Move Metadata Field",
+                str(exc),
+            )
+            return False
 
     def _begin_inline_child_creation(
         self,

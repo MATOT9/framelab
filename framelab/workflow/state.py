@@ -17,6 +17,7 @@ from .profiles import built_in_workflow_profiles, workflow_profile_by_id
 
 _SKIPPED_DIR_NAMES = {"__pycache__", ".framelab"}
 _SESSION_CONTAINER_NAMES = {"01_sessions", "sessions"}
+_CUSTOM_WORKFLOW_PROFILE_ID = "custom"
 
 
 @dataclass(frozen=True, slots=True)
@@ -30,6 +31,15 @@ class WorkflowLoadResult:
     active_node_id: str
     node_count: int
     warnings: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class WorkflowDetectionResult:
+    """Structured workflow detection result for one filesystem path."""
+
+    workspace_root: Path
+    profile_id: str
+    anchor_type_id: str
 
 
 class WorkflowStateController:
@@ -93,11 +103,18 @@ class WorkflowStateController:
 
         return bool(self.anchor_type_id and self.anchor_type_id != "root")
 
+    def is_custom_workspace(self) -> bool:
+        """Return whether the current load is using the unstructured fallback."""
+
+        return self.profile_id == _CUSTOM_WORKFLOW_PROFILE_ID
+
     def anchor_summary_label(self) -> str:
         """Return a compact label describing the loaded anchor scope."""
 
         if self.profile is None or self.anchor_type_id is None:
             return "Folder mode"
+        if self.is_custom_workspace():
+            return "Custom folder"
         if self.anchor_type_id == "root":
             return "Full workspace"
         try:
@@ -183,6 +200,14 @@ class WorkflowStateController:
         nodes_in_order: list[WorkflowNode] = []
         warnings: list[str] = []
         resolved_anchor_type = self._normalize_anchor_type_id(profile, anchor_type_id)
+        if self._should_fallback_to_custom(
+            profile,
+            root,
+            resolved_anchor_type,
+        ):
+            warnings.append(self._custom_workspace_warning(profile))
+            profile = self._resolve_profile(_CUSTOM_WORKFLOW_PROFILE_ID)
+            resolved_anchor_type = "root"
         if resolved_anchor_type is None:
             resolved_anchor_type = self._infer_anchor_type_for_path(profile, root)
             if resolved_anchor_type is None:
@@ -284,15 +309,63 @@ class WorkflowStateController:
         ):
             return None
         profile = self._resolve_profile(profile_id)
-        subtree_labels = ", ".join(
-            node_type.display_name for node_type in profile.node_types[1:]
-        )
-        return (
-            f"FrameLab currently supports opening {profile.display_name} workflows "
-            "only from the full workspace root or one of its recognized subtree "
-            f"folders ({subtree_labels}). The selected folder appears to be above "
-            "that supported level or does not match the expected workflow layout yet."
-        )
+        if profile.profile_id == _CUSTOM_WORKFLOW_PROFILE_ID:
+            return None
+        return self._custom_workspace_warning(profile)
+
+    def detect_supported_workspace(
+        self,
+        workspace_root: str | Path,
+        *,
+        preferred_profile_ids: tuple[str, ...] = ("calibration", "trials"),
+    ) -> WorkflowDetectionResult | None:
+        """Detect the nearest structured workflow root for one path."""
+
+        candidate = Path(workspace_root).expanduser().resolve()
+        search_root = candidate if candidate.is_dir() else candidate.parent
+        ancestors = (search_root, *search_root.parents)
+        best_result: WorkflowDetectionResult | None = None
+        best_score: tuple[int, int, int] | None = None
+        for profile_rank, profile_id in enumerate(preferred_profile_ids):
+            clean_profile_id = str(profile_id).strip().lower()
+            if not clean_profile_id or clean_profile_id == _CUSTOM_WORKFLOW_PROFILE_ID:
+                continue
+            profile = self._resolve_profile(clean_profile_id)
+            matches: list[tuple[int, Path, str]] = []
+            for distance, current in enumerate(ancestors):
+                anchor_type = self._infer_anchor_type_for_path(profile, current)
+                if anchor_type is None:
+                    continue
+                matches.append((distance, current, anchor_type))
+            if not matches:
+                continue
+
+            nearest_distance, nearest_root, nearest_anchor = matches[0]
+            farthest_distance = matches[-1][0]
+            folder_name_bonus = 0
+            for _distance, current, anchor_type in matches:
+                current_name = current.name.strip().lower()
+                if clean_profile_id == "calibration":
+                    if "campaign" in current_name or anchor_type == "campaign":
+                        folder_name_bonus = max(folder_name_bonus, 2)
+                elif clean_profile_id == "trials":
+                    if "trial" in current_name or anchor_type == "trial":
+                        folder_name_bonus = max(folder_name_bonus, 2)
+            score = (
+                farthest_distance,
+                folder_name_bonus,
+                -nearest_distance,
+                -profile_rank,
+            )
+            if best_score is not None and score <= best_score:
+                continue
+            best_score = score
+            best_result = WorkflowDetectionResult(
+                workspace_root=nearest_root,
+                profile_id=profile.profile_id,
+                anchor_type_id=nearest_anchor,
+            )
+        return best_result
 
     def as_debug_dict(self) -> dict[str, object]:
         """Return a compact workflow-state snapshot for debugging."""
@@ -516,9 +589,12 @@ class WorkflowStateController:
         profile: WorkflowProfile,
         path: Path,
     ) -> str | None:
+        if path.is_dir() and len(profile.node_types) == 1:
+            return "root"
         card = load_nodecard(path)
-        if card.node_type_id and card.node_type_id in profile.node_type_index:
-            return card.node_type_id
+        nodecard_anchor = self._nodecard_anchor_type(profile, card)
+        if nodecard_anchor is not None:
+            return nodecard_anchor
         if (
             path.name.lower() in _SESSION_CONTAINER_NAMES
             and "campaign" in profile.node_type_index
@@ -553,7 +629,7 @@ class WorkflowStateController:
         anchor_type_id: str,
     ) -> bool:
         card = load_nodecard(path)
-        if card.node_type_id == anchor_type_id:
+        if self._nodecard_anchor_type(profile, card) == anchor_type_id:
             return True
         max_depth = max(len(profile.node_types) + 1, 2)
         return self._anchor_type_score(
@@ -579,7 +655,7 @@ class WorkflowStateController:
             return 90 if self._looks_like_session_anchor(path) else 0
 
         card = load_nodecard(path)
-        if card.node_type_id == node_type_id:
+        if self._nodecard_anchor_type(profile, card) == node_type_id:
             return 95
 
         child_type_ids = profile.node_type(node_type_id).child_type_ids
@@ -606,6 +682,47 @@ class WorkflowStateController:
                 return 0
             child_scores.append(child_score)
         return 10 + min(child_scores)
+
+    def _should_fallback_to_custom(
+        self,
+        profile: WorkflowProfile,
+        path: Path,
+        anchor_type_id: str | None,
+    ) -> bool:
+        """Return whether an unsupported structured load should use Custom mode."""
+
+        if profile.profile_id == _CUSTOM_WORKFLOW_PROFILE_ID:
+            return False
+        if anchor_type_id is None:
+            return self._infer_anchor_type_for_path(profile, path) is None
+        return not self._path_matches_anchor_type(profile, path, anchor_type_id)
+
+    @staticmethod
+    def _custom_workspace_warning(profile: WorkflowProfile) -> str:
+        """Return the warning shown when a structured workflow falls back."""
+
+        return (
+            f"This folder does not match the expected {profile.display_name} "
+            "workflow structure. FrameLab will open it as a Custom workflow so "
+            "you can still scan TIFF files and use the Data and Measure tabs. "
+            "Workflow-derived metadata and Analyze plugins are limited in "
+            "Custom mode."
+        )
+
+    @staticmethod
+    def _nodecard_anchor_type(
+        profile: WorkflowProfile,
+        card,
+    ) -> str | None:
+        """Return the node type declared by a compatible nodecard when present."""
+
+        node_type_id = str(getattr(card, "node_type_id", "") or "").strip().lower()
+        if not node_type_id or node_type_id not in profile.node_type_index:
+            return None
+        profile_id = str(getattr(card, "profile_id", "") or "").strip().lower()
+        if profile_id and profile_id != profile.profile_id:
+            return None
+        return node_type_id
 
     @staticmethod
     def _looks_like_acquisition_anchor(path: Path) -> bool:

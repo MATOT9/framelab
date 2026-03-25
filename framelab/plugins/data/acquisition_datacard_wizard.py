@@ -2034,18 +2034,34 @@ class AcquisitionDatacardWizardPlugin:
     @staticmethod
     def populate_page_menu(host_window: qtw.QWidget, menu: qtw.QMenu) -> None:
         """Populate plugin menu with wizard actions."""
-        open_action = menu.addAction("Open Wizard...")
-        open_action.setToolTip(
-            "Open the acquisition datacard wizard for the selected folder, including any app-overridable eBUS-backed fields.",
+        open_action = getattr(
+            host_window,
+            "_acquisition_datacard_wizard_shortcut_action",
+            None,
         )
-        open_action.setStatusTip(
-            "Open the acquisition datacard wizard for the selected folder, including any app-overridable eBUS-backed fields.",
-        )
-        open_action.triggered.connect(
-            lambda _checked=False: AcquisitionDatacardWizardPlugin.open_wizard(
+        if not isinstance(open_action, QtGui.QAction):
+            open_action = QtGui.QAction("Open Wizard...", host_window)
+            open_action.setToolTip(
+                "Open the acquisition datacard wizard for the selected folder, including any app-overridable eBUS-backed fields.",
+            )
+            open_action.setStatusTip(
+                "Open the acquisition datacard wizard for the selected folder, including any app-overridable eBUS-backed fields.",
+            )
+            open_action.setShortcut(QtGui.QKeySequence("Ctrl+Shift+D"))
+            open_action.setShortcutContext(Qt.WindowShortcut)
+            open_action.triggered.connect(
+                lambda _checked=False: AcquisitionDatacardWizardPlugin.open_wizard(
+                    host_window,
+                ),
+            )
+            if hasattr(host_window, "addAction"):
+                host_window.addAction(open_action)
+            setattr(
                 host_window,
-            ),
-        )
+                "_acquisition_datacard_wizard_shortcut_action",
+                open_action,
+            )
+        menu.addAction(open_action)
         menu.addSeparator()
         mapping_action = menu.addAction("Open Mapping Folder")
         mapping_action.setToolTip(

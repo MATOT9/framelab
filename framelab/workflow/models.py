@@ -35,6 +35,7 @@ class MetadataFieldRule:
     label: str
     group: str
     value_type: str = "any"
+    source_kind: str | None = None
     options: tuple[str, ...] = ()
     required_node_types: tuple[str, ...] = ()
     template_node_types: tuple[str, ...] = ()
@@ -44,6 +45,8 @@ class MetadataFieldRule:
     def applies_as_required(self, node_type_id: str | None) -> bool:
         """Return whether the field is required for the requested node type."""
 
+        if self.source_kind == "ad_hoc":
+            return False
         if node_type_id is None:
             return False
         return node_type_id in self.required_node_types
@@ -51,6 +54,8 @@ class MetadataFieldRule:
     def contributes_to_template(self, node_type_id: str | None) -> bool:
         """Return whether the field contributes to the node-type template."""
 
+        if self.source_kind == "ad_hoc":
+            return False
         if node_type_id is None:
             return False
         return node_type_id in self.template_node_types

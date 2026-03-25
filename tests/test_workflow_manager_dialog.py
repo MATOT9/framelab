@@ -10,6 +10,7 @@ from PySide6.QtCore import Qt
 from tifffile import imwrite
 
 import framelab.acquisition_authoring_dialog as acquisition_authoring_dialog_module
+from framelab.node_metadata import load_nodecard
 from framelab.workflow_manager_dialog import WorkflowManagerDialog
 
 
@@ -219,3 +220,31 @@ def test_workflow_manager_structure_button_opens_menu(
     finally:
         dialog.close()
         dialog.deleteLater()
+
+
+def test_workflow_manager_can_scaffold_empty_trials_root(
+    tmp_path: Path,
+    framelab_window_factory,
+    monkeypatch,
+) -> None:
+    workspace_root = tmp_path / "new-trials-workspace"
+    workspace_root.mkdir()
+    window = framelab_window_factory(enabled_plugin_ids=())
+    dialog = WorkflowManagerDialog(window)
+    dialog._workspace_edit.setText(str(workspace_root))
+    dialog._profile_combo.setCurrentIndex(dialog._profile_combo.findData("trials"))
+    monkeypatch.setattr(
+        window,
+        "_prompt_for_unsupported_workflow_resolution",
+        lambda *_args, **_kwargs: "trials",
+    )
+
+    dialog._load_workflow()
+    saved = load_nodecard(workspace_root)
+
+    assert window.workflow_state_controller.profile_id == "trials"
+    assert window.workflow_state_controller.anchor_type_id == "root"
+    assert window.workflow_state_controller.root_node_id == "trials:root"
+    assert saved.profile_id == "trials"
+    assert saved.node_type_id == "root"
+    assert "empty Trials workflow root" in dialog._warning_label.text()

@@ -22,6 +22,7 @@ class MetricsTableModel(QAbstractTableModel):
         label_for_metadata_field("iris_position"),
         label_for_metadata_field("exposure_ms"),
         "Max Pixel",
+        "ROI Max",
         "Min > 0",
         "# Saturated",
         "Average Metric",
@@ -30,6 +31,7 @@ class MetricsTableModel(QAbstractTableModel):
         "DN/ms",
     )
     SATURATED_ROW_BRUSH = QtGui.QBrush(QtGui.QColor(210, 48, 48, 72))
+    LOW_SIGNAL_ROW_BRUSH = QtGui.QBrush(QtGui.QColor(214, 157, 51, 72))
 
     def __init__(self, parent: Optional[qtw.QWidget] = None) -> None:
         super().__init__(parent)
@@ -37,8 +39,10 @@ class MetricsTableModel(QAbstractTableModel):
         self._iris_positions: Optional[np.ndarray] = None
         self._exposure_ms: Optional[np.ndarray] = None
         self._maxs: Optional[np.ndarray] = None
+        self._roi_maxs: Optional[np.ndarray] = None
         self._min_non_zero: Optional[np.ndarray] = None
         self._sat_counts: Optional[np.ndarray] = None
+        self._low_signal_flags: Optional[np.ndarray] = None
         self._avg_topk: Optional[np.ndarray] = None
         self._avg_topk_std: Optional[np.ndarray] = None
         self._avg_topk_sem: Optional[np.ndarray] = None
@@ -60,13 +64,13 @@ class MetricsTableModel(QAbstractTableModel):
 
     def _base_header_label(self, section: int) -> Optional[str]:
         """Return section label without sort-indicator decorations."""
-        if section == 7:
-            return self._avg_header
         if section == 8:
-            return self._std_header
+            return self._avg_header
         if section == 9:
-            return self._sem_header
+            return self._std_header
         if section == 10:
+            return self._sem_header
+        if section == 11:
             return self._dn_per_ms_header
         if 0 <= section < len(self.HEADERS):
             return self.HEADERS[section]
@@ -80,15 +84,16 @@ class MetricsTableModel(QAbstractTableModel):
             2: "Iris position extracted from selected metadata source.",
             3: "Exposure extracted from selected metadata source (milliseconds).",
             4: "Maximum pixel intensity in the image. Normalized when enabled.",
-            5: "Smallest strictly non-zero pixel intensity in the image.",
-            6: "Count of pixels above the saturation threshold.",
-            7: (
+            5: "Maximum intensity inside the applied ROI for this image.",
+            6: "Smallest strictly non-zero pixel intensity in the image.",
+            7: "Count of pixels above the saturation threshold.",
+            8: (
                 f"{self._avg_header}. Computed from Top-K pixels or ROI, "
                 "depending on average mode."
             ),
-            8: f"{self._std_header} associated with the selected average metric.",
-            9: f"{self._sem_header} associated with the selected average metric.",
-            10: (
+            9: f"{self._std_header} associated with the selected average metric.",
+            10: f"{self._sem_header} associated with the selected average metric.",
+            11: (
                 f"{self._dn_per_ms_header}: average intensity divided by "
                 "exposure time."
             ),
@@ -161,6 +166,12 @@ class MetricsTableModel(QAbstractTableModel):
                 and int(self._sat_counts[row]) > 0
             ):
                 return self.SATURATED_ROW_BRUSH
+            if (
+                self._low_signal_flags is not None
+                and row < len(self._low_signal_flags)
+                and bool(self._low_signal_flags[row])
+            ):
+                return self.LOW_SIGNAL_ROW_BRUSH
             return None
 
         if role == Qt.TextAlignmentRole:
@@ -206,8 +217,17 @@ class MetricsTableModel(QAbstractTableModel):
                 return f"{max_value:.6g}"
             return str(int(self._maxs[row]))
         if col == 5:
-            return str(int(self._min_non_zero[row]))
+            if self._roi_maxs is None or row >= len(self._roi_maxs):
+                return "-"
+            roi_max_value = float(self._roi_maxs[row])
+            if not np.isfinite(roi_max_value):
+                return "-"
+            if self._normalize_intensity and self._normalization_scale > 0.0:
+                roi_max_value /= self._normalization_scale
+            return f"{roi_max_value:.6g}"
         if col == 6:
+            return str(int(self._min_non_zero[row]))
+        if col == 7:
             return str(int(self._sat_counts[row]))
 
         mean_value = float("nan")
@@ -239,19 +259,19 @@ class MetricsTableModel(QAbstractTableModel):
             std_value /= self._normalization_scale
             sem_value /= self._normalization_scale
 
-        if col in (7, 8, 9):
+        if col in (8, 9, 10):
             mean_text, std_text, sem_text = format_metric_triplet(
                 mean_value,
                 std_value,
                 sem_value,
                 self._rounding_mode,
             )
-            if col == 7:
-                return mean_text
             if col == 8:
+                return mean_text
+            if col == 9:
                 return std_text
             return sem_text
-        if col == 10:
+        if col == 11:
             if self._dn_per_ms is None or row >= len(self._dn_per_ms):
                 return "-"
             dn_per_ms = float(self._dn_per_ms[row])
@@ -268,28 +288,28 @@ class MetricsTableModel(QAbstractTableModel):
         if self._avg_header == header_text:
             return
         self._avg_header = header_text
-        self.headerDataChanged.emit(Qt.Horizontal, 7, 7)
+        self.headerDataChanged.emit(Qt.Horizontal, 8, 8)
 
     def set_std_header(self, header_text: str) -> None:
         """Set dynamic label for uncertainty column."""
         if self._std_header == header_text:
             return
         self._std_header = header_text
-        self.headerDataChanged.emit(Qt.Horizontal, 8, 8)
+        self.headerDataChanged.emit(Qt.Horizontal, 9, 9)
 
     def set_sem_header(self, header_text: str) -> None:
         """Set dynamic label for standard-error column."""
         if self._sem_header == header_text:
             return
         self._sem_header = header_text
-        self.headerDataChanged.emit(Qt.Horizontal, 9, 9)
+        self.headerDataChanged.emit(Qt.Horizontal, 10, 10)
 
     def set_dn_per_ms_header(self, header_text: str) -> None:
         """Set dynamic label for DN-per-millisecond column."""
         if self._dn_per_ms_header == header_text:
             return
         self._dn_per_ms_header = header_text
-        self.headerDataChanged.emit(Qt.Horizontal, 10, 10)
+        self.headerDataChanged.emit(Qt.Horizontal, 11, 11)
 
     def set_sort_indicator(
         self,
@@ -334,7 +354,7 @@ class MetricsTableModel(QAbstractTableModel):
         if not self._paths:
             return
         top_left = self.index(0, 4)
-        bottom_right = self.index(len(self._paths) - 1, 10)
+        bottom_right = self.index(len(self._paths) - 1, 11)
         self.dataChanged.emit(top_left, bottom_right, [Qt.DisplayRole])
 
     def set_rounding_mode(self, mode: str) -> None:
@@ -345,8 +365,8 @@ class MetricsTableModel(QAbstractTableModel):
         self._rounding_mode = normalized
         if not self._paths:
             return
-        top_left = self.index(0, 7)
-        bottom_right = self.index(len(self._paths) - 1, 10)
+        top_left = self.index(0, 8)
+        bottom_right = self.index(len(self._paths) - 1, 11)
         self.dataChanged.emit(
             top_left,
             bottom_right,
@@ -359,9 +379,14 @@ class MetricsTableModel(QAbstractTableModel):
             self._avg_mode = "none"
             self._iris_positions = None
             self._exposure_ms = None
+            self._maxs = None
+            self._roi_maxs = None
+            self._min_non_zero = None
+            self._sat_counts = None
             self._avg_topk = None
             self._avg_topk_std = None
             self._avg_topk_sem = None
+            self._low_signal_flags = None
             self._avg_roi = None
             self._avg_roi_std = None
             self._avg_roi_sem = None
@@ -377,8 +402,10 @@ class MetricsTableModel(QAbstractTableModel):
         self._iris_positions = None
         self._exposure_ms = None
         self._maxs = None
+        self._roi_maxs = None
         self._min_non_zero = None
         self._sat_counts = None
+        self._low_signal_flags = None
         self._avg_topk = None
         self._avg_topk_std = None
         self._avg_topk_sem = None
@@ -496,8 +523,10 @@ class MetricsTableModel(QAbstractTableModel):
         iris_positions: np.ndarray,
         exposure_ms: np.ndarray,
         maxs: np.ndarray,
+        roi_maxs: Optional[np.ndarray],
         min_non_zero: np.ndarray,
         sat_counts: np.ndarray,
+        low_signal_flags: Optional[np.ndarray],
         avg_mode: str,
         avg_topk: Optional[np.ndarray],
         avg_topk_std: Optional[np.ndarray],
@@ -519,10 +548,14 @@ class MetricsTableModel(QAbstractTableModel):
             Per-image exposure values in milliseconds.
         maxs : numpy.ndarray
             Per-image max intensity values.
+        roi_maxs : numpy.ndarray or None
+            Per-image maximum intensity values within the applied ROI.
         min_non_zero : numpy.ndarray
             Per-image minimum non-zero values.
         sat_counts : numpy.ndarray
             Per-image saturated pixel counts.
+        low_signal_flags : numpy.ndarray or None
+            Per-image low-signal flags based on the applied low threshold.
         avg_mode : str
             Active averaging mode (``"none"``, ``"topk"``, ``"roi"``).
         avg_topk : numpy.ndarray or None
@@ -553,8 +586,10 @@ class MetricsTableModel(QAbstractTableModel):
             self._iris_positions = iris_positions
             self._exposure_ms = exposure_ms
             self._maxs = maxs
+            self._roi_maxs = roi_maxs
             self._min_non_zero = min_non_zero
             self._sat_counts = sat_counts
+            self._low_signal_flags = low_signal_flags
             self._avg_mode = avg_mode
             self._avg_topk = avg_topk
             self._avg_topk_std = avg_topk_std
@@ -569,8 +604,10 @@ class MetricsTableModel(QAbstractTableModel):
         old_iris_positions = self._iris_positions
         old_exposure_ms = self._exposure_ms
         old_maxs = self._maxs
+        old_roi_maxs = self._roi_maxs
         old_min_non_zero = self._min_non_zero
         old_sat_counts = self._sat_counts
+        old_low_signal_flags = self._low_signal_flags
         old_avg_mode = self._avg_mode
         old_avg_topk = self._avg_topk
         old_avg_topk_std = self._avg_topk_std
@@ -584,8 +621,10 @@ class MetricsTableModel(QAbstractTableModel):
         self._iris_positions = iris_positions
         self._exposure_ms = exposure_ms
         self._maxs = maxs
+        self._roi_maxs = roi_maxs
         self._min_non_zero = min_non_zero
         self._sat_counts = sat_counts
+        self._low_signal_flags = low_signal_flags
         self._avg_mode = avg_mode
         self._avg_topk = avg_topk
         self._avg_topk_std = avg_topk_std
@@ -621,6 +660,10 @@ class MetricsTableModel(QAbstractTableModel):
         )
         self._emit_changes_for_mask(
             5,
+            self._diff_mask_float(old_roi_maxs, self._roi_maxs, n_rows),
+        )
+        self._emit_changes_for_mask(
+            6,
             self._diff_mask_int(old_min_non_zero, self._min_non_zero, n_rows),
         )
         sat_mask = self._diff_mask_int(
@@ -628,9 +671,17 @@ class MetricsTableModel(QAbstractTableModel):
             self._sat_counts,
             n_rows,
         )
-        self._emit_changes_for_mask(6, sat_mask, roles=[Qt.DisplayRole])
+        if old_low_signal_flags is None and self._low_signal_flags is None:
+            low_signal_mask = np.zeros(n_rows, dtype=bool)
+        else:
+            low_signal_mask = self._diff_mask_int(
+                old_low_signal_flags,
+                self._low_signal_flags,
+                n_rows,
+            )
+        self._emit_changes_for_mask(7, sat_mask, roles=[Qt.DisplayRole])
         self._emit_row_role_changes_for_mask(
-            sat_mask,
+            sat_mask | low_signal_mask,
             [Qt.BackgroundRole],
         )
 
@@ -675,11 +726,11 @@ class MetricsTableModel(QAbstractTableModel):
             std_mask = np.zeros(n_rows, dtype=bool)
             sem_mask = np.zeros(n_rows, dtype=bool)
 
-        self._emit_changes_for_mask(7, mean_mask)
-        self._emit_changes_for_mask(8, std_mask)
-        self._emit_changes_for_mask(9, sem_mask)
+        self._emit_changes_for_mask(8, mean_mask)
+        self._emit_changes_for_mask(9, std_mask)
+        self._emit_changes_for_mask(10, sem_mask)
         self._emit_changes_for_mask(
-            10,
+            11,
             self._diff_mask_float(old_dn_per_ms, self._dn_per_ms, n_rows),
         )
         return False
@@ -726,7 +777,7 @@ class MetricsSortProxyModel(QtCore.QSortFilterProxyModel):
                 return str(left_value or "").lower() < str(right_value or "").lower()
             return left_text < right_text
 
-        if column in {2, 3, 4, 5, 6, 7, 8, 9, 10}:
+        if column in {2, 3, 4, 5, 6, 7, 8, 9, 10, 11}:
             left_num = self._numeric_value(left_value)
             right_num = self._numeric_value(right_value)
             if left_num is None and right_num is None:

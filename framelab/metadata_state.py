@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional
 
+from .acquisition_datacard import find_acquisition_root
+from .datacard_authoring.service import load_acquisition_datacard
 from .datacard_authoring.mapping import load_field_mapping
 from .datacard_labels import label_for_metadata_field
 from .node_metadata import (
@@ -16,8 +18,12 @@ from .node_metadata import (
     save_nodecard,
 )
 from .payload_utils import flatten_payload_dict, unflatten_payload_dict
-from .workflow import workflow_profile_by_id
-from .workflow.governance_config import promote_field_rule
+from .workflow import base_workflow_profile_by_id, workflow_profile_by_id
+from .workflow.governance_config import (
+    demote_field_rule,
+    load_governance_overrides,
+    promote_field_rule,
+)
 
 
 def _is_same_or_child_path(path: Path, boundary: Path) -> bool:
@@ -102,6 +108,7 @@ class MetadataFieldSource:
     source_path: Path
     profile_id: str | None = None
     node_type_id: str | None = None
+    storage_kind: str = "nodecard"
 
 
 @dataclass(frozen=True, slots=True)
@@ -239,11 +246,15 @@ class MetadataStateController:
         if governance is not None:
             for rule in governance.field_rules:
                 existing = definitions.get(rule.key)
-                merged_source_kind = (
-                    existing.source_kind
-                    if existing is not None and existing.source_kind == "core"
-                    else "profile"
-                )
+                clean_rule_source_kind = str(rule.source_kind or "").strip().lower()
+                if clean_rule_source_kind in {"core", "profile", "ad_hoc"}:
+                    merged_source_kind = clean_rule_source_kind
+                else:
+                    merged_source_kind = (
+                        existing.source_kind
+                        if existing is not None and existing.source_kind == "core"
+                        else "profile"
+                    )
                 definitions[rule.key] = MetadataFieldDefinition(
                     key=rule.key,
                     label=rule.label or (
@@ -377,7 +388,54 @@ class MetadataStateController:
                         source_path=root.resolve(),
                         profile_id=card.profile_id,
                         node_type_id=card.node_type_id,
+                        storage_kind="nodecard",
                     )
+
+        acquisition_override_keys: set[str] = set()
+        if node_type_id == "acquisition" or self._path_is_acquisition_root(target_dir):
+            card = load_acquisition_datacard(target_dir)
+            datacard_defaults = (
+                deepcopy(card.defaults)
+                if isinstance(card.defaults, dict)
+                else {}
+            )
+            flat_datacard_defaults = flatten_payload_dict(datacard_defaults)
+            if flat_datacard_defaults:
+                merged = _merge_inherit(merged, datacard_defaults)
+                layers.append(
+                    MetadataLayerSnapshot(
+                        source_path=target_dir.resolve(),
+                        provenance="acquisition_datacard",
+                        profile_id=profile_id,
+                        node_type_id="acquisition",
+                        metadata=deepcopy(datacard_defaults),
+                    ),
+                )
+                for key, value in flat_datacard_defaults.items():
+                    if key not in known_keys:
+                        additional_keys.add(key)
+                    if value is None:
+                        continue
+                    field_def = schema_index.get(key)
+                    field_sources[key] = MetadataFieldSource(
+                        key=key,
+                        value=deepcopy(value),
+                        provenance="acquisition_datacard",
+                        schema_source_kind=(
+                            field_def.source_kind if field_def is not None else "ad_hoc"
+                        ),
+                        source_path=target_dir.resolve(),
+                        profile_id=profile_id,
+                        node_type_id="acquisition",
+                        storage_kind="acquisition_datacard_defaults",
+                    )
+            acquisition_override_keys = {
+                str(key).strip()
+                for row in card.overrides
+                for key in row.changes.keys()
+                if str(key).strip()
+            }
+            additional_keys.update(acquisition_override_keys)
 
         if additional_keys:
             schema = self.schema_for_profile(
@@ -398,8 +456,24 @@ class MetadataStateController:
                     source_path=source.source_path,
                     profile_id=source.profile_id,
                     node_type_id=source.node_type_id,
+                    storage_kind=source.storage_kind,
                 )
         flat_metadata = flatten_payload_dict(merged)
+        for key in sorted(acquisition_override_keys):
+            flat_metadata[key] = None
+            field_def = schema_index.get(key)
+            field_sources[key] = MetadataFieldSource(
+                key=key,
+                value=None,
+                provenance="acquisition_override",
+                schema_source_kind=(
+                    field_def.source_kind if field_def is not None else "ad_hoc"
+                ),
+                source_path=target_dir.resolve(),
+                profile_id=profile_id,
+                node_type_id="acquisition",
+                storage_kind="acquisition_datacard_override",
+            )
         validation = self._validate_effective_metadata(
             profile_id=profile_id,
             node_type_id=node_type_id,
@@ -504,6 +578,64 @@ class MetadataStateController:
         self.clear_cache()
         return saved_path
 
+    def demote_field_from_profile(
+        self,
+        profile_id: str | None,
+        *,
+        key: str,
+        label: str,
+        group: str,
+        value_type: str = "string",
+        options: tuple[str, ...] = (),
+        current_source_kind: str | None = None,
+    ) -> Path | None:
+        """Demote one field so it becomes ad-hoc for this workflow profile."""
+
+        if not profile_id:
+            raise ValueError("profile_id is required to demote a field")
+        clean_key = str(key).strip()
+        clean_source_kind = str(current_source_kind or "").strip().lower()
+        if not clean_key:
+            raise ValueError("key is required to demote a field")
+        if clean_source_kind == "ad_hoc":
+            return None
+
+        if (
+            clean_source_kind == "profile"
+            and self.has_profile_field_override(profile_id, key=clean_key)
+            and not self._base_schema_has_field(profile_id, clean_key)
+        ):
+            saved_path = demote_field_rule(profile_id, key=clean_key)
+        else:
+            saved_path = promote_field_rule(
+                str(profile_id),
+                key=clean_key,
+                label=label,
+                group=group,
+                value_type=value_type,
+                source_kind="ad_hoc",
+                options=options,
+            )
+        self.clear_cache()
+        return saved_path
+
+    def has_profile_field_override(
+        self,
+        profile_id: str | None,
+        *,
+        key: str,
+    ) -> bool:
+        """Return whether one field is defined in the user governance overlay."""
+
+        clean_profile_id = str(profile_id or "").strip().lower()
+        clean_key = str(key).strip()
+        if not clean_profile_id or not clean_key:
+            return False
+        override = load_governance_overrides().get(clean_profile_id)
+        if override is None:
+            return False
+        return clean_key in override.field_rule_index()
+
     def _profile_id_for_resolution(
         self,
         roots: tuple[Path, ...],
@@ -516,6 +648,36 @@ class MetadataStateController:
         if controller is None:
             return None
         return getattr(controller, "profile_id", None)
+
+    @staticmethod
+    def _path_is_acquisition_root(path: Path) -> bool:
+        """Return whether ``path`` resolves to the active acquisition root itself."""
+
+        acquisition_root = find_acquisition_root(path, allow_name_only=True)
+        if acquisition_root is None:
+            return False
+        return acquisition_root.resolve() == path.resolve()
+
+    def _base_schema_has_field(
+        self,
+        profile_id: str | None,
+        key: str,
+    ) -> bool:
+        """Return whether a field exists in built-ins or the mapping bridge."""
+
+        clean_key = str(key).strip()
+        if not clean_key:
+            return False
+        try:
+            mapping = load_field_mapping()
+        except Exception:
+            mapping = None
+        if mapping is not None and clean_key in mapping.by_key():
+            return True
+        base_profile = base_workflow_profile_by_id(str(profile_id or ""))
+        if base_profile is None:
+            return False
+        return clean_key in base_profile.metadata_governance.field_rule_index()
 
     @staticmethod
     def _group_name_for_key(key: str, *, source_kind: str) -> str:

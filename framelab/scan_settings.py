@@ -45,6 +45,9 @@ def _legacy_user_config_dir() -> Path:
 
 def app_config_dir() -> Path:
     """Return shareable in-app config directory."""
+    override = os.environ.get("FRAMELAB_CONFIG_DIR", "").strip()
+    if override:
+        return Path(override).expanduser()
     return _repo_root() / _CONFIG_DIR_NAME
 
 

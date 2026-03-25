@@ -136,6 +136,32 @@ def _make_calibration_workspace_with_frames(
     )
 
 
+def _make_trials_workspace_with_frames(
+    tmp_path: Path,
+) -> tuple[Path, Path, Path, str]:
+    workspace_root = tmp_path / "trials"
+    session_root = workspace_root / "trial-alpha" / "camera-a" / "session-1"
+    acquisitions_root = session_root / "acquisitions"
+    acquisitions_root.mkdir(parents=True, exist_ok=True)
+    _write_session_datacard(session_root)
+
+    acquisition_root = acquisitions_root / "acq-0011__scene"
+    acquisition_root.mkdir(parents=True, exist_ok=True)
+    _write_acquisition_datacard(acquisition_root)
+    _write_frame(acquisition_root / "frames" / "f0.tiff", 25)
+
+    acquisition_node_id = (
+        "trials:acquisition:"
+        "trial-alpha/camera-a/session-1/acquisitions/acq-0011__scene"
+    )
+    return (
+        workspace_root,
+        session_root,
+        acquisition_root,
+        acquisition_node_id,
+    )
+
+
 def test_window_restores_and_saves_workflow_context(
     tmp_path: Path,
     monkeypatch,
@@ -362,6 +388,22 @@ def test_workflow_explorer_toggle_action_controls_fallback_breadcrumb(
     window.view_workflow_explorer_action.trigger()
     process_events()
 
+
+def test_datacard_wizard_registers_window_shortcut(
+    framelab_window_factory,
+) -> None:
+    window = framelab_window_factory(
+        enabled_plugin_ids=("acquisition_datacard_wizard",),
+    )
+
+    action = getattr(window, "_acquisition_datacard_wizard_shortcut_action", None)
+
+    assert isinstance(action, QtGui.QAction)
+    assert (
+        action.shortcut().toString()
+        == QtGui.QKeySequence("Ctrl+Shift+D").toString()
+    )
+
     assert not window._workflow_explorer_dock.isHidden()
     assert window._workflow_context_row.isHidden()
 
@@ -392,6 +434,123 @@ def test_load_folder_uses_active_workflow_scope_and_resolves_entered_child_node(
     assert window.dataset_state.dataset_root == first.resolve()
     assert window.dataset_state.path_count() == 1
     assert window.folder_edit.text() == str(first.resolve())
+
+
+def test_unstructured_workflow_loads_as_custom_and_still_scans_tiffs(
+    tmp_path: Path,
+    framelab_window_factory,
+) -> None:
+    folder = tmp_path / "custom-scope"
+    folder.mkdir()
+    imwrite(folder / "sample.tiff", np.full((4, 4), 21, dtype=np.uint16))
+    window = framelab_window_factory(enabled_plugin_ids=())
+
+    window.set_workflow_context(str(folder), "calibration")
+
+    assert window.workflow_state_controller.profile_id == "custom"
+    assert window.workflow_state_controller.is_custom_workspace()
+    assert window.folder_edit.text() == str(folder.resolve())
+    assert window.dataset_state.scope_snapshot.kind == "custom"
+
+    window.load_folder()
+
+    assert window.dataset_state.dataset_root == folder.resolve()
+    assert window.dataset_state.path_count() == 1
+
+
+def test_loading_structured_calibration_folder_from_custom_switches_workflow(
+    tmp_path: Path,
+    framelab_window_factory,
+) -> None:
+    custom_root = tmp_path / "custom-root"
+    custom_root.mkdir()
+    imwrite(custom_root / "sample.tiff", np.full((4, 4), 9, dtype=np.uint16))
+    (
+        _workspace_root,
+        _session_root,
+        first,
+        _second,
+        _session_node_id,
+        _acquisition_node_id,
+    ) = _make_calibration_workspace_with_frames(tmp_path)
+    window = framelab_window_factory(enabled_plugin_ids=())
+    window.set_workflow_context(str(custom_root), "calibration")
+
+    window.folder_edit.setText(str(first / "frames"))
+    window.load_folder()
+
+    assert window.workflow_state_controller.profile_id == "calibration"
+    assert window.workflow_state_controller.anchor_type_id == "acquisition"
+    assert window.workflow_state_controller.active_node_id == "calibration:acquisition"
+    assert window.dataset_state.dataset_root == first.resolve()
+    assert "Detected Calibration workflow" in window.statusBar().currentMessage()
+
+
+def test_loading_structured_trials_folder_from_custom_switches_workflow(
+    tmp_path: Path,
+    framelab_window_factory,
+) -> None:
+    custom_root = tmp_path / "custom-root"
+    custom_root.mkdir()
+    imwrite(custom_root / "sample.tiff", np.full((4, 4), 9, dtype=np.uint16))
+    _workspace_root, _session_root, acquisition_root, _acquisition_node_id = (
+        _make_trials_workspace_with_frames(tmp_path)
+    )
+    window = framelab_window_factory(enabled_plugin_ids=())
+    window.set_workflow_context(str(custom_root), "calibration")
+
+    window.folder_edit.setText(str(acquisition_root / "frames"))
+    window.load_folder()
+
+    assert window.workflow_state_controller.profile_id == "trials"
+    assert window.workflow_state_controller.anchor_type_id == "acquisition"
+    assert window.workflow_state_controller.active_node_id == "trials:acquisition"
+    assert window.dataset_state.dataset_root == acquisition_root.resolve()
+    assert "Detected Trials workflow" in window.statusBar().currentMessage()
+
+
+def test_custom_workflow_can_scan_plain_tiff_subfolder_without_reverting_to_root(
+    tmp_path: Path,
+    framelab_window_factory,
+) -> None:
+    custom_root = tmp_path / "custom-root"
+    custom_root.mkdir()
+    imwrite(custom_root / "sample.tiff", np.full((4, 4), 9, dtype=np.uint16))
+    plain_child = custom_root / "nested"
+    plain_child.mkdir()
+    imwrite(plain_child / "nested.tiff", np.full((4, 4), 12, dtype=np.uint16))
+
+    window = framelab_window_factory(enabled_plugin_ids=())
+    window.set_workflow_context(str(custom_root), "calibration")
+
+    window.folder_edit.setText(str(plain_child))
+    window.load_folder()
+
+    assert window.workflow_state_controller.profile_id == "custom"
+    assert window.dataset_state.dataset_root == plain_child.resolve()
+    assert window.dataset_state.scope_snapshot.source == "manual"
+
+
+def test_scaffolded_empty_calibration_root_enables_root_create_actions(
+    tmp_path: Path,
+    framelab_window_factory,
+) -> None:
+    workspace_root = tmp_path / "empty-calibration"
+    window = framelab_window_factory(enabled_plugin_ids=())
+    window._scaffold_structured_workflow_root(workspace_root, "calibration")
+    window.set_workflow_context(
+        str(workspace_root),
+        "calibration",
+        anchor_type_id="root",
+    )
+
+    state = window._workflow_structure_action_state("calibration:root")
+
+    assert window.workflow_state_controller.profile_id == "calibration"
+    assert window.workflow_state_controller.root_node_id == "calibration:root"
+    assert state["can_create_child"]
+    assert state["create_child_type_id"] == "camera"
+    assert state["create_action_text"] == "New Camera..."
 
 
 def test_metadata_context_change_refreshes_only_affected_loaded_subtree(

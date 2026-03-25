@@ -267,7 +267,7 @@ class WorkflowLineageRail(qtw.QFrame):
                 parent=self,
             )
             self._rows_layout.insertWidget(self._rows_layout.count() - 1, row)
-        self.setVisible(bool(rows or has_context))
+        self.setVisible(bool(rows or has_context or self._empty_label.text().strip()))
 
     def entry_labels(self) -> tuple[str, ...]:
         """Return visible lineage labels for tests and diagnostics."""

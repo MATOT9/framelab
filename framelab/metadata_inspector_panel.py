@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from PySide6 import QtCore, QtWidgets as qtw
+from PySide6 import QtCore, QtGui, QtWidgets as qtw
 from PySide6.QtCore import Qt
 
 from .datacard_labels import label_for_metadata_field
@@ -19,6 +19,8 @@ from .ui_primitives import (
     make_status_chip,
 )
 from .workflow_widgets import WorkflowBreadcrumbBar, set_chip_cell
+
+METADATA_FIELD_MIME_TYPE = "application/x-framelab-metadata-field"
 
 
 def display_metadata_value(value: Any) -> str:
@@ -56,16 +58,21 @@ def format_metadata_source_badge(
         return ("None", "neutral", f"{key}\nNo resolved source.", "", "")
 
     provenance_text = str(source.provenance or "none").replace("_", " ").strip()
-    base_text = "Local" if source.provenance == "node_local" else (
-        "Inherited" if source.provenance == "node_inherited" else provenance_text.title()
-    )
-    level = (
-        "success"
-        if source.provenance == "node_local"
-        else "info"
-        if source.provenance == "node_inherited"
-        else "neutral"
-    )
+    if source.provenance == "node_local":
+        base_text = "Local"
+        level = "success"
+    elif source.provenance == "node_inherited":
+        base_text = "Inherited"
+        level = "info"
+    elif source.provenance == "acquisition_datacard":
+        base_text = "Datacard"
+        level = "success"
+    elif source.provenance == "acquisition_override":
+        base_text = "Override"
+        level = "warning"
+    else:
+        base_text = provenance_text.title()
+        level = "neutral"
     schema_kind = (
         str(field_def.source_kind).replace("_", " ").strip()
         if field_def is not None and str(field_def.source_kind).strip()
@@ -85,7 +92,43 @@ def format_metadata_source_badge(
             f"Node: {source_path}",
         ],
     )
+    if source.provenance == "acquisition_override":
+        tooltip += "\nValue varies by frame due to acquisition override rows."
     return (base_text, level, tooltip, node_label, str(source_path))
+
+
+class MetadataDragTable(qtw.QTableWidget):
+    """Table widget that can start a metadata-field drag when a row is selected."""
+
+    def __init__(
+        self,
+        *,
+        payload_provider,
+        parent: qtw.QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self._payload_provider = payload_provider
+        self.setDragEnabled(True)
+        self.setDragDropMode(qtw.QAbstractItemView.DragOnly)
+        self.setDefaultDropAction(Qt.MoveAction)
+
+    def startDrag(self, supported_actions: Qt.DropActions) -> None:
+        """Start a field-move drag when the current selection resolves to metadata."""
+
+        payload = self._payload_provider() if callable(self._payload_provider) else None
+        if not isinstance(payload, dict):
+            return
+        mime = QtCore.QMimeData()
+        mime.setData(
+            METADATA_FIELD_MIME_TYPE,
+            QtCore.QByteArray(
+                json.dumps(payload, ensure_ascii=True, sort_keys=True).encode("utf-8"),
+            ),
+        )
+        mime.setText(str(payload.get("label") or payload.get("key") or "Metadata Field"))
+        drag = QtGui.QDrag(self)
+        drag.setMimeData(mime)
+        drag.exec(Qt.MoveAction)
 
 
 class MetadataInspectorPanel(qtw.QWidget):
@@ -164,7 +207,10 @@ class MetadataInspectorPanel(qtw.QWidget):
         effective_title = qtw.QLabel("Effective Metadata")
         effective_title.setObjectName("SectionTitle")
         effective_layout.addWidget(effective_title)
-        self._effective_table = qtw.QTableWidget(0, 4)
+        self._effective_table = MetadataDragTable(
+            payload_provider=self._drag_payload_for_selected_field,
+        )
+        self._effective_table.setColumnCount(4)
         self._effective_table.setHorizontalHeaderLabels(
             ["Field", "Value", "Source", "Node"],
         )
@@ -172,19 +218,26 @@ class MetadataInspectorPanel(qtw.QWidget):
         self._effective_table.setSelectionBehavior(qtw.QAbstractItemView.SelectRows)
         self._effective_table.setAlternatingRowColors(True)
         self._effective_table.verticalHeader().setVisible(False)
-        self._effective_table.horizontalHeader().setStretchLastSection(True)
+        self._effective_table.horizontalHeader().setStretchLastSection(False)
         self._effective_table.horizontalHeader().setSectionResizeMode(
             0,
+            qtw.QHeaderView.Interactive,
+        )
+        self._effective_table.horizontalHeader().setSectionResizeMode(
+            1,
             qtw.QHeaderView.Stretch,
         )
         self._effective_table.horizontalHeader().setSectionResizeMode(
             2,
-            qtw.QHeaderView.ResizeToContents,
+            qtw.QHeaderView.Interactive,
         )
         self._effective_table.horizontalHeader().setSectionResizeMode(
             3,
-            qtw.QHeaderView.ResizeToContents,
+            qtw.QHeaderView.Interactive,
         )
+        self._effective_table.setColumnWidth(0, 220)
+        self._effective_table.setColumnWidth(2, 170)
+        self._effective_table.setColumnWidth(3, 190)
         effective_layout.addWidget(self._effective_table, 1)
         splitter.addWidget(effective_panel)
 
@@ -195,7 +248,10 @@ class MetadataInspectorPanel(qtw.QWidget):
         local_title = qtw.QLabel("Local Metadata")
         local_title.setObjectName("SectionTitle")
         local_layout.addWidget(local_title)
-        self._local_table = qtw.QTableWidget(0, 2)
+        self._local_table = MetadataDragTable(
+            payload_provider=self._drag_payload_for_selected_field,
+        )
+        self._local_table.setColumnCount(2)
         self._local_table.setHorizontalHeaderLabels(["Key", "Value"])
         self._local_table.setSelectionBehavior(qtw.QAbstractItemView.SelectRows)
         self._local_table.setAlternatingRowColors(True)
@@ -228,6 +284,8 @@ class MetadataInspectorPanel(qtw.QWidget):
         self._apply_template_button.clicked.connect(self._apply_template)
         self._promote_field_button = qtw.QPushButton("Promote Field")
         self._promote_field_button.clicked.connect(self._promote_selected_field)
+        self._demote_field_button = qtw.QPushButton("Demote Field")
+        self._demote_field_button.clicked.connect(self._demote_selected_field)
         self._advanced_button = qtw.QToolButton()
         self._advanced_button.setObjectName("DockActionButton")
         self._advanced_button.setText("Advanced")
@@ -252,6 +310,12 @@ class MetadataInspectorPanel(qtw.QWidget):
         self._advanced_promote_action.triggered.connect(
             self._promote_selected_field,
         )
+        self._advanced_demote_action = self._advanced_menu.addAction(
+            "Demote Field from Profile",
+        )
+        self._advanced_demote_action.triggered.connect(
+            self._demote_selected_field,
+        )
         self._advanced_menu.addSeparator()
         self._advanced_open_dialog_action = self._advanced_menu.addAction(
             "Open Metadata Governance Tools...",
@@ -260,11 +324,13 @@ class MetadataInspectorPanel(qtw.QWidget):
             self._open_advanced_metadata_tools,
         )
         self._advanced_button.setMenu(self._advanced_menu)
+        self._apply_action_tooltips()
         if self._advanced_mode:
             actions.addWidget(self._add_field_button)
             actions.addWidget(self._add_group_button)
             actions.addWidget(self._apply_template_button)
             actions.addWidget(self._promote_field_button)
+            actions.addWidget(self._demote_field_button)
             self._advanced_button.setVisible(False)
         else:
             actions.addWidget(self._advanced_button)
@@ -272,8 +338,9 @@ class MetadataInspectorPanel(qtw.QWidget):
             self._add_group_button.setVisible(False)
             self._apply_template_button.setVisible(False)
             self._promote_field_button.setVisible(False)
+            self._demote_field_button.setVisible(False)
         self._remove_field_button = qtw.QPushButton("Remove Selected")
-        self._remove_field_button.clicked.connect(self._remove_selected_local_rows)
+        self._remove_field_button.clicked.connect(self._remove_selected_rows)
         actions.addWidget(self._remove_field_button)
         self._revert_button = qtw.QPushButton("Revert")
         self._revert_button.clicked.connect(self.sync_from_host)
@@ -338,6 +405,7 @@ class MetadataInspectorPanel(qtw.QWidget):
         if hasattr(self._summary_strip, "apply_density"):
             self._summary_strip.apply_density(tokens)
         self._splitter.setHandleWidth(max(8, tokens.panel_spacing + 2))
+        self._resize_effective_table_columns()
 
     def sync_from_host(self) -> None:
         """Refresh effective and local metadata from the active workflow node."""
@@ -510,9 +578,19 @@ class MetadataInspectorPanel(qtw.QWidget):
                 field_def.label if field_def is not None else label_for_metadata_field(key),
             )
             label_item.setToolTip(key)
-            value_item = qtw.QTableWidgetItem(display_metadata_value(value))
-            value_item.setToolTip(display_metadata_value(value))
             source = field_sources.get(key)
+            display_value = (
+                ""
+                if source is not None and source.provenance == "acquisition_override"
+                else display_metadata_value(value)
+            )
+            value_tooltip = (
+                "Value varies by frame in acquisition override rows."
+                if source is not None and source.provenance == "acquisition_override"
+                else display_value
+            )
+            value_item = qtw.QTableWidgetItem(display_value)
+            value_item.setToolTip(value_tooltip)
             source_text, source_level, source_tooltip, node_text, node_tooltip = (
                 format_metadata_source_badge(
                     key,
@@ -539,6 +617,7 @@ class MetadataInspectorPanel(qtw.QWidget):
             )
             self._effective_table.setItem(row, 3, node_item)
         self._effective_table.resizeRowsToContents()
+        self._resize_effective_table_columns()
 
     def _populate_local_table(self, local_flat: dict[str, Any]) -> None:
         """Populate the editable local metadata table."""
@@ -655,8 +734,59 @@ class MetadataInspectorPanel(qtw.QWidget):
         )
         for row in selected_rows:
             self._local_table.removeRow(row)
-        if self._local_table.rowCount() == 0:
-            self._remove_field_button.setEnabled(False)
+        self._sync_action_state(has_active_node=self._last_active_node is not None)
+
+    def _selected_effective_removal_payload(self) -> dict[str, Any] | None:
+        """Return removable storage payload for the selected effective field."""
+
+        if self._last_effective_snapshot is None or self._last_active_node is None:
+            return None
+        selected_key = self._selected_metadata_key()
+        if not selected_key:
+            return None
+        source = self._last_effective_snapshot.field_sources.get(selected_key)
+        if source is None:
+            return None
+        active_path = self._last_active_node.folder_path.resolve()
+        source_path = source.source_path.resolve()
+        if source_path != active_path:
+            return None
+        if source.storage_kind not in {
+            "nodecard",
+            "acquisition_datacard_defaults",
+            "acquisition_datacard_override",
+        }:
+            return None
+        field_def = self._last_effective_snapshot.schema.by_key().get(selected_key)
+        return {
+            "key": selected_key,
+            "label": (
+                field_def.label
+                if field_def is not None
+                else label_for_metadata_field(selected_key)
+            ),
+            "source_path": str(source_path),
+            "storage_kind": source.storage_kind,
+        }
+
+    def _remove_selected_rows(self) -> None:
+        """Remove selected metadata from the local editor or backing store."""
+
+        has_local_selection = bool(
+            self._local_table.selectionModel().selectedRows(),
+        )
+        if has_local_selection:
+            self._remove_selected_local_rows()
+            return
+
+        payload = self._selected_effective_removal_payload()
+        if payload is None:
+            return
+        remove_field = getattr(self._host_window, "_remove_metadata_field_payload", None)
+        if not callable(remove_field):
+            return
+        remove_field(payload)
+        self.sync_from_host()
 
     def _collect_local_metadata(self) -> dict[str, Any]:
         """Collect nested metadata payload from the editor table."""
@@ -731,6 +861,40 @@ class MetadataInspectorPanel(qtw.QWidget):
                 return item.text().strip()
         return None
 
+    def _selected_metadata_source(self):
+        """Return the effective source record for the currently selected key."""
+
+        selected_key = self._selected_metadata_key()
+        if not selected_key or self._last_effective_snapshot is None:
+            return None
+        return self._last_effective_snapshot.field_sources.get(selected_key)
+
+    def _drag_payload_for_selected_field(self) -> dict[str, Any] | None:
+        """Build one drag payload for the current inspector field selection."""
+
+        selected_key = self._selected_metadata_key()
+        if not selected_key or self._last_effective_snapshot is None:
+            return None
+        source = self._last_effective_snapshot.field_sources.get(selected_key)
+        if source is None:
+            return None
+        field_def = self._last_effective_snapshot.schema.by_key().get(selected_key)
+        return {
+            "key": selected_key,
+            "label": (
+                field_def.label
+                if field_def is not None
+                else label_for_metadata_field(selected_key)
+            ),
+            "value": source.value,
+            "source_path": str(source.source_path),
+            "profile_id": source.profile_id,
+            "node_type_id": source.node_type_id,
+            "provenance": source.provenance,
+            "schema_source_kind": source.schema_source_kind,
+            "storage_kind": source.storage_kind,
+        }
+
     def _promote_selected_field(self) -> None:
         """Promote the selected ad-hoc field into the profile schema overlay."""
 
@@ -771,6 +935,46 @@ class MetadataInspectorPanel(qtw.QWidget):
         )
         self.sync_from_host()
 
+    def _demote_selected_field(self) -> None:
+        """Demote the selected field so it becomes ad-hoc for this profile."""
+
+        metadata_controller = getattr(self._host_window, "metadata_state_controller", None)
+        selected_key = self._selected_metadata_key()
+        if metadata_controller is None or not selected_key or not self._last_profile_id:
+            return
+        schema = (
+            self._last_effective_snapshot.schema.by_key()
+            if self._last_effective_snapshot is not None
+            else {}
+        )
+        field_def = schema.get(selected_key)
+        if field_def is None or field_def.source_kind == "ad_hoc":
+            return
+        metadata_controller.demote_field_from_profile(
+            self._last_profile_id,
+            key=selected_key,
+            label=(
+                field_def.label
+                if field_def is not None
+                else label_for_metadata_field(selected_key)
+            ),
+            group=(
+                field_def.group
+                if field_def is not None
+                else selected_key.split(".", 1)[0].replace("_", " ").title()
+            ),
+            value_type=(
+                field_def.value_type
+                if field_def is not None
+                else self._infer_metadata_value_type(
+                    self._selected_metadata_value(selected_key),
+                )
+            ),
+            options=field_def.options if field_def is not None else (),
+            current_source_kind=field_def.source_kind if field_def is not None else None,
+        )
+        self.sync_from_host()
+
     def _open_advanced_metadata_tools(self) -> None:
         """Reveal the detached advanced metadata tool surface."""
 
@@ -781,28 +985,58 @@ class MetadataInspectorPanel(qtw.QWidget):
     def _on_selection_changed(self) -> None:
         """Refresh action enablement when the current row selection changes."""
 
+        sender = self.sender()
+        if sender is self._effective_table:
+            blocker = QtCore.QSignalBlocker(self._local_table.selectionModel())
+            self._local_table.clearSelection()
+            del blocker
+        elif sender is self._local_table:
+            blocker = QtCore.QSignalBlocker(self._effective_table.selectionModel())
+            self._effective_table.clearSelection()
+            del blocker
         self._sync_action_state(has_active_node=self._last_active_node is not None)
 
     def _sync_action_state(self, *, has_active_node: bool) -> None:
         """Enable or disable local-editing actions."""
 
+        metadata_controller = getattr(self._host_window, "metadata_state_controller", None)
         allow_ad_hoc_fields = self._can_add_ad_hoc_fields()
         allow_ad_hoc_groups = self._can_add_ad_hoc_groups()
-        self._add_field_button.setEnabled(has_active_node and allow_ad_hoc_fields)
-        self._add_group_button.setEnabled(has_active_node and allow_ad_hoc_groups)
-        self._add_field_button.setToolTip(
-            ""
-            if allow_ad_hoc_fields
-            else "This workflow profile locks new ad-hoc metadata fields.",
+        can_add_field = bool(has_active_node and allow_ad_hoc_fields)
+        can_add_group = bool(has_active_node and allow_ad_hoc_groups)
+        self._add_field_button.setEnabled(can_add_field)
+        self._add_group_button.setEnabled(can_add_group)
+        self._set_control_tooltip(
+            self._add_field_button,
+            enabled_text=(
+                "Add a new local metadata key that exists only on this node unless "
+                "you later promote it."
+            ),
+            disabled_text=(
+                "Load an active workflow node and use a profile that allows "
+                "ad-hoc metadata fields."
+            ),
+            enabled=can_add_field,
         )
-        self._add_group_button.setToolTip(
-            ""
-            if allow_ad_hoc_groups
-            else "This workflow profile locks new ad-hoc metadata groups.",
+        self._set_control_tooltip(
+            self._add_group_button,
+            enabled_text=(
+                "Create a new ad-hoc metadata group and seed it with one starter field."
+            ),
+            disabled_text=(
+                "Load an active workflow node and use a profile that allows "
+                "ad-hoc metadata groups."
+            ),
+            enabled=can_add_group,
         )
-        self._remove_field_button.setEnabled(
-            has_active_node and self._local_table.rowCount() > 0,
+        can_remove_selected = bool(
+            has_active_node
+            and (
+                self._local_table.selectionModel().selectedRows()
+                or self._selected_effective_removal_payload() is not None
+            )
         )
+        self._remove_field_button.setEnabled(can_remove_selected)
         has_template = bool(
             self._last_effective_snapshot is not None
             and self._last_effective_snapshot.validation.template_keys
@@ -823,20 +1057,182 @@ class MetadataInspectorPanel(qtw.QWidget):
                 or field_def.source_kind == "ad_hoc"
             )
         )
+        can_demote = bool(
+            has_active_node
+            and metadata_controller is not None
+            and self._last_profile_id
+            and selected_key
+            and (
+                field_def is not None
+                and field_def.source_kind != "ad_hoc"
+            )
+        )
         self._promote_field_button.setEnabled(can_promote)
+        self._demote_field_button.setEnabled(can_demote)
         self._advanced_button.setEnabled(has_active_node)
         self._advanced_add_field_action.setEnabled(
-            has_active_node and allow_ad_hoc_fields,
+            can_add_field,
         )
         self._advanced_add_group_action.setEnabled(
-            has_active_node and allow_ad_hoc_groups,
+            can_add_group,
         )
         self._advanced_apply_template_action.setEnabled(has_active_node and has_template)
         self._advanced_promote_action.setEnabled(can_promote)
+        self._advanced_demote_action.setEnabled(can_demote)
         self._advanced_open_dialog_action.setEnabled(True)
         self._revert_button.setEnabled(has_active_node)
         self._refresh_button.setEnabled(has_active_node)
         self._save_button.setEnabled(has_active_node)
+        self._set_control_tooltip(
+            self._apply_template_button,
+            enabled_text=(
+                "Apply the current profile template for this node type while preserving "
+                "existing local values."
+            ),
+            disabled_text="No profile template is defined for this node type yet.",
+            enabled=has_template,
+        )
+        self._set_control_tooltip(
+            self._promote_field_button,
+            enabled_text=(
+                "Turn the selected ad-hoc field into a profile-defined field so it is "
+                "recognized across this workflow profile."
+            ),
+            disabled_text="Select an ad-hoc field to promote it into the profile schema.",
+            enabled=can_promote,
+        )
+        self._set_control_tooltip(
+            self._demote_field_button,
+            enabled_text=(
+                "Demote the selected field so it becomes ad-hoc for this workflow "
+                "profile instead of remaining locked to the governed schema."
+            ),
+            disabled_text=(
+                "Select a governed field to demote it into ad-hoc metadata."
+            ),
+            enabled=can_demote,
+        )
+        self._set_control_tooltip(
+            self._remove_field_button,
+            enabled_text=(
+                "Remove the selected metadata from this node. Effective rows remove "
+                "their real local backing entry when that source belongs to the "
+                "active node."
+            ),
+            disabled_text=(
+                "Select local rows or a removable effective field on this node."
+            ),
+            enabled=can_remove_selected,
+        )
+        self._set_control_tooltip(
+            self._revert_button,
+            enabled_text="Discard unsaved table edits and reload metadata from disk.",
+            disabled_text="Load an active workflow node to edit local metadata.",
+            enabled=has_active_node,
+        )
+        self._set_control_tooltip(
+            self._refresh_button,
+            enabled_text="Reload effective and local metadata for the active node.",
+            disabled_text="Load an active workflow node to inspect metadata.",
+            enabled=has_active_node,
+        )
+        self._set_control_tooltip(
+            self._save_button,
+            enabled_text="Write the Local Metadata table back into this node's nodecard.",
+            disabled_text="Load an active workflow node before saving local metadata.",
+            enabled=has_active_node,
+        )
+
+    def _apply_action_tooltips(self) -> None:
+        """Configure persistent button and menu help text."""
+
+        self._set_tooltip(
+            self._advanced_button,
+            "Open metadata authoring and governance actions for the selected node.",
+        )
+        self._set_tooltip(
+            self._advanced_add_field_action,
+            "Add a new local metadata key on this node.",
+        )
+        self._set_tooltip(
+            self._advanced_add_group_action,
+            "Create a new ad-hoc metadata group and one starter field.",
+        )
+        self._set_tooltip(
+            self._advanced_apply_template_action,
+            "Apply the current profile template for this node type.",
+        )
+        self._set_tooltip(
+            self._advanced_promote_action,
+            "Promote the selected ad-hoc field into the profile schema overlay.",
+        )
+        self._set_tooltip(
+            self._advanced_demote_action,
+            "Demote the selected field so it becomes ad-hoc in this workflow profile.",
+        )
+        self._set_tooltip(
+            self._advanced_open_dialog_action,
+            "Open the detached advanced metadata tools window.",
+        )
+
+    @staticmethod
+    def _set_tooltip(target: object, text: str) -> None:
+        """Apply tooltip and status-tip text when the target supports it."""
+
+        clean_text = " ".join(str(text).split())
+        set_tooltip = getattr(target, "setToolTip", None)
+        if callable(set_tooltip):
+            set_tooltip(clean_text)
+        set_status_tip = getattr(target, "setStatusTip", None)
+        if callable(set_status_tip):
+            set_status_tip(clean_text)
+
+    def _set_control_tooltip(
+        self,
+        target: object,
+        *,
+        enabled_text: str,
+        disabled_text: str,
+        enabled: bool,
+    ) -> None:
+        """Apply contextual help text for one button-like control."""
+
+        self._set_tooltip(
+            target,
+            enabled_text if enabled else disabled_text,
+        )
+
+    def _resize_effective_table_columns(self) -> None:
+        """Size the effective-metadata columns so source and node text stay readable."""
+
+        table = self._effective_table
+        if table.columnCount() < 4:
+            return
+
+        header = table.horizontalHeader()
+        metrics = header.fontMetrics()
+
+        def _header_width(column: int) -> int:
+            item = table.horizontalHeaderItem(column)
+            label = item.text() if item is not None else ""
+            return metrics.horizontalAdvance(label) + 26
+
+        source_width = _header_width(2)
+        node_width = _header_width(3)
+
+        for row in range(table.rowCount()):
+            source_widget = table.cellWidget(row, 2)
+            if source_widget is not None:
+                source_width = max(source_width, source_widget.sizeHint().width() + 22)
+            node_item = table.item(row, 3)
+            if node_item is not None:
+                node_width = max(
+                    node_width,
+                    table.fontMetrics().horizontalAdvance(node_item.text()) + 28,
+                )
+
+        table.setColumnWidth(2, max(150, source_width))
+        table.setColumnWidth(3, max(170, node_width))
 
     @staticmethod
     def _sanitize_key_token(value: str) -> str:

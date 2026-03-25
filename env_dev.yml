@@ -128,6 +128,7 @@ dependencies:
   - pyside6=6.10.2=py314h447aaf0_1
   - pysocks=1.7.1=pyh09c184e_7
   - pytest=9.0.2=pyhcf101f3_0
+  - pytest-xdist
   - python=3.14.3=h4b44e0e_101_cp314
   - python-dateutil=2.9.0.post0=pyhe01879c_2
   - python_abi=3.14=8_cp314

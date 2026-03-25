@@ -59,10 +59,14 @@ class MetadataInspectorDock(qtw.QDockWidget):
         self._add_group_button = self._panel._add_group_button
         self._apply_template_button = self._panel._apply_template_button
         self._promote_field_button = self._panel._promote_field_button
+        self._demote_field_button = self._panel._demote_field_button
+        self._advanced_promote_action = self._panel._advanced_promote_action
+        self._advanced_demote_action = self._panel._advanced_demote_action
         self._add_local_row = self._panel._add_local_row
         self._add_ad_hoc_group = self._panel._add_ad_hoc_group
         self._apply_template = self._panel._apply_template
         self._promote_selected_field = self._panel._promote_selected_field
+        self._demote_selected_field = self._panel._demote_selected_field
         self._save_local_metadata = self._panel._save_local_metadata
         self.setWidget(self._panel)
         self.visibilityChanged.connect(self._on_visibility_changed)

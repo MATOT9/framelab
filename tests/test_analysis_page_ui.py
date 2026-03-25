@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from pathlib import Path
 
 import numpy as np
 import pytest
 from PySide6 import QtWidgets as qtw
+from tifffile import imwrite
 
 from framelab.plugins.analysis.iris_gain._shared import _CurveSeries
 from framelab.ui_settings import DensityMode
@@ -301,3 +303,35 @@ def test_visible_analysis_page_coalesces_multiple_context_invalidations(
 
     assert len(calls) == 1
     assert not analysis_window._analysis_context_dirty
+
+
+def test_custom_workflow_disables_analysis_context_delivery(
+    analysis_window: FrameLabWindow,
+    process_events,
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    folder = tmp_path / "custom-workflow"
+    folder.mkdir()
+    imwrite(folder / "frame_0001.tiff", np.full((4, 4), 12, dtype=np.uint16))
+    analysis_window.set_workflow_context(str(folder), "calibration")
+    analysis_window.load_folder()
+    plugin = analysis_window._current_analysis_plugin()
+
+    assert plugin is not None
+    initial_context = plugin._context
+    calls: list[object] = []
+    original = plugin.on_context_changed
+
+    def _wrapped(context) -> None:
+        calls.append(context)
+        original(context)
+
+    monkeypatch.setattr(plugin, "on_context_changed", _wrapped)
+
+    _show_analysis_page(analysis_window, process_events)
+
+    assert calls == []
+    assert analysis_window._analysis_unavailable_frame.isVisible()
+    assert analysis_window.analysis_main_splitter.isHidden()
+    assert plugin._context is initial_context

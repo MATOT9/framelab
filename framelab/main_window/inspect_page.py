@@ -163,6 +163,32 @@ class InspectPageMixin:
 
         metrics_row.addSpacing(12)
 
+        low_signal_label = qtw.QLabel("Low Signal Threshold (<=)")
+        low_signal_label.setObjectName("SectionTitle")
+        metrics_row.addWidget(low_signal_label)
+
+        self.low_signal_spin = qtw.QDoubleSpinBox(decimals=0)
+        self.low_signal_spin.setRange(0, 2**16)
+        self.low_signal_spin.setValue(0)
+        self.low_signal_spin.setSingleStep(1)
+        self.low_signal_spin.setMinimumWidth(110)
+        self.low_signal_spin.setToolTip(
+            "Images with max pixel at or below this value are flagged as low signal. "
+            "Set to 0 to disable.",
+        )
+        metrics_row.addWidget(self.low_signal_spin)
+
+        apply_low_signal_button = qtw.QPushButton("Apply")
+        apply_low_signal_button.setToolTip(
+            "Apply low-signal threshold and refresh row highlighting.",
+        )
+        apply_low_signal_button.clicked.connect(
+            lambda _checked=False: self._apply_low_signal_threshold_update()
+        )
+        metrics_row.addWidget(apply_low_signal_button)
+
+        metrics_row.addSpacing(12)
+
         mode_label = qtw.QLabel("Average Mode")
         mode_label.setObjectName("SectionTitle")
         metrics_row.addWidget(mode_label)
@@ -334,6 +360,7 @@ class InspectPageMixin:
         header.setSectionResizeMode(8, qtw.QHeaderView.ResizeToContents)
         header.setSectionResizeMode(9, qtw.QHeaderView.ResizeToContents)
         header.setSectionResizeMode(10, qtw.QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(11, qtw.QHeaderView.ResizeToContents)
         install_large_header_resize_cursor(header)
         selection_model = self.table.selectionModel()
         if selection_model is not None:
@@ -557,7 +584,10 @@ class InspectPageMixin:
 
         if hasattr(self, "_measure_summary_strip"):
             self._measure_summary_strip.set_collapsed(not policy.show_summary_strip)
+        if hasattr(self, "_measure_header"):
+            self._measure_header.set_compact_chip_mode(not policy.show_summary_strip)
         self._set_measure_help_visibility(policy.show_measure_help_labels)
+        self._refresh_measure_header_state()
 
     def _set_measure_help_visibility(self, visible: bool) -> None:
         """Show contextual preview help only when both policy and preview allow it."""
@@ -952,6 +982,12 @@ class InspectPageMixin:
             and hasattr(self, "threshold_spin")
             and float(self.threshold_spin.value()) != float(metrics.threshold_value)
         )
+        pending_low_signal_apply = (
+            has_data
+            and hasattr(self, "low_signal_spin")
+            and float(self.low_signal_spin.value())
+            != float(metrics.low_signal_threshold_value)
+        )
         if not has_data:
             saturation_text = "None"
             saturation_level = "neutral"
@@ -991,6 +1027,37 @@ class InspectPageMixin:
                 f"at threshold {float(metrics.threshold_value):g}."
             )
 
+        low_signal_threshold = float(metrics.low_signal_threshold_value)
+        if low_signal_threshold <= 0.0:
+            low_signal_text = "Inactive"
+            low_signal_level = "neutral"
+            low_signal_tooltip = (
+                "Set a low-signal threshold to flag images whose max pixel is too low."
+            )
+        elif pending_low_signal_apply:
+            low_signal_text = "Awaiting apply"
+            low_signal_level = "warning"
+            low_signal_tooltip = (
+                "Low-signal threshold changed in the control bar. Apply it to refresh "
+                "low-signal row highlighting."
+            )
+        else:
+            low_signal_images = (
+                metrics.low_signal_image_count(path_count=dataset.path_count())
+                if has_data
+                else 0
+            )
+            low_signal_text = str(low_signal_images)
+            low_signal_level = (
+                "warning"
+                if low_signal_images > 0
+                else ("success" if has_data else "neutral")
+            )
+            low_signal_tooltip = (
+                f"{low_signal_images} image(s) have max pixel at or below "
+                f"{low_signal_threshold:g}."
+            )
+
         dn_per_ms_ready = bool(
             metrics.dn_per_ms_values is not None
             and np.any(np.isfinite(np.asarray(metrics.dn_per_ms_values, dtype=np.float64)))
@@ -1023,6 +1090,27 @@ class InspectPageMixin:
                     tooltip=self._processing_failure_summary_text(),
                 ),
             )
+        summary_collapsed = bool(
+            hasattr(self, "_measure_summary_strip")
+            and self._measure_summary_strip.is_collapsed()
+        )
+        if hasattr(self, "_measure_header"):
+            self._measure_header.set_compact_chip_mode(summary_collapsed)
+        if summary_collapsed:
+            chips.extend(
+                [
+                    ChipSpec(
+                        f"Low Signal {low_signal_text}",
+                        level=low_signal_level,
+                        tooltip=low_signal_tooltip,
+                    ),
+                    ChipSpec(
+                        f"Saturated {saturation_text}",
+                        level=saturation_level,
+                        tooltip=saturation_tooltip,
+                    ),
+                ],
+            )
         self._measure_header.set_chips(chips)
         self._measure_summary_strip.set_items(
             [
@@ -1037,14 +1125,15 @@ class InspectPageMixin:
                     level="info" if dataset.scope_snapshot.root is not None else "neutral",
                 ),
                 SummaryItem(
-                    "Average Mode",
-                    mode_label,
-                    level="info" if mode != "none" else "neutral",
-                ),
-                SummaryItem(
                     "ROI",
                     roi_text,
                     level=roi_level,
+                ),
+                SummaryItem(
+                    "Low Signal",
+                    low_signal_text,
+                    level=low_signal_level,
+                    tooltip=low_signal_tooltip,
                 ),
                 SummaryItem(
                     "Saturated Images",

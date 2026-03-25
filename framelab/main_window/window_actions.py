@@ -56,9 +56,10 @@ class WindowActionsMixin:
         self._reset_roi_metrics()
 
         if dataset.selected_index is not None:
-            roi_mean, roi_std, roi_sem = self._compute_roi_stats_for_index(
+            roi_max, roi_mean, roi_std, roi_sem = self._compute_roi_stats_for_index(
                 dataset.selected_index,
             )
+            metrics.roi_maxs[dataset.selected_index] = roi_max
             metrics.roi_means[dataset.selected_index] = roi_mean
             metrics.roi_stds[dataset.selected_index] = roi_std
             metrics.roi_sems[dataset.selected_index] = roi_sem
@@ -369,6 +370,8 @@ class WindowActionsMixin:
         msg = self.base_status
         if self._has_loaded_data():
             msg += f" | Threshold={metrics.threshold_value:g}"
+            if float(metrics.low_signal_threshold_value) > 0.0:
+                msg += f" | Low signal<={metrics.low_signal_threshold_value:g}"
             mode = self._current_average_mode()
             if mode == "topk":
                 msg += f" | Top-K mean over {metrics.avg_count_value} px"

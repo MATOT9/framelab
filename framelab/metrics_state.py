@@ -30,6 +30,7 @@ class RoiApplyResult:
     """Structured worker result for dataset-wide ROI application."""
 
     job_id: int
+    maxs: np.ndarray
     means: np.ndarray
     stds: np.ndarray
     sems: np.ndarray
@@ -47,6 +48,7 @@ class MetricsPipelineController:
         self.avg_maxs: np.ndarray | None = None
         self.avg_maxs_std: np.ndarray | None = None
         self.avg_maxs_sem: np.ndarray | None = None
+        self.roi_maxs: np.ndarray | None = None
         self.roi_means: np.ndarray | None = None
         self.roi_stds: np.ndarray | None = None
         self.roi_sems: np.ndarray | None = None
@@ -65,6 +67,7 @@ class MetricsPipelineController:
         self.bg_unmatched_count = 0
         self.bg_total_count = 0
         self.threshold_value = 4095.0
+        self.low_signal_threshold_value = 0.0
         self.avg_count_value = 32
         self.stats_job_id = 0
         self.stats_update_kind = "idle"
@@ -100,6 +103,7 @@ class MetricsPipelineController:
         """Reset ROI-derived arrays to NaN-filled buffers for one dataset size."""
         count = max(0, int(path_count))
         self.roi_applied_to_all = False
+        self.roi_maxs = np.full(count, np.nan, dtype=np.float64)
         self.roi_means = np.full(count, np.nan, dtype=np.float64)
         self.roi_stds = np.full(count, np.nan, dtype=np.float64)
         self.roi_sems = np.full(count, np.nan, dtype=np.float64)
@@ -150,6 +154,8 @@ class MetricsPipelineController:
 
         if self.roi_means is None or len(self.roi_means) != count:
             self.roi_means = np.full(count, np.nan, dtype=np.float64)
+        if self.roi_maxs is None or len(self.roi_maxs) != count:
+            self.roi_maxs = np.full(count, np.nan, dtype=np.float64)
         if self.roi_stds is None or len(self.roi_stds) != count:
             self.roi_stds = np.full(count, np.nan, dtype=np.float64)
         if self.roi_sems is None or len(self.roi_sems) != count:
@@ -189,9 +195,37 @@ class MetricsPipelineController:
     def apply_roi_result(self, result: RoiApplyResult) -> None:
         """Store one structured ROI-apply worker result."""
         self.roi_applied_to_all = True
+        self.roi_maxs = np.asarray(result.maxs, dtype=np.float64)
         self.roi_means = np.asarray(result.means, dtype=np.float64)
         self.roi_stds = np.asarray(result.stds, dtype=np.float64)
         self.roi_sems = np.asarray(result.sems, dtype=np.float64)
+
+    def low_signal_mask(
+        self,
+        *,
+        path_count: int | None = None,
+    ) -> np.ndarray | None:
+        """Return per-image low-signal flags for the applied threshold."""
+
+        threshold = float(self.low_signal_threshold_value)
+        if threshold <= 0.0 or self.maxs is None:
+            return None
+        mask = np.asarray(self.maxs, dtype=np.int64) <= int(threshold)
+        if path_count is not None and len(mask) != max(0, int(path_count)):
+            return None
+        return mask
+
+    def low_signal_image_count(
+        self,
+        *,
+        path_count: int | None = None,
+    ) -> int:
+        """Return number of images flagged by the applied low-signal threshold."""
+
+        mask = self.low_signal_mask(path_count=path_count)
+        if mask is None:
+            return 0
+        return int(np.count_nonzero(mask))
 
     def begin_stats_job(
         self,

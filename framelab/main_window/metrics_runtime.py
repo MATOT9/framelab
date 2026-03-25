@@ -295,11 +295,12 @@ class MetricsRuntimeMixin:
     def _prefill_roi_metric_arrays(
         self,
         cached_payloads: dict[str, dict[str, object]],
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, list[int]]:
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, list[int]]:
         """Build partially cached ROI arrays and return miss indices."""
 
         dataset = self.dataset_state
         n = dataset.path_count()
+        maxs = np.full(n, np.nan, dtype=np.float64)
         means = np.full(n, np.nan, dtype=np.float64)
         stds = np.full(n, np.nan, dtype=np.float64)
         sems = np.full(n, np.nan, dtype=np.float64)
@@ -309,6 +310,7 @@ class MetricsRuntimeMixin:
             if payload is None:
                 continue
             hit_indices.add(index)
+            maxs[index] = float(payload.get("max", np.nan))
             means[index] = float(payload.get("mean", np.nan))
             stds[index] = float(payload.get("std", np.nan))
             sems[index] = float(payload.get("sem", np.nan))
@@ -317,7 +319,7 @@ class MetricsRuntimeMixin:
             for index in range(n)
             if index not in hit_indices
         ]
-        return (means, stds, sems, missing_indices)
+        return (maxs, means, stds, sems, missing_indices)
 
     def _store_cached_roi_metrics(
         self,
@@ -344,6 +346,7 @@ class MetricsRuntimeMixin:
                 MetricCacheWrite(
                     identity=identity,
                     payload={
+                        "max": float(result.maxs[index]),
                         "mean": float(result.means[index]),
                         "std": float(result.stds[index]),
                         "sem": float(result.sems[index]),
@@ -617,7 +620,7 @@ class MetricsRuntimeMixin:
         if signature_hash is None:
             return
         identities, cached_payloads = self._cached_roi_payloads(signature_hash)
-        existing_means, existing_stds, existing_sems, missing_indices = (
+        existing_maxs, existing_means, existing_stds, existing_sems, missing_indices = (
             self._prefill_roi_metric_arrays(cached_payloads)
         )
         if not missing_indices:
@@ -625,6 +628,7 @@ class MetricsRuntimeMixin:
             self._on_roi_apply_finished(
                 RoiApplyResult(
                     job_id=job_id,
+                    maxs=existing_maxs,
                     means=existing_means,
                     stds=existing_stds,
                     sems=existing_sems,
@@ -643,6 +647,7 @@ class MetricsRuntimeMixin:
             background_config=self._background_config_snapshot(),
             background_library=self._background_library_snapshot(),
             path_metadata=dict(dataset.path_metadata),
+            existing_maxs=existing_maxs,
             existing_means=existing_means,
             existing_stds=existing_stds,
             existing_sems=existing_sems,
@@ -781,6 +786,7 @@ class MetricsRuntimeMixin:
 
         metrics = self.metrics_state
         metrics.threshold_value = self.threshold_spin.value()
+        metrics.low_signal_threshold_value = self.low_signal_spin.value()
         metrics.avg_count_value = self.avg_spin.value()
         count = self.dataset_state.path_count()
         mode = self._current_average_mode()
@@ -831,6 +837,24 @@ class MetricsRuntimeMixin:
         self._refresh_workspace_document_dirty_state()
         self._set_status("Updating saturation counts")
 
+    def _apply_low_signal_threshold_update(self) -> None:
+        """Refresh low-signal row highlighting using the cached max-pixel values."""
+
+        metrics = self.metrics_state
+        metrics.low_signal_threshold_value = self.low_signal_spin.value()
+
+        if self._has_loaded_data():
+            self._refresh_table(update_analysis=False)
+        else:
+            self._update_average_controls()
+            if hasattr(self, "_refresh_measure_header_state"):
+                self._refresh_measure_header_state()
+        self._refresh_workspace_document_dirty_state()
+        if float(metrics.low_signal_threshold_value) <= 0.0:
+            self._set_status("Low-signal detection disabled")
+        else:
+            self._set_status("Updated low-signal image highlighting")
+
     def _refresh_table(self, *, update_analysis: bool = True) -> None:
         """Refresh the measure table and linked preview state."""
         if (
@@ -879,8 +903,10 @@ class MetricsRuntimeMixin:
             iris_positions=iris_positions,
             exposure_ms=exposure_ms,
             maxs=metrics.maxs,
+            roi_maxs=metrics.roi_maxs,
             min_non_zero=metrics.min_non_zero,
             sat_counts=metrics.sat_counts,
+            low_signal_flags=metrics.low_signal_mask(path_count=dataset.path_count()),
             avg_mode=mode,
             avg_topk=metrics.avg_maxs if mode == "topk" else None,
             avg_topk_std=metrics.avg_maxs_std if mode == "topk" else None,
@@ -1023,6 +1049,11 @@ class MetricsRuntimeMixin:
             f"max={int(metrics.maxs[idx])} "
             f"| saturated={int(metrics.sat_counts[idx])}"
         )
+        if (
+            float(metrics.low_signal_threshold_value) > 0.0
+            and int(metrics.maxs[idx]) <= int(metrics.low_signal_threshold_value)
+        ):
+            info += " | low-signal"
         if metrics.background_config.enabled:
             if bg_applied:
                 ref_label = self._background_reference_label_for_path(
@@ -1094,14 +1125,14 @@ class MetricsRuntimeMixin:
     def _compute_roi_stats_for_index(
         self,
         index: int,
-    ) -> tuple[float, float, float]:
-        """Compute ROI mean, std, and sem for one image index."""
+    ) -> tuple[float, float, float, float]:
+        """Compute ROI max, mean, std, and sem for one image index."""
         dataset = self.dataset_state
         roi_rect = self.metrics_state.roi_rect
         if not self._has_loaded_data() or roi_rect is None:
-            return (np.nan, np.nan, np.nan)
+            return (np.nan, np.nan, np.nan, np.nan)
         if not (0 <= index < dataset.path_count()):
-            return (np.nan, np.nan, np.nan)
+            return (np.nan, np.nan, np.nan, np.nan)
 
         signature_hash = self._roi_metric_signature_hash()
         path = dataset.paths[index]
@@ -1122,6 +1153,7 @@ class MetricsRuntimeMixin:
                 cached_payload = cached.get(str(Path(path).resolve()))
                 if cached_payload is not None:
                     return (
+                        float(cached_payload.get("max", np.nan)),
                         float(cached_payload.get("mean", np.nan)),
                         float(cached_payload.get("std", np.nan)),
                         float(cached_payload.get("sem", np.nan)),
@@ -1129,12 +1161,13 @@ class MetricsRuntimeMixin:
 
         metric_img, _bg_applied = self._get_metric_image_by_index(index)
         if metric_img is None:
-            return (np.nan, np.nan, np.nan)
+            return (np.nan, np.nan, np.nan, np.nan)
 
         x0, y0, x1, y1 = roi_rect
         roi = metric_img[y0:y1, x0:x1]
         if roi.size == 0:
-            return (np.nan, np.nan, np.nan)
+            return (np.nan, np.nan, np.nan, np.nan)
+        roi_max = float(np.max(roi))
         roi_std = float(roi.std())
         roi_sem = float(roi_std / np.sqrt(roi.size))
         roi_mean = float(roi.mean())
@@ -1148,6 +1181,7 @@ class MetricsRuntimeMixin:
                     MetricCacheWrite(
                         identity=identity,
                         payload={
+                            "max": roi_max,
                             "mean": roi_mean,
                             "std": roi_std,
                             "sem": roi_sem,
@@ -1157,7 +1191,7 @@ class MetricsRuntimeMixin:
                 metric_kind=ROI_METRIC_KIND,
                 signature_hash=signature_hash,
             )
-        return (roi_mean, roi_std, roi_sem)
+        return (roi_max, roi_mean, roi_std, roi_sem)
 
     def _on_average_mode_changed(self) -> None:
         """Respond to average-mode UI changes."""

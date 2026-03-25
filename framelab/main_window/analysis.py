@@ -78,6 +78,21 @@ class AnalysisPageMixin:
         self._analysis_summary_strip = build_summary_strip()
         layout.addWidget(self._analysis_summary_strip)
 
+        self._analysis_unavailable_frame = qtw.QFrame()
+        self._analysis_unavailable_frame.setObjectName("SubtlePanel")
+        unavailable_layout = qtw.QVBoxLayout(self._analysis_unavailable_frame)
+        unavailable_layout.setContentsMargins(12, 10, 12, 10)
+        unavailable_layout.setSpacing(6)
+        unavailable_title = qtw.QLabel("Analyze Unavailable")
+        unavailable_title.setObjectName("SectionTitle")
+        unavailable_layout.addWidget(unavailable_title)
+        self._analysis_unavailable_label = qtw.QLabel("")
+        self._analysis_unavailable_label.setObjectName("MutedLabel")
+        self._analysis_unavailable_label.setWordWrap(True)
+        unavailable_layout.addWidget(self._analysis_unavailable_label)
+        self._analysis_unavailable_frame.hide()
+        layout.addWidget(self._analysis_unavailable_frame)
+
         main_splitter = qtw.QSplitter(Qt.Horizontal)
         self.analysis_main_splitter = main_splitter
         main_splitter.setChildrenCollapsible(False)
@@ -184,6 +199,35 @@ class AnalysisPageMixin:
         if hasattr(self, "_active_density_tokens"):
             self._apply_analysis_page_density(self._active_density_tokens)
         return page
+
+    def _analysis_unavailable_reason(self) -> str | None:
+        """Return the current reason analysis integration is unavailable."""
+
+        controller = getattr(self, "workflow_state_controller", None)
+        if controller is not None and controller.is_custom_workspace():
+            return (
+                "This workspace is open in Custom mode because the folder does not "
+                "match the structured calibration or trials layout. Data and "
+                "Measure still work on TIFF folders, but Analyze is disabled "
+                "until a structured workflow is loaded."
+            )
+        return None
+
+    def _apply_analysis_availability_state(self) -> bool:
+        """Show or hide the analysis lockout surface for unsupported scopes."""
+
+        reason = self._analysis_unavailable_reason()
+        unavailable = bool(reason)
+        frame = getattr(self, "_analysis_unavailable_frame", None)
+        label = getattr(self, "_analysis_unavailable_label", None)
+        splitter = getattr(self, "analysis_main_splitter", None)
+        if frame is not None:
+            frame.setVisible(unavailable)
+        if label is not None:
+            label.setText(reason or "")
+        if splitter is not None:
+            splitter.setVisible(not unavailable)
+        return not unavailable
 
     def _load_analysis_plugins(self) -> None:
         """Instantiate analysis plugins and add them to the UI stack."""
@@ -639,6 +683,10 @@ class AnalysisPageMixin:
             self._refresh_analysis_summary()
             return None
 
+        if not self._apply_analysis_availability_state():
+            self._refresh_analysis_summary()
+            return None
+
         if (
             force_rebuild
             or self._analysis_context_dirty
@@ -707,6 +755,7 @@ class AnalysisPageMixin:
             if dataset is not None
             else getattr(self, "metadata_source_mode", "json")
         )
+        analysis_available = self._apply_analysis_availability_state()
         record_count = (
             dataset.path_count()
             if dataset is not None
@@ -726,6 +775,10 @@ class AnalysisPageMixin:
                 ChipSpec(
                     "Dataset loaded" if self._has_loaded_data() else "No dataset",
                     level="success" if self._has_loaded_data() else "neutral",
+                ),
+                ChipSpec(
+                    "Analyze unavailable" if not analysis_available else "Analyze ready",
+                    level="warning" if not analysis_available else "success",
                 ),
             ],
         )

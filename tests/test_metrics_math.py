@@ -117,8 +117,10 @@ def test_metrics_table_normalization_changes_intensity_fields_but_not_sat_count(
         iris_positions=np.array([5.0]),
         exposure_ms=np.array([10.0]),
         maxs=np.array([100], dtype=np.int64),
+        roi_maxs=np.array([80.0]),
         min_non_zero=np.array([4], dtype=np.int64),
         sat_counts=np.array([3], dtype=np.int64),
+        low_signal_flags=np.array([False], dtype=bool),
         avg_mode="topk",
         avg_topk=np.array([50.0]),
         avg_topk_std=np.array([10.0]),
@@ -130,16 +132,43 @@ def test_metrics_table_normalization_changes_intensity_fields_but_not_sat_count(
     )
 
     assert model.data(model.index(0, 4)) == "100"
-    assert model.data(model.index(0, 6)) == "3"
-    assert model.data(model.index(0, 7)) == "50.00"
-    assert model.data(model.index(0, 10)) == "2"
+    assert model.data(model.index(0, 5)) == "80"
+    assert model.data(model.index(0, 7)) == "3"
+    assert model.data(model.index(0, 8)) == "50.00"
+    assert model.data(model.index(0, 11)) == "2"
 
     model.set_intensity_normalization(True, 100.0)
 
     assert model.data(model.index(0, 4)) == "1"
-    assert model.data(model.index(0, 6)) == "3"
-    assert model.data(model.index(0, 7)) == "0.50"
-    assert model.data(model.index(0, 10)) == "0.02"
+    assert model.data(model.index(0, 5)) == "0.8"
+    assert model.data(model.index(0, 7)) == "3"
+    assert model.data(model.index(0, 8)) == "0.50"
+    assert model.data(model.index(0, 11)) == "0.02"
+
+
+def test_metrics_table_uses_distinct_low_signal_row_highlight_with_saturation_precedence() -> None:
+    model = MetricsTableModel()
+    model.update_metrics(
+        paths=["/tmp/a.tif", "/tmp/b.tif"],
+        iris_positions=np.array([5.0, 5.0]),
+        exposure_ms=np.array([10.0, 10.0]),
+        maxs=np.array([4, 6], dtype=np.int64),
+        roi_maxs=np.array([4.0, 6.0]),
+        min_non_zero=np.array([1, 1], dtype=np.int64),
+        sat_counts=np.array([0, 2], dtype=np.int64),
+        low_signal_flags=np.array([True, True], dtype=bool),
+        avg_mode="none",
+        avg_topk=None,
+        avg_topk_std=None,
+        avg_topk_sem=None,
+        avg_roi=None,
+        avg_roi_std=None,
+        avg_roi_sem=None,
+        dn_per_ms=None,
+    )
+
+    assert model.data(model.index(0, 0), QtCore.Qt.BackgroundRole) == model.LOW_SIGNAL_ROW_BRUSH
+    assert model.data(model.index(1, 0), QtCore.Qt.BackgroundRole) == model.SATURATED_ROW_BRUSH
 
 
 def test_analysis_context_normalizes_active_metric_and_dn_per_ms_but_keeps_raw_metadata() -> None:

@@ -14,20 +14,46 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 
 @pytest.fixture(scope="session", autouse=True)
-def isolated_metrics_cache(tmp_path_factory: pytest.TempPathFactory) -> Iterator[None]:
-    """Route the persisted metrics cache to one temp location for this session."""
+def isolated_runtime_paths(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> Iterator[None]:
+    """Route persisted config and cache paths to one worker-local temp root."""
 
-    cache_root = tmp_path_factory.mktemp("metrics-cache")
+    runtime_root = tmp_path_factory.mktemp("framelab-runtime")
+    config_dir = runtime_root / "config"
+    cache_root = runtime_root / "cache"
+    cache_root.mkdir(parents=True, exist_ok=True)
+    config_dir.mkdir(parents=True, exist_ok=True)
     cache_path = cache_root / "metrics.sqlite"
-    previous = os.environ.get("FRAMELAB_METRICS_CACHE_PATH")
+
+    previous_config = os.environ.get("FRAMELAB_CONFIG_DIR")
+    previous_cache = os.environ.get("FRAMELAB_METRICS_CACHE_PATH")
+    previous_xdg_cache = os.environ.get("XDG_CACHE_HOME")
+    previous_mpl = os.environ.get("MPLCONFIGDIR")
+
+    os.environ["FRAMELAB_CONFIG_DIR"] = str(config_dir)
     os.environ["FRAMELAB_METRICS_CACHE_PATH"] = str(cache_path)
+    os.environ["XDG_CACHE_HOME"] = str(cache_root)
+    os.environ["MPLCONFIGDIR"] = str(cache_root / "mpl")
     try:
         yield
     finally:
-        if previous is None:
+        if previous_config is None:
+            os.environ.pop("FRAMELAB_CONFIG_DIR", None)
+        else:
+            os.environ["FRAMELAB_CONFIG_DIR"] = previous_config
+        if previous_cache is None:
             os.environ.pop("FRAMELAB_METRICS_CACHE_PATH", None)
         else:
-            os.environ["FRAMELAB_METRICS_CACHE_PATH"] = previous
+            os.environ["FRAMELAB_METRICS_CACHE_PATH"] = previous_cache
+        if previous_xdg_cache is None:
+            os.environ.pop("XDG_CACHE_HOME", None)
+        else:
+            os.environ["XDG_CACHE_HOME"] = previous_xdg_cache
+        if previous_mpl is None:
+            os.environ.pop("MPLCONFIGDIR", None)
+        else:
+            os.environ["MPLCONFIGDIR"] = previous_mpl
 
 
 @pytest.fixture(scope="session")
@@ -51,6 +77,33 @@ def process_events(qapp) -> Callable[[], None]:
         qapp.processEvents()
 
     return _process_events
+
+
+@pytest.fixture
+def widget_factory(
+    qapp,
+) -> Iterator[Callable[[type[object]], object]]:
+    """Create lightweight Qt widgets with predictable cleanup."""
+
+    widgets: list[object] = []
+
+    def _factory(widget_type, *args, **kwargs):
+        widget = widget_type(*args, **kwargs)
+        widgets.append(widget)
+        return widget
+
+    yield _factory
+
+    for widget in reversed(widgets):
+        try:
+            widget.close()
+        except Exception:
+            pass
+        try:
+            widget.deleteLater()
+        except Exception:
+            pass
+    qapp.processEvents()
 
 
 @pytest.fixture

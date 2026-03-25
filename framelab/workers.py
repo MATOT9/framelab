@@ -327,6 +327,7 @@ class RoiApplyWorker(QObject):
         background_config: Optional[BackgroundConfig] = None,
         background_library: Optional[BackgroundLibrary] = None,
         path_metadata: Optional[dict[str, dict[str, object]]] = None,
+        existing_maxs: Optional[np.ndarray] = None,
         existing_means: Optional[np.ndarray] = None,
         existing_stds: Optional[np.ndarray] = None,
         existing_sems: Optional[np.ndarray] = None,
@@ -344,6 +345,7 @@ class RoiApplyWorker(QObject):
         self._background_config = background_config
         self._background_library = background_library
         self._path_metadata = path_metadata or {}
+        self._existing_maxs = existing_maxs
         self._existing_means = existing_means
         self._existing_stds = existing_stds
         self._existing_sems = existing_sems
@@ -377,6 +379,11 @@ class RoiApplyWorker(QObject):
     def run(self) -> None:
         """Compute ROI mean/std/stderr for each image."""
         n = max(0, self._result_length)
+        maxs = (
+            np.asarray(self._existing_maxs, dtype=np.float64).copy()
+            if self._existing_maxs is not None and len(self._existing_maxs) == n
+            else np.full(n, np.nan, dtype=np.float64)
+        )
         means = (
             np.asarray(self._existing_means, dtype=np.float64).copy()
             if self._existing_means is not None and len(self._existing_means) == n
@@ -438,6 +445,7 @@ class RoiApplyWorker(QObject):
                 roi = metric_img[y0:y1, x0:x1]
                 if roi.size > 0:
                     roi_f = np.asarray(roi, dtype=np.float64)
+                    maxs[source_index] = float(np.max(roi_f))
                     means[source_index] = float(roi_f.mean())
                     stds[source_index] = float(roi_f.std())
                     sems[source_index] = float(
@@ -453,6 +461,7 @@ class RoiApplyWorker(QObject):
         self.finished.emit(
             RoiApplyResult(
                 job_id=self._job_id,
+                maxs=maxs,
                 means=means,
                 stds=stds,
                 sems=sems,

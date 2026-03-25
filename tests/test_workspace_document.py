@@ -122,6 +122,7 @@ def test_workspace_document_store_round_trip(tmp_path: Path) -> None:
         measure=WorkspaceDocumentMeasureState(
             average_mode="roi",
             threshold_value=1234.0,
+            low_signal_threshold_value=111.0,
             avg_count_value=55,
             rounding_mode="std",
             normalize_intensity_values=True,
@@ -153,6 +154,7 @@ def test_workspace_document_store_round_trip(tmp_path: Path) -> None:
     assert loaded.workflow.workspace_root == "/tmp/workspace"
     assert loaded.measure.roi_rect == (1, 2, 3, 4)
     assert loaded.measure.roi_applied_to_all is True
+    assert loaded.measure.low_signal_threshold_value == pytest.approx(111.0)
     assert loaded.background.source_path == "/tmp/background.tiff"
     assert loaded.ui.splitter_sizes["measure.main_splitter"] == [300, 700]
 
@@ -215,6 +217,7 @@ def test_window_actions_restore_workspace_document_session(
     roi_index = window.avg_mode_combo.findData("roi")
     window.avg_mode_combo.setCurrentIndex(roi_index)
     window.threshold_spin.setValue(42)
+    window.low_signal_spin.setValue(17)
     window._apply_live_update()
     window._on_normalize_intensity_toggled(True)
     window._set_rounding_mode("std")
@@ -269,6 +272,7 @@ def test_window_actions_restore_workspace_document_session(
     assert restored.dataset_state.dataset_root == session_root.resolve()
     assert restored._current_average_mode() == "roi"
     assert restored.metrics_state.threshold_value == pytest.approx(42.0)
+    assert restored.metrics_state.low_signal_threshold_value == pytest.approx(17.0)
     assert restored.metrics_state.normalize_intensity_values is True
     assert restored.metrics_state.rounding_mode == "std"
     assert restored.metrics_state.roi_rect == (0, 0, 2, 2)

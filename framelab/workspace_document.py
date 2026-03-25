@@ -119,6 +119,7 @@ class WorkspaceDocumentMeasureState:
 
     average_mode: str = "none"
     threshold_value: float = 65520.0
+    low_signal_threshold_value: float = 0.0
     avg_count_value: int = 32
     rounding_mode: str = "off"
     normalize_intensity_values: bool = False
@@ -187,6 +188,7 @@ class WorkspaceDocumentSnapshot:
             "measure": {
                 "average_mode": self.measure.average_mode,
                 "threshold_value": self.measure.threshold_value,
+                "low_signal_threshold_value": self.measure.low_signal_threshold_value,
                 "avg_count_value": self.measure.avg_count_value,
                 "rounding_mode": self.measure.rounding_mode,
                 "normalize_intensity_values": self.measure.normalize_intensity_values,
@@ -264,6 +266,11 @@ class WorkspaceDocumentSnapshot:
                     65520.0,
                 )
                 or 65520.0,
+                low_signal_threshold_value=_parse_float(
+                    measure.get("low_signal_threshold_value"),
+                    0.0,
+                )
+                or 0.0,
                 avg_count_value=_parse_int(measure.get("avg_count_value"), 32) or 32,
                 rounding_mode=rounding_mode,
                 normalize_intensity_values=_parse_bool(

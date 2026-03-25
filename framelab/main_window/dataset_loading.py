@@ -470,8 +470,15 @@ class DatasetLoadingMixin:
         """Load the dataset, compute static metrics, and refresh UI state."""
         metrics = self.metrics_state
         folder = Path(self.folder_edit.text().strip()).expanduser()
+        workflow_notice = None
         if hasattr(self, "_resolve_requested_dataset_scope_folder"):
             folder = self._resolve_requested_dataset_scope_folder(folder)
+            workflow_notice = getattr(
+                self,
+                "_workflow_scope_transition_message",
+                None,
+            )
+            self._workflow_scope_transition_message = None
         if not folder.is_dir():
             self._show_error("Invalid folder", "Choose a valid directory.")
             return
@@ -571,6 +578,8 @@ class DatasetLoadingMixin:
         self._update_background_status_label()
         self._apply_dynamic_visibility_policy()
         self._refresh_workspace_document_dirty_state()
+        if workflow_notice:
+            self.statusBar().showMessage(str(workflow_notice), 5000)
 
     def _compute_static_stats(
         self,

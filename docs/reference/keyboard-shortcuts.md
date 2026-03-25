@@ -11,6 +11,7 @@ This page documents the current shortcut and pointer interaction contract. Short
 | `Ctrl+Shift+S` | app-wide | Save the current workspace to a new `.framelab` file |
 | `Ctrl+R` | app-wide | Scan or rescan the current dataset folder |
 | `Ctrl+Shift+W` | app-wide | Show or hide the Workflow Explorer |
+| `Ctrl+Shift+D` | app-wide | Open the acquisition datacard wizard for the current folder context |
 | `Ctrl+Shift+E` | app-wide | Export the current image-metrics table |
 | `Ctrl+C` | focused table context | Copy selected cells from the active metrics/result table |
 | `Ctrl+A` | focused metrics table context | Select all cells in the active metrics table |

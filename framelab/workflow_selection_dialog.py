@@ -494,38 +494,37 @@ class WorkflowSelectionDialog(qtw.QDialog):
             )
             return
         requested_anchor_type_id = self._current_anchor_type_id()
-        controller = getattr(self._host_window, "workflow_state_controller", None)
-        warning_text = (
-            controller.unsupported_load_message(
-                workspace_root,
-                str(profile_id),
-                anchor_type_id=requested_anchor_type_id,
-            )
-            if controller is not None
-            else None
+        resolve_load = getattr(self._host_window, "_resolve_workflow_load_request", None)
+        if not callable(resolve_load):
+            self._warning_label.setText("Host window does not support workflow loading.")
+            return
+        resolution = resolve_load(
+            workspace_root,
+            str(profile_id),
+            anchor_type_id=requested_anchor_type_id,
+            prompt_parent=self,
         )
-        if warning_text:
-            self._warning_label.setText(warning_text)
-            qtw.QMessageBox.warning(self, "Unsupported Workflow Level", warning_text)
+        if resolution is None:
             return
         requested_active_node_id = None
         if (
             self._selected_recent_entry is not None
             and self._selected_recent_entry.workspace_root == workspace_root
-            and self._selected_recent_entry.profile_id == str(profile_id)
-            and self._selected_recent_entry.anchor_type_id == requested_anchor_type_id
+            and self._selected_recent_entry.profile_id == resolution.profile_id
+            and self._selected_recent_entry.anchor_type_id == resolution.anchor_type_id
         ):
             requested_active_node_id = self._selected_recent_entry.active_node_id
         try:
             self._host_window.set_workflow_context(
                 workspace_root,
-                str(profile_id),
-                anchor_type_id=requested_anchor_type_id,
+                resolution.profile_id,
+                anchor_type_id=resolution.anchor_type_id,
                 active_node_id=requested_active_node_id,
             )
         except Exception as exc:
             self._warning_label.setText(f"Could not load workflow: {exc}")
             return
+        self._warning_label.setText(resolution.info_text)
         self.accept()
 
     def _sync_action_state(self) -> None:

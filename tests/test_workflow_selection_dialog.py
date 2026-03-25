@@ -9,6 +9,7 @@ from tifffile import imwrite
 from PySide6 import QtWidgets as qtw
 from PySide6.QtCore import Qt
 
+from framelab.node_metadata import load_nodecard
 from framelab.ui_settings import RecentWorkflowEntry
 from framelab.workflow_selection_dialog import WorkflowSelectionDialog
 
@@ -186,16 +187,43 @@ def test_workflow_selection_dialog_warns_for_folder_above_workspace_root(
     dialog = WorkflowSelectionDialog(window)
     dialog._profile_combo.setCurrentIndex(dialog._profile_combo.findData("calibration"))
     dialog._workspace_edit.setText(str(workspace_root.parent))
-
-    captured: list[str] = []
     monkeypatch.setattr(
-        qtw.QMessageBox,
-        "warning",
-        lambda _parent, _title, message: captured.append(message),
+        window,
+        "_prompt_for_unsupported_workflow_resolution",
+        lambda *_args, **_kwargs: "custom",
     )
 
     dialog._load_selected_workflow()
 
-    assert captured
-    assert "full workspace root" in captured[0].lower()
-    assert window.workflow_state_controller.profile_id is None
+    assert dialog.result() == qtw.QDialog.Accepted
+    assert window.workflow_state_controller.profile_id == "custom"
+    assert "custom workflow" in dialog._warning_label.text().lower()
+
+
+def test_workflow_selection_dialog_can_scaffold_empty_calibration_root(
+    tmp_path: Path,
+    framelab_window_factory,
+    monkeypatch,
+) -> None:
+    workspace_root = tmp_path / "new-workspace"
+    workspace_root.mkdir()
+    window = framelab_window_factory(enabled_plugin_ids=())
+    dialog = WorkflowSelectionDialog(window)
+    dialog._profile_combo.setCurrentIndex(dialog._profile_combo.findData("calibration"))
+    dialog._workspace_edit.setText(str(workspace_root))
+    monkeypatch.setattr(
+        window,
+        "_prompt_for_unsupported_workflow_resolution",
+        lambda *_args, **_kwargs: "calibration",
+    )
+
+    dialog._load_selected_workflow()
+    saved = load_nodecard(workspace_root)
+
+    assert dialog.result() == qtw.QDialog.Accepted
+    assert window.workflow_state_controller.profile_id == "calibration"
+    assert window.workflow_state_controller.anchor_type_id == "root"
+    assert window.workflow_state_controller.root_node_id == "calibration:root"
+    assert window.workflow_state_controller.active_node_id == "calibration:root"
+    assert saved.profile_id == "calibration"
+    assert saved.node_type_id == "root"

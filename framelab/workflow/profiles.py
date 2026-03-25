@@ -12,8 +12,8 @@ from .models import (
 
 
 _CALIBRATION_GOVERNANCE = MetadataGovernanceProfile(
-    allow_ad_hoc_fields=False,
-    allow_ad_hoc_groups=False,
+    allow_ad_hoc_fields=True,
+    allow_ad_hoc_groups=True,
     field_rules=(
         MetadataFieldRule(
             key="workflow.operator",
@@ -31,15 +31,6 @@ _CALIBRATION_GOVERNANCE = MetadataGovernanceProfile(
             value_type="string",
             template_node_types=("session", "campaign"),
             template_value="",
-        ),
-        MetadataFieldRule(
-            key="camera_settings.exposure_us",
-            label="Exposure (us)",
-            group="Camera",
-            value_type="int",
-            required_node_types=("camera",),
-            template_node_types=("camera",),
-            template_value=1200,
         ),
         MetadataFieldRule(
             key="instrument.optics.iris.position",
@@ -165,6 +156,25 @@ TRIALS_WORKFLOW_PROFILE = WorkflowProfile(
 )
 
 
+CUSTOM_WORKFLOW_PROFILE = WorkflowProfile(
+    profile_id="custom",
+    display_name="Custom",
+    root_display_name="Custom Workspace",
+    description=(
+        "Fallback workflow for directories that do not match a structured "
+        "calibration or trials hierarchy."
+    ),
+    node_types=(
+        NodeTypeDefinition(
+            type_id="root",
+            display_name="Folder",
+            child_type_ids=(),
+            discovery_mode="leaf",
+        ),
+    ),
+)
+
+
 def built_in_workflow_profiles() -> tuple[WorkflowProfile, ...]:
     """Return the built-in workflow profiles in stable order."""
 
@@ -178,6 +188,10 @@ def built_in_workflow_profiles() -> tuple[WorkflowProfile, ...]:
             TRIALS_WORKFLOW_PROFILE,
             overrides.get("trials"),
         ),
+        merge_governance(
+            CUSTOM_WORKFLOW_PROFILE,
+            overrides.get("custom"),
+        ),
     )
 
 
@@ -186,6 +200,20 @@ def workflow_profile_by_id(profile_id: str) -> WorkflowProfile | None:
 
     target = str(profile_id).strip().lower()
     for profile in built_in_workflow_profiles():
+        if profile.profile_id == target:
+            return profile
+    return None
+
+
+def base_workflow_profile_by_id(profile_id: str) -> WorkflowProfile | None:
+    """Return one built-in profile without user governance overrides."""
+
+    target = str(profile_id).strip().lower()
+    for profile in (
+        CALIBRATION_WORKFLOW_PROFILE,
+        TRIALS_WORKFLOW_PROFILE,
+        CUSTOM_WORKFLOW_PROFILE,
+    ):
         if profile.profile_id == target:
             return profile
     return None

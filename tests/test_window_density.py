@@ -47,3 +47,26 @@ def test_compact_density_updates_root_and_page_layouts(
         == tokens.panel_margin_h
     )
     assert density_window._analysis_side_rail_layout.spacing() == tokens.panel_spacing
+
+
+def test_schedule_density_refresh_is_safe_before_bootstrap() -> None:
+    class _FakeTimer:
+        def __init__(self) -> None:
+            self.starts = 0
+
+        def start(self) -> None:
+            self.starts += 1
+
+    class _StubWindow:
+        pass
+
+    stub = _StubWindow()
+    stub._density_refresh_ready = False
+    stub._density_refresh_timer = _FakeTimer()
+
+    FrameLabWindow._schedule_density_refresh(stub)
+    assert stub._density_refresh_timer.starts == 0
+
+    stub._density_refresh_ready = True
+    FrameLabWindow._schedule_density_refresh(stub)
+    assert stub._density_refresh_timer.starts == 1

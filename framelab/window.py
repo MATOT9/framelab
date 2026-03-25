@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Iterable, Optional
@@ -13,6 +14,11 @@ from PySide6.QtCore import Qt, QSignalBlocker, QThread, QTimer
 
 from .analysis_context import AnalysisContextController
 from .byte_budget_cache import ByteBudgetCache
+from .datacard_authoring.mapping import load_field_mapping
+from .datacard_authoring.service import (
+    load_acquisition_datacard,
+    save_acquisition_datacard,
+)
 from .datacard_labels import label_for_metadata_field
 from .dataset_state import DatasetScopeNode, DatasetStateController
 from .icons import apply_app_identity
@@ -29,6 +35,8 @@ from .metrics_cache import MetricsCache
 from .metrics_state import MetricsPipelineController
 from .metadata import clear_metadata_cache, invalidate_metadata_cache
 from .metadata_state import MetadataStateController
+from .node_metadata import load_nodecard, save_nodecard
+from .payload_utils import delete_dot_path, flatten_payload_dict, set_dot_path
 from .plugins import (
     PAGE_IDS,
     PluginManifest,
@@ -49,7 +57,7 @@ from .workspace_document import (
     WorkspaceDocumentUiState,
     WorkspaceDocumentWorkflowState,
 )
-from .workflow import WorkflowStateController
+from .workflow import WorkflowStateController, workflow_profile_by_id
 from .workers import DynamicStatsWorker, RoiApplyWorker
 
 
@@ -73,6 +81,15 @@ class WorkflowTreeMutationResult:
     created_paths: tuple[Path, ...] = ()
     deleted_paths: tuple[Path, ...] = ()
     renamed_paths: tuple[tuple[Path, Path], ...] = ()
+
+
+@dataclass(frozen=True)
+class WorkflowLoadResolution:
+    """Resolved workflow load request after prompt-driven fallback decisions."""
+
+    profile_id: str
+    anchor_type_id: str | None = None
+    info_text: str = ""
 
 
 class FrameLabWindow(
@@ -105,18 +122,20 @@ class FrameLabWindow(
         "iris_pos": 2,
         "exposure_ms": 3,
         "max_pixel": 4,
-        "min_non_zero": 5,
-        "sat_count": 6,
-        "avg": 7,
-        "std": 8,
-        "sem": 9,
-        "dn_per_ms": 10,
+        "roi_max": 5,
+        "min_non_zero": 6,
+        "sat_count": 7,
+        "avg": 8,
+        "std": 9,
+        "sem": 10,
+        "dn_per_ms": 11,
     }
     BASE_VISIBLE_DATA_COLUMNS = {"path", "parent", "grandparent"}
     BASE_VISIBLE_MEASURE_COLUMNS = {
         "row",
         "path",
         "max_pixel",
+        "roi_max",
         "min_non_zero",
         "sat_count",
     }
@@ -131,6 +150,7 @@ class FrameLabWindow(
         ("iris_pos", label_for_metadata_field("iris_position")),
         ("exposure_ms", label_for_metadata_field("exposure_ms")),
         ("max_pixel", "Max Pixel"),
+        ("roi_max", "ROI Max"),
         ("min_non_zero", "Min > 0"),
         ("sat_count", "# Saturated"),
         ("avg", "Average Metric"),
@@ -150,6 +170,8 @@ class FrameLabWindow(
 
     def __init__(self, enabled_plugin_ids: Iterable[str] = ()) -> None:
         super().__init__()
+        self._density_refresh_ready = False
+        self._density_refresh_timer: QTimer | None = None
         self.setWindowTitle("FrameLab")
         app = qtw.QApplication.instance()
         if app is not None and not app.windowIcon().isNull():
@@ -210,12 +232,13 @@ class FrameLabWindow(
         self.show_image_preview = self.ui_preferences.show_image_preview
         self.show_histogram_preview = self.ui_preferences.show_histogram_preview
         self._density_resolver = UiDensityResolver()
-        self._density_refresh_timer = QTimer(self)
-        self._density_refresh_timer.setSingleShot(True)
-        self._density_refresh_timer.setInterval(90)
-        self._density_refresh_timer.timeout.connect(
+        density_refresh_timer = QTimer(self)
+        density_refresh_timer.setSingleShot(True)
+        density_refresh_timer.setInterval(90)
+        density_refresh_timer.timeout.connect(
             self._apply_dynamic_visibility_policy,
         )
+        self._density_refresh_timer = density_refresh_timer
         initial_context = AdaptiveUiContext(
             usable_height=max(self.height(), 0),
             active_page="data",
@@ -275,6 +298,8 @@ class FrameLabWindow(
         self._restore_persisted_ui_state()
         self._set_status()
         self._initialize_workspace_document_tracking()
+        self._density_refresh_ready = True
+        self._schedule_density_refresh()
 
     def showEvent(self, event: QtGui.QShowEvent) -> None:
         """Re-apply app identity once the main window is a native top level."""
@@ -372,9 +397,14 @@ class FrameLabWindow(
 
         metadata_snapshot = self.metadata_state_controller.resolve_active_node_metadata()
         ancestry = self.workflow_state_controller.ancestry_for(active_node.node_id)
+        scope_kind = (
+            "custom"
+            if self.workflow_state_controller.is_custom_workspace()
+            else active_node.type_id
+        )
         self.dataset_state.set_workflow_scope(
             root=active_node.folder_path,
-            kind=active_node.type_id,
+            kind=scope_kind,
             label=active_node.display_name,
             workflow_profile_id=self.workflow_state_controller.profile_id,
             workflow_anchor_type_id=self.workflow_state_controller.anchor_type_id,
@@ -487,6 +517,189 @@ class FrameLabWindow(
                 self._refresh_table()
         self._notify_workflow_scope_changed()
 
+    def _move_metadata_field_to_workflow_node_payload(
+        self,
+        payload: dict[str, object],
+        target_node_id: str,
+    ) -> bool:
+        """Move one metadata field from its current storage onto another node."""
+
+        workflow = self.workflow_state_controller
+        target_node = workflow.node(target_node_id)
+        if target_node is None:
+            return False
+
+        key = str(payload.get("key", "") or "").strip()
+        label = str(payload.get("label", "") or key).strip() or key
+        source_path_text = str(payload.get("source_path", "") or "").strip()
+        source_storage_kind = str(payload.get("storage_kind", "") or "nodecard").strip()
+        source_value = deepcopy(payload.get("value"))
+        if not key or not source_path_text:
+            return False
+        if source_storage_kind == "acquisition_datacard_override":
+            raise ValueError(
+                f"'{label}' varies by frame in acquisition override rows and cannot "
+                "be moved as one single field value.",
+            )
+
+        source_path = Path(source_path_text).expanduser().resolve()
+        target_storage_kind = self._metadata_target_storage_kind(
+            key,
+            target_node.type_id,
+        )
+        if (
+            source_path == target_node.folder_path.resolve()
+            and source_storage_kind == target_storage_kind
+        ):
+            return False
+
+        self._remove_metadata_field_from_storage(
+            source_path,
+            key,
+            source_storage_kind,
+        )
+        self._write_metadata_field_to_storage(
+            target_node.folder_path,
+            target_node.profile_id,
+            target_node.type_id,
+            key,
+            source_value,
+            target_storage_kind,
+        )
+        self._notify_metadata_context_changed()
+        self.statusBar().showMessage(
+            (
+                f"Moved '{label}' to "
+                f"{self._workflow_node_type_label(target_node.type_id)} "
+                f"'{target_node.display_name}'."
+            ),
+            5000,
+        )
+        return True
+
+    def _remove_metadata_field_payload(
+        self,
+        payload: dict[str, object],
+    ) -> bool:
+        """Remove one metadata field from the storage owned by its current node."""
+
+        key = str(payload.get("key", "") or "").strip()
+        label = str(payload.get("label", "") or key).strip() or key
+        source_path_text = str(payload.get("source_path", "") or "").strip()
+        source_storage_kind = str(payload.get("storage_kind", "") or "nodecard").strip()
+        if not key or not source_path_text:
+            return False
+
+        source_path = Path(source_path_text).expanduser().resolve()
+        self._remove_metadata_field_from_storage(
+            source_path,
+            key,
+            source_storage_kind,
+        )
+        self._notify_metadata_context_changed(changed_root=source_path)
+        self.statusBar().showMessage(
+            f"Removed '{label}' from {source_path.name}.",
+            5000,
+        )
+        return True
+
+    def _metadata_target_storage_kind(
+        self,
+        key: str,
+        node_type_id: str,
+    ) -> str:
+        """Return the preferred storage backend for a field on one node type."""
+
+        clean_key = str(key).strip()
+        if str(node_type_id).strip().lower() != "acquisition":
+            return "nodecard"
+        try:
+            mapping = load_field_mapping()
+        except Exception:
+            mapping = None
+        if mapping is not None and clean_key in mapping.by_key():
+            return "acquisition_datacard_defaults"
+        return "nodecard"
+
+    def _remove_metadata_field_from_storage(
+        self,
+        node_path: Path,
+        key: str,
+        storage_kind: str,
+    ) -> None:
+        """Remove one metadata key from its current backing storage."""
+
+        clean_storage = str(storage_kind).strip().lower()
+        if clean_storage == "acquisition_datacard_override":
+            model = load_acquisition_datacard(node_path)
+            delete_dot_path(model.defaults, key)
+            filtered_rows = []
+            for row in model.overrides:
+                if not isinstance(row.changes, dict):
+                    continue
+                row.changes.pop(key, None)
+                if row.changes:
+                    filtered_rows.append(row)
+            model.overrides = filtered_rows
+            save_acquisition_datacard(node_path, model)
+            return
+        if clean_storage == "acquisition_datacard_defaults":
+            model = load_acquisition_datacard(node_path)
+            delete_dot_path(model.defaults, key)
+            save_acquisition_datacard(node_path, model)
+            return
+
+        existing_card = self.metadata_state_controller.load_node_metadata(node_path)
+        updated_metadata = deepcopy(existing_card.metadata)
+        delete_dot_path(updated_metadata, key)
+        self.metadata_state_controller.save_node_metadata(
+            node_path,
+            updated_metadata,
+            profile_id=existing_card.profile_id,
+            node_type_id=existing_card.node_type_id,
+            extra_top_level=dict(existing_card.extra_top_level),
+        )
+
+    def _write_metadata_field_to_storage(
+        self,
+        node_path: Path,
+        profile_id: str | None,
+        node_type_id: str | None,
+        key: str,
+        value: object,
+        storage_kind: str,
+    ) -> None:
+        """Write one metadata key into the requested target storage backend."""
+
+        clean_storage = str(storage_kind).strip().lower()
+        if clean_storage == "acquisition_datacard_defaults":
+            model = load_acquisition_datacard(node_path)
+            set_dot_path(model.defaults, key, deepcopy(value))
+            save_acquisition_datacard(node_path, model)
+            existing_card = self.metadata_state_controller.load_node_metadata(node_path)
+            existing_flat = deepcopy(existing_card.metadata)
+            if existing_card.source_exists and key in flatten_payload_dict(existing_flat):
+                delete_dot_path(existing_flat, key)
+                self.metadata_state_controller.save_node_metadata(
+                    node_path,
+                    existing_flat,
+                    profile_id=existing_card.profile_id or profile_id,
+                    node_type_id=existing_card.node_type_id or node_type_id,
+                    extra_top_level=dict(existing_card.extra_top_level),
+                )
+            return
+
+        existing_card = self.metadata_state_controller.load_node_metadata(node_path)
+        updated_metadata = deepcopy(existing_card.metadata)
+        set_dot_path(updated_metadata, key, deepcopy(value))
+        self.metadata_state_controller.save_node_metadata(
+            node_path,
+            updated_metadata,
+            profile_id=existing_card.profile_id or profile_id,
+            node_type_id=existing_card.node_type_id or node_type_id,
+            extra_top_level=dict(existing_card.extra_top_level),
+        )
+
     def _set_manual_dataset_scope(self, folder: Path | None) -> None:
         """Store a manual folder-driven scope when workflow resolution is not used."""
 
@@ -494,6 +707,180 @@ class FrameLabWindow(
             self.dataset_state.clear_scope()
             return
         self.dataset_state.set_manual_scope(folder)
+
+    def _try_switch_custom_workflow_context(
+        self,
+        folder: Path,
+    ) -> Path | None:
+        """Detect and switch from Custom mode to a structured workflow when possible."""
+
+        workflow = self.workflow_state_controller
+        detection = workflow.detect_supported_workspace(folder)
+        if detection is None:
+            return None
+
+        self.set_workflow_context(
+            str(detection.workspace_root),
+            detection.profile_id,
+            anchor_type_id=detection.anchor_type_id,
+        )
+        profile = workflow_profile_by_id(detection.profile_id)
+        display_name = (
+            profile.display_name
+            if profile is not None
+            else detection.profile_id.replace("_", " ").title()
+        )
+        self._workflow_scope_transition_message = (
+            f"Detected {display_name} workflow and switched out of Custom mode."
+        )
+        resolved_node = self.workflow_state_controller.active_node()
+        if resolved_node is not None:
+            return resolved_node.folder_path
+        return detection.workspace_root
+
+    def _scaffold_structured_workflow_root(
+        self,
+        workspace_root: str | Path,
+        profile_id: str,
+    ) -> Path:
+        """Register one folder as an empty structured workflow root in place."""
+
+        root = Path(workspace_root).expanduser().resolve()
+        root.mkdir(parents=True, exist_ok=True)
+        existing = load_nodecard(root)
+        save_nodecard(
+            root,
+            existing.metadata,
+            profile_id=profile_id,
+            node_type_id="root",
+            extra_top_level=existing.extra_top_level,
+        )
+        profile = workflow_profile_by_id(profile_id)
+        display_name = (
+            profile.display_name
+            if profile is not None
+            else profile_id.replace("_", " ").title()
+        )
+        if hasattr(self, "statusBar"):
+            self.statusBar().showMessage(
+                f"Registered {display_name} workflow root at {root}.",
+                5000,
+            )
+        return root
+
+    def _prompt_for_unsupported_workflow_resolution(
+        self,
+        workspace_root: str | Path,
+        requested_profile_id: str,
+        warning_text: str,
+        *,
+        parent: qtw.QWidget | None = None,
+    ) -> str | None:
+        """Ask how an unsupported folder should be opened or scaffolded."""
+
+        profile = workflow_profile_by_id(requested_profile_id)
+        display_name = (
+            profile.display_name
+            if profile is not None
+            else requested_profile_id.replace("_", " ").title()
+        )
+        dialog = qtw.QMessageBox(parent or self)
+        dialog.setOption(qtw.QMessageBox.DontUseNativeDialog, True)
+        dialog.setIcon(qtw.QMessageBox.Warning)
+        dialog.setWindowTitle("Unsupported Workflow Level")
+        dialog.setText(warning_text)
+        dialog.setInformativeText(
+            (
+                f"You can still open this folder in Custom mode, or register "
+                f"this folder itself as a new empty Calibration or Trials "
+                f"workspace. Choosing a structured option writes a root "
+                f"nodecard here so FrameLab recognizes it later even before "
+                f"any child nodes exist.\n\nSelected profile: {display_name}\n"
+                f"Folder: {Path(workspace_root).expanduser()}"
+            ),
+        )
+        custom_button = dialog.addButton(
+            "Open as Custom",
+            qtw.QMessageBox.AcceptRole,
+        )
+        calibration_button = dialog.addButton(
+            "Create Calibration Here",
+            qtw.QMessageBox.ActionRole,
+        )
+        trials_button = dialog.addButton(
+            "Create Trials Here",
+            qtw.QMessageBox.ActionRole,
+        )
+        cancel_button = dialog.addButton(qtw.QMessageBox.Cancel)
+        dialog.setDefaultButton(custom_button)
+        dialog.exec()
+        clicked = dialog.clickedButton()
+        if clicked is calibration_button:
+            return "calibration"
+        if clicked is trials_button:
+            return "trials"
+        if clicked is custom_button:
+            return "custom"
+        if clicked is cancel_button:
+            return None
+        return None
+
+    def _resolve_workflow_load_request(
+        self,
+        workspace_root: str | Path,
+        requested_profile_id: str,
+        *,
+        anchor_type_id: str | None = None,
+        prompt_parent: qtw.QWidget | None = None,
+    ) -> WorkflowLoadResolution | None:
+        """Resolve one workflow-load request, including unsupported-folder prompts."""
+
+        clean_profile_id = str(requested_profile_id).strip().lower()
+        clean_anchor_type = (
+            str(anchor_type_id).strip().lower()
+            if anchor_type_id is not None and str(anchor_type_id).strip()
+            else None
+        )
+        controller = self.workflow_state_controller
+        warning_text = controller.unsupported_load_message(
+            workspace_root,
+            clean_profile_id,
+            anchor_type_id=clean_anchor_type,
+        )
+        if not warning_text:
+            return WorkflowLoadResolution(
+                profile_id=clean_profile_id,
+                anchor_type_id=clean_anchor_type,
+            )
+
+        choice = self._prompt_for_unsupported_workflow_resolution(
+            workspace_root,
+            clean_profile_id,
+            warning_text,
+            parent=prompt_parent,
+        )
+        if choice is None:
+            return None
+        if choice == "custom":
+            return WorkflowLoadResolution(
+                profile_id="custom",
+                anchor_type_id="root",
+                info_text=warning_text,
+            )
+
+        scaffold_root = self._scaffold_structured_workflow_root(
+            workspace_root,
+            choice,
+        )
+        display_name = choice.replace("_", " ").title()
+        return WorkflowLoadResolution(
+            profile_id=choice,
+            anchor_type_id="root",
+            info_text=(
+                f"Created an empty {display_name} workflow root at "
+                f"{scaffold_root}."
+            ),
+        )
 
     def _resolve_requested_dataset_scope_folder(self, folder: Path) -> Path:
         """Resolve the effective scan root from manual input and workflow state."""
@@ -503,6 +890,18 @@ class FrameLabWindow(
         active_node = workflow.active_node()
         if active_node is None:
             return candidate
+
+        if workflow.is_custom_workspace():
+            detected_root = self._try_switch_custom_workflow_context(candidate)
+            if detected_root is not None:
+                candidate = detected_root
+                workflow = self.workflow_state_controller
+                active_node = workflow.active_node()
+                if active_node is None:
+                    return candidate
+            elif candidate.resolve(strict=False) != active_node.folder_path.resolve():
+                self._set_manual_dataset_scope(candidate)
+                return candidate
 
         node_id = workflow.resolve_node_id_for_path(candidate)
         if node_id is not None:
@@ -1070,6 +1469,7 @@ class FrameLabWindow(
     ) -> Path | None:
         """Create a direct workflow child under the selected node."""
 
+        controller = self.workflow_state_controller
         parent_node, child_type_id = self._workflow_create_target(node_id)
         if parent_node is None or child_type_id is None:
             return None
@@ -1095,6 +1495,14 @@ class FrameLabWindow(
         created_path.mkdir(parents=True, exist_ok=False)
         if child_type_id == "campaign":
             created_path.joinpath("01_sessions").mkdir(parents=True, exist_ok=True)
+        profile_id = str(getattr(controller.profile, "profile_id", "") or "").strip().lower()
+        if profile_id and child_type_id not in {"session", "acquisition"}:
+            save_nodecard(
+                created_path,
+                {},
+                profile_id=profile_id,
+                node_type_id=child_type_id,
+            )
 
         result = WorkflowTreeMutationResult(
             created_path=created_path,
@@ -1499,6 +1907,11 @@ class FrameLabWindow(
                     if hasattr(self, "threshold_spin")
                     else metrics.threshold_value
                 ),
+                low_signal_threshold_value=float(
+                    self.low_signal_spin.value()
+                    if hasattr(self, "low_signal_spin")
+                    else metrics.low_signal_threshold_value
+                ),
                 avg_count_value=int(
                     self.avg_spin.value()
                     if hasattr(self, "avg_spin")
@@ -1720,11 +2133,20 @@ class FrameLabWindow(
                 blocker = QSignalBlocker(self.threshold_spin)
                 self.threshold_spin.setValue(float(measure_state.threshold_value))
                 del blocker
+            if hasattr(self, "low_signal_spin"):
+                blocker = QSignalBlocker(self.low_signal_spin)
+                self.low_signal_spin.setValue(
+                    float(measure_state.low_signal_threshold_value),
+                )
+                del blocker
             if hasattr(self, "avg_spin"):
                 blocker = QSignalBlocker(self.avg_spin)
                 self.avg_spin.setValue(max(1, int(measure_state.avg_count_value)))
                 del blocker
             metrics.threshold_value = float(measure_state.threshold_value)
+            metrics.low_signal_threshold_value = float(
+                measure_state.low_signal_threshold_value,
+            )
             metrics.avg_count_value = max(1, int(measure_state.avg_count_value))
             metrics.rounding_mode = str(measure_state.rounding_mode)
             metrics.normalize_intensity_values = bool(
@@ -2203,7 +2625,12 @@ class FrameLabWindow(
     def _schedule_density_refresh(self) -> None:
         """Debounce resize-driven density recomputation."""
 
-        self._density_refresh_timer.start()
+        if not bool(getattr(self, "_density_refresh_ready", False)):
+            return
+        timer = getattr(self, "_density_refresh_timer", None)
+        start = getattr(timer, "start", None)
+        if callable(start):
+            start()
 
     def resizeEvent(self, event: QtGui.QResizeEvent) -> None:
         """Refresh density-dependent policy after the window is resized."""
@@ -2309,6 +2736,11 @@ class FrameLabWindow(
         "roi_means",
         "Compatibility proxy for controller-owned ROI means.",
     )
+    roi_maxs = _controller_property(
+        "metrics_state",
+        "roi_maxs",
+        "Compatibility proxy for controller-owned ROI max values.",
+    )
     roi_stds = _controller_property(
         "metrics_state",
         "roi_stds",
@@ -2388,6 +2820,11 @@ class FrameLabWindow(
         "metrics_state",
         "threshold_value",
         "Compatibility proxy for controller-owned saturation threshold.",
+    )
+    low_signal_threshold_value = _controller_property(
+        "metrics_state",
+        "low_signal_threshold_value",
+        "Compatibility proxy for controller-owned low-signal threshold.",
     )
     avg_count_value = _controller_property(
         "metrics_state",

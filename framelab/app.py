@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 
-from PySide6 import QtWidgets as qtw
+from PySide6 import QtGui, QtWidgets as qtw
 from PySide6.QtCore import QTimer
 
 from .icons import apply_app_identity, prepare_process_identity
@@ -17,6 +18,58 @@ from .plugins.selection import (
 )
 from .window import FrameLabWindow
 from .stylesheets import DARK_THEME
+
+
+def _selector_splash_path() -> Path:
+    """Return the packaged selector-splash image path."""
+
+    return Path(__file__).resolve().parent / "assets" / "framelab_splash.png"
+
+
+def _create_selector_splash(
+    app: qtw.QApplication,
+) -> qtw.QSplashScreen | None:
+    """Show the startup splash used before the plugin selector."""
+
+    platform_name = ""
+    try:
+        platform_name = str(app.platformName()).strip().lower()
+    except Exception:
+        platform_name = ""
+    if platform_name in {"offscreen", "minimal", "minimalegl"}:
+        return None
+
+    splash_path = _selector_splash_path()
+    if not splash_path.exists():
+        return None
+    pixmap = QtGui.QPixmap(str(splash_path))
+    if pixmap.isNull():
+        return None
+
+    splash = qtw.QSplashScreen(pixmap)
+    splash.setObjectName("FrameLabSplash")
+    apply_app_identity(app, splash)
+    splash.show()
+    app.processEvents()
+    return splash
+
+
+def _close_selector_splash(
+    splash: qtw.QSplashScreen | None,
+    *,
+    target: qtw.QWidget | None = None,
+) -> None:
+    """Close the selector splash without leaving a stray top-level window."""
+
+    if splash is None:
+        return
+    try:
+        if isinstance(target, qtw.QWidget):
+            splash.finish(target)
+        else:
+            splash.close()
+    finally:
+        splash.deleteLater()
 
 
 def main() -> int:
@@ -32,11 +85,13 @@ def main() -> int:
     app = qtw.QApplication(sys.argv)
     apply_app_identity(app)
     app.setStyleSheet(DARK_THEME)
+    splash = _create_selector_splash(app)
 
     try:
         manifests = discover_plugin_manifests()
         selected_ids = load_selected_plugin_ids(manifests)
     except Exception as exc:
+        _close_selector_splash(splash)
         qtw.QMessageBox.critical(
             None,
             "Plugin Startup Error",
@@ -50,6 +105,7 @@ def main() -> int:
     )
     apply_app_identity(app, selector)
     QTimer.singleShot(0, lambda: apply_app_identity(app, selector))
+    _close_selector_splash(splash, target=selector)
     if selector.exec() != qtw.QDialog.Accepted:
         return 0
 

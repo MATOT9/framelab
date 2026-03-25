@@ -110,21 +110,41 @@ def load_app_icon() -> QtGui.QIcon:
 def _apply_icon_to_widget(widget: object, icon: QtGui.QIcon) -> None:
     """Apply the app icon to one widget and its native window handle when present."""
 
-    try:
-        widget.setWindowIcon(icon)
-    except Exception:
-        return
-
-    try:
-        handle = widget.windowHandle()
-    except Exception:
-        handle = None
+    if isinstance(widget, qtw.QWidget):
+        try:
+            if not _should_apply_native_icon(widget):
+                return
+            widget.setWindowIcon(icon)
+            handle = widget.windowHandle()
+        except Exception:
+            return
+    else:
+        try:
+            widget.setWindowIcon(icon)
+            handle = widget.windowHandle()
+        except Exception:
+            return
     if handle is None:
         return
     try:
         handle.setIcon(icon)
     except Exception:
         return
+
+
+def _should_apply_native_icon(widget: qtw.QWidget) -> bool:
+    """Return whether one QWidget should receive native-window icon updates."""
+
+    if not isinstance(widget, qtw.QWidget):
+        return False
+    if isinstance(widget, qtw.QDockWidget):
+        return False
+    try:
+        if widget.window() is not widget:
+            return False
+    except Exception:
+        return False
+    return isinstance(widget, (qtw.QMainWindow, qtw.QDialog, qtw.QSplashScreen))
 
 
 def apply_app_identity(
@@ -148,8 +168,9 @@ def apply_app_identity(
     widgets: list[object] = []
     if window is not None:
         widgets.append(window)
-    for top_level in app.topLevelWidgets():
-        if top_level not in widgets:
-            widgets.append(top_level)
+    else:
+        for top_level in app.topLevelWidgets():
+            if top_level not in widgets:
+                widgets.append(top_level)
     for widget in widgets:
         _apply_icon_to_widget(widget, icon)
