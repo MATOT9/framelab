@@ -1095,6 +1095,7 @@ class HistogramWidget(qtw.QWidget):
         self._theme_mode = "light"
         self._pending_image: Optional[np.ndarray] = None
         self._view_limits: Optional[tuple[float, float, float, float]] = None
+        self._log_scale_y = False
         self._is_plot_panning = False
         self._is_plot_selecting = False
         self._plot_pan_state: Optional[
@@ -1249,28 +1250,14 @@ class HistogramWidget(qtw.QWidget):
             range_min = data_min - 0.5
             range_max = data_max + 0.5
         else:
-            q_low = float(np.percentile(arrf, 0.1))
-            q_high = float(np.percentile(arrf, 99.9))
-            if q_high <= q_low:
-                q_low, q_high = data_min, data_max
-            span = q_high - q_low
-            pad = 0.04 * span if span > 0 else 1.0
-            range_min = max(data_min, q_low - pad)
-            range_max = min(data_max, q_high + pad)
+            range_min = data_min
+            range_max = data_max
             if data_min <= 0.0 <= data_max:
                 range_min = min(range_min, 0.0)
             if range_max <= range_min:
-                range_min, range_max = data_min, data_max
-            if range_max <= range_min:
                 range_max = range_min + 1.0
 
-        focused = arrf[(arrf >= range_min) & (arrf <= range_max)]
-        if focused.size < 16:
-            focused = arrf
-            range_min = data_min
-            range_max = data_max if data_max > data_min else data_min + 1.0
-
-        bins = int(max(32, min(144, np.sqrt(float(focused.size)) * 0.45)))
+        bins = int(max(32, min(144, np.sqrt(float(arrf.size)) * 0.45)))
         if np.issubdtype(arr.dtype, np.integer):
             span_int = int(round(range_max - range_min))
             if span_int > 0:
@@ -1278,7 +1265,7 @@ class HistogramWidget(qtw.QWidget):
                 bins = max(24, bins)
 
         counts, edges = np.histogram(
-            focused,
+            arrf,
             bins=bins,
             range=(range_min, range_max),
         )
@@ -1293,6 +1280,23 @@ class HistogramWidget(qtw.QWidget):
 
         self._view_limits = None
         self._clear_plot_selection_overlay()
+        self._redraw()
+
+    def set_log_scale_y(self, enabled: bool) -> None:
+        """Enable or disable logarithmic scaling on the histogram y-axis."""
+
+        requested = bool(enabled)
+        if self._log_scale_y == requested:
+            return
+        self._log_scale_y = requested
+        if self._counts is not None and self._edges is not None:
+            if self._view_limits is None:
+                x0 = float(self._edges[0])
+                x1 = float(self._edges[-1])
+            else:
+                x0, x1, _y0, _y1 = self._view_limits
+            y0, y1 = self._visible_y_limits(x0, x1)
+            self._view_limits = (x0, x1, y0, y1)
         self._redraw()
 
     def zoom_to_x_range(
@@ -1368,9 +1372,10 @@ class HistogramWidget(qtw.QWidget):
     def _full_view_limits(self) -> tuple[float, float, float, float]:
         if self._counts is None or self._edges is None:
             return (0.0, 1.0, 0.0, 1.0)
-        y1 = float(np.max(self._counts)) if self._counts.size else 1.0
-        y1 = max(1.0, y1 * 1.08)
-        return (float(self._edges[0]), float(self._edges[-1]), 0.0, y1)
+        x0 = float(self._edges[0])
+        x1 = float(self._edges[-1])
+        y0, y1 = self._visible_y_limits(x0, x1)
+        return (x0, x1, y0, y1)
 
     def _visible_y_limits(self, x0: float, x1: float) -> tuple[float, float]:
         if self._counts is None or self._edges is None or self._counts.size == 0:
@@ -1379,10 +1384,50 @@ class HistogramWidget(qtw.QWidget):
         right_edges = self._edges[1:]
         mask = (left_edges < x1) & (right_edges > x0)
         if not np.any(mask):
-            visible_max = float(np.max(self._counts))
+            visible = np.asarray(self._counts, dtype=np.float64)
         else:
-            visible_max = float(np.max(self._counts[mask]))
+            visible = np.asarray(self._counts[mask], dtype=np.float64)
+        visible_max = float(np.max(visible)) if visible.size else 1.0
+        if self._log_scale_y:
+            positive = visible[visible > 0.0]
+            if positive.size == 0:
+                return (0.8, 1.2)
+            visible_min = float(np.min(positive))
+            lower = max(1e-3, visible_min * 0.8)
+            upper = max(lower * 10.0, visible_max * 1.08)
+            return (lower, upper)
         return (0.0, max(1.0, visible_max * 1.08))
+
+    def _x_view_bounds(self) -> tuple[float, float]:
+        """Return bounded x-axis extents used by zoom and pan interactions."""
+
+        if self._edges is None or self._edges.size < 2:
+            return (0.0, 1.0)
+        full_x0 = float(self._edges[0])
+        full_x1 = float(self._edges[-1])
+        positive_span = max(1.0, full_x1 - max(full_x0, 0.0))
+        margin = max(0.5, positive_span * 0.02)
+        lower = full_x0 if full_x0 < 0.0 else -margin
+        upper = full_x1 + margin
+        if upper <= lower:
+            upper = lower + 1.0
+        return (lower, upper)
+
+    def _clamp_x_limits(
+        self,
+        x0: float,
+        x1: float,
+    ) -> tuple[float, float]:
+        """Clamp one requested x-range to the histogram interaction bounds."""
+
+        lower, upper = self._x_view_bounds()
+        span = max(1e-9, float(x1) - float(x0))
+        max_span = max(1e-9, upper - lower)
+        span = min(span, max_span)
+        center = (float(x0) + float(x1)) / 2.0
+        half = span / 2.0
+        center = min(max(center, lower + half), upper - half)
+        return (center - half, center + half)
 
     def _apply_view_limits(self) -> None:
         if self._axes is None:
@@ -1392,6 +1437,19 @@ class HistogramWidget(qtw.QWidget):
             if self._view_limits is not None
             else self._full_view_limits()
         )
+        x0, x1 = self._clamp_x_limits(x0, x1)
+        if self._log_scale_y:
+            self._axes.set_yscale("log", nonpositive="clip")
+            if y0 <= 0.0 or y1 <= y0:
+                y0, y1 = self._visible_y_limits(x0, x1)
+            else:
+                y0 = max(1e-3, float(y0))
+                y1 = max(y0 * 1.0001, float(y1))
+        else:
+            self._axes.set_yscale("linear")
+            y0 = max(0.0, float(y0))
+            y1 = max(y0 + 1e-9, float(y1))
+        self._view_limits = (x0, x1, y0, y1)
         self._axes.set_xlim(x0, x1)
         self._axes.set_ylim(y0, y1)
 
@@ -1441,9 +1499,14 @@ class HistogramWidget(qtw.QWidget):
 
         menu = qtw.QMenu(self)
         reset_action = menu.addAction("Reset View")
+        log_y_action = menu.addAction("Log Y Axis")
+        log_y_action.setCheckable(True)
+        log_y_action.setChecked(self._log_scale_y)
         chosen = self._exec_plot_context_menu(menu)
         if chosen == reset_action:
             self.reset_view()
+        elif chosen == log_y_action:
+            self.set_log_scale_y(bool(log_y_action.isChecked()))
 
     def _exec_plot_context_menu(self, menu: qtw.QMenu) -> object | None:
         """Execute the histogram context menu.
@@ -1543,11 +1606,11 @@ class HistogramWidget(qtw.QWidget):
         new_y_span = min(max(y_span * zoom_scale, min_y_span), max_y_span)
         x0 = float(x_data) - x_ratio * new_x_span
         x1 = x0 + new_x_span
-        y0 = max(0.0, float(y_data) - y_ratio * new_y_span)
+        min_y0 = 1e-3 if self._log_scale_y else 0.0
+        y0 = max(min_y0, float(y_data) - y_ratio * new_y_span)
         y1 = y0 + new_y_span
-        self._axes.set_xlim(x0, x1)
-        self._axes.set_ylim(y0, y1)
-        self._remember_current_view_limits()
+        self._view_limits = (x0, x1, y0, y1)
+        self._apply_view_limits()
         self._canvas.draw_idle()
 
     def _on_plot_motion(self, event: object) -> None:
@@ -1580,11 +1643,16 @@ class HistogramWidget(qtw.QWidget):
         start_x, start_y, start_xlim, start_ylim = self._plot_pan_state
         delta_x = float(getattr(event, "xdata")) - start_x
         delta_y = float(getattr(event, "ydata")) - start_y
-        y0 = max(0.0, start_ylim[0] - delta_y)
+        min_y0 = 1e-3 if self._log_scale_y else 0.0
+        y0 = max(min_y0, start_ylim[0] - delta_y)
         y1 = y0 + float(start_ylim[1] - start_ylim[0])
-        self._axes.set_xlim(start_xlim[0] - delta_x, start_xlim[1] - delta_x)
-        self._axes.set_ylim(y0, y1)
-        self._remember_current_view_limits()
+        self._view_limits = (
+            start_xlim[0] - delta_x,
+            start_xlim[1] - delta_x,
+            y0,
+            y1,
+        )
+        self._apply_view_limits()
         self._canvas.draw_idle()
 
     def _clear_plot_selection_overlay(self) -> None:
@@ -1681,6 +1749,7 @@ class HistogramWidget(qtw.QWidget):
         ax.xaxis.label.set_color(text)
         ax.yaxis.label.set_color(text)
         ax.grid(True, color=grid, alpha=0.35, linewidth=0.8)
+        ax.set_yscale("linear")
         ax.set_xlabel("Pixel Intensity")
         ax.set_ylabel("Occurrences")
 

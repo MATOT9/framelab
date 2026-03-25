@@ -159,6 +159,42 @@ def test_histogram_context_menu_reset_restores_full_view(qapp, monkeypatch) -> N
     widget.deleteLater()
 
 
+def test_histogram_context_menu_can_toggle_log_y_scale(qapp, monkeypatch) -> None:
+    widget = HistogramWidget()
+    image = np.arange(1, 101, dtype=np.float32).reshape(10, 10)
+    widget.set_image(image)
+    qapp.processEvents()
+
+    monkeypatch.setattr(
+        widget,
+        "_exec_plot_context_menu",
+        lambda menu: (
+            menu.actions()[1].setChecked(True) or menu.actions()[1]
+        ),
+    )
+    widget._show_plot_context_menu()
+    qapp.processEvents()
+
+    assert widget._log_scale_y
+    assert widget._axes.get_yscale() == "log"
+    assert widget._axes.get_ylim()[0] > 0.0
+    widget.deleteLater()
+
+
+def test_histogram_uses_full_image_x_range_including_outliers(qapp) -> None:
+    widget = HistogramWidget()
+    image = np.arange(110, dtype=np.float32).reshape(11, 10)
+    image[-1, -1] = 5000.0
+    widget.set_image(image)
+    qapp.processEvents()
+
+    xlim = tuple(widget._axes.get_xlim())
+    assert xlim[0] <= float(np.min(image))
+    assert xlim[1] >= float(np.max(image))
+    assert widget._edges[-1] == pytest.approx(float(np.max(image)))
+    widget.deleteLater()
+
+
 def test_histogram_selection_zoom_keeps_full_image_histogram_counts(qapp) -> None:
     widget = HistogramWidget()
     image = np.arange(100, dtype=np.float32).reshape(10, 10)
@@ -294,4 +330,27 @@ def test_histogram_selection_zoom_clamps_when_drag_leaves_plot_vertically(
     assert xlim[0] == pytest.approx(start_x)
     assert xlim[1] == pytest.approx(end_x)
     assert ylim[1] == pytest.approx(full_ylim[1])
+    widget.deleteLater()
+
+
+def test_histogram_zoom_out_keeps_x_axis_near_zero_floor(qapp) -> None:
+    widget = HistogramWidget()
+    image = np.arange(100, dtype=np.float32).reshape(10, 10)
+    widget.set_image(image)
+    qapp.processEvents()
+
+    full_xlim = tuple(widget._axes.get_xlim())
+    center_x = float(sum(full_xlim) / 2.0)
+    center_y = float(sum(widget._axes.get_ylim()) / 2.0)
+    lower_bound, _upper_bound = widget._x_view_bounds()
+
+    for _ in range(25):
+        widget._on_plot_scroll(
+            _plot_event(widget, xdata=center_x, ydata=center_y, button="down"),
+        )
+    qapp.processEvents()
+
+    xlim = tuple(widget._axes.get_xlim())
+    assert xlim[0] >= lower_bound - 1e-6
+    assert xlim[0] > -5.0
     widget.deleteLater()
