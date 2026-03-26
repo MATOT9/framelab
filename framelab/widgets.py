@@ -421,7 +421,12 @@ class ImagePreviewLabel(qtw.QLabel):
         self.reset_view()
         self.setText("No image selected.")
 
-    def set_rgb_image(self, rgb: np.ndarray) -> None:
+    def set_rgb_image(
+        self,
+        rgb: np.ndarray,
+        *,
+        image_size: tuple[int, int] | None = None,
+    ) -> None:
         """Set RGB image data used for on-screen rendering."""
         if rgb.ndim != 3 or rgb.shape[2] != 3:
             self.clear_image()
@@ -438,7 +443,11 @@ class ImagePreviewLabel(qtw.QLabel):
             QtGui.QImage.Format_RGB888,
         )
         self._source_pixmap = QtGui.QPixmap.fromImage(image)
-        self._image_size = (w, h)
+        if image_size is None:
+            self._image_size = (w, h)
+        else:
+            img_w, img_h = image_size
+            self._image_size = (max(1, int(img_w)), max(1, int(img_h)))
         self.setText("")
         self._clamp_pan_offset()
         self._update_cursor()
@@ -1096,6 +1105,7 @@ class HistogramWidget(qtw.QWidget):
         self._pending_image: Optional[np.ndarray] = None
         self._view_limits: Optional[tuple[float, float, float, float]] = None
         self._log_scale_y = False
+        self._exact_refresh_suppressed = False
         self._is_plot_panning = False
         self._is_plot_selecting = False
         self._plot_pan_state: Optional[
@@ -1183,6 +1193,16 @@ class HistogramWidget(qtw.QWidget):
         self._selection_rect_artist = None
         self._redraw()
 
+    def set_exact_refresh_suppressed(self, suppressed: bool) -> None:
+        """Temporarily pause exact histogram refinement while the UI is busy."""
+
+        requested = bool(suppressed)
+        if self._exact_refresh_suppressed == requested:
+            return
+        self._exact_refresh_suppressed = requested
+        if not requested and self._pending_image is not None:
+            self._exact_timer.start()
+
     def set_image(self, image: np.ndarray, *, exact: bool = True) -> None:
         """Build histogram data from a 2D intensity image.
 
@@ -1215,12 +1235,17 @@ class HistogramWidget(qtw.QWidget):
             arr,
             sample_limit=self._APPROXIMATE_SAMPLE_LIMIT,
         )
-        self._exact_timer.start()
+        if not self._exact_refresh_suppressed:
+            self._exact_timer.start()
 
     def _render_pending_image_exact(self) -> None:
         image = self._pending_image
         self._pending_image = None
         if image is None:
+            return
+        if self._exact_refresh_suppressed:
+            self._pending_image = image
+            self._exact_timer.start()
             return
         self._set_histogram_data(image, sample_limit=None)
 

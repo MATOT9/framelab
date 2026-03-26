@@ -224,6 +224,26 @@ class DataPageMixin:
         )
         command_layout.addWidget(load_button)
 
+        self.data_load_progress = qtw.QProgressBar()
+        self.data_load_progress.setMinimum(0)
+        self.data_load_progress.setMaximum(100)
+        self.data_load_progress.setValue(0)
+        self.data_load_progress.setFormat("Load %v/%m")
+        self.data_load_progress.setTextVisible(True)
+        self.data_load_progress.setVisible(False)
+        self.data_load_progress.setMinimumWidth(180)
+        command_layout.addWidget(self.data_load_progress)
+
+        self.cancel_dataset_load_button = qtw.QPushButton("Cancel Load")
+        self.cancel_dataset_load_button.setToolTip(
+            "Cancel the current dataset load and keep rows that already arrived.",
+        )
+        self.cancel_dataset_load_button.clicked.connect(
+            lambda _checked=False: self._cancel_dataset_load_job(),
+        )
+        self.cancel_dataset_load_button.setVisible(False)
+        command_layout.addWidget(self.cancel_dataset_load_button)
+
         self.data_advanced_toggle = qtw.QToolButton()
         self.data_advanced_toggle.setObjectName("DisclosureButton")
         self.data_advanced_toggle.setToolButtonStyle(
@@ -603,6 +623,27 @@ class DataPageMixin:
                 level="info" if datacard_present else "warning",
             ),
         ]
+        if getattr(self, "_is_dataset_load_running", None) and self._is_dataset_load_running():
+            processed = (
+                self.data_load_progress.value()
+                if hasattr(self, "data_load_progress")
+                else 0
+            )
+            total = (
+                self.data_load_progress.maximum()
+                if hasattr(self, "data_load_progress")
+                else 0
+            )
+            chips.append(
+                ChipSpec(
+                    (
+                        f"Loading {processed}/{total}"
+                        if total > 0
+                        else "Loading dataset"
+                    ),
+                    level="warning",
+                ),
+            )
         if len(ebus_configs) > 1:
             chips.append(
                 ChipSpec(

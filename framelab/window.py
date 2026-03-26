@@ -10,7 +10,7 @@ import shutil
 
 import numpy as np
 from PySide6 import QtGui, QtWidgets as qtw
-from PySide6.QtCore import Qt, QSignalBlocker, QThread, QTimer
+from PySide6.QtCore import Qt, QSignalBlocker, QThread, QTimer, Signal
 
 from .analysis_context import AnalysisContextController
 from .byte_budget_cache import ByteBudgetCache
@@ -58,7 +58,7 @@ from .workspace_document import (
     WorkspaceDocumentWorkflowState,
 )
 from .workflow import WorkflowStateController, workflow_profile_by_id
-from .workers import DynamicStatsWorker, RoiApplyWorker
+from .workers import DynamicStatsWorker, RoiApplyWorker, DatasetLoadWorker
 
 
 def _controller_property(controller_name: str, state_name: str, doc: str) -> property:
@@ -103,6 +103,8 @@ class FrameLabWindow(
     qtw.QMainWindow,
 ):
     """Main application window for image measurement and analysis."""
+
+    datasetLoadCompleted = Signal(object)
 
     RAW_IMAGE_CACHE_BUDGET_BYTES = 256 * 1024 * 1024
     CORRECTED_IMAGE_CACHE_BUDGET_BYTES = 256 * 1024 * 1024
@@ -262,6 +264,13 @@ class FrameLabWindow(
         self._measure_column_actions: dict[str, QtGui.QAction] = {}
         self._stats_thread: Optional[QThread] = None
         self._stats_worker: Optional[DynamicStatsWorker] = None
+        self._dataset_load_thread: Optional[QThread] = None
+        self._dataset_load_worker: Optional[DatasetLoadWorker] = None
+        self._dataset_load_job_id = 0
+        self._dataset_load_callbacks: dict[int, list[object]] = {}
+        self._dataset_load_auto_metrics: dict[int, bool] = {}
+        self._dataset_load_workflow_notices: dict[int, str] = {}
+        self._dataset_load_batch_applying = False
         self._threshold_summary_anim_phase = 0
         self._threshold_summary_timer = QTimer(self)
         self._threshold_summary_timer.setInterval(320)
@@ -270,6 +279,13 @@ class FrameLabWindow(
         )
         self._roi_apply_thread: Optional[QThread] = None
         self._roi_apply_worker: Optional[RoiApplyWorker] = None
+        self._preview_refresh_timer = QTimer(self)
+        self._preview_refresh_timer.setSingleShot(True)
+        self._preview_refresh_timer.setInterval(120)
+        self._preview_refresh_timer.timeout.connect(
+            self._flush_pending_preview_refresh,
+        )
+        self._pending_preview_index: int | None = None
         self._pause_preview_updates = False
         self._sort_column = -1
         self._sort_order = Qt.AscendingOrder
@@ -2020,71 +2036,53 @@ class FrameLabWindow(
         self._set_table_current_source_row(index)
         self._display_image(index)
 
-    def _restore_workspace_document_snapshot(
+    def _finalize_workspace_document_open(
+        self,
+        path: Path,
+        snapshot: WorkspaceDocumentSnapshot,
+        warnings: list[str],
+    ) -> None:
+        """Record one fully restored workspace document as the active session."""
+
+        try:
+            reference_payload = self._capture_workspace_document_snapshot().to_payload()
+        except Exception:
+            reference_payload = snapshot.to_payload()
+        self._workspace_document_path = path.expanduser()
+        self._workspace_document_reference_payload = reference_payload
+        self._workspace_document_dirty = False
+        self._update_workspace_document_window_title()
+        self._set_status(f"Opened workspace file {self._workspace_document_path.name}")
+        if warnings:
+            self._show_info(
+                "Workspace File Opened With Warnings",
+                "\n".join(warnings),
+            )
+
+    def _continue_workspace_document_restore(
         self,
         snapshot: WorkspaceDocumentSnapshot,
-    ) -> list[str]:
-        """Apply one workspace-document snapshot to the live window state."""
+        warnings: list[str],
+        *,
+        document_path: Path | None = None,
+        load_summary=None,
+    ) -> None:
+        """Apply the post-load portion of workspace restore, then finalize open."""
 
-        warnings: list[str] = []
-        self._workspace_document_restore_depth += 1
         try:
-            self._session_panel_overrides.clear()
-            self.ui_state_snapshot.panel_states = {
-                str(key).strip().lower(): bool(value)
-                for key, value in snapshot.ui.panel_states.items()
-                if str(key).strip()
-            }
-            self.ui_state_snapshot.splitter_sizes = {
-                str(key).strip().lower(): [max(0, int(size)) for size in value]
-                for key, value in snapshot.ui.splitter_sizes.items()
-                if str(key).strip() and value
-            }
-
-            workflow_state = snapshot.workflow
-            workflow_loaded = False
-            if workflow_state.workspace_root and workflow_state.profile_id:
-                workflow_root = Path(workflow_state.workspace_root).expanduser()
-                if workflow_root.exists():
-                    self.set_workflow_context(
-                        str(workflow_root),
-                        workflow_state.profile_id,
-                        anchor_type_id=workflow_state.anchor_type_id,
-                        active_node_id=workflow_state.active_node_id,
-                    )
-                    workflow_loaded = True
-                else:
+            if load_summary is not None and (
+                getattr(load_summary, "failed", False)
+                or getattr(load_summary, "no_files", False)
+                or (
+                    getattr(snapshot.dataset, "scan_root", None)
+                    and not self._has_loaded_data()
+                )
+            ):
+                scan_root_text = (snapshot.dataset.scan_root or "").strip()
+                if scan_root_text:
                     warnings.append(
-                        f"Workflow root is missing: {workflow_state.workspace_root}",
+                        f"Dataset scan root could not be loaded: {scan_root_text}",
                     )
-                    self.set_workflow_context(None, None)
-            else:
-                self.set_workflow_context(None, None)
-
-            dataset_state = snapshot.dataset
-            scan_root_text = (dataset_state.scan_root or "").strip()
-            scan_root = Path(scan_root_text).expanduser() if scan_root_text else None
-            if not scan_root_text:
-                if self._has_loaded_data():
-                    self.unload_folder(clear_folder_edit=False)
-                if workflow_loaded:
-                    self._sync_dataset_scope_to_workflow(
-                        update_folder_edit=True,
-                        unload_mismatched_dataset=False,
-                    )
-            else:
-                if dataset_state.scope_source == "manual":
-                    self._set_manual_dataset_scope(scan_root)
-                if hasattr(self, "_set_folder_edit_text"):
-                    self._set_folder_edit_text(str(scan_root))
-                if scan_root is not None and scan_root.is_dir():
-                    self.load_folder()
-                else:
-                    warnings.append(
-                        f"Dataset scan root is missing: {scan_root_text}",
-                    )
-                    if self._has_loaded_data():
-                        self.unload_folder(clear_folder_edit=False)
 
             background_state = snapshot.background
             metrics = self.metrics_state
@@ -2225,11 +2223,110 @@ class FrameLabWindow(
             )
             self._refresh_manager_dialogs()
             self._set_status()
+            if document_path is not None:
+                self._finalize_workspace_document_open(
+                    document_path,
+                    snapshot,
+                    warnings,
+                )
         finally:
             self._workspace_document_restore_depth = max(
                 0,
                 self._workspace_document_restore_depth - 1,
             )
+
+    def _restore_workspace_document_snapshot(
+        self,
+        snapshot: WorkspaceDocumentSnapshot,
+        *,
+        document_path: Path | None = None,
+    ) -> list[str]:
+        """Apply one workspace-document snapshot to the live window state."""
+
+        warnings: list[str] = []
+        self._workspace_document_restore_depth += 1
+        async_pending = False
+        try:
+            self._session_panel_overrides.clear()
+            self.ui_state_snapshot.panel_states = {
+                str(key).strip().lower(): bool(value)
+                for key, value in snapshot.ui.panel_states.items()
+                if str(key).strip()
+            }
+            self.ui_state_snapshot.splitter_sizes = {
+                str(key).strip().lower(): [max(0, int(size)) for size in value]
+                for key, value in snapshot.ui.splitter_sizes.items()
+                if str(key).strip() and value
+            }
+
+            workflow_state = snapshot.workflow
+            workflow_loaded = False
+            if workflow_state.workspace_root and workflow_state.profile_id:
+                workflow_root = Path(workflow_state.workspace_root).expanduser()
+                if workflow_root.exists():
+                    self.set_workflow_context(
+                        str(workflow_root),
+                        workflow_state.profile_id,
+                        anchor_type_id=workflow_state.anchor_type_id,
+                        active_node_id=workflow_state.active_node_id,
+                    )
+                    workflow_loaded = True
+                else:
+                    warnings.append(
+                        f"Workflow root is missing: {workflow_state.workspace_root}",
+                    )
+                    self.set_workflow_context(None, None)
+            else:
+                self.set_workflow_context(None, None)
+
+            dataset_state = snapshot.dataset
+            scan_root_text = (dataset_state.scan_root or "").strip()
+            scan_root = Path(scan_root_text).expanduser() if scan_root_text else None
+            if not scan_root_text:
+                if self._has_loaded_data():
+                    self.unload_folder(clear_folder_edit=False)
+                if workflow_loaded:
+                    self._sync_dataset_scope_to_workflow(
+                        update_folder_edit=True,
+                        unload_mismatched_dataset=False,
+                    )
+            else:
+                if dataset_state.scope_source == "manual":
+                    self._set_manual_dataset_scope(scan_root)
+                if hasattr(self, "_set_folder_edit_text"):
+                    self._set_folder_edit_text(str(scan_root))
+                if scan_root is not None and scan_root.is_dir():
+                    async_pending = True
+                    self.load_folder(
+                        after_load=(
+                            lambda summary, snapshot=snapshot, warnings=warnings, document_path=document_path:
+                            self._continue_workspace_document_restore(
+                                snapshot,
+                                warnings,
+                                document_path=document_path,
+                                load_summary=summary,
+                            )
+                        ),
+                        suppress_auto_metrics=True,
+                    )
+                else:
+                    warnings.append(
+                        f"Dataset scan root is missing: {scan_root_text}",
+                    )
+                    if self._has_loaded_data():
+                        self.unload_folder(clear_folder_edit=False)
+            if not async_pending:
+                self._continue_workspace_document_restore(
+                    snapshot,
+                    warnings,
+                    document_path=document_path,
+                )
+        finally:
+            if not async_pending:
+                self._workspace_document_restore_depth = max(
+                    0,
+                    self._workspace_document_restore_depth - 1,
+                )
         return warnings
 
     def _select_workspace_document_path_to_open(self) -> Path | None:
@@ -2360,32 +2457,21 @@ class FrameLabWindow(
     def _open_workspace_document(self, path: Path | str) -> bool:
         """Load and restore one workspace document from disk."""
 
+        document_path = Path(path).expanduser()
         try:
-            snapshot = self.workspace_document_store.load(path)
+            snapshot = self.workspace_document_store.load(document_path)
         except Exception as exc:
             self._show_error("Open Workspace failed", str(exc))
             return False
 
         try:
-            warnings = self._restore_workspace_document_snapshot(snapshot)
-        except Exception as exc:
-            self._show_error("Open Workspace failed", str(exc))
-            return False
-
-        try:
-            reference_payload = self._capture_workspace_document_snapshot().to_payload()
-        except Exception:
-            reference_payload = snapshot.to_payload()
-        self._workspace_document_path = Path(path).expanduser()
-        self._workspace_document_reference_payload = reference_payload
-        self._workspace_document_dirty = False
-        self._update_workspace_document_window_title()
-        self._set_status(f"Opened workspace file {self._workspace_document_path.name}")
-        if warnings:
-            self._show_info(
-                "Workspace File Opened With Warnings",
-                "\n".join(warnings),
+            self._restore_workspace_document_snapshot(
+                snapshot,
+                document_path=document_path,
             )
+        except Exception as exc:
+            self._show_error("Open Workspace failed", str(exc))
+            return False
         return True
 
     def _open_workspace_document_from_dialog(self) -> None:

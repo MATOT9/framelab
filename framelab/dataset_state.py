@@ -102,6 +102,23 @@ class DatasetStateController:
         self.metadata_visible_paths = []
         self.selected_index = None
 
+    def begin_loaded_dataset(
+        self,
+        dataset_root: Path | str | None,
+    ) -> None:
+        """Prepare one empty loaded dataset that can receive incremental batches."""
+
+        self.set_loaded_dataset(dataset_root, ())
+
+    def append_loaded_paths(self, paths: Iterable[str]) -> list[str]:
+        """Append one ordered path batch to the loaded dataset."""
+
+        appended = [str(path) for path in paths]
+        if not appended:
+            return []
+        self.paths.extend(appended)
+        return appended
+
     def set_manual_scope(
         self,
         root: Path | str | None,

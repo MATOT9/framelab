@@ -126,6 +126,68 @@ class MetricsPipelineController:
             count if self.background_config.enabled else 0
         )
 
+    def append_loaded_batch(
+        self,
+        min_non_zero: np.ndarray,
+        maxs: np.ndarray,
+    ) -> None:
+        """Extend dataset-sized metric arrays for one incremental load batch."""
+
+        mins_arr = np.asarray(min_non_zero, dtype=np.int64)
+        maxs_arr = np.asarray(maxs, dtype=np.int64)
+        if mins_arr.size == 0 and maxs_arr.size == 0:
+            return
+        if self.min_non_zero is None or self.maxs is None:
+            self.min_non_zero = mins_arr.copy()
+            self.maxs = maxs_arr.copy()
+        else:
+            self.min_non_zero = np.concatenate((self.min_non_zero, mins_arr))
+            self.maxs = np.concatenate((self.maxs, maxs_arr))
+
+        batch_count = int(maxs_arr.size)
+        if self.sat_counts is None:
+            self.sat_counts = np.zeros(batch_count, dtype=np.int64)
+        else:
+            self.sat_counts = np.concatenate(
+                (self.sat_counts, np.zeros(batch_count, dtype=np.int64)),
+            )
+
+        def _append_nan(values: np.ndarray | None) -> np.ndarray:
+            if values is None:
+                return np.full(batch_count, np.nan, dtype=np.float64)
+            return np.concatenate(
+                (values, np.full(batch_count, np.nan, dtype=np.float64)),
+            )
+
+        self.roi_maxs = _append_nan(self.roi_maxs)
+        self.roi_means = _append_nan(self.roi_means)
+        self.roi_stds = _append_nan(self.roi_stds)
+        self.roi_sems = _append_nan(self.roi_sems)
+
+        if self.avg_maxs is not None:
+            self.avg_maxs = _append_nan(self.avg_maxs)
+        if self.avg_maxs_std is not None:
+            self.avg_maxs_std = _append_nan(self.avg_maxs_std)
+        if self.avg_maxs_sem is not None:
+            self.avg_maxs_sem = _append_nan(self.avg_maxs_sem)
+        if self.dn_per_ms_values is not None:
+            self.dn_per_ms_values = _append_nan(self.dn_per_ms_values)
+        if self.dn_per_ms_stds is not None:
+            self.dn_per_ms_stds = _append_nan(self.dn_per_ms_stds)
+        if self.dn_per_ms_sems is not None:
+            self.dn_per_ms_sems = _append_nan(self.dn_per_ms_sems)
+
+        if self.bg_applied_mask is None:
+            self.bg_applied_mask = np.zeros(batch_count, dtype=bool)
+        else:
+            self.bg_applied_mask = np.concatenate(
+                (self.bg_applied_mask, np.zeros(batch_count, dtype=bool)),
+            )
+        self.bg_total_count = len(self.maxs)
+        self.bg_unmatched_count = (
+            self.bg_total_count if self.background_config.enabled else 0
+        )
+
     def prepare_for_live_update(self, *, path_count: int, mode: str) -> None:
         """Ensure dataset-sized metric arrays exist for one recompute request."""
         count = max(0, int(path_count))

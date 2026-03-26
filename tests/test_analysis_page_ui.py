@@ -310,12 +310,14 @@ def test_custom_workflow_disables_analysis_context_delivery(
     process_events,
     monkeypatch,
     tmp_path: Path,
+    wait_for_dataset_load,
 ) -> None:
     folder = tmp_path / "custom-workflow"
     folder.mkdir()
     imwrite(folder / "frame_0001.tiff", np.full((4, 4), 12, dtype=np.uint16))
     analysis_window.set_workflow_context(str(folder), "calibration")
     analysis_window.load_folder()
+    wait_for_dataset_load(analysis_window)
     plugin = analysis_window._current_analysis_plugin()
 
     assert plugin is not None

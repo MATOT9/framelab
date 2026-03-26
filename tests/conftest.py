@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import time
 from collections.abc import Callable, Iterator
 
 import pytest
@@ -77,6 +78,42 @@ def process_events(qapp) -> Callable[[], None]:
         qapp.processEvents()
 
     return _process_events
+
+
+@pytest.fixture
+def wait_until(qapp) -> Callable[[Callable[[], bool], int], None]:
+    """Wait until one predicate becomes true while pumping Qt events."""
+
+    def _wait_until(
+        predicate: Callable[[], bool],
+        timeout_ms: int = 5000,
+    ) -> None:
+        deadline = time.monotonic() + (max(int(timeout_ms), 1) / 1000.0)
+        while time.monotonic() < deadline:
+            qapp.processEvents()
+            if predicate():
+                qapp.processEvents()
+                return
+            time.sleep(0.01)
+        qapp.processEvents()
+        assert predicate(), "Timed out waiting for Qt condition"
+
+    return _wait_until
+
+
+@pytest.fixture
+def wait_for_dataset_load(wait_until) -> Callable[[object, int], None]:
+    """Wait until one FrameLab window finishes its active dataset load."""
+
+    def _wait(window, timeout_ms: int = 10000) -> None:
+        wait_until(
+            lambda: not bool(
+                getattr(window, "_is_dataset_load_running", lambda: False)(),
+            ),
+            timeout_ms=timeout_ms,
+        )
+
+    return _wait
 
 
 @pytest.fixture

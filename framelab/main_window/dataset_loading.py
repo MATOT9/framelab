@@ -9,7 +9,7 @@ from typing import Optional
 
 import numpy as np
 from PySide6 import QtWidgets as qtw
-from PySide6.QtCore import QSignalBlocker
+from PySide6.QtCore import QSignalBlocker, QThread
 
 from ..background import (
     BackgroundLibrary,
@@ -31,6 +31,15 @@ from ..processing_failures import (
     failure_reason_from_exception,
     make_processing_failure,
 )
+from ..workers import (
+    DatasetLoadBatch,
+    DatasetLoadProgress,
+    DatasetLoadSummary,
+    DatasetLoadWorker,
+    dataset_scan_chunk_size,
+    dataset_scan_worker_count,
+    scan_single_static_image,
+)
 
 
 class DatasetLoadingMixin:
@@ -40,6 +49,7 @@ class DatasetLoadingMixin:
         """Clear the currently loaded dataset and reset dependent UI state."""
         dataset = self.dataset_state
         metrics = self.metrics_state
+        self._cancel_dataset_load_job()
         self._cancel_stats_job()
         self._cancel_roi_apply_job()
         self._clear_image_cache()
@@ -133,41 +143,19 @@ class DatasetLoadingMixin:
 
     def _scan_worker_count(self) -> int:
         """Return worker count used for TIFF scanning."""
-        cpu = os.cpu_count() or 4
-        return max(2, min(12, cpu * 2))
+        return dataset_scan_worker_count()
 
     @staticmethod
     def _chunk_size_for_scan(total_files: int) -> int:
         """Return scan chunk size based on dataset size."""
-        if total_files <= 64:
-            return 16
-        if total_files <= 256:
-            return 32
-        return 64
+        return dataset_scan_chunk_size(total_files)
 
     def _scan_single_tiff(
         self,
         path: Path,
     ) -> tuple[Optional[tuple[str, int, int]], tuple[object, ...]]:
         """Read a single TIFF and derive quick static metrics."""
-        try:
-            img = self._read_2d_image(path)
-        except Exception as exc:
-            return (
-                None,
-                (
-                    make_processing_failure(
-                        stage="scan",
-                        path=path,
-                        reason=failure_reason_from_exception(exc),
-                    ),
-                ),
-            )
-
-        non_zero = img[img != 0]
-        min_non_zero = int(non_zero.min()) if non_zero.size > 0 else 0
-        max_pixel = int(img.max())
-        return ((str(path), min_non_zero, max_pixel), ())
+        return scan_single_static_image(path)
 
     def _scan_tiffs_chunked_parallel(
         self,
@@ -466,9 +454,400 @@ class DatasetLoadingMixin:
         """Reset ROI-derived metric arrays to empty NaN-filled buffers."""
         self.metrics_state.reset_roi_metrics(self.dataset_state.path_count())
 
-    def load_folder(self) -> None:
-        """Load the dataset, compute static metrics, and refresh UI state."""
-        metrics = self.metrics_state
+    def _is_dataset_load_running(self) -> bool:
+        """Return whether one dataset load worker is currently active."""
+
+        thread = getattr(self, "_dataset_load_thread", None)
+        return bool(thread is not None and thread.isRunning())
+
+    def _cancel_dataset_load_job(self) -> None:
+        """Cancel any in-flight dataset load worker and drop queued callbacks."""
+
+        thread = getattr(self, "_dataset_load_thread", None)
+        if thread is None:
+            return
+        worker = getattr(self, "_dataset_load_worker", None)
+        job_id = getattr(self, "_dataset_load_job_id", 0)
+        callbacks = getattr(self, "_dataset_load_callbacks", None)
+        if isinstance(callbacks, dict):
+            callbacks.pop(job_id, None)
+        auto_metrics = getattr(self, "_dataset_load_auto_metrics", None)
+        if isinstance(auto_metrics, dict):
+            auto_metrics.pop(job_id, None)
+        notices = getattr(self, "_dataset_load_workflow_notices", None)
+        if isinstance(notices, dict):
+            notices.pop(job_id, None)
+        if worker is not None:
+            try:
+                thread.requestInterruption()
+            except Exception:
+                pass
+        self._update_dataset_load_ui(
+            active=False,
+            processed=0,
+            total=0,
+            message="",
+        )
+
+    def _on_dataset_load_thread_finished(
+        self,
+        thread: QThread,
+        worker: DatasetLoadWorker,
+    ) -> None:
+        """Clean up dataset loader worker objects after thread shutdown."""
+
+        if getattr(self, "_dataset_load_worker", None) is worker:
+            self._dataset_load_worker = None
+        if getattr(self, "_dataset_load_thread", None) is thread:
+            self._dataset_load_thread = None
+        worker.deleteLater()
+        thread.deleteLater()
+
+    def _register_dataset_load_callback(
+        self,
+        job_id: int,
+        callback,
+    ) -> None:
+        """Register one callback to run when a specific load job completes."""
+
+        callbacks = getattr(self, "_dataset_load_callbacks", None)
+        if not isinstance(callbacks, dict):
+            return
+        callbacks.setdefault(int(job_id), []).append(callback)
+
+    def _run_dataset_load_callbacks(
+        self,
+        summary: DatasetLoadSummary,
+    ) -> None:
+        """Run and clear callbacks queued for one completed load job."""
+
+        callbacks = getattr(self, "_dataset_load_callbacks", None)
+        if not isinstance(callbacks, dict):
+            return
+        for callback in callbacks.pop(int(summary.job_id), []):
+            try:
+                callback(summary)
+            except Exception:
+                continue
+
+    def _update_dataset_load_ui(
+        self,
+        *,
+        active: bool,
+        processed: int,
+        total: int,
+        message: str,
+    ) -> None:
+        """Refresh dataset-load progress widgets shared across Data and Measure."""
+
+        progress_value = min(max(int(processed), 0), max(int(total), 0))
+        progress_total = max(int(total), 0)
+        status_text = str(message or "")
+        if hasattr(self, "data_load_progress"):
+            if progress_total > 0:
+                self.data_load_progress.setRange(0, progress_total)
+                self.data_load_progress.setValue(progress_value)
+                self.data_load_progress.setFormat(f"Load %v/{progress_total}")
+            else:
+                self.data_load_progress.setRange(0, 0)
+                self.data_load_progress.setFormat("Loading...")
+            self.data_load_progress.setVisible(bool(active))
+        if hasattr(self, "measure_load_progress"):
+            if progress_total > 0:
+                self.measure_load_progress.setRange(0, progress_total)
+                self.measure_load_progress.setValue(progress_value)
+                self.measure_load_progress.setFormat(f"Load %v/{progress_total}")
+            else:
+                self.measure_load_progress.setRange(0, 0)
+                self.measure_load_progress.setFormat("Loading...")
+            self.measure_load_progress.setVisible(bool(active))
+        if hasattr(self, "cancel_dataset_load_button"):
+            self.cancel_dataset_load_button.setVisible(bool(active))
+            self.cancel_dataset_load_button.setEnabled(bool(active))
+        if hasattr(self, "cancel_dataset_load_button_measure"):
+            self.cancel_dataset_load_button_measure.setVisible(bool(active))
+            self.cancel_dataset_load_button_measure.setEnabled(bool(active))
+        if hasattr(self, "histogram_widget"):
+            self.histogram_widget.set_exact_refresh_suppressed(bool(active))
+        if hasattr(self, "_refresh_data_header_state"):
+            self._refresh_data_header_state()
+        if hasattr(self, "_refresh_measure_header_state"):
+            self._refresh_measure_header_state()
+        if hasattr(self, "_update_average_controls"):
+            self._update_average_controls()
+        if status_text:
+            self._set_status(status_text)
+        elif hasattr(self, "_set_status"):
+            self._set_status()
+
+    def _start_dataset_load_job(
+        self,
+        folder: Path,
+        *,
+        workflow_notice: str | None = None,
+        after_load=None,
+        suppress_auto_metrics: bool = False,
+    ) -> int:
+        """Start one asynchronous dataset load job and return its job id."""
+
+        self._cancel_dataset_load_job()
+        self.unload_folder(clear_folder_edit=False)
+        self.dataset_state.begin_loaded_dataset(folder)
+        self.metrics_state.initialize_loaded_dataset(0)
+        self._clear_image_cache()
+        if hasattr(self, "image_preview"):
+            self.image_preview.set_roi_rect(None)
+            self.image_preview.reset_view()
+        if hasattr(self, "_clear_processing_failures"):
+            self._clear_processing_failures()
+        if hasattr(self, "_refresh_metadata_table"):
+            self._refresh_metadata_table()
+        self._last_scan_pruned_dirs = 0
+        self._last_scan_skipped_files = 0
+        self.base_status = f"Loading {folder.name or str(folder)}"
+        self._update_metadata_source_options(False)
+
+        self._dataset_load_job_id = int(getattr(self, "_dataset_load_job_id", 0)) + 1
+        job_id = self._dataset_load_job_id
+        self._dataset_load_auto_metrics[job_id] = not bool(suppress_auto_metrics)
+        self._dataset_load_workflow_notices[job_id] = (
+            str(workflow_notice) if workflow_notice else ""
+        )
+        if after_load is not None:
+            self._register_dataset_load_callback(job_id, after_load)
+
+        metadata_boundary_root = (
+            self.dataset_state.scope_snapshot.root
+            if self.dataset_state.scope_snapshot.source == "workflow"
+            else None
+        )
+        worker = DatasetLoadWorker(
+            job_id=job_id,
+            folder=str(folder),
+            skip_patterns=tuple(self.skip_patterns),
+            metadata_source=self.dataset_state.metadata_source_mode,
+            metadata_boundary_root=(
+                str(metadata_boundary_root)
+                if metadata_boundary_root is not None
+                else None
+            ),
+            cache_path=str(self.metrics_cache.path),
+            workspace_root=(
+                str(self.workflow_state_controller.workspace_root)
+                if getattr(self.workflow_state_controller, "workspace_root", None)
+                is not None
+                else None
+            ),
+        )
+        thread = QThread(self)
+        worker.moveToThread(thread)
+        thread.started.connect(worker.run)
+        worker.batch_ready.connect(self._on_dataset_load_batch)
+        worker.progress.connect(self._on_dataset_load_progress)
+        worker.finished.connect(self._on_dataset_load_finished)
+        worker.failed.connect(self._on_dataset_load_failed)
+        worker.finished.connect(thread.quit)
+        worker.failed.connect(thread.quit)
+        thread.finished.connect(
+            lambda t=thread, w=worker: self._on_dataset_load_thread_finished(t, w),
+        )
+
+        self._dataset_load_thread = thread
+        self._dataset_load_worker = worker
+        self._update_dataset_load_ui(
+            active=True,
+            processed=0,
+            total=0,
+            message="Discovering TIFF files...",
+        )
+        thread.start()
+        return job_id
+
+    def _on_dataset_load_batch(self, batch: object) -> None:
+        """Append one ordered dataset-load batch into live controllers and table."""
+
+        if not isinstance(batch, DatasetLoadBatch):
+            return
+        if int(batch.job_id) != int(getattr(self, "_dataset_load_job_id", -1)):
+            return
+
+        self.dataset_state.append_loaded_paths(batch.paths)
+        self.dataset_state.update_path_metadata(batch.metadata_by_path)
+        self.metrics_state.append_loaded_batch(
+            batch.min_non_zero,
+            batch.max_pixels,
+        )
+        if hasattr(self, "_record_processing_failures") and batch.failures:
+            self._record_processing_failures(
+                list(batch.failures),
+                replace_stage=None,
+            )
+        self._dataset_load_batch_applying = True
+        try:
+            self._refresh_table(update_analysis=False)
+        finally:
+            self._dataset_load_batch_applying = False
+        self._update_dataset_load_ui(
+            active=True,
+            processed=batch.processed,
+            total=batch.total,
+            message=f"Loading images... {batch.processed}/{batch.total}",
+        )
+
+    def _on_dataset_load_progress(self, progress: object) -> None:
+        """Update progress UI for one active dataset load job."""
+
+        if not isinstance(progress, DatasetLoadProgress):
+            return
+        if int(progress.job_id) != int(getattr(self, "_dataset_load_job_id", -1)):
+            return
+        self._update_dataset_load_ui(
+            active=True,
+            processed=progress.processed,
+            total=progress.total,
+            message=progress.message,
+        )
+
+    def _on_dataset_load_finished(self, summary: object) -> None:
+        """Finalize dataset state after the async loader completes or cancels."""
+
+        if not isinstance(summary, DatasetLoadSummary):
+            return
+        if int(summary.job_id) != int(getattr(self, "_dataset_load_job_id", -1)):
+            return
+
+        folder = Path(summary.dataset_root).expanduser()
+        self._last_scan_pruned_dirs = int(summary.pruned_dirs)
+        self._last_scan_skipped_files = int(summary.skipped_files)
+        self._update_dataset_load_ui(
+            active=False,
+            processed=summary.loaded_count,
+            total=summary.total_candidates,
+            message="",
+        )
+
+        if summary.no_files:
+            self.dataset_state.clear_loaded_dataset()
+            self.metrics_state.clear_dataset_state()
+            self._refresh_table(update_analysis=False)
+            self._update_metadata_source_options(False)
+            suffix_text = "/".join(supported_suffixes())
+            msg = f"No {suffix_text} files found."
+            if self.skip_patterns:
+                msg = f"No {suffix_text} files found after applying skip patterns."
+                details: list[str] = []
+                if self._last_scan_pruned_dirs > 0:
+                    details.append(f"{self._last_scan_pruned_dirs} folders pruned")
+                if self._last_scan_skipped_files > 0:
+                    details.append(f"{self._last_scan_skipped_files} files skipped")
+                if details:
+                    msg += f"\n({', '.join(details)})"
+            self.base_status = "Select a folder."
+            self._show_info("No TIFF files", msg)
+            self._run_dataset_load_callbacks(summary)
+            self.datasetLoadCompleted.emit(summary)
+            return
+
+        if summary.loaded_count <= 0 or not self.dataset_state.has_loaded_data():
+            self.dataset_state.clear_loaded_dataset()
+            self.metrics_state.clear_dataset_state()
+            self._refresh_table(update_analysis=False)
+            self._update_metadata_source_options(False)
+            self.base_status = "Load failed"
+            self._clear_image_cache()
+            self._show_error("Load failed", "No readable 2D TIFF images.")
+            self._run_dataset_load_callbacks(summary)
+            self.datasetLoadCompleted.emit(summary)
+            return
+
+        if getattr(self.dataset_state.scope_snapshot, "source", "manual") == "workflow":
+            if hasattr(self, "_sync_dataset_scope_to_workflow"):
+                self._sync_dataset_scope_to_workflow(
+                    update_folder_edit=False,
+                    unload_mismatched_dataset=False,
+                )
+        elif hasattr(self, "_set_manual_dataset_scope"):
+            self._set_manual_dataset_scope(folder)
+
+        if hasattr(self, "_refresh_ebus_config_status"):
+            self._refresh_ebus_config_status(folder)
+        has_json_metadata = (
+            self._dataset_has_json_metadata(self.dataset_state.paths)
+            or self._folder_has_json_metadata(folder)
+        )
+        self._update_metadata_source_options(has_json_metadata)
+        self._refresh_metadata_table()
+
+        skipped_parts: list[str] = []
+        if summary.pruned_dirs > 0:
+            skipped_parts.append(f"{summary.pruned_dirs} folders pruned")
+        if summary.skipped_files > 0:
+            skipped_parts.append(f"{summary.skipped_files} files pattern-skipped")
+        if summary.skipped_unreadable > 0:
+            skipped_parts.append(f"{summary.skipped_unreadable} unreadable skipped")
+        if summary.was_cancelled:
+            skipped_parts.append("load cancelled")
+        self.base_status = f"Loaded {self.dataset_state.path_count()} images"
+        if skipped_parts:
+            self.base_status += f" ({', '.join(skipped_parts)})"
+
+        auto_metrics = bool(
+            self._dataset_load_auto_metrics.pop(int(summary.job_id), True),
+        )
+        workflow_notice = self._dataset_load_workflow_notices.pop(
+            int(summary.job_id),
+            "",
+        )
+        if auto_metrics:
+            self._apply_live_update()
+        else:
+            self._refresh_table(update_analysis=False)
+            self._update_background_status_label()
+            self._apply_dynamic_visibility_policy()
+            self._update_average_controls()
+            self._refresh_workspace_document_dirty_state()
+            self._set_status()
+
+        self._run_dataset_load_callbacks(summary)
+        if workflow_notice:
+            self.statusBar().showMessage(str(workflow_notice), 5000)
+        self.datasetLoadCompleted.emit(summary)
+
+    def _on_dataset_load_failed(self, job_id: int, message: str) -> None:
+        """Handle fatal loader failures from the dataset worker."""
+
+        if int(job_id) != int(getattr(self, "_dataset_load_job_id", -1)):
+            return
+        summary = DatasetLoadSummary(
+            job_id=int(job_id),
+            dataset_root=str(
+                getattr(self.dataset_state, "dataset_root", None) or ""
+            ),
+            loaded_count=self.dataset_state.path_count(),
+            total_candidates=self.dataset_state.path_count(),
+            failed=True,
+            failure_message=str(message or "Unknown error"),
+        )
+        self._dataset_load_auto_metrics.pop(int(job_id), None)
+        self._dataset_load_workflow_notices.pop(int(job_id), None)
+        self._update_dataset_load_ui(
+            active=False,
+            processed=0,
+            total=0,
+            message="",
+        )
+        self.base_status = "Load failed"
+        self._run_dataset_load_callbacks(summary)
+        self.datasetLoadCompleted.emit(summary)
+        self._show_error("Dataset load failed", message or "Unknown error")
+
+    def load_folder(
+        self,
+        *,
+        after_load=None,
+        suppress_auto_metrics: bool = False,
+    ) -> None:
+        """Start asynchronous dataset loading for the selected folder."""
         folder = Path(self.folder_edit.text().strip()).expanduser()
         workflow_notice = None
         if hasattr(self, "_resolve_requested_dataset_scope_folder"):
@@ -493,93 +872,12 @@ class DatasetLoadingMixin:
                 blocker = QSignalBlocker(self.metadata_filter_edit)
                 self.metadata_filter_edit.clear()
                 del blocker
-
-        files = self._find_tiffs(folder)
-        if not files:
-            suffix_text = "/".join(supported_suffixes())
-            msg = f"No {suffix_text} files found."
-            if self.skip_patterns:
-                msg = f"No {suffix_text} files found after applying skip patterns."
-                details: list[str] = []
-                if self._last_scan_pruned_dirs > 0:
-                    details.append(
-                        f"{self._last_scan_pruned_dirs} folders pruned",
-                    )
-                if self._last_scan_skipped_files > 0:
-                    details.append(
-                        f"{self._last_scan_skipped_files} files skipped",
-                    )
-                if details:
-                    msg += f"\n({', '.join(details)})"
-            self._show_info("No TIFF files", msg)
-            return
-
-        self._cancel_stats_job()
-        self._cancel_roi_apply_job()
-        self._clear_image_cache()
-        if hasattr(self, "_clear_processing_failures"):
-            self._clear_processing_failures()
-        paths, mins, maxs, skipped, failures = self._scan_tiffs_chunked_parallel(
-            files,
-            update_status=True,
-            dataset_root=folder,
+        self._start_dataset_load_job(
+            folder,
+            workflow_notice=workflow_notice,
+            after_load=after_load,
+            suppress_auto_metrics=suppress_auto_metrics,
         )
-        if hasattr(self, "_record_processing_failures"):
-            self._record_processing_failures(failures, replace_stage="scan")
-
-        if not paths:
-            self._show_error("Load failed", "No readable 2D TIFF images.")
-            self._clear_image_cache()
-            return
-
-        self.dataset_state.set_loaded_dataset(folder, paths)
-        if getattr(self.dataset_state.scope_snapshot, "source", "manual") == "workflow":
-            if hasattr(self, "_sync_dataset_scope_to_workflow"):
-                self._sync_dataset_scope_to_workflow(
-                    update_folder_edit=False,
-                    unload_mismatched_dataset=False,
-                )
-        elif hasattr(self, "_set_manual_dataset_scope"):
-            self._set_manual_dataset_scope(folder)
-        if hasattr(self, "_refresh_ebus_config_status"):
-            self._refresh_ebus_config_status(folder)
-        has_json_metadata = (
-            self._dataset_has_json_metadata(paths)
-            or self._folder_has_json_metadata(folder)
-        )
-        self._update_metadata_source_options(has_json_metadata)
-        self._refresh_metadata_cache(clear_cache=True)
-        self._refresh_metadata_table()
-        metrics.initialize_loaded_dataset(len(paths))
-        self.image_preview.set_roi_rect(None)
-        self.image_preview.reset_view()
-        self._compute_static_stats(
-            precomputed=(
-                np.asarray(mins, dtype=np.int64),
-                np.asarray(maxs, dtype=np.int64),
-            )
-        )
-        self.base_status = f"Loaded {len(paths)} images"
-        skipped_parts: list[str] = []
-        if self._last_scan_pruned_dirs > 0:
-            skipped_parts.append(
-                f"{self._last_scan_pruned_dirs} folders pruned",
-            )
-        if self._last_scan_skipped_files > 0:
-            skipped_parts.append(
-                f"{self._last_scan_skipped_files} files pattern-skipped",
-            )
-        if skipped > 0:
-            skipped_parts.append(f"{skipped} unreadable skipped")
-        if skipped_parts:
-            self.base_status += f" ({', '.join(skipped_parts)})"
-        self.dataset_state.set_selected_index(0, path_count=self.dataset_state.path_count())
-        self._apply_live_update()
-        self._update_background_status_label()
-        self._apply_dynamic_visibility_policy()
-        self._refresh_workspace_document_dirty_state()
-        if workflow_notice:
-            self.statusBar().showMessage(str(workflow_notice), 5000)
 
     def _compute_static_stats(
         self,

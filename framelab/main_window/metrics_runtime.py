@@ -7,6 +7,7 @@ from pathlib import Path
 import numpy as np
 from PySide6.QtCore import QThread
 
+from ..metric_reducers import compute_roi_stats
 from ..metrics_cache import (
     DYNAMIC_METRIC_KIND,
     ROI_METRIC_KIND,
@@ -23,14 +24,25 @@ from ..workers import DynamicStatsWorker, RoiApplyWorker
 class MetricsRuntimeMixin:
     """Live metric computation and preview refresh helpers."""
 
+    PREVIEW_FAST_MAX_DIM = 768
+
     @staticmethod
     def _build_preview_rgb(
         image: np.ndarray,
         *,
         threshold_value: float,
+        max_dim: int | None = None,
     ) -> np.ndarray:
         """Build one RGB preview buffer with thresholded pixels highlighted."""
         metric_arr = np.asarray(image)
+        if (
+            max_dim is not None
+            and max_dim > 0
+            and metric_arr.ndim == 2
+            and max(metric_arr.shape) > int(max_dim)
+        ):
+            step = max(1, int(np.ceil(max(metric_arr.shape) / float(max_dim))))
+            metric_arr = metric_arr[::step, ::step]
         imgf = np.array(metric_arr, dtype=np.float32, copy=True, order="C")
         mn = float(imgf.min()) if imgf.size > 0 else 0.0
         mx = float(imgf.max()) if imgf.size > 0 else 0.0
@@ -778,6 +790,10 @@ class MetricsRuntimeMixin:
 
     def _apply_live_update(self) -> None:
         """Apply UI-driven metric settings to the loaded dataset."""
+        if self._is_dataset_load_running():
+            self._update_average_controls()
+            self._set_status("Dataset load in progress")
+            return
         if not self._has_loaded_data():
             self._update_average_controls()
             self._refresh_workspace_document_dirty_state()
@@ -803,6 +819,9 @@ class MetricsRuntimeMixin:
 
     def _apply_threshold_update(self) -> None:
         """Refresh saturation display without rebuilding unrelated metrics."""
+        if self._is_dataset_load_running():
+            self._set_status("Wait for dataset loading to finish")
+            return
         metrics = self.metrics_state
         threshold_value = self.threshold_spin.value()
         threshold_changed = float(threshold_value) != float(metrics.threshold_value)
@@ -839,6 +858,9 @@ class MetricsRuntimeMixin:
 
     def _apply_low_signal_threshold_update(self) -> None:
         """Refresh low-signal row highlighting using the cached max-pixel values."""
+        if self._is_dataset_load_running():
+            self._set_status("Wait for dataset loading to finish")
+            return
 
         metrics = self.metrics_state
         metrics.low_signal_threshold_value = self.low_signal_spin.value()
@@ -898,7 +920,8 @@ class MetricsRuntimeMixin:
         )
         dataset = self.dataset_state
         metrics = self.metrics_state
-        model_reset = self.table_model.update_metrics(
+        previous_selected_index = dataset.selected_index
+        update_kind = self.table_model.update_metrics(
             paths=dataset.paths,
             iris_positions=iris_positions,
             exposure_ms=exposure_ms,
@@ -938,7 +961,7 @@ class MetricsRuntimeMixin:
         )
         assert target_index is not None
 
-        if model_reset or not current_index.isValid():
+        if update_kind == "reset" or not current_index.isValid():
             self._set_table_current_source_row(target_index)
 
         if self._is_multi_cell_selection():
@@ -948,7 +971,13 @@ class MetricsRuntimeMixin:
             self._update_background_status_label()
             return
         self._pause_preview_updates = False
-        self._display_image(target_index)
+        should_refresh_preview = not (
+            update_kind == "append"
+            and previous_selected_index == target_index
+            and current_index.isValid()
+        )
+        if should_refresh_preview:
+            self._display_image(target_index)
         if update_analysis:
             self._invalidate_analysis_context(refresh_visible_plugin=True)
         self._update_background_status_label()
@@ -997,8 +1026,43 @@ class MetricsRuntimeMixin:
         self._display_image(row)
         self._refresh_workspace_document_dirty_state()
 
+    def _schedule_exact_preview_refresh(self, idx: int) -> None:
+        """Queue one exact preview refresh after selection settles."""
+
+        self._pending_preview_index = idx
+        self._preview_refresh_timer.stop()
+        if (
+            (self.show_image_preview or self.show_histogram_preview)
+            and not self._is_dataset_load_running()
+            and not getattr(self, "_dataset_load_batch_applying", False)
+        ):
+            self._preview_refresh_timer.start()
+
+    def _flush_pending_preview_refresh(self) -> None:
+        """Render the exact preview once selection and loading have settled."""
+
+        idx = self._pending_preview_index
+        if idx is None or self._pause_preview_updates:
+            return
+        if self._is_dataset_load_running() or getattr(
+            self,
+            "_dataset_load_batch_applying",
+            False,
+        ):
+            self._preview_refresh_timer.start()
+            return
+        if self.dataset_state.selected_index != idx:
+            return
+        self._render_display_image(idx, exact_preview=True)
+
     def _display_image(self, idx: int) -> None:
-        """Refresh image preview, histogram, and info text for a row."""
+        """Refresh one row preview immediately, then queue its exact redraw."""
+
+        self._render_display_image(idx, exact_preview=False)
+        self._schedule_exact_preview_refresh(idx)
+
+    def _render_display_image(self, idx: int, *, exact_preview: bool) -> None:
+        """Render image preview, histogram, and info text for a row."""
         dataset = self.dataset_state
         metrics = self.metrics_state
         if self._pause_preview_updates:
@@ -1028,7 +1092,13 @@ class MetricsRuntimeMixin:
                 self._build_preview_rgb(
                     metric_arr,
                     threshold_value=metrics.threshold_value,
+                    max_dim=(
+                        None
+                        if exact_preview
+                        else self.PREVIEW_FAST_MAX_DIM
+                    ),
                 ),
+                image_size=(int(metric_arr.shape[1]), int(metric_arr.shape[0])),
             )
             self.image_preview.set_intensity_image(metric_arr)
             self.image_preview.set_roi_rect(metrics.roi_rect)
@@ -1037,7 +1107,14 @@ class MetricsRuntimeMixin:
             self.image_preview.set_intensity_image(None)
 
         if self.show_histogram_preview:
-            self.histogram_widget.set_image(metric_arr, exact=False)
+            self.histogram_widget.set_image(
+                metric_arr,
+                exact=(
+                    exact_preview
+                    and not self._is_dataset_load_running()
+                    and not getattr(self, "_dataset_load_batch_applying", False)
+                ),
+            )
         else:
             self.histogram_widget.clear_histogram()
         self._update_average_controls()
@@ -1167,10 +1244,7 @@ class MetricsRuntimeMixin:
         roi = metric_img[y0:y1, x0:x1]
         if roi.size == 0:
             return (np.nan, np.nan, np.nan, np.nan)
-        roi_max = float(np.max(roi))
-        roi_std = float(roi.std())
-        roi_sem = float(roi_std / np.sqrt(roi.size))
-        roi_mean = float(roi.mean())
+        roi_max, roi_mean, roi_std, roi_sem = compute_roi_stats(roi)
         if (
             cache is not None
             and identity is not None

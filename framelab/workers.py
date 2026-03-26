@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-import math
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass
+from fnmatch import fnmatch
+import os
+from pathlib import Path
 from typing import Optional
 
 import numpy as np
@@ -15,12 +19,201 @@ from .background import (
     select_reference,
     validate_reference_shape,
 )
-from .image_io import read_2d_image
+from .image_io import is_supported_image, read_2d_image
+from .metadata import extract_path_metadata
+from .metric_reducers import (
+    compute_min_non_zero_and_max,
+    compute_roi_stats,
+    compute_topk_stats_inplace,
+    count_at_or_above_threshold,
+)
+from .metrics_cache import (
+    FileMetricIdentity,
+    MetricCacheWrite,
+    MetricsCache,
+    STATIC_METRIC_KIND,
+    build_file_metric_identity,
+    static_metric_signature_hash,
+)
 from .metrics_state import DynamicStatsResult, RoiApplyResult
 from .processing_failures import (
+    ProcessingFailure,
     failure_reason_from_exception,
     make_processing_failure,
 )
+
+
+@dataclass(frozen=True, slots=True)
+class DatasetLoadBatch:
+    """One ordered batch of static scan rows emitted by the dataset loader."""
+
+    job_id: int
+    paths: tuple[str, ...]
+    min_non_zero: np.ndarray
+    max_pixels: np.ndarray
+    metadata_by_path: dict[str, dict[str, object]]
+    failures: tuple[ProcessingFailure, ...] = ()
+    processed: int = 0
+    total: int = 0
+
+
+@dataclass(frozen=True, slots=True)
+class DatasetLoadProgress:
+    """Progress update emitted while discovering and scanning a dataset."""
+
+    job_id: int
+    phase: str
+    processed: int
+    total: int
+    message: str
+
+
+@dataclass(frozen=True, slots=True)
+class DatasetLoadSummary:
+    """Terminal summary for one dataset load job."""
+
+    job_id: int
+    dataset_root: str
+    loaded_count: int
+    total_candidates: int
+    failures: tuple[ProcessingFailure, ...] = ()
+    skipped_unreadable: int = 0
+    pruned_dirs: int = 0
+    skipped_files: int = 0
+    no_files: bool = False
+    was_cancelled: bool = False
+    failed: bool = False
+    failure_message: str = ""
+
+
+def _skip_match(
+    pattern: str,
+    *,
+    name: str,
+    rel_path: str,
+    abs_path: str,
+) -> bool:
+    """Return whether one configured skip pattern matches the entry."""
+
+    token = pattern.strip().lower()
+    if not token:
+        return False
+
+    entry_name = name.lower()
+    rel = rel_path.lower().replace("\\", "/")
+    absolute = abs_path.lower().replace("\\", "/")
+    if "/" in token:
+        return fnmatch(rel, token) or fnmatch(absolute, token)
+    return fnmatch(entry_name, token) or fnmatch(rel, token)
+
+
+def _is_path_skipped(
+    patterns: tuple[str, ...],
+    *,
+    name: str,
+    rel_path: str,
+    abs_path: str,
+) -> bool:
+    """Return whether any configured skip pattern matches the entry."""
+
+    return any(
+        _skip_match(
+            pattern,
+            name=name,
+            rel_path=rel_path,
+            abs_path=abs_path,
+        )
+        for pattern in patterns
+    )
+
+
+def _find_supported_images(
+    folder: Path,
+    *,
+    skip_patterns: tuple[str, ...] = (),
+) -> tuple[list[Path], int, int]:
+    """Recursively discover supported image files under one folder."""
+
+    found: list[Path] = []
+    root = folder.resolve()
+    pruned_dirs = 0
+    skipped_files = 0
+
+    for current_root, dir_names, file_names in os.walk(root, topdown=True):
+        current_path = Path(current_root)
+        relative_root = current_path.relative_to(root)
+        kept_dirs: list[str] = []
+        for dirname in dir_names:
+            candidate_path = current_path / dirname
+            rel_path = (relative_root / dirname).as_posix()
+            if _is_path_skipped(
+                skip_patterns,
+                name=dirname,
+                rel_path=rel_path,
+                abs_path=str(candidate_path),
+            ):
+                pruned_dirs += 1
+                continue
+            kept_dirs.append(dirname)
+        dir_names[:] = kept_dirs
+
+        for filename in file_names:
+            candidate = current_path / filename
+            if not is_supported_image(candidate):
+                continue
+            rel_file_path = (relative_root / filename).as_posix()
+            if _is_path_skipped(
+                skip_patterns,
+                name=filename,
+                rel_path=rel_file_path,
+                abs_path=str(candidate),
+            ):
+                skipped_files += 1
+                continue
+            found.append(candidate)
+
+    return (sorted(found), pruned_dirs, skipped_files)
+
+
+def dataset_scan_worker_count() -> int:
+    """Return a conservative worker count for large TIFF scans."""
+
+    cpu = os.cpu_count() or 4
+    return min(4, max(2, cpu // 4))
+
+
+def dataset_scan_chunk_size(total_files: int) -> int:
+    """Return static-scan chunk size for one dataset size."""
+
+    if total_files <= 64:
+        return 16
+    if total_files <= 256:
+        return 32
+    return 64
+
+
+def scan_single_static_image(
+    path: Path | str,
+) -> tuple[tuple[str, int, int] | None, tuple[ProcessingFailure, ...]]:
+    """Read one image and compute quick static metrics."""
+
+    source_path = Path(path)
+    try:
+        image = read_2d_image(source_path)
+    except Exception as exc:
+        return (
+            None,
+            (
+                make_processing_failure(
+                    stage="scan",
+                    path=source_path,
+                    reason=failure_reason_from_exception(exc),
+                ),
+            ),
+        )
+
+    min_non_zero, max_pixel = compute_min_non_zero_and_max(image)
+    return ((str(source_path), min_non_zero, max_pixel), ())
 
 
 class DynamicStatsWorker(QObject):
@@ -76,26 +269,6 @@ class DynamicStatsWorker(QObject):
         self._existing_max_pixels = existing_max_pixels
         self._existing_min_non_zero = existing_min_non_zero
         self._existing_bg_applied_mask = existing_bg_applied_mask
-
-    @staticmethod
-    def _compute_min_non_zero_and_max(image: np.ndarray) -> tuple[int, int]:
-        """Compute minimum non-zero and max pixel from metric image."""
-        arr = np.asarray(image, dtype=np.float64)
-        if arr.size == 0:
-            return (0, 0)
-
-        finite = arr[np.isfinite(arr)]
-        if finite.size == 0:
-            return (0, 0)
-
-        positive = finite[finite > 0.0]
-        min_non_zero = (
-            int(round(float(np.min(positive))))
-            if positive.size > 0
-            else 0
-        )
-        max_pixel = int(round(float(np.max(finite))))
-        return (max(min_non_zero, 0), max(max_pixel, 0))
 
     def _reference_for_path(self, path: str) -> Optional[np.ndarray]:
         config = self._background_config
@@ -233,6 +406,7 @@ class DynamicStatsWorker(QObject):
                 avg_topk = np.full(n, np.nan, dtype=np.float64)
                 avg_topk_std = np.full(n, np.nan, dtype=np.float64)
                 avg_topk_sem = np.full(n, np.nan, dtype=np.float64)
+        threshold_mask: np.ndarray | None = None
         thread = QThread.currentThread()
         try:
             for source_index, path in zip(self._source_indices, self._paths):
@@ -266,29 +440,26 @@ class DynamicStatsWorker(QObject):
                     continue
                 if not threshold_only:
                     bg_applied_mask[source_index] = bool(bg_applied)
-                    min_nz, max_px = self._compute_min_non_zero_and_max(metric_img)
+                    min_nz, max_px = compute_min_non_zero_and_max(metric_img)
                     min_non_zero[source_index] = min_nz
                     max_pixels[source_index] = max_px
-                sat_counts[source_index] = int(
-                    np.count_nonzero(metric_img >= self._threshold_value),
+                sat_counts[source_index], threshold_mask = count_at_or_above_threshold(
+                    metric_img,
+                    self._threshold_value,
+                    scratch_mask=threshold_mask,
                 )
 
                 if threshold_only or avg_topk is None:
                     continue
-                flat = np.ravel(metric_img)
-                if flat.size == 0:
-                    continue
-                k = min(self._avg_count_value, flat.size)
-                split = flat.size - k
-                top_k = np.partition(flat, split)[split:]
-                if top_k.size == 0:
-                    continue
-                top_k_std = float(top_k.std())
-                avg_topk[source_index] = float(top_k.mean())
+                top_k_mean, top_k_std, top_k_sem = compute_topk_stats_inplace(
+                    metric_img,
+                    self._avg_count_value,
+                )
+                avg_topk[source_index] = top_k_mean
                 if avg_topk_std is not None:
                     avg_topk_std[source_index] = top_k_std
                 if avg_topk_sem is not None:
-                    avg_topk_sem[source_index] = top_k_std / math.sqrt(top_k.size)
+                    avg_topk_sem[source_index] = top_k_sem
         except Exception as exc:
             self.failed.emit(self._job_id, str(exc))
             return
@@ -444,13 +615,12 @@ class RoiApplyWorker(QObject):
                     continue
                 roi = metric_img[y0:y1, x0:x1]
                 if roi.size > 0:
-                    roi_f = np.asarray(roi, dtype=np.float64)
-                    maxs[source_index] = float(np.max(roi_f))
-                    means[source_index] = float(roi_f.mean())
-                    stds[source_index] = float(roi_f.std())
-                    sems[source_index] = float(
-                        stds[source_index] / math.sqrt(roi.size),
-                    )
+                    (
+                        maxs[source_index],
+                        means[source_index],
+                        stds[source_index],
+                        sems[source_index],
+                    ) = compute_roi_stats(roi)
                     valid_count += 1
 
                 self.progress.emit(processed_index, total)
@@ -469,3 +639,295 @@ class RoiApplyWorker(QObject):
                 failures=tuple(failures),
             ),
         )
+
+
+class DatasetLoadWorker(QObject):
+    """Background worker that discovers files and emits static scan batches."""
+
+    batch_ready = Signal(object)
+    progress = Signal(object)
+    finished = Signal(object)
+    failed = Signal(int, str)
+
+    def __init__(
+        self,
+        *,
+        job_id: int,
+        folder: str,
+        skip_patterns: tuple[str, ...] = (),
+        metadata_source: str = "json",
+        metadata_boundary_root: str | None = None,
+        cache_path: str | None = None,
+        workspace_root: str | None = None,
+    ) -> None:
+        super().__init__()
+        self._job_id = int(job_id)
+        self._folder = str(folder)
+        self._skip_patterns = tuple(
+            str(pattern).strip()
+            for pattern in skip_patterns
+            if str(pattern).strip()
+        )
+        self._metadata_source = str(metadata_source or "path")
+        self._metadata_boundary_root = (
+            Path(metadata_boundary_root).expanduser().resolve()
+            if metadata_boundary_root
+            else None
+        )
+        self._cache_path = str(cache_path).strip() or None
+        self._workspace_root = (
+            Path(workspace_root).expanduser().resolve()
+            if workspace_root
+            else None
+        )
+
+    def _emit_progress(
+        self,
+        *,
+        phase: str,
+        processed: int,
+        total: int,
+        message: str,
+    ) -> None:
+        self.progress.emit(
+            DatasetLoadProgress(
+                job_id=self._job_id,
+                phase=phase,
+                processed=max(0, int(processed)),
+                total=max(0, int(total)),
+                message=str(message),
+            ),
+        )
+
+    def _build_identity_map(
+        self,
+        paths: list[Path],
+    ) -> dict[str, FileMetricIdentity]:
+        dataset_root = Path(self._folder).expanduser().resolve()
+        identities: dict[str, FileMetricIdentity] = {}
+        for path in paths:
+            try:
+                identity = build_file_metric_identity(
+                    path,
+                    dataset_root=dataset_root,
+                    workspace_root=self._workspace_root,
+                )
+            except OSError:
+                continue
+            identities[str(path.resolve())] = identity
+        return identities
+
+    def run(self) -> None:
+        """Discover, statically scan, and emit dataset rows in ordered batches."""
+
+        thread = QThread.currentThread()
+        folder = Path(self._folder).expanduser().resolve()
+        failures: list[ProcessingFailure] = []
+        skipped_unreadable = 0
+        loaded_count = 0
+
+        try:
+            self._emit_progress(
+                phase="discover",
+                processed=0,
+                total=0,
+                message="Discovering TIFF files...",
+            )
+            files, pruned_dirs, skipped_files = _find_supported_images(
+                folder,
+                skip_patterns=self._skip_patterns,
+            )
+            if thread.isInterruptionRequested():
+                self.finished.emit(
+                    DatasetLoadSummary(
+                        job_id=self._job_id,
+                        dataset_root=str(folder),
+                        loaded_count=0,
+                        total_candidates=len(files),
+                        pruned_dirs=pruned_dirs,
+                        skipped_files=skipped_files,
+                        was_cancelled=True,
+                    ),
+                )
+                return
+
+            if not files:
+                self.finished.emit(
+                    DatasetLoadSummary(
+                        job_id=self._job_id,
+                        dataset_root=str(folder),
+                        loaded_count=0,
+                        total_candidates=0,
+                        pruned_dirs=pruned_dirs,
+                        skipped_files=skipped_files,
+                        no_files=True,
+                    ),
+                )
+                return
+
+            total_files = len(files)
+            chunk_size = dataset_scan_chunk_size(total_files)
+            max_workers = dataset_scan_worker_count()
+            cache = MetricsCache(Path(self._cache_path)) if self._cache_path else None
+            static_signature = static_metric_signature_hash()
+            executor: ThreadPoolExecutor | None = None
+            if max_workers > 1:
+                executor = ThreadPoolExecutor(max_workers=max_workers)
+            try:
+                for start in range(0, total_files, chunk_size):
+                    if thread.isInterruptionRequested():
+                        self.finished.emit(
+                            DatasetLoadSummary(
+                                job_id=self._job_id,
+                                dataset_root=str(folder),
+                                loaded_count=loaded_count,
+                                total_candidates=total_files,
+                                failures=tuple(failures),
+                                skipped_unreadable=skipped_unreadable,
+                                pruned_dirs=pruned_dirs,
+                                skipped_files=skipped_files,
+                                was_cancelled=True,
+                            ),
+                        )
+                        return
+
+                    chunk = files[start:start + chunk_size]
+                    identities = self._build_identity_map(chunk)
+                    cached_payloads: dict[str, dict[str, object]] = {}
+                    if cache is not None and identities:
+                        cached_payloads = cache.fetch_entries(
+                            identities.values(),
+                            metric_kind=STATIC_METRIC_KIND,
+                            signature_hash=static_signature,
+                        )
+
+                    computed_results: dict[
+                        str,
+                        tuple[tuple[str, int, int] | None, tuple[ProcessingFailure, ...]],
+                    ] = {}
+                    uncached_paths = [
+                        path
+                        for path in chunk
+                        if str(path.resolve()) not in cached_payloads
+                    ]
+                    if uncached_paths:
+                        if executor is None:
+                            for path in uncached_paths:
+                                computed_results[str(path.resolve())] = (
+                                    scan_single_static_image(path)
+                                )
+                        else:
+                            future_to_path = {
+                                executor.submit(scan_single_static_image, path): path
+                                for path in uncached_paths
+                            }
+                            for future in as_completed(future_to_path):
+                                path = future_to_path[future]
+                                try:
+                                    computed_results[str(path.resolve())] = future.result()
+                                except Exception as exc:
+                                    computed_results[str(path.resolve())] = (
+                                        None,
+                                        (
+                                            make_processing_failure(
+                                                stage="scan",
+                                                path=path,
+                                                reason=failure_reason_from_exception(exc),
+                                            ),
+                                        ),
+                                    )
+
+                    batch_paths: list[str] = []
+                    batch_mins: list[int] = []
+                    batch_maxs: list[int] = []
+                    batch_metadata: dict[str, dict[str, object]] = {}
+                    cache_writes: list[MetricCacheWrite] = []
+                    chunk_failures: list[ProcessingFailure] = []
+
+                    for path in chunk:
+                        resolved = str(path.resolve())
+                        payload = cached_payloads.get(resolved)
+                        if payload is not None:
+                            min_non_zero = int(payload.get("min_non_zero", 0))
+                            max_pixel = int(payload.get("max_pixel", 0))
+                        else:
+                            result, result_failures = computed_results.get(
+                                resolved,
+                                (None, ()),
+                            )
+                            chunk_failures.extend(result_failures)
+                            if result is None:
+                                skipped_unreadable += 1
+                                continue
+                            _path_str, min_non_zero, max_pixel = result
+                            identity = identities.get(resolved)
+                            if identity is not None and cache is not None:
+                                cache_writes.append(
+                                    MetricCacheWrite(
+                                        identity=identity,
+                                        payload={
+                                            "min_non_zero": int(min_non_zero),
+                                            "max_pixel": int(max_pixel),
+                                        },
+                                    ),
+                                )
+
+                        metadata = extract_path_metadata(
+                            resolved,
+                            metadata_source=self._metadata_source,
+                            metadata_boundary_root=self._metadata_boundary_root,
+                        )
+                        batch_paths.append(resolved)
+                        batch_mins.append(int(min_non_zero))
+                        batch_maxs.append(int(max_pixel))
+                        batch_metadata[resolved] = metadata
+
+                    failures.extend(chunk_failures)
+                    if cache is not None and cache_writes:
+                        cache.store_entries(
+                            cache_writes,
+                            metric_kind=STATIC_METRIC_KIND,
+                            signature_hash=static_signature,
+                        )
+
+                    loaded_count += len(batch_paths)
+                    if batch_paths:
+                        self.batch_ready.emit(
+                            DatasetLoadBatch(
+                                job_id=self._job_id,
+                                paths=tuple(batch_paths),
+                                min_non_zero=np.asarray(batch_mins, dtype=np.int64),
+                                max_pixels=np.asarray(batch_maxs, dtype=np.int64),
+                                metadata_by_path=batch_metadata,
+                                failures=tuple(chunk_failures),
+                                processed=min(start + len(chunk), total_files),
+                                total=total_files,
+                            ),
+                        )
+                    self._emit_progress(
+                        phase="scan",
+                        processed=min(start + len(chunk), total_files),
+                        total=total_files,
+                        message=(
+                            f"Loading images... "
+                            f"{min(start + len(chunk), total_files)}/{total_files}"
+                        ),
+                    )
+            finally:
+                if executor is not None:
+                    executor.shutdown(wait=False, cancel_futures=False)
+
+            self.finished.emit(
+                DatasetLoadSummary(
+                    job_id=self._job_id,
+                    dataset_root=str(folder),
+                    loaded_count=loaded_count,
+                    total_candidates=total_files,
+                    failures=tuple(failures),
+                    skipped_unreadable=skipped_unreadable,
+                    pruned_dirs=pruned_dirs,
+                    skipped_files=skipped_files,
+                ),
+            )
+        except Exception as exc:
+            self.failed.emit(self._job_id, str(exc))

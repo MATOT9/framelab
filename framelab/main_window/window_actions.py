@@ -404,6 +404,14 @@ class WindowActionsMixin:
                     )
                 else:
                     msg += " | ROI apply in progress"
+        if getattr(self, "_is_dataset_load_running", None) and self._is_dataset_load_running():
+            if hasattr(self, "data_load_progress") and self.data_load_progress.maximum() > 0:
+                msg += (
+                    f" | Loading {self.data_load_progress.value()}"
+                    f"/{self.data_load_progress.maximum()}"
+                )
+            else:
+                msg += " | Loading dataset..."
         if metrics.is_stats_running:
             msg += " | Updating metrics..."
         failure_count = self._processing_failure_count()
@@ -593,8 +601,13 @@ class WindowActionsMixin:
                 pass
         roi_thread = self._roi_apply_thread
         thread = self._stats_thread
+        load_thread = getattr(self, "_dataset_load_thread", None)
+        if hasattr(self, "_cancel_dataset_load_job"):
+            self._cancel_dataset_load_job()
         self._cancel_roi_apply_job()
         self._cancel_stats_job()
+        if load_thread is not None and load_thread.isRunning():
+            load_thread.wait(1500)
         if roi_thread is not None and roi_thread.isRunning():
             roi_thread.wait(1500)
         if thread is not None and thread.isRunning():

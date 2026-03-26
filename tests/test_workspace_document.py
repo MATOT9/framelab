@@ -191,6 +191,7 @@ def test_window_actions_restore_workspace_document_session(
     tmp_path: Path,
     monkeypatch,
     framelab_window_factory,
+    wait_for_dataset_load,
 ) -> None:
     config_path = tmp_path / "ui_state.ini"
     monkeypatch.setattr(
@@ -213,6 +214,7 @@ def test_window_actions_restore_workspace_document_session(
         active_node_id=session_node_id,
     )
     window.load_folder()
+    wait_for_dataset_load(window)
 
     roi_index = window.avg_mode_combo.findData("roi")
     window.avg_mode_combo.setCurrentIndex(roi_index)
@@ -266,6 +268,7 @@ def test_window_actions_restore_workspace_document_session(
         lambda: document_path,
     )
     restored.file_open_workspace_action.trigger()
+    wait_for_dataset_load(restored)
 
     assert restored.workflow_state_controller.profile_id == "calibration"
     assert restored.workflow_state_controller.active_node_id == session_node_id

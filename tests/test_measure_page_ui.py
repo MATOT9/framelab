@@ -104,12 +104,14 @@ def test_measure_splitter_state_round_trip(measure_window: FrameLabWindow) -> No
 def test_low_signal_threshold_updates_summary_and_row_highlighting(
     tmp_path: Path,
     measure_window: FrameLabWindow,
+    wait_for_dataset_load,
 ) -> None:
     dataset_root = _write_measure_dataset(tmp_path)
     dark_path = str((dataset_root / "a_dark.tiff").resolve())
     bright_path = str((dataset_root / "b_bright.tiff").resolve())
     measure_window.folder_edit.setText(str(dataset_root))
     measure_window.load_folder()
+    wait_for_dataset_load(measure_window)
 
     assert _measure_summary_values(measure_window).get("Low Signal") == "Inactive"
 
@@ -139,11 +141,13 @@ def test_low_signal_threshold_updates_summary_and_row_highlighting(
 def test_low_signal_threshold_does_not_add_preview_pixel_overlay(
     tmp_path: Path,
     measure_window: FrameLabWindow,
+    wait_for_dataset_load,
 ) -> None:
     dataset_root = _write_measure_dataset(tmp_path)
     dark_path = str((dataset_root / "a_dark.tiff").resolve())
     measure_window.folder_edit.setText(str(dataset_root))
     measure_window.load_folder()
+    wait_for_dataset_load(measure_window)
     measure_window.threshold_spin.setValue(100)
     measure_window._apply_threshold_update()
     measure_window.low_signal_spin.setValue(10)
@@ -169,11 +173,13 @@ def test_low_signal_threshold_does_not_add_preview_pixel_overlay(
 def test_roi_selection_updates_roi_max_for_selected_image_immediately(
     tmp_path: Path,
     measure_window: FrameLabWindow,
+    wait_for_dataset_load,
 ) -> None:
     dataset_root = _write_measure_dataset(tmp_path)
     dark_path = str((dataset_root / "a_dark.tiff").resolve())
     measure_window.folder_edit.setText(str(dataset_root))
     measure_window.load_folder()
+    wait_for_dataset_load(measure_window)
 
     dark_index = measure_window.dataset_state.paths.index(dark_path)
     measure_window.dataset_state.set_selected_index(
@@ -198,10 +204,12 @@ def test_compact_measure_header_mirrors_low_signal_and_saturation_status(
     tmp_path: Path,
     measure_window: FrameLabWindow,
     qapp,
+    wait_for_dataset_load,
 ) -> None:
     dataset_root = _write_measure_dataset(tmp_path)
     measure_window.folder_edit.setText(str(dataset_root))
     measure_window.load_folder()
+    wait_for_dataset_load(measure_window)
     measure_window.threshold_spin.setValue(10)
     measure_window._apply_threshold_update()
     measure_window.low_signal_spin.setValue(5)

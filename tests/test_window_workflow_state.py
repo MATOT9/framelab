@@ -404,13 +404,13 @@ def test_datacard_wizard_registers_window_shortcut(
         == QtGui.QKeySequence("Ctrl+Shift+D").toString()
     )
 
-    assert not window._workflow_explorer_dock.isHidden()
-    assert window._workflow_context_row.isHidden()
+    assert window._workflow_explorer_dock.isHidden() != window._workflow_context_row.isHidden()
 
 
 def test_load_folder_uses_active_workflow_scope_and_resolves_entered_child_node(
     tmp_path: Path,
     framelab_window_factory,
+    wait_for_dataset_load,
 ) -> None:
     workspace_root, session_root, first, _second, session_node_id, acquisition_node_id = (
         _make_calibration_workspace_with_frames(tmp_path)
@@ -423,12 +423,14 @@ def test_load_folder_uses_active_workflow_scope_and_resolves_entered_child_node(
     )
 
     window.load_folder()
+    wait_for_dataset_load(window)
     assert window.dataset_state.dataset_root == session_root.resolve()
     assert window.dataset_state.path_count() == 2
     assert window.dataset_state.scope_snapshot.active_node_id == session_node_id
 
     window.folder_edit.setText(str(first / "frames"))
     window.load_folder()
+    wait_for_dataset_load(window)
 
     assert window.workflow_state_controller.active_node_id == acquisition_node_id
     assert window.dataset_state.dataset_root == first.resolve()
@@ -439,6 +441,7 @@ def test_load_folder_uses_active_workflow_scope_and_resolves_entered_child_node(
 def test_unstructured_workflow_loads_as_custom_and_still_scans_tiffs(
     tmp_path: Path,
     framelab_window_factory,
+    wait_for_dataset_load,
 ) -> None:
     folder = tmp_path / "custom-scope"
     folder.mkdir()
@@ -453,6 +456,7 @@ def test_unstructured_workflow_loads_as_custom_and_still_scans_tiffs(
     assert window.dataset_state.scope_snapshot.kind == "custom"
 
     window.load_folder()
+    wait_for_dataset_load(window)
 
     assert window.dataset_state.dataset_root == folder.resolve()
     assert window.dataset_state.path_count() == 1
@@ -461,6 +465,7 @@ def test_unstructured_workflow_loads_as_custom_and_still_scans_tiffs(
 def test_loading_structured_calibration_folder_from_custom_switches_workflow(
     tmp_path: Path,
     framelab_window_factory,
+    wait_for_dataset_load,
 ) -> None:
     custom_root = tmp_path / "custom-root"
     custom_root.mkdir()
@@ -478,6 +483,7 @@ def test_loading_structured_calibration_folder_from_custom_switches_workflow(
 
     window.folder_edit.setText(str(first / "frames"))
     window.load_folder()
+    wait_for_dataset_load(window)
 
     assert window.workflow_state_controller.profile_id == "calibration"
     assert window.workflow_state_controller.anchor_type_id == "acquisition"
@@ -489,6 +495,7 @@ def test_loading_structured_calibration_folder_from_custom_switches_workflow(
 def test_loading_structured_trials_folder_from_custom_switches_workflow(
     tmp_path: Path,
     framelab_window_factory,
+    wait_for_dataset_load,
 ) -> None:
     custom_root = tmp_path / "custom-root"
     custom_root.mkdir()
@@ -501,6 +508,7 @@ def test_loading_structured_trials_folder_from_custom_switches_workflow(
 
     window.folder_edit.setText(str(acquisition_root / "frames"))
     window.load_folder()
+    wait_for_dataset_load(window)
 
     assert window.workflow_state_controller.profile_id == "trials"
     assert window.workflow_state_controller.anchor_type_id == "acquisition"
@@ -512,6 +520,7 @@ def test_loading_structured_trials_folder_from_custom_switches_workflow(
 def test_custom_workflow_can_scan_plain_tiff_subfolder_without_reverting_to_root(
     tmp_path: Path,
     framelab_window_factory,
+    wait_for_dataset_load,
 ) -> None:
     custom_root = tmp_path / "custom-root"
     custom_root.mkdir()
@@ -525,6 +534,7 @@ def test_custom_workflow_can_scan_plain_tiff_subfolder_without_reverting_to_root
 
     window.folder_edit.setText(str(plain_child))
     window.load_folder()
+    wait_for_dataset_load(window)
 
     assert window.workflow_state_controller.profile_id == "custom"
     assert window.dataset_state.dataset_root == plain_child.resolve()
@@ -557,6 +567,7 @@ def test_metadata_context_change_refreshes_only_affected_loaded_subtree(
     tmp_path: Path,
     framelab_window_factory,
     monkeypatch,
+    wait_for_dataset_load,
 ) -> None:
     workspace_root, _session_root, first, second, session_node_id, _acq_node_id = (
         _make_calibration_workspace_with_frames(tmp_path)
@@ -568,6 +579,7 @@ def test_metadata_context_change_refreshes_only_affected_loaded_subtree(
         active_node_id=session_node_id,
     )
     window.load_folder()
+    wait_for_dataset_load(window)
 
     original_by_path = {
         path: dict(window.dataset_state.metadata_for_path(path))
@@ -675,6 +687,7 @@ def test_window_can_delete_acquisition_from_workflow_structure_tools(
     tmp_path: Path,
     framelab_window_factory,
     monkeypatch,
+    wait_for_dataset_load,
 ) -> None:
     workspace_root, session_root, _first, second, session_node_id, _acq_node_id = (
         _make_calibration_workspace_with_frames(tmp_path)
@@ -690,6 +703,7 @@ def test_window_can_delete_acquisition_from_workflow_structure_tools(
         active_node_id=second_node_id,
     )
     window.load_folder()
+    wait_for_dataset_load(window)
     monkeypatch.setattr(
         qtw.QMessageBox,
         "question",

@@ -152,6 +152,7 @@ class InspectPageMixin:
         metrics_row.addWidget(self.threshold_spin)
 
         apply_threshold_button = qtw.QPushButton("Apply")
+        self.apply_threshold_button = apply_threshold_button
         apply_threshold_button.setObjectName("AccentButton")
         apply_threshold_button.setToolTip(
             "Apply threshold change and refresh saturation display.",
@@ -179,6 +180,7 @@ class InspectPageMixin:
         metrics_row.addWidget(self.low_signal_spin)
 
         apply_low_signal_button = qtw.QPushButton("Apply")
+        self.apply_low_signal_button = apply_low_signal_button
         apply_low_signal_button.setToolTip(
             "Apply low-signal threshold and refresh row highlighting.",
         )
@@ -248,6 +250,26 @@ class InspectPageMixin:
             self._build_measure_display_menu(),
         )
         metrics_row.addWidget(self.measure_display_button)
+
+        self.measure_load_progress = qtw.QProgressBar()
+        self.measure_load_progress.setMinimum(0)
+        self.measure_load_progress.setMaximum(100)
+        self.measure_load_progress.setValue(0)
+        self.measure_load_progress.setFormat("Load %v/%m")
+        self.measure_load_progress.setTextVisible(True)
+        self.measure_load_progress.setVisible(False)
+        self.measure_load_progress.setMinimumWidth(180)
+        metrics_row.addWidget(self.measure_load_progress)
+
+        self.cancel_dataset_load_button_measure = qtw.QPushButton("Cancel Load")
+        self.cancel_dataset_load_button_measure.setToolTip(
+            "Cancel the current dataset load and keep rows that already arrived.",
+        )
+        self.cancel_dataset_load_button_measure.clicked.connect(
+            lambda _checked=False: self._cancel_dataset_load_job(),
+        )
+        self.cancel_dataset_load_button_measure.setVisible(False)
+        metrics_row.addWidget(self.cancel_dataset_load_button_measure)
         metrics_row.addStretch(1)
         metrics_layout.addLayout(metrics_row)
 
@@ -1081,6 +1103,28 @@ class InspectPageMixin:
                 level="info" if (self.show_image_preview or self.show_histogram_preview) else "neutral",
             ),
         ]
+        if getattr(self, "_is_dataset_load_running", None) and self._is_dataset_load_running():
+            processed = (
+                self.measure_load_progress.value()
+                if hasattr(self, "measure_load_progress")
+                else 0
+            )
+            total = (
+                self.measure_load_progress.maximum()
+                if hasattr(self, "measure_load_progress")
+                else 0
+            )
+            loading_text = (
+                f"Loading {processed}/{total}"
+                if total > 0
+                else "Loading dataset"
+            )
+            chips.append(
+                ChipSpec(
+                    loading_text,
+                    level="warning",
+                ),
+            )
         failure_count = len(getattr(self, "_processing_failures", []))
         if failure_count > 0:
             chips.append(
@@ -1533,10 +1577,18 @@ class InspectPageMixin:
         """Show Measure controls only when the active mode makes them relevant."""
 
         mode = self._current_average_mode()
+        load_running = bool(
+            getattr(self, "_is_dataset_load_running", None)
+            and self._is_dataset_load_running()
+        )
         topk_enabled = mode == "topk"
         self.topk_controls_widget.setVisible(topk_enabled)
-        self.avg_spin.setEnabled(topk_enabled)
-        self.apply_topk_button.setEnabled(topk_enabled)
+        self.avg_spin.setEnabled(topk_enabled and not load_running)
+        self.apply_topk_button.setEnabled(topk_enabled and not load_running)
+        if hasattr(self, "apply_threshold_button"):
+            self.apply_threshold_button.setEnabled(not load_running)
+        if hasattr(self, "apply_low_signal_button"):
+            self.apply_low_signal_button.setEnabled(not load_running)
         roi_enabled = mode == "roi"
         self.roi_controls_widget.setVisible(roi_enabled)
         self.image_preview.set_roi_mode(
@@ -1551,13 +1603,14 @@ class InspectPageMixin:
             roi_enabled
             and self._has_loaded_data()
             and metrics.roi_rect is not None
+            and not load_running
             and not roi_job_running
         )
         self.apply_roi_all_button.setEnabled(
             roi_action_enabled
         )
         self.load_roi_button.setEnabled(
-            roi_enabled and self._has_loaded_data() and not roi_job_running
+            roi_enabled and self._has_loaded_data() and not roi_job_running and not load_running
         )
         self.save_roi_button.setEnabled(
             roi_action_enabled
