@@ -9,6 +9,7 @@ from tifffile import imwrite
 from PySide6 import QtWidgets as qtw
 from PySide6.QtCore import Qt
 
+import framelab.workflow_selection_dialog as workflow_selection_dialog_module
 from framelab.node_metadata import load_nodecard
 from framelab.ui_settings import RecentWorkflowEntry
 from framelab.workflow_selection_dialog import WorkflowSelectionDialog
@@ -173,6 +174,26 @@ def test_workflow_selection_dialog_supports_drag_and_maximize(
     assert dialog.windowFlags() & Qt.Window
     assert dialog.windowFlags() & Qt.WindowMaximizeButtonHint
     assert getattr(dialog, "_window_drag_controller", None) is not None
+
+
+def test_workflow_selection_dialog_browse_uses_shared_directory_helper(
+    tmp_path: Path,
+    framelab_window_factory,
+    monkeypatch,
+) -> None:
+    window = framelab_window_factory(enabled_plugin_ids=())
+    dialog = WorkflowSelectionDialog(window)
+    chosen = str(tmp_path / "selected-workspace")
+
+    monkeypatch.setattr(
+        workflow_selection_dialog_module,
+        "choose_existing_directory",
+        lambda *args, **kwargs: chosen,
+    )
+
+    dialog._browse_workspace()
+
+    assert dialog._workspace_edit.text() == chosen
 
 
 def test_workflow_selection_dialog_warns_for_folder_above_workspace_root(

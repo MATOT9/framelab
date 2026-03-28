@@ -97,7 +97,7 @@ class _SkipRulesEditorDialog(qtw.QDialog):
         self.pattern_list.setAlternatingRowColors(True)
         layout.addWidget(self.pattern_list, 1)
 
-        self.hint_label = qtw.QLabel()
+        self.hint_label = qtw.QLabel(self)
         self.hint_label.setObjectName("MutedLabel")
         self.hint_label.setWordWrap(True)
         layout.addWidget(self.hint_label)
@@ -185,7 +185,7 @@ class DataPageMixin:
         command_layout.setContentsMargins(14, 12, 14, 12)
         command_layout.setSpacing(8)
 
-        folder_label = qtw.QLabel("Dataset")
+        folder_label = qtw.QLabel("Dataset", command_bar)
         self._data_scope_label = folder_label
         folder_label.setObjectName("SectionTitle")
         command_layout.addWidget(folder_label)
@@ -283,7 +283,7 @@ class DataPageMixin:
         self._data_skip_header_row = skip_header_row
         skip_header_row.setSpacing(8)
 
-        skip_title = qtw.QLabel("Skip Rules")
+        skip_title = qtw.QLabel("Skip Rules", skip_panel)
         skip_title.setObjectName("SectionTitle")
         skip_header_row.addWidget(skip_title)
 
@@ -304,12 +304,12 @@ class DataPageMixin:
         skip_header_row.addWidget(edit_skip_rules_button)
         skip_layout.addLayout(skip_header_row)
 
-        self.skip_pattern_hint = qtw.QLabel()
+        self.skip_pattern_hint = qtw.QLabel(skip_panel)
         self.skip_pattern_hint.setObjectName("MutedLabel")
         self.skip_pattern_hint.setWordWrap(True)
         skip_layout.addWidget(self.skip_pattern_hint)
 
-        self.skip_pattern_preview_label = qtw.QLabel()
+        self.skip_pattern_preview_label = qtw.QLabel(skip_panel)
         self.skip_pattern_preview_label.setObjectName("MutedLabel")
         self.skip_pattern_preview_label.setWordWrap(True)
         self.skip_pattern_preview_label.setVisible(False)
@@ -327,13 +327,13 @@ class DataPageMixin:
         metadata_header_row = qtw.QHBoxLayout()
         self._data_metadata_header_row = metadata_header_row
         metadata_header_row.setSpacing(8)
-        metadata_title = qtw.QLabel("Metadata Controls")
+        metadata_title = qtw.QLabel("Metadata Controls", metadata_panel)
         metadata_title.setObjectName("SectionTitle")
         metadata_header_row.addWidget(metadata_title)
         metadata_header_row.addStretch(1)
         metadata_outer_layout.addLayout(metadata_header_row)
 
-        self.ebus_config_status_label = qtw.QLabel("")
+        self.ebus_config_status_label = qtw.QLabel("", metadata_panel)
         self.ebus_config_status_label.setObjectName("MutedLabel")
         self.ebus_config_status_label.setWordWrap(True)
         metadata_outer_layout.addWidget(self.ebus_config_status_label)
@@ -349,7 +349,7 @@ class DataPageMixin:
         self._data_metadata_row = metadata_row
         metadata_row.setSpacing(8)
 
-        group_label = qtw.QLabel("Group Rows By")
+        group_label = qtw.QLabel("Group Rows By", self.metadata_controls_body)
         group_label.setObjectName("SectionTitle")
         metadata_row.addWidget(group_label)
 
@@ -364,7 +364,7 @@ class DataPageMixin:
         )
         metadata_row.addWidget(self.metadata_group_combo)
 
-        filter_label = qtw.QLabel("Quick Filter")
+        filter_label = qtw.QLabel("Quick Filter", self.metadata_controls_body)
         filter_label.setObjectName("SectionTitle")
         metadata_row.addWidget(filter_label)
 
@@ -380,7 +380,7 @@ class DataPageMixin:
         )
         metadata_row.addWidget(self.metadata_filter_edit, 1)
 
-        metadata_source_label = qtw.QLabel("Metadata Source")
+        metadata_source_label = qtw.QLabel("Metadata Source", self.metadata_controls_body)
         metadata_source_label.setObjectName("SectionTitle")
         metadata_row.addWidget(metadata_source_label)
         self.metadata_source_combo = qtw.QComboBox()
@@ -410,11 +410,12 @@ class DataPageMixin:
         table_layout.setContentsMargins(12, 12, 12, 12)
         table_layout.setSpacing(8)
 
-        table_title = qtw.QLabel("Dataset Metadata")
+        table_title = qtw.QLabel("Dataset Metadata", table_panel)
         table_title.setObjectName("SectionTitle")
         table_layout.addWidget(table_title)
         self.metadata_summary_label = qtw.QLabel(
             "Load a dataset to populate metadata.",
+            table_panel,
         )
         self.metadata_summary_label.setObjectName("MutedLabel")
         self.metadata_summary_label.setWordWrap(True)

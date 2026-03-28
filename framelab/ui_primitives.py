@@ -102,18 +102,18 @@ class PageHeader(qtw.QFrame):
         layout.setContentsMargins(16, 14, 16, 14)
         layout.setSpacing(8)
 
-        self.title_label = qtw.QLabel(title)
+        self.title_label = qtw.QLabel(title, self)
         self.title_label.setObjectName("PageHeaderTitle")
         self.title_label.setWordWrap(True)
         layout.addWidget(self.title_label)
 
-        self.subtitle_label = qtw.QLabel(subtitle)
+        self.subtitle_label = qtw.QLabel(subtitle, self)
         self.subtitle_label.setObjectName("PageHeaderSubtitle")
         self.subtitle_label.setWordWrap(True)
         self.subtitle_label.setVisible(bool(subtitle.strip()))
         layout.addWidget(self.subtitle_label)
 
-        chip_row = qtw.QWidget()
+        chip_row = qtw.QWidget(self)
         chip_row.setObjectName("PageHeaderChips")
         chip_layout = qtw.QHBoxLayout(chip_row)
         chip_layout.setContentsMargins(0, 0, 0, 0)
@@ -168,7 +168,6 @@ class PageHeader(qtw.QFrame):
             widget = item.widget()
             if widget is not None:
                 widget.hide()
-                widget.setParent(None)
                 widget.deleteLater()
         for spec in specs:
             chip = make_status_chip(
@@ -261,7 +260,6 @@ class SummaryStrip(qtw.QFrame):
             widget = item.widget()
             if widget is not None:
                 widget.hide()
-                widget.setParent(None)
                 widget.deleteLater()
 
         visible_count = 0
@@ -282,7 +280,7 @@ class SummaryStrip(qtw.QFrame):
             )
             card_layout.setSpacing(self._density_tokens.summary_card_spacing)
 
-            value = qtw.QLabel(summary.value)
+            value = qtw.QLabel(summary.value, card)
             value.setObjectName("SummaryValue")
             value.setTextFormat(Qt.PlainText)
             value.setWordWrap(False)
@@ -292,7 +290,7 @@ class SummaryStrip(qtw.QFrame):
             )
             card_layout.addWidget(value)
 
-            label = qtw.QLabel(summary.label)
+            label = qtw.QLabel(summary.label, card)
             label.setObjectName("SummaryLabel")
             label.setTextFormat(Qt.PlainText)
             label.setWordWrap(False)

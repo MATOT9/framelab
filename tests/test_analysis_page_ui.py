@@ -10,6 +10,7 @@ import pytest
 from PySide6 import QtWidgets as qtw
 from tifffile import imwrite
 
+import framelab.plugins.analysis.iris_gain._plotting as plotting_module
 from framelab.plugins.analysis.iris_gain._shared import _CurveSeries
 from framelab.ui_settings import DensityMode
 from framelab.window import FrameLabWindow
@@ -244,6 +245,111 @@ def test_analysis_plot_layout_expands_for_wide_y_tick_labels(
     assert plugin._plot_hint_label.isHidden()
     analysis_window._apply_ui_preferences(comfortable_prefs, persist=False)
     assert not plugin._plot_hint_label.isHidden()
+
+
+def test_analysis_plot_layout_updates_after_workspace_plot_pane_shrinks(
+    analysis_window: FrameLabWindow,
+    process_events,
+) -> None:
+    _show_analysis_page(analysis_window, process_events)
+    plugin = analysis_window._current_analysis_plugin()
+
+    assert plugin is not None
+    assert plugin._canvas is not None
+    assert plugin._figure is not None
+    assert plugin._axes is not None
+    splitter = plugin.workspace_splitter()
+    assert splitter is not None
+
+    plugin._update_plot(
+        [
+            _CurveSeries(
+                curve_id=1,
+                label="Series A",
+                x_values=[1.0, 2.0, 3.0],
+                y_values=[1234567.0, 2345678.0, 3456789.0],
+                std_values=[0.0, 0.0, 0.0],
+                sem_values=[0.0, 0.0, 0.0],
+                error_values=[0.0, 0.0, 0.0],
+                point_counts=[1, 1, 1],
+            ),
+        ],
+        "Exposure",
+        "Mean Intensity",
+        "off",
+        [],
+        False,
+        "off",
+    )
+    plugin._axes.ticklabel_format(style="plain", axis="y", useOffset=False)
+    plugin._canvas.draw()
+    process_events()
+    wide_left = float(plugin._figure.subplotpars.left)
+
+    splitter.moveSplitter(max(0, splitter.width() - 170), 1)
+    process_events()
+    plugin._canvas.draw()
+    process_events()
+
+    renderer = plugin._canvas.get_renderer()
+    tight_bbox = plugin._axes.get_tightbbox(renderer)
+    assert plugin._canvas.width() >= plugin._canvas.minimumWidth()
+    assert float(plugin._figure.subplotpars.left) >= wide_left
+    assert float(tight_bbox.x0) >= -1.0
+
+
+def test_analysis_plot_export_uses_shared_save_dialog_helper(
+    analysis_window: FrameLabWindow,
+    process_events,
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    _show_analysis_page(analysis_window, process_events)
+    plugin = analysis_window._current_analysis_plugin()
+
+    assert plugin is not None
+
+    plugin._update_plot(
+        [
+            _CurveSeries(
+                curve_id=1,
+                label="Series A",
+                x_values=[1.0, 2.0],
+                y_values=[3.0, 4.0],
+                std_values=[0.0, 0.0],
+                sem_values=[0.0, 0.0],
+                error_values=[0.0, 0.0],
+                point_counts=[1, 1],
+            ),
+        ],
+        "Exposure",
+        "Mean Intensity",
+        "off",
+        [],
+        False,
+        "off",
+    )
+    process_events()
+
+    chosen_path = tmp_path / "export.png"
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        plotting_module,
+        "choose_save_file",
+        lambda *args, **kwargs: (str(chosen_path), "PNG Image (*.png)"),
+    )
+    monkeypatch.setattr(
+        plugin._figure,
+        "savefig",
+        lambda path, **kwargs: captured.update({"path": path, **kwargs}),
+    )
+
+    plugin._export_plot_dialog()
+
+    assert captured["path"] == chosen_path
+    assert captured["dpi"] == 220
+    assert captured["bbox_inches"] == "tight"
 
 
 def test_analysis_context_stays_dirty_until_analysis_page_is_visible(

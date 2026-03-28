@@ -255,7 +255,7 @@ class WorkflowExplorerDock(qtw.QDockWidget):
 
         overview_layout.addWidget(controls)
 
-        self._warning_label = qtw.QLabel("")
+        self._warning_label = qtw.QLabel("", overview)
         self._warning_label.setObjectName("MutedLabel")
         self._warning_label.setWordWrap(True)
         self._warning_label.setVisible(False)
@@ -263,19 +263,29 @@ class WorkflowExplorerDock(qtw.QDockWidget):
 
         self._lineage_scroll = qtw.QScrollArea()
         self._lineage_scroll.setObjectName("WorkflowActivePathScroll")
+        self._lineage_scroll.setAttribute(Qt.WA_StyledBackground, True)
+        self._lineage_scroll.setAutoFillBackground(True)
         self._lineage_scroll.setFrameShape(qtw.QFrame.NoFrame)
         self._lineage_scroll.setWidgetResizable(True)
         self._lineage_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self._lineage_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self._lineage_scroll.viewport().setObjectName("WorkflowActivePathViewport")
+        self._lineage_scroll.viewport().setAttribute(Qt.WA_StyledBackground, True)
+        self._lineage_scroll.viewport().setAutoFillBackground(True)
         self._lineage_scroll.setSizePolicy(
-            qtw.QSizePolicy.Preferred,
-            qtw.QSizePolicy.Fixed,
+            qtw.QSizePolicy.Expanding,
+            qtw.QSizePolicy.Expanding,
         )
         self._lineage_rail = WorkflowLineageRail(self._lineage_scroll)
+        self._lineage_rail.setAttribute(Qt.WA_StyledBackground, True)
+        self._lineage_rail.setAutoFillBackground(True)
+        self._lineage_rail.setSizePolicy(
+            qtw.QSizePolicy.Expanding,
+            qtw.QSizePolicy.Expanding,
+        )
         self._lineage_scroll.setWidget(self._lineage_rail)
         self._lineage_scroll.setVisible(False)
-        overview_layout.addWidget(self._lineage_scroll)
-        overview_layout.addStretch(1)
+        overview_layout.addWidget(self._lineage_scroll, 1)
 
         self._tree = WorkflowExplorerTree(self)
         self._tree.setObjectName("WorkflowTree")
@@ -348,12 +358,7 @@ class WorkflowExplorerDock(qtw.QDockWidget):
         self._controls_layout.setVerticalSpacing(tokens.command_bar_spacing)
         self._tree.setIndentation(max(16, tokens.panel_margin_h + 8))
         lineage_min_height = max(96, 72 + tokens.panel_spacing * 3)
-        lineage_max_height = max(
-            lineage_min_height,
-            92 + tokens.panel_spacing * 7,
-        )
         self._lineage_scroll.setMinimumHeight(lineage_min_height)
-        self._lineage_scroll.setMaximumHeight(lineage_max_height)
         self._overview_widget.setMinimumHeight(
             max(188, lineage_min_height + tokens.panel_spacing * 5),
         )

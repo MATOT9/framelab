@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from dataclasses import replace
 from typing import Any, Optional
 
@@ -96,12 +97,12 @@ class WindowChromeMixin:
                 action.setToolTip(status)
 
     def _build_ui(self) -> None:
-        self.setDockOptions(
-            self.dockOptions()
-            | qtw.QMainWindow.AllowNestedDocks
-            | qtw.QMainWindow.AllowTabbedDocks
-            | qtw.QMainWindow.AnimatedDocks,
-        )
+        dock_options = self.dockOptions() | qtw.QMainWindow.AllowNestedDocks | qtw.QMainWindow.AllowTabbedDocks
+        if sys.platform.startswith("win"):
+            dock_options &= ~qtw.QMainWindow.AnimatedDocks
+        else:
+            dock_options |= qtw.QMainWindow.AnimatedDocks
+        self.setDockOptions(dock_options)
         self._build_menu_bar()
         self._build_toolbar()
         self._build_status_bar()
@@ -1152,7 +1153,6 @@ class WindowChromeMixin:
         if hasattr(self, "file_clear_workflow_action"):
             self.file_clear_workflow_action.setEnabled(has_workflow)
         self._sync_scope_action_labels()
-        self._ensure_primary_workflow_surfaces(has_workflow)
         self._sync_workflow_context_row_visibility()
 
     def _sync_workflow_context_row_visibility(self) -> None:
@@ -1248,23 +1248,6 @@ class WindowChromeMixin:
         if load_button is not None:
             load_button.setText(scan_text)
             load_button.setToolTip(scan_tooltip)
-
-    def _ensure_primary_workflow_surfaces(self, has_workflow: bool) -> None:
-        """Reveal the primary metadata dock when workflow mode first becomes active."""
-
-        if not has_workflow:
-            return
-        panel_states = {
-            str(key).strip().lower(): bool(value)
-            for key, value in getattr(self.ui_state_snapshot, "panel_states", {}).items()
-            if str(key).strip()
-        }
-        if MetadataInspectorDock.PANEL_STATE_KEY in panel_states:
-            return
-        dock = getattr(self, "_metadata_inspector_dock", None)
-        if dock is None or dock.isVisible():
-            return
-        dock.show()
 
     def _open_workflow_selection_dialog(self) -> None:
         """Open the dedicated workflow selector dialog."""

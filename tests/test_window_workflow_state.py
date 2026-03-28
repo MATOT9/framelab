@@ -10,6 +10,7 @@ import pytest
 from PySide6 import QtGui, QtWidgets as qtw
 from tifffile import imwrite
 
+import framelab.main_window.chrome as chrome_module
 import framelab.main_window.data_page as data_page_module
 import framelab.window as window_module
 from framelab.ui_primitives import StatusChip
@@ -387,6 +388,28 @@ def test_workflow_explorer_toggle_action_controls_fallback_breadcrumb(
 
     window.view_workflow_explorer_action.trigger()
     process_events()
+
+
+def test_window_disables_animated_docks_on_windows(
+    framelab_window_factory,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(chrome_module.sys, "platform", "win32")
+
+    window = framelab_window_factory(enabled_plugin_ids=())
+
+    assert not bool(window.dockOptions() & qtw.QMainWindow.AnimatedDocks)
+
+
+def test_window_keeps_animated_docks_on_non_windows(
+    framelab_window_factory,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(chrome_module.sys, "platform", "linux")
+
+    window = framelab_window_factory(enabled_plugin_ids=())
+
+    assert bool(window.dockOptions() & qtw.QMainWindow.AnimatedDocks)
 
 
 def test_datacard_wizard_registers_window_shortcut(

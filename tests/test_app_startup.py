@@ -122,3 +122,49 @@ def test_main_closes_selector_splash_on_plugin_startup_error(monkeypatch) -> Non
         "splash-close",
         "critical:Plugin Startup Error:boom",
     ]
+
+
+def test_create_selector_splash_still_allows_windows(monkeypatch) -> None:
+    class _FakeSplashApp:
+        def platformName(self) -> str:
+            return "windows"
+
+        def processEvents(self) -> None:
+            return None
+
+    class _FakePixmap:
+        def isNull(self) -> bool:
+            return False
+
+    events: list[str] = []
+
+    class _FakeSplash:
+        def __init__(self, pixmap) -> None:
+            events.append(f"pixmap:{type(pixmap).__name__}")
+
+        def setObjectName(self, name: str) -> None:
+            events.append(f"name:{name}")
+
+        def show(self) -> None:
+            events.append("show")
+
+    class _FakePath:
+        def exists(self) -> bool:
+            return True
+
+        def __str__(self) -> str:
+            return "fake-splash.png"
+
+    monkeypatch.setattr(app_module.sys, "platform", "win32")
+    monkeypatch.setattr(app_module, "_selector_splash_path", lambda: _FakePath())
+    monkeypatch.setattr(app_module.QtGui, "QPixmap", lambda path: _FakePixmap())
+    monkeypatch.setattr(app_module.qtw, "QSplashScreen", _FakeSplash)
+
+    splash = app_module._create_selector_splash(_FakeSplashApp())
+
+    assert splash is not None
+    assert events == [
+        "pixmap:_FakePixmap",
+        "name:FrameLabSplash",
+        "show",
+    ]

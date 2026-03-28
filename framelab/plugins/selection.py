@@ -175,7 +175,7 @@ class PluginStartupDialog(qtw.QDialog):
             group_layout.setSpacing(8)
             page_manifests = manifests_by_page[page]
             if not page_manifests:
-                label = qtw.QLabel("No plugins available.")
+                label = qtw.QLabel("No plugins available.", group)
                 label.setObjectName("MutedLabel")
                 group_layout.addWidget(label)
             else:
@@ -254,7 +254,7 @@ class PluginStartupDialog(qtw.QDialog):
 
         details = manifest.description.strip()
         if details:
-            label = qtw.QLabel(details)
+            label = qtw.QLabel(details, container)
             label.setObjectName("MutedLabel")
             label.setWordWrap(True)
             label.setContentsMargins(0, 0, 0, 0)
@@ -262,6 +262,7 @@ class PluginStartupDialog(qtw.QDialog):
         if manifest.dependencies:
             deps = qtw.QLabel(
                 "Depends on: " + ", ".join(manifest.dependencies),
+                container,
             )
             deps.setObjectName("MutedLabel")
             deps.setWordWrap(True)

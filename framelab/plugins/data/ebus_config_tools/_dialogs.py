@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any, Optional
 
 from PySide6 import QtWidgets as qtw
-from PySide6.QtCore import QDir, Qt
+from PySide6.QtCore import Qt
 
 from ....ebus import describe_ebus_source, ebus_catalog_index, effective_ebus_parameters, mapped_datacard_key_for_ebus
+from ....file_dialogs import choose_existing_directory, choose_open_file
 from ....ui_primitives import (
     ChipSpec,
     SummaryItem,
@@ -35,47 +35,20 @@ def _apply_tooltip(target: Any, text: str) -> None:
         target.setStatusTip(text)
 
 
-def _resolve_dialog_start_path(start: str = "") -> Path:
-    """Return the closest existing directory to use as a dialog starting point."""
-    candidate = Path(start).expanduser() if start else Path.home()
-    if candidate.is_file():
-        return candidate.parent
-    if candidate.is_dir():
-        return candidate
-    for parent in candidate.parents:
-        if parent.is_dir():
-            return parent
-    return Path.home()
-
-
 def _choose_ebus_file(parent: qtw.QWidget, start: str = "") -> str:
     """Open a themed file picker for ``.pvcfg`` files."""
-    start_path = _resolve_dialog_start_path(start)
-    dialog = qtw.QFileDialog(parent, "Select eBUS Config File", str(start_path))
-    dialog.setAcceptMode(qtw.QFileDialog.AcceptOpen)
-    dialog.setFileMode(qtw.QFileDialog.ExistingFile)
-    dialog.setFilter(QDir.AllDirs | QDir.Files | QDir.NoDotAndDotDot)
-    dialog.setNameFilters(["eBUS Config (*.pvcfg)", "All files (*)"])
-    dialog.selectNameFilter("eBUS Config (*.pvcfg)")
-    dialog.setDirectory(str(start_path))
-    dialog.setOption(qtw.QFileDialog.ShowDirsOnly, False)
-    dialog.setOption(qtw.QFileDialog.DontUseNativeDialog, True)
-    if not dialog.exec():
-        return ""
-    selected = dialog.selectedFiles()
-    return selected[0] if selected else ""
+    return choose_open_file(
+        parent,
+        "Select eBUS Config File",
+        start,
+        name_filters=("eBUS Config (*.pvcfg)", "All files (*)"),
+        selected_name_filter="eBUS Config (*.pvcfg)",
+    )
 
 
 def _choose_folder(parent: qtw.QWidget, title: str, start: str = "") -> str:
     """Open a themed directory picker for a generic folder selection."""
-    dialog = qtw.QFileDialog(parent, title, str(_resolve_dialog_start_path(start)))
-    dialog.setFileMode(qtw.QFileDialog.Directory)
-    dialog.setOption(qtw.QFileDialog.ShowDirsOnly, True)
-    dialog.setOption(qtw.QFileDialog.DontUseNativeDialog, True)
-    if not dialog.exec():
-        return ""
-    selected = dialog.selectedFiles()
-    return selected[0] if selected else ""
+    return choose_existing_directory(parent, title, start)
 
 
 class EbusInspectDialog(qtw.QDialog):

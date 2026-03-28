@@ -15,6 +15,7 @@ from ..background import (
     canonical_exposure_key,
     freeze_background_array,
 )
+from ..file_dialogs import choose_existing_directory, choose_open_file
 from ..formatting import format_metric_triplet
 from ..metadata import extract_path_metadata
 from ..processing_failures import (
@@ -137,7 +138,7 @@ class InspectPageMixin:
         metrics_row = qtw.QHBoxLayout()
         self._measure_metrics_row = metrics_row
         metrics_row.setSpacing(8)
-        thr_label = qtw.QLabel("Saturation Threshold (>=)")
+        thr_label = qtw.QLabel("Saturation Threshold (>=)", metrics_group)
         thr_label.setObjectName("SectionTitle")
         metrics_row.addWidget(thr_label)
 
@@ -164,7 +165,7 @@ class InspectPageMixin:
 
         metrics_row.addSpacing(12)
 
-        low_signal_label = qtw.QLabel("Low Signal Threshold (<=)")
+        low_signal_label = qtw.QLabel("Low Signal Threshold (<=)", metrics_group)
         low_signal_label.setObjectName("SectionTitle")
         metrics_row.addWidget(low_signal_label)
 
@@ -191,7 +192,7 @@ class InspectPageMixin:
 
         metrics_row.addSpacing(12)
 
-        mode_label = qtw.QLabel("Average Mode")
+        mode_label = qtw.QLabel("Average Mode", metrics_group)
         mode_label.setObjectName("SectionTitle")
         metrics_row.addWidget(mode_label)
 
@@ -213,7 +214,7 @@ class InspectPageMixin:
         topk_layout.setContentsMargins(0, 0, 0, 0)
         topk_layout.setSpacing(8)
 
-        self.topk_label = qtw.QLabel("Top-K Count")
+        self.topk_label = qtw.QLabel("Top-K Count", self.topk_controls_widget)
         self.topk_label.setObjectName("SectionTitle")
         topk_layout.addWidget(self.topk_label)
 
@@ -279,7 +280,7 @@ class InspectPageMixin:
         roi_row.setContentsMargins(0, 0, 0, 0)
         roi_row.setSpacing(8)
 
-        self.roi_tools_label = qtw.QLabel("ROI Tools")
+        self.roi_tools_label = qtw.QLabel("ROI Tools", self.roi_controls_widget)
         self.roi_tools_label.setObjectName("SectionTitle")
         roi_row.addWidget(self.roi_tools_label)
 
@@ -337,7 +338,7 @@ class InspectPageMixin:
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(8)
 
-        title = qtw.QLabel("Image Metrics")
+        title = qtw.QLabel("Image Metrics", panel)
         title.setObjectName("SectionTitle")
         layout.addWidget(title)
 
@@ -470,7 +471,7 @@ class InspectPageMixin:
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(8)
 
-        title = qtw.QLabel("Preview")
+        title = qtw.QLabel("Preview", panel)
         title.setObjectName("SectionTitle")
         layout.addWidget(title)
 
@@ -498,7 +499,8 @@ class InspectPageMixin:
 
         self.preview_help_label = qtw.QLabel(
             "Wheel to zoom, drag to pan, and double-click to reset. "
-            "ROI mode uses left-drag to draw or reposition the ROI."
+            "ROI mode uses left-drag to draw or reposition the ROI.",
+            image_page,
         )
         self.preview_help_label.setObjectName("MutedLabel")
         self.preview_help_label.setWordWrap(True)
@@ -520,7 +522,7 @@ class InspectPageMixin:
         self.preview_pages.addTab(hist_page, "Histogram")
         layout.addWidget(self.preview_pages, 1)
 
-        self.info_label = qtw.QLabel("No image selected.")
+        self.info_label = qtw.QLabel("No image selected.", panel)
         self.info_label.setObjectName("MutedLabel")
         self.info_label.setWordWrap(True)
         layout.addWidget(self.info_label)
@@ -1266,46 +1268,38 @@ class InspectPageMixin:
         dialog_parent = parent or self
 
         if resolved_mode == "folder_library":
-            dialog = qtw.QFileDialog(
+            selected_path = choose_existing_directory(
                 dialog_parent,
                 "Select background folder",
                 initial,
             )
-            dialog.setFileMode(qtw.QFileDialog.Directory)
-            dialog.setOption(qtw.QFileDialog.ShowDirsOnly, True)
-            dialog.setOption(qtw.QFileDialog.DontUseNativeDialog, True)
-            if not dialog.exec():
+            if not selected_path:
                 return None
-            selected = dialog.selectedFiles()
-            if not selected:
-                return None
-            metrics.background_source_text = selected[0]
+            metrics.background_source_text = selected_path
             target = getattr(self, "background_path_edit", None)
             if isinstance(target, qtw.QLineEdit):
-                target.setText(selected[0])
+                target.setText(selected_path)
             self._refresh_workspace_document_dirty_state()
-            return selected[0]
+            return selected_path
 
-        dialog = qtw.QFileDialog(dialog_parent, "Select background TIFF", initial)
-        dialog.setFileMode(qtw.QFileDialog.ExistingFile)
-        dialog.setNameFilters(
-            [
+        selected_path = choose_open_file(
+            dialog_parent,
+            "Select background TIFF",
+            initial,
+            name_filters=(
                 "TIFF files (*.tif *.tiff *.TIF *.TIFF)",
                 "All files (*)",
-            ]
+            ),
+            selected_name_filter="TIFF files (*.tif *.tiff *.TIF *.TIFF)",
         )
-        dialog.setOption(qtw.QFileDialog.DontUseNativeDialog, True)
-        if not dialog.exec():
+        if not selected_path:
             return None
-        selected = dialog.selectedFiles()
-        if not selected:
-            return None
-        metrics.background_source_text = selected[0]
+        metrics.background_source_text = selected_path
         target = getattr(self, "background_path_edit", None)
         if isinstance(target, qtw.QLineEdit):
-            target.setText(selected[0])
+            target.setText(selected_path)
         self._refresh_workspace_document_dirty_state()
-        return selected[0]
+        return selected_path
 
     def _load_single_background_reference(
         self,

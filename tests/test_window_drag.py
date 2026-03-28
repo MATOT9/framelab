@@ -13,6 +13,7 @@ from framelab.plugins.data.acquisition_datacard_wizard import (
     AcquisitionDatacardWizardDialog,
 )
 from framelab.window_drag import (
+    _current_frame_margins,
     apply_secondary_window_geometry,
     configure_secondary_window,
     place_secondary_window,
@@ -157,3 +158,16 @@ def test_acquisition_wizard_uses_host_parent_and_clamped_geometry(
         host.close()
         host.deleteLater()
         qapp.processEvents()
+
+
+def test_current_frame_margins_does_not_force_native_window_creation(qapp) -> None:
+    class _DialogWithoutWinId(qtw.QDialog):
+        def winId(self):  # type: ignore[override]
+            raise AssertionError("winId should not be called for pre-show geometry")
+
+    dialog = _DialogWithoutWinId()
+
+    margins = _current_frame_margins(dialog)
+
+    assert margins == QtCore.QMargins()
+    dialog.deleteLater()

@@ -18,6 +18,7 @@ from ..background import (
     select_reference,
     validate_reference_shape,
 )
+from ..file_dialogs import choose_existing_directory
 from ..image_io import is_supported_image, read_2d_image, supported_suffixes
 from ..metadata import clear_metadata_cache
 from ..metrics_cache import (
@@ -77,16 +78,11 @@ class DatasetLoadingMixin:
     def browse_folder(self) -> None:
         """Open a directory picker and trigger dataset loading."""
         initial_dir = self.folder_edit.text().strip() or str(Path.home())
-        dialog = qtw.QFileDialog(self, "Select TIFF folder", initial_dir)
-        dialog.setFileMode(qtw.QFileDialog.Directory)
-        dialog.setOption(qtw.QFileDialog.ShowDirsOnly, True)
-        dialog.setOption(qtw.QFileDialog.DontUseNativeDialog, True)
-        if dialog.exec():
-            selected_files = dialog.selectedFiles()
-            if not selected_files:
-                return
-            self.folder_edit.setText(selected_files[0])
-            self.load_folder()
+        selected = choose_existing_directory(self, "Select TIFF folder", initial_dir)
+        if not selected:
+            return
+        self.folder_edit.setText(selected)
+        self.load_folder()
 
     def _find_tiffs(
         self,

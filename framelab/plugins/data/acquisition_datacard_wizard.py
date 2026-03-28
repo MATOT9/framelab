@@ -12,6 +12,7 @@ from typing import Any, Optional
 from PySide6 import QtCore, QtGui, QtWidgets as qtw
 from PySide6.QtCore import Qt
 
+from ...file_dialogs import choose_existing_directory
 from ..registry import register_page_plugin
 from ...datacard_authoring import (
     AcquisitionDatacardModel,
@@ -1185,7 +1186,7 @@ class AcquisitionDatacardWizardDialog(qtw.QDialog):
 
     def _browse_folder(self) -> None:
         start = self._folder_edit.text().strip() or str(Path.home())
-        folder = qtw.QFileDialog.getExistingDirectory(
+        folder = choose_existing_directory(
             self,
             "Select Acquisition Folder",
             start,

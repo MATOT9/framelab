@@ -98,6 +98,29 @@ def test_histogram_widget_reserves_bottom_margin_for_x_axis_label(qapp) -> None:
     widget.deleteLater()
 
 
+def test_histogram_layout_updates_after_widget_shrinks(qapp) -> None:
+    widget = HistogramWidget()
+    image = np.arange(20_000, dtype=np.float32).reshape(200, 100)
+    widget.resize(640, 360)
+    widget.show()
+    qapp.processEvents()
+
+    widget.set_image(image)
+    qapp.processEvents()
+    widget._canvas.draw()
+    wide_left = float(widget._figure.subplotpars.left)
+
+    widget.resize(240, 360)
+    qapp.processEvents()
+    widget._canvas.draw()
+
+    renderer = widget._canvas.get_renderer()
+    tight_bbox = widget._axes.get_tightbbox(renderer)
+    assert float(widget._figure.subplotpars.left) > wide_left
+    assert float(tight_bbox.x0) >= -1.0
+    widget.deleteLater()
+
+
 def test_histogram_widget_supports_zoom_pan_and_reset(qapp) -> None:
     widget = HistogramWidget()
     image = np.arange(100, dtype=np.float32).reshape(10, 10)
@@ -353,4 +376,28 @@ def test_histogram_zoom_out_keeps_x_axis_near_zero_floor(qapp) -> None:
     xlim = tuple(widget._axes.get_xlim())
     assert xlim[0] >= lower_bound - 1e-6
     assert xlim[0] > -5.0
+    widget.deleteLater()
+
+
+def test_histogram_uses_same_major_and_minor_grid_style_as_analysis_plot(qapp) -> None:
+    widget = HistogramWidget()
+    image = np.arange(100, dtype=np.float32).reshape(10, 10)
+    widget.set_theme("dark")
+    widget.set_image(image)
+    qapp.processEvents()
+
+    major_tick = widget._axes.xaxis.get_major_ticks()[0]
+    minor_tick = widget._axes.xaxis.get_minor_ticks()[0]
+    major_line = major_tick.gridline
+    minor_line = minor_tick.gridline
+
+    assert major_line.get_visible()
+    assert minor_line.get_visible()
+    assert major_line.get_color() == "#64748b"
+    assert minor_line.get_color() == "#94a3b8"
+    assert major_line.get_alpha() == pytest.approx(0.42)
+    assert minor_line.get_alpha() == pytest.approx(0.24)
+    assert major_line.get_linewidth() == pytest.approx(0.85)
+    assert minor_line.get_linewidth() == pytest.approx(0.65)
+    assert minor_line.get_linestyle() == ":"
     widget.deleteLater()

@@ -9,17 +9,16 @@ import numpy as np
 from PySide6 import QtGui, QtWidgets as qtw
 from PySide6.QtCore import Qt
 
+from ....mpl_canvas import FigureCanvasQTAgg
 from ....mpl_config import ensure_matplotlib_config_dir
 
 ensure_matplotlib_config_dir()
 
 try:
-    from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
     from matplotlib.figure import Figure
 
-    MATPLOTLIB_AVAILABLE = True
+    MATPLOTLIB_AVAILABLE = FigureCanvasQTAgg is not None
 except Exception:
-    FigureCanvasQTAgg = None  # type: ignore[assignment]
     Figure = None  # type: ignore[assignment]
     MATPLOTLIB_AVAILABLE = False
 

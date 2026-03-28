@@ -7,6 +7,7 @@ from pathlib import Path
 from PySide6 import QtCore, QtWidgets as qtw
 from PySide6.QtCore import Qt
 
+from .file_dialogs import choose_existing_directory
 from .ui_primitives import ChipSpec, SummaryItem, build_page_header, build_summary_strip
 from .ui_settings import RecentWorkflowEntry
 from .window_drag import apply_secondary_window_geometry, configure_secondary_window
@@ -47,7 +48,7 @@ class WorkflowSelectionDialog(qtw.QDialog):
         self._current_breadcrumb = WorkflowBreadcrumbBar(compact=True)
         layout.addWidget(self._current_breadcrumb)
 
-        self._warning_label = qtw.QLabel("")
+        self._warning_label = qtw.QLabel("", self)
         self._warning_label.setObjectName("MutedLabel")
         self._warning_label.setWordWrap(True)
         layout.addWidget(self._warning_label)
@@ -59,7 +60,7 @@ class WorkflowSelectionDialog(qtw.QDialog):
         form_layout.setHorizontalSpacing(10)
         form_layout.setVerticalSpacing(8)
 
-        profile_label = qtw.QLabel("Workflow Profile")
+        profile_label = qtw.QLabel("Workflow Profile", self)
         profile_label.setObjectName("SectionTitle")
         form_layout.addWidget(profile_label, 0, 0)
 
@@ -67,7 +68,7 @@ class WorkflowSelectionDialog(qtw.QDialog):
         self._profile_combo.currentIndexChanged.connect(self._on_profile_changed)
         form_layout.addWidget(self._profile_combo, 0, 1, 1, 2)
 
-        workspace_label = qtw.QLabel("Workspace Root")
+        workspace_label = qtw.QLabel("Workspace Root", self)
         workspace_label.setObjectName("SectionTitle")
         form_layout.addWidget(workspace_label, 1, 0)
 
@@ -80,7 +81,7 @@ class WorkflowSelectionDialog(qtw.QDialog):
         self._browse_button.clicked.connect(self._browse_workspace)
         form_layout.addWidget(self._browse_button, 1, 2)
 
-        anchor_label = qtw.QLabel("Open As")
+        anchor_label = qtw.QLabel("Open As", self)
         anchor_label.setObjectName("SectionTitle")
         form_layout.addWidget(anchor_label, 2, 0)
 
@@ -88,7 +89,7 @@ class WorkflowSelectionDialog(qtw.QDialog):
         self._anchor_combo.currentIndexChanged.connect(self._on_anchor_changed)
         form_layout.addWidget(self._anchor_combo, 2, 1)
 
-        self._anchor_hint = qtw.QLabel("")
+        self._anchor_hint = qtw.QLabel("", self)
         self._anchor_hint.setObjectName("MutedLabel")
         self._anchor_hint.setWordWrap(True)
         form_layout.addWidget(self._anchor_hint, 2, 2)
@@ -101,7 +102,7 @@ class WorkflowSelectionDialog(qtw.QDialog):
         recent_layout.setContentsMargins(12, 10, 12, 10)
         recent_layout.setSpacing(8)
 
-        recent_title = qtw.QLabel("Recent Workflows")
+        recent_title = qtw.QLabel("Recent Workflows", self)
         recent_title.setObjectName("SectionTitle")
         recent_layout.addWidget(recent_title)
 
@@ -117,6 +118,7 @@ class WorkflowSelectionDialog(qtw.QDialog):
             "Select a recent workspace to reuse its profile and last active node, "
             "or choose a different profile/root above. This is the primary "
             "workflow entry point, not a plugin-management step.",
+            self,
         )
         self._recent_hint.setObjectName("MutedLabel")
         self._recent_hint.setWordWrap(True)
@@ -468,11 +470,10 @@ class WorkflowSelectionDialog(qtw.QDialog):
         """Browse for a workflow root folder."""
 
         start = self._workspace_edit.text().strip() or str(Path.home())
-        folder = qtw.QFileDialog.getExistingDirectory(
+        folder = choose_existing_directory(
             self,
             "Select Workflow Workspace",
             start,
-            qtw.QFileDialog.ShowDirsOnly,
         )
         if folder:
             self._workspace_edit.setText(folder)

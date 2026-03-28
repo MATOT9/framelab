@@ -46,6 +46,8 @@ def test_theme_stylesheets_include_dock_button_rules() -> None:
     assert "QWidget#DockTitleBar" in dark_sheet
     assert "QToolButton#DockTitleButton" in dark_sheet
     assert "QWidget#MetadataInspectorDockContent" in dark_sheet
+    assert "QScrollArea#WorkflowActivePathScroll" in dark_sheet
+    assert "QWidget#WorkflowActivePathViewport" in dark_sheet
 
 
 def test_theme_stylesheets_include_plain_text_editor_rules() -> None:

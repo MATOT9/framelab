@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from PySide6 import QtCore, QtGui, QtWidgets as qtw
 from PySide6.QtCore import Qt
 
+from .file_dialogs import choose_existing_directory
 from .ui_primitives import ChipSpec, SummaryItem, build_page_header, build_summary_strip
 from .window_drag import apply_secondary_window_geometry, configure_secondary_window
 from .workflow import workflow_profile_by_id
@@ -299,12 +298,10 @@ class WorkflowManagerDialog(qtw.QDialog):
     def _browse_workspace(self) -> None:
         """Browse for one workflow workspace root."""
 
-        start = self._workspace_edit.text().strip() or str(Path.home())
-        folder = qtw.QFileDialog.getExistingDirectory(
+        folder = choose_existing_directory(
             self,
             "Select Workflow Workspace",
-            start,
-            qtw.QFileDialog.ShowDirsOnly,
+            self._workspace_edit.text().strip(),
         )
         if folder:
             self._workspace_edit.setText(folder)

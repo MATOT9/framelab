@@ -9,6 +9,7 @@ from pathlib import Path
 from PySide6 import QtWidgets as qtw
 from PySide6.QtCore import Qt
 
+from ..file_dialogs import choose_open_file, choose_save_file
 from ..stylesheets import DARK_THEME, LIGHT_THEME
 from ..payload_utils import read_json_dict, write_json_dict
 from ..processing_failures import (
@@ -17,7 +18,7 @@ from ..processing_failures import (
     merge_processing_failures,
     summarize_processing_failures,
 )
-from ..window_drag import configure_secondary_window
+from ..window_drag import apply_secondary_window_geometry, configure_secondary_window
 
 
 class WindowActionsMixin:
@@ -251,22 +252,17 @@ class WindowActionsMixin:
             return
 
         default_path = Path.home() / "roi_selection.json"
-        dialog = qtw.QFileDialog(
+        selected_path, _selected_filter = choose_save_file(
             self,
             "Save ROI",
-            str(default_path),
+            default_path,
+            name_filters=("JSON (*.json)", "All files (*)"),
+            selected_name_filter="JSON (*.json)",
         )
-        dialog.setAcceptMode(qtw.QFileDialog.AcceptSave)
-        dialog.setOption(qtw.QFileDialog.DontUseNativeDialog, True)
-        dialog.setNameFilters(("JSON (*.json)", "All files (*)"))
-        dialog.selectNameFilter("JSON (*.json)")
-        if not dialog.exec():
-            return
-        selected_files = dialog.selectedFiles()
-        if not selected_files:
+        if not selected_path:
             return
 
-        path = Path(selected_files[0])
+        path = Path(selected_path)
         if path.suffix.lower() != ".json":
             path = path.with_suffix(".json")
         x0, y0, x1, y1 = metrics.roi_rect
@@ -294,18 +290,17 @@ class WindowActionsMixin:
         ):
             return
 
-        initial = str(Path.home())
-        dialog = qtw.QFileDialog(self, "Load ROI", initial)
-        dialog.setFileMode(qtw.QFileDialog.ExistingFile)
-        dialog.setNameFilters(("JSON (*.json)", "All files (*)"))
-        dialog.setOption(qtw.QFileDialog.DontUseNativeDialog, True)
-        if not dialog.exec():
-            return
-        selected_files = dialog.selectedFiles()
-        if not selected_files:
+        selected_path = choose_open_file(
+            self,
+            "Load ROI",
+            Path.home(),
+            name_filters=("JSON (*.json)", "All files (*)"),
+            selected_name_filter="JSON (*.json)",
+        )
+        if not selected_path:
             return
 
-        path = Path(selected_files[0])
+        path = Path(selected_path)
         payload = read_json_dict(path)
         if payload is None:
             self._show_error(
@@ -526,29 +521,20 @@ class WindowActionsMixin:
             return
 
         default_path = Path.home() / "image_metrics.csv"
-        dialog = qtw.QFileDialog(
+        chosen_path, selected_filter = choose_save_file(
             self,
             "Export Image Metrics Table",
-            str(default_path),
-        )
-        dialog.setAcceptMode(qtw.QFileDialog.AcceptSave)
-        dialog.setOption(qtw.QFileDialog.DontUseNativeDialog, True)
-        dialog.setNameFilters(
-            (
+            default_path,
+            name_filters=(
                 "CSV (*.csv)",
                 "Text (*.txt)",
                 "JSON (*.json)",
                 "Excel Workbook (*.xlsx)",
-            )
+            ),
+            selected_name_filter="CSV (*.csv)",
         )
-        dialog.selectNameFilter("CSV (*.csv)")
-        if not dialog.exec():
+        if not chosen_path:
             return
-        selected_files = dialog.selectedFiles()
-        if not selected_files:
-            return
-        chosen_path = selected_files[0]
-        selected_filter = dialog.selectedNameFilter()
 
         path = Path(chosen_path)
         suffix = path.suffix.lower()
@@ -635,6 +621,11 @@ class WindowActionsMixin:
             else DARK_THEME if self._theme_mode == "dark" else LIGHT_THEME
         )
         dialog.setStyleSheet(theme_sheet)
+        apply_secondary_window_geometry(
+            dialog,
+            preferred_size=dialog.sizeHint(),
+            host_window=self,
+        )
         dialog.exec()
 
     def _show_info(self, title: str, message: str) -> None:

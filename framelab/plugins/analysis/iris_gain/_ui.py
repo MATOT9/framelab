@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from PySide6 import QtGui, QtWidgets as qtw
+from PySide6 import QtCore, QtGui, QtWidgets as qtw
 from PySide6.QtCore import QSignalBlocker, Qt
 
 from .._base import AnalysisContext
@@ -14,6 +14,26 @@ from ._shared import (
     MATPLOTLIB_AVAILABLE,
     _ResultTableWidget,
 )
+
+
+class _ResizeAwarePanel(qtw.QWidget):
+    """Panel wrapper that reruns plot layout after Qt resizes settle."""
+
+    def __init__(
+        self,
+        parent: qtw.QWidget | None = None,
+        *,
+        resize_callback=None,
+    ) -> None:
+        super().__init__(parent)
+        self._resize_callback = resize_callback
+
+    def resizeEvent(self, event) -> None:  # type: ignore[override]
+        super().resizeEvent(event)
+        callback = self._resize_callback
+        if not callable(callback):
+            return
+        QtCore.QTimer.singleShot(0, callback)
 
 
 class IrisGainUiMixin:
@@ -172,8 +192,11 @@ class IrisGainUiMixin:
         table_layout.addWidget(self._table, 1)
         splitter.addWidget(table_panel)
 
-        plot_panel = qtw.QWidget()
+        plot_panel = _ResizeAwarePanel(
+            resize_callback=self._apply_plot_layout,
+        )
         plot_panel.setObjectName("ImagePanel")
+        plot_panel.setMinimumWidth(560)
         plot_layout = qtw.QVBoxLayout(plot_panel)
         plot_layout.setContentsMargins(0, 0, 0, 0)
         plot_layout.setSpacing(0)
@@ -190,7 +213,11 @@ class IrisGainUiMixin:
         ):
             self._figure = Figure(figsize=(5.2, 3.0), dpi=100)
             self._axes = self._figure.add_subplot(111)
-            self._canvas = FigureCanvasQTAgg(self._figure)
+            self._canvas = FigureCanvasQTAgg(
+                self._figure,
+                resize_callback=self._apply_plot_layout,
+            )
+            self._canvas.setMinimumWidth(560)
             self._canvas.setSizePolicy(
                 qtw.QSizePolicy.Expanding,
                 qtw.QSizePolicy.Expanding,
@@ -219,6 +246,7 @@ class IrisGainUiMixin:
         splitter.setStretchFactor(0, 1)
         splitter.setStretchFactor(1, 2)
         splitter.setSizes([360, 680])
+        splitter.splitterMoved.connect(lambda _pos, _index: self._apply_plot_layout())
         layout.addWidget(splitter, 1)
         self._connect_plot_interactions()
         self._finalize_widget_state()

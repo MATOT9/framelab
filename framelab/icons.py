@@ -115,6 +115,11 @@ def _apply_icon_to_widget(widget: object, icon: QtGui.QIcon) -> None:
             if not _should_apply_native_icon(widget):
                 return
             widget.setWindowIcon(icon)
+        except Exception:
+            return
+        if not widget.isVisible():
+            return
+        try:
             handle = widget.windowHandle()
         except Exception:
             return

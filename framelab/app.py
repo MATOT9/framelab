@@ -48,7 +48,6 @@ def _create_selector_splash(
 
     splash = qtw.QSplashScreen(pixmap)
     splash.setObjectName("FrameLabSplash")
-    apply_app_identity(app, splash)
     splash.show()
     app.processEvents()
     return splash
@@ -64,10 +63,8 @@ def _close_selector_splash(
     if splash is None:
         return
     try:
-        if isinstance(target, qtw.QWidget):
-            splash.finish(target)
-        else:
-            splash.close()
+        _ = target
+        splash.close()
     finally:
         splash.deleteLater()
 
@@ -103,8 +100,6 @@ def main() -> int:
         manifests,
         selected_plugin_ids=selected_ids,
     )
-    apply_app_identity(app, selector)
-    QTimer.singleShot(0, lambda: apply_app_identity(app, selector))
     _close_selector_splash(splash, target=selector)
     if selector.exec() != qtw.QDialog.Accepted:
         return 0
@@ -121,10 +116,7 @@ def main() -> int:
             str(exc),
         )
         return 1
-    apply_app_identity(app, win)
-    win.showMaximized()
-    # Re-apply once native window handle exists (helps Windows taskbar icon).
-    apply_app_identity(app, win)
     if win.workflow_state_controller.workspace_root is None:
-        QTimer.singleShot(0, win._open_workflow_selection_dialog)
+        win._open_workflow_selection_dialog()
+    win.showMaximized()
     return app.exec()

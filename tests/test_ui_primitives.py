@@ -8,7 +8,8 @@ import pytest
 from PySide6 import QtCore, QtWidgets as qtw
 
 from framelab.ui_density import compact_density_tokens
-from framelab.ui_primitives import PageHeader, SummaryItem, SummaryStrip
+from framelab.ui_primitives import ChipSpec, PageHeader, SummaryItem, SummaryStrip
+from framelab.workflow_widgets import WorkflowBreadcrumbBar, WorkflowLineageEntry, WorkflowLineageRail
 
 
 pytestmark = [pytest.mark.ui, pytest.mark.core]
@@ -75,3 +76,99 @@ def test_summary_strip_rebuilds_cards_with_density_tokens(
     assert not strip.isHidden()
 
     strip.deleteLater()
+
+
+class _TransientWindowRecorder(QtCore.QObject):
+    def __init__(self) -> None:
+        super().__init__()
+        self.windowed_children: list[tuple[str, str]] = []
+        self._tracked_object_names = {
+            "MutedLabel",
+            "PageHeaderSubtitle",
+            "StatusChip",
+            "SummaryCard",
+            "SummaryLabel",
+            "SummaryValue",
+            "SectionTitle",
+        }
+
+    def eventFilter(self, watched, event) -> bool:
+        if (
+            event.type() == QtCore.QEvent.Show
+            and isinstance(watched, qtw.QWidget)
+            and watched.isWindow()
+            and watched.objectName() in self._tracked_object_names
+        ):
+            self.windowed_children.append(
+                (type(watched).__name__, watched.objectName()),
+            )
+        return False
+
+
+def test_rebuilding_visible_ui_primitives_does_not_promote_children_to_windows(
+    qapp,
+    filtered_qt_message_handler,
+    process_events,
+) -> None:
+    container = qtw.QWidget()
+    layout = qtw.QVBoxLayout(container)
+    header = PageHeader("Title", "Subtitle", parent=container)
+    strip = SummaryStrip(container)
+    breadcrumb = WorkflowBreadcrumbBar(container)
+    rail = WorkflowLineageRail(container)
+    layout.addWidget(header)
+    layout.addWidget(strip)
+    layout.addWidget(breadcrumb)
+    layout.addWidget(rail)
+    container.resize(720, 480)
+
+    recorder = _TransientWindowRecorder()
+    qapp.installEventFilter(recorder)
+    try:
+        container.show()
+        process_events()
+        recorder.windowed_children.clear()
+
+        header.set_chips([ChipSpec("Loaded", level="success")])
+        process_events()
+        header.set_chips([ChipSpec("Ready", level="info")])
+
+        strip.set_items([SummaryItem("Images", "4"), SummaryItem("Mode", "ROI")])
+        process_events()
+        strip.set_items([SummaryItem("Images", "8"), SummaryItem("Mode", "Full")])
+
+        breadcrumb.set_breadcrumb(
+            profile_label="Calibration",
+            context_label="Workspace",
+            nodes=(("camera-a", "camera-a"), ("session-01", "session-01")),
+        )
+        process_events()
+        breadcrumb.set_breadcrumb(
+            profile_label="Calibration",
+            context_label="Workspace",
+            nodes=(("camera-a", "camera-a"), ("session-02", "session-02")),
+        )
+
+        rail.set_entries(
+            [
+                WorkflowLineageEntry("camera-a"),
+                WorkflowLineageEntry("session-01", is_active=True),
+            ],
+            context_label="Workspace",
+        )
+        process_events()
+        rail.set_entries(
+            [
+                WorkflowLineageEntry("camera-a"),
+                WorkflowLineageEntry("session-02", is_active=True),
+            ],
+            context_label="Workspace",
+        )
+        process_events()
+
+        assert recorder.windowed_children == []
+    finally:
+        qapp.removeEventFilter(recorder)
+        container.close()
+        container.deleteLater()
+        process_events()

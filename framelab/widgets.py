@@ -8,23 +8,23 @@ import numpy as np
 from PySide6 import QtCore, QtGui, QtWidgets as qtw
 from PySide6.QtCore import Qt, QPoint, QPointF, QRect, QRectF, QSize, Signal
 
+from .mpl_canvas import FigureCanvasQTAgg
 from .mpl_config import ensure_matplotlib_config_dir
+from .mpl_layout import adjust_single_axes_layout
 
 ensure_matplotlib_config_dir()
 
 try:
     from matplotlib.figure import Figure
     from matplotlib import pyplot as plt
-    from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
     from matplotlib.patches import Rectangle
 
-    MATPLOTLIB_AVAILABLE = True
+    MATPLOTLIB_AVAILABLE = FigureCanvasQTAgg is not None
     try:
         plt.style.use("framelab/assets/LabReport.mplstyle")
     except Exception:
         pass
 except Exception:
-    FigureCanvasQTAgg = None  # type: ignore[assignment]
     Figure = None  # type: ignore[assignment]
     Rectangle = None  # type: ignore[assignment]
     MATPLOTLIB_AVAILABLE = False
@@ -1094,6 +1094,7 @@ class HistogramWidget(qtw.QWidget):
 
     def __init__(self, parent: Optional[qtw.QWidget] = None) -> None:
         super().__init__(parent)
+        self.setMinimumWidth(340)
         self.setMinimumHeight(280)
         self.setObjectName("HistogramWidget")
 
@@ -1144,7 +1145,10 @@ class HistogramWidget(qtw.QWidget):
                 top=0.955,
                 bottom=0.16,
             )
-            self._canvas = FigureCanvasQTAgg(self._figure)
+            self._canvas = FigureCanvasQTAgg(
+                self._figure,
+                resize_callback=self._apply_plot_layout,
+            )
             self._axes = self._figure.add_subplot(111)
             self._canvas.mpl_connect("scroll_event", self._on_plot_scroll)
             self._canvas.mpl_connect("button_press_event", self._on_plot_press)
@@ -1176,6 +1180,20 @@ class HistogramWidget(qtw.QWidget):
         """
         self._theme_mode = mode if mode == "dark" else "light"
         self._redraw()
+
+    def _apply_plot_layout(self) -> None:
+        """Keep the histogram y-axis label visible in narrow panes."""
+
+        adjust_single_axes_layout(
+            self._figure,
+            self._axes,
+            self._canvas,
+            base_left=0.13,
+            right=0.985,
+            bottom=0.16,
+            top=0.955,
+            max_left=0.97,
+        )
 
     def clear_histogram(self) -> None:
         """Clear current histogram data and redraw empty state."""
@@ -1740,14 +1758,20 @@ class HistogramWidget(qtw.QWidget):
             fig_bg = "#1f2937"
             axes_bg = "#111827"
             text = "#e5e7eb"
-            grid = "#475569"
+            major_grid = "#64748b"
+            minor_grid = "#94a3b8"
+            major_grid_alpha = 0.42
+            minor_grid_alpha = 0.24
             accent = "#60a5fa"
             edge = "#dbeafe"
         else:
             fig_bg = "#ffffff"
             axes_bg = "#f8fbff"
             text = "#1f2937"
-            grid = "#c7d6ea"
+            major_grid = "#c7d6ea"
+            minor_grid = "#dbe5f3"
+            major_grid_alpha = 0.62
+            minor_grid_alpha = 0.4
             accent = "#2563eb"
             edge = "#1e3a8a"
 
@@ -1756,27 +1780,36 @@ class HistogramWidget(qtw.QWidget):
         self._figure.patch.set_facecolor(fig_bg)
         self._figure.patch.set_edgecolor(fig_bg)
         ax.set_facecolor(axes_bg)
-        self._figure.subplots_adjust(
-            left=0.12,
-            right=0.985,
-            top=0.955,
-            bottom=0.16,
-        )
         if self._canvas is not None:
             self._canvas.setStyleSheet(
                 f"background-color: {fig_bg}; border: none;",
             )
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
-        ax.spines["left"].set_color(grid)
-        ax.spines["bottom"].set_color(grid)
+        ax.spines["left"].set_color(major_grid)
+        ax.spines["bottom"].set_color(major_grid)
         ax.tick_params(which="both", colors=text)
         ax.xaxis.label.set_color(text)
         ax.yaxis.label.set_color(text)
-        ax.grid(True, color=grid, alpha=0.35, linewidth=0.8)
         ax.set_yscale("linear")
         ax.set_xlabel("Pixel Intensity")
         ax.set_ylabel("Occurrences")
+        ax.minorticks_on()
+        ax.grid(
+            True,
+            which="major",
+            color=major_grid,
+            alpha=major_grid_alpha,
+            linewidth=0.85,
+        )
+        ax.grid(
+            True,
+            which="minor",
+            color=minor_grid,
+            alpha=minor_grid_alpha,
+            linewidth=0.65,
+            linestyle=":",
+        )
 
         if self._counts is None or self._edges is None:
             ax.text(
@@ -1809,4 +1842,5 @@ class HistogramWidget(qtw.QWidget):
             ax.margins(x=0)
             self._apply_view_limits()
 
+        self._apply_plot_layout()
         self._canvas.draw_idle()

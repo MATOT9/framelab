@@ -100,6 +100,29 @@ def test_apply_app_identity_with_explicit_window_skips_other_top_levels(qapp) ->
         qapp.processEvents()
 
 
+def test_apply_icon_to_widget_skips_native_handle_for_hidden_top_level_widgets(
+    qapp,
+) -> None:
+    class _ProbeDialog(qtw.QDialog):
+        def __init__(self) -> None:
+            super().__init__()
+            self.window_handle_calls = 0
+
+        def windowHandle(self):
+            self.window_handle_calls += 1
+            return super().windowHandle()
+
+    dialog = _ProbeDialog()
+
+    try:
+        _apply_icon_to_widget(dialog, load_app_icon())
+        assert dialog.window_handle_calls == 0
+    finally:
+        dialog.close()
+        dialog.deleteLater()
+        qapp.processEvents()
+
+
 def test_main_window_reapplies_app_identity_after_show(
     framelab_window_factory,
     monkeypatch,
@@ -117,7 +140,10 @@ def test_main_window_reapplies_app_identity_after_show(
         window.show()
         qapp.processEvents()
         qapp.processEvents()
-        assert window in calls
+        if window_module.sys.platform == "win32":
+            assert window not in calls
+        else:
+            assert window in calls
     finally:
         window.close()
         window.deleteLater()

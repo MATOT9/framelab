@@ -5,6 +5,7 @@ from __future__ import annotations
 from copy import deepcopy
 from dataclasses import dataclass, replace
 from pathlib import Path
+import sys
 from typing import Iterable, Optional
 import shutil
 
@@ -21,6 +22,7 @@ from .datacard_authoring.service import (
 )
 from .datacard_labels import label_for_metadata_field
 from .dataset_state import DatasetScopeNode, DatasetStateController
+from .file_dialogs import choose_open_file, choose_save_file
 from .icons import apply_app_identity
 from .main_window import (
     AnalysisPageMixin,
@@ -57,6 +59,7 @@ from .workspace_document import (
     WorkspaceDocumentUiState,
     WorkspaceDocumentWorkflowState,
 )
+from .window_drag import apply_secondary_window_geometry
 from .workflow import WorkflowStateController, workflow_profile_by_id
 from .workers import DynamicStatsWorker, RoiApplyWorker, DatasetLoadWorker
 
@@ -321,6 +324,8 @@ class FrameLabWindow(
         """Re-apply app identity once the main window is a native top level."""
 
         super().showEvent(event)
+        if sys.platform == "win32":
+            return
         app = qtw.QApplication.instance()
         if not isinstance(app, qtw.QApplication):
             return
@@ -829,6 +834,11 @@ class FrameLabWindow(
         )
         cancel_button = dialog.addButton(qtw.QMessageBox.Cancel)
         dialog.setDefaultButton(custom_button)
+        apply_secondary_window_geometry(
+            dialog,
+            preferred_size=dialog.sizeHint(),
+            host_window=parent or self,
+        )
         dialog.exec()
         clicked = dialog.clickedButton()
         if clicked is calibration_button:
@@ -2337,42 +2347,31 @@ class FrameLabWindow(
             if self._workspace_document_path is not None
             else str(self._suggest_workspace_document_path().parent)
         )
-        dialog = qtw.QFileDialog(self, "Open Workspace File", initial_dir)
-        dialog.setFileMode(qtw.QFileDialog.ExistingFile)
-        dialog.setNameFilters(
-            ("FrameLab Workspace (*.framelab)", "All files (*)"),
+        selected_path = choose_open_file(
+            self,
+            "Open Workspace File",
+            initial_dir,
+            name_filters=("FrameLab Workspace (*.framelab)", "All files (*)"),
+            selected_name_filter="FrameLab Workspace (*.framelab)",
         )
-        dialog.selectNameFilter("FrameLab Workspace (*.framelab)")
-        dialog.setOption(qtw.QFileDialog.DontUseNativeDialog, True)
-        if not dialog.exec():
+        if not selected_path:
             return None
-        selected = dialog.selectedFiles()
-        if not selected:
-            return None
-        return Path(selected[0]).expanduser()
+        return Path(selected_path).expanduser()
 
     def _select_workspace_document_path_to_save(self) -> Path | None:
         """Prompt for one workspace-document path to save."""
 
         initial_path = self._suggest_workspace_document_path()
-        dialog = qtw.QFileDialog(
+        selected_path, _selected_filter = choose_save_file(
             self,
             "Save Workspace File",
-            str(initial_path),
+            initial_path,
+            name_filters=("FrameLab Workspace (*.framelab)", "All files (*)"),
+            selected_name_filter="FrameLab Workspace (*.framelab)",
         )
-        dialog.setAcceptMode(qtw.QFileDialog.AcceptSave)
-        dialog.setNameFilters(
-            ("FrameLab Workspace (*.framelab)", "All files (*)"),
-        )
-        dialog.selectNameFilter("FrameLab Workspace (*.framelab)")
-        dialog.setDefaultSuffix("framelab")
-        dialog.setOption(qtw.QFileDialog.DontUseNativeDialog, True)
-        if not dialog.exec():
+        if not selected_path:
             return None
-        selected = dialog.selectedFiles()
-        if not selected:
-            return None
-        candidate = Path(selected[0]).expanduser()
+        candidate = Path(selected_path).expanduser()
         if candidate.suffix.lower() != ".framelab":
             candidate = candidate.with_suffix(".framelab")
         return candidate
@@ -2447,6 +2446,11 @@ class FrameLabWindow(
         )
         if theme_sheet:
             dialog.setStyleSheet(theme_sheet)
+        apply_secondary_window_geometry(
+            dialog,
+            preferred_size=dialog.sizeHint(),
+            host_window=self,
+        )
         answer = dialog.exec()
         if answer == qtw.QMessageBox.Cancel:
             return False

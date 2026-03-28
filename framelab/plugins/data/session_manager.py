@@ -14,6 +14,7 @@ from .session_manager_ui_state import (
     build_session_manager_action_state,
 )
 from ...acquisition_datacard import find_session_root
+from ...file_dialogs import choose_existing_directory
 from ...session_manager import (
     AcquisitionDatacardClipboard,
     AcquisitionEntry,
@@ -243,11 +244,10 @@ class SessionManagerDialog(qtw.QDialog):
     def _browse_session(self) -> None:
         """Browse to one session folder."""
         start = self._session_edit.text().strip() or str(Path.home())
-        folder = qtw.QFileDialog.getExistingDirectory(
+        folder = choose_existing_directory(
             self,
             "Select Session Folder",
             start,
-            qtw.QFileDialog.ShowDirsOnly,
         )
         if not folder:
             return

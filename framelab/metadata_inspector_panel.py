@@ -174,7 +174,7 @@ class MetadataInspectorPanel(qtw.QWidget):
         self._breadcrumb = WorkflowBreadcrumbBar(compact=not self._show_header)
         layout.addWidget(self._breadcrumb)
 
-        self._node_path_label = qtw.QLabel("")
+        self._node_path_label = qtw.QLabel("", self)
         self._node_path_label.setObjectName("MutedLabel")
         self._node_path_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self._node_path_label.setWordWrap(True)
@@ -183,6 +183,7 @@ class MetadataInspectorPanel(qtw.QWidget):
         self._provenance_hint = qtw.QLabel(
             "Badges show whether values are local, inherited, or ad-hoc. "
             "Use the node column to see where each effective value came from.",
+            self,
         )
         self._provenance_hint.setObjectName("MutedLabel")
         self._provenance_hint.setWordWrap(True)
@@ -204,7 +205,7 @@ class MetadataInspectorPanel(qtw.QWidget):
         effective_panel.setObjectName("SubtlePanel")
         effective_layout = qtw.QVBoxLayout(effective_panel)
         self._effective_layout = effective_layout
-        effective_title = qtw.QLabel("Effective Metadata")
+        effective_title = qtw.QLabel("Effective Metadata", effective_panel)
         effective_title.setObjectName("SectionTitle")
         effective_layout.addWidget(effective_title)
         self._effective_table = MetadataDragTable(
@@ -245,7 +246,7 @@ class MetadataInspectorPanel(qtw.QWidget):
         local_panel.setObjectName("SubtlePanel")
         local_layout = qtw.QVBoxLayout(local_panel)
         self._local_layout = local_layout
-        local_title = qtw.QLabel("Local Metadata")
+        local_title = qtw.QLabel("Local Metadata", local_panel)
         local_title.setObjectName("SectionTitle")
         local_layout.addWidget(local_title)
         self._local_table = MetadataDragTable(
@@ -265,6 +266,7 @@ class MetadataInspectorPanel(qtw.QWidget):
         self._editor_hint = qtw.QLabel(
             "Value editor accepts plain text or JSON literals like 1200, true, "
             "\"label\", [1, 2], or {\"x\": 1}.",
+            local_panel,
         )
         self._editor_hint.setObjectName("MutedLabel")
         self._editor_hint.setWordWrap(True)
@@ -641,7 +643,6 @@ class MetadataInspectorPanel(qtw.QWidget):
             widget = item.widget()
             if widget is not None:
                 widget.hide()
-                widget.setParent(None)
                 widget.deleteLater()
         visible = False
         for status in group_statuses:

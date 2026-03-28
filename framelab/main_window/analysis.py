@@ -83,10 +83,10 @@ class AnalysisPageMixin:
         unavailable_layout = qtw.QVBoxLayout(self._analysis_unavailable_frame)
         unavailable_layout.setContentsMargins(12, 10, 12, 10)
         unavailable_layout.setSpacing(6)
-        unavailable_title = qtw.QLabel("Analyze Unavailable")
+        unavailable_title = qtw.QLabel("Analyze Unavailable", self._analysis_unavailable_frame)
         unavailable_title.setObjectName("SectionTitle")
         unavailable_layout.addWidget(unavailable_title)
-        self._analysis_unavailable_label = qtw.QLabel("")
+        self._analysis_unavailable_label = qtw.QLabel("", self._analysis_unavailable_frame)
         self._analysis_unavailable_label.setObjectName("MutedLabel")
         self._analysis_unavailable_label.setWordWrap(True)
         unavailable_layout.addWidget(self._analysis_unavailable_label)
@@ -115,7 +115,7 @@ class AnalysisPageMixin:
         self._analysis_selector_layout = selector_layout
         selector_layout.setContentsMargins(12, 10, 12, 10)
         selector_layout.setSpacing(8)
-        profile_label = qtw.QLabel("Analysis Plugin")
+        profile_label = qtw.QLabel("Analysis Plugin", selector_panel)
         profile_label.setObjectName("SectionTitle")
         selector_layout.addWidget(profile_label)
         self.analysis_profile_combo = qtw.QComboBox()
@@ -245,11 +245,11 @@ class AnalysisPageMixin:
 
         plugin_classes = self._plugin_classes_for_page("analysis")
         if not plugin_classes:
-            placeholder = qtw.QLabel("No analysis plugins enabled.")
+            placeholder = qtw.QLabel("No analysis plugins enabled.", self.analysis_workspace_stack)
             placeholder.setAlignment(Qt.AlignCenter)
             placeholder.setObjectName("MutedLabel")
             self.analysis_workspace_stack.addWidget(placeholder)
-            controls_placeholder = qtw.QLabel("No plugin-specific controls.")
+            controls_placeholder = qtw.QLabel("No plugin-specific controls.", self.analysis_controls_stack)
             controls_placeholder.setAlignment(Qt.AlignCenter)
             controls_placeholder.setObjectName("MutedLabel")
             self.analysis_controls_stack.addWidget(controls_placeholder)
@@ -396,6 +396,7 @@ class AnalysisPageMixin:
 
         label = qtw.QLabel(
             f"{plugin_name} keeps its controls inside the workspace view.",
+            self.analysis_controls_stack,
         )
         label.setObjectName("MutedLabel")
         label.setWordWrap(True)

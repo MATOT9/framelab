@@ -8,6 +8,7 @@ EbusData
 archived
 json_templates
 test.py
+*/.tmp
 
 # Software cache
 .framelab

@@ -59,7 +59,6 @@ class WorkflowBreadcrumbBar(qtw.QFrame):
             widget = item.widget()
             if widget is not None:
                 widget.hide()
-                widget.setParent(None)
                 widget.deleteLater()
 
         breadcrumb_nodes = [(str(label), str(tooltip)) for label, tooltip in nodes if str(label).strip()]
@@ -87,7 +86,7 @@ class WorkflowBreadcrumbBar(qtw.QFrame):
             )
         if context_label:
             if profile_label:
-                arrow = qtw.QLabel("›")
+                arrow = qtw.QLabel("›", self)
                 arrow.setObjectName("MutedLabel")
                 arrow.setAlignment(Qt.AlignCenter)
                 self._layout.insertWidget(self._layout.count() - 1, arrow)
@@ -102,7 +101,7 @@ class WorkflowBreadcrumbBar(qtw.QFrame):
             )
         for index, (label, tooltip) in enumerate(breadcrumb_nodes):
             if profile_label or context_label or index > 0:
-                arrow = qtw.QLabel("›")
+                arrow = qtw.QLabel("›", self)
                 arrow.setObjectName("MutedLabel")
                 arrow.setAlignment(Qt.AlignCenter)
                 self._layout.insertWidget(self._layout.count() - 1, arrow)
@@ -138,7 +137,7 @@ class WorkflowLineageRow(qtw.QWidget):
         layout.setContentsMargins(30, 3, 6, 3)
         layout.setSpacing(1)
 
-        self._label = qtw.QLabel(entry.label)
+        self._label = qtw.QLabel(entry.label, self)
         self._label.setWordWrap(True)
         self._label.setToolTip(entry.tooltip)
         if entry.is_active:
@@ -148,7 +147,7 @@ class WorkflowLineageRow(qtw.QWidget):
             self._label.setObjectName("SectionTitle")
         layout.addWidget(self._label)
 
-        self._detail = qtw.QLabel(entry.detail)
+        self._detail = qtw.QLabel(entry.detail, self)
         self._detail.setObjectName("MutedLabel")
         self._detail.setWordWrap(True)
         self._detail.setToolTip(entry.tooltip)
@@ -197,11 +196,11 @@ class WorkflowLineageRail(qtw.QFrame):
         layout = qtw.QVBoxLayout(self)
         self._layout = layout
 
-        self._title_label = qtw.QLabel("Active Path")
+        self._title_label = qtw.QLabel("Active Path", self)
         self._title_label.setObjectName("SectionTitle")
         layout.addWidget(self._title_label)
 
-        self._context_label = qtw.QLabel("")
+        self._context_label = qtw.QLabel("", self)
         self._context_label.setObjectName("MutedLabel")
         self._context_label.setWordWrap(True)
         layout.addWidget(self._context_label)
@@ -209,7 +208,7 @@ class WorkflowLineageRail(qtw.QFrame):
         self._rows_layout = qtw.QVBoxLayout()
         layout.addLayout(self._rows_layout)
 
-        self._empty_label = qtw.QLabel("No active workflow scope")
+        self._empty_label = qtw.QLabel("No active workflow scope", self)
         self._empty_label.setObjectName("MutedLabel")
         self._empty_label.setWordWrap(True)
         self._rows_layout.addWidget(self._empty_label)
@@ -249,7 +248,6 @@ class WorkflowLineageRail(qtw.QFrame):
             widget = item.widget()
             if widget is not None:
                 widget.hide()
-                widget.setParent(None)
                 widget.deleteLater()
 
         rows = [entry for entry in entries if entry.label.strip()]

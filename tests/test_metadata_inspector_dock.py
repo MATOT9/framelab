@@ -498,3 +498,37 @@ def test_metadata_inspector_dock_visibility_restores_from_ui_state(
         window.close()
         window.deleteLater()
         qapp.processEvents()
+
+
+def test_metadata_inspector_stays_hidden_on_start_when_workflow_restores_without_panel_state(
+    tmp_path: Path,
+    monkeypatch,
+    qapp,
+) -> None:
+    config_path = tmp_path / "ui_state.ini"
+    workspace_root, _camera_root, _session_root, session_node_id = (
+        _make_workspace_with_metadata(tmp_path)
+    )
+    store = UiStateStore(config_path)
+    store.save(
+        UiStateSnapshot(
+            workflow_workspace_root=str(workspace_root),
+            workflow_profile_id="calibration",
+            workflow_anchor_type_id="root",
+            workflow_active_node_id=session_node_id,
+        ),
+    )
+    monkeypatch.setattr(
+        window_module,
+        "UiStateStore",
+        lambda: UiStateStore(config_path),
+    )
+
+    window = window_module.FrameLabWindow(enabled_plugin_ids=())
+    try:
+        assert window.workflow_state_controller.profile_id == "calibration"
+        assert not window._metadata_inspector_dock.isVisible()
+    finally:
+        window.close()
+        window.deleteLater()
+        qapp.processEvents()

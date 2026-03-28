@@ -251,7 +251,7 @@ def test_workflow_explorer_keeps_active_path_visible_without_loaded_workflow(
     )
 
 
-def test_workflow_explorer_prioritizes_tree_space_and_caps_active_path_growth(
+def test_workflow_explorer_active_path_expands_with_top_pane_resize(
     tmp_path: Path,
     framelab_window_factory,
     process_events,
@@ -270,15 +270,16 @@ def test_workflow_explorer_prioritizes_tree_space_and_caps_active_path_growth(
 
     dock._tree.setCurrentItem(dock._item_by_node_id["calibration:root"])
     process_events()
-    root_height_cap = dock._lineage_scroll.maximumHeight()
+    before_height = dock._lineage_scroll.height()
 
     dock._tree.setCurrentItem(dock._item_by_node_id[acquisition_node_id])
     process_events()
-    deep_height_cap = dock._lineage_scroll.maximumHeight()
-    splitter_sizes = dock._main_splitter.sizes()
+    dock._main_splitter.setSizes([420, 260])
+    process_events()
+    after_height = dock._lineage_scroll.height()
 
-    assert root_height_cap == deep_height_cap
-    assert splitter_sizes[1] > splitter_sizes[0]
+    assert dock._lineage_scroll.sizePolicy().verticalPolicy() == qtw.QSizePolicy.Expanding
+    assert after_height > before_height
     assert dock._tree.minimumHeight() >= 240
 
 

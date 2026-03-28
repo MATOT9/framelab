@@ -81,6 +81,9 @@ QWidget#WorkflowExplorerDockContent,
 QWidget#MetadataInspectorDockContent {
     background: $window_bg;
 }
+QWidget#WorkflowExplorerOverview {
+    background: $window_bg;
+}
 QWidget#DockTitleBar {
     background: $menu_bg;
     border: 1px solid $border;
@@ -136,6 +139,11 @@ QFrame#SummaryCard {
 }
 QFrame#SummaryStrip {
     background: transparent;
+    border: none;
+}
+QScrollArea#WorkflowActivePathScroll,
+QWidget#WorkflowActivePathViewport {
+    background: $subtle_surface;
     border: none;
 }
 QScrollArea#WizardScrollArea {

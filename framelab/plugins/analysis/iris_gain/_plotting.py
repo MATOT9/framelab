@@ -9,6 +9,8 @@ import numpy as np
 from PySide6 import QtGui, QtWidgets as qtw
 from PySide6.QtCore import Qt
 
+from ....file_dialogs import choose_save_file
+from ....mpl_layout import adjust_single_axes_layout
 from ._shared import _CurveSeries, _FitHoverItem, _FitSeries
 
 
@@ -17,70 +19,16 @@ class IrisGainPlotMixin:
 
     def _apply_plot_layout(self) -> None:
         """Keep plot margins stable across empty and populated states."""
-        if self._figure is None or self._axes is None or self._canvas is None:
-            return
-        base_left = 0.115
-        right = 0.985
-        bottom = 0.16
-        top = 0.965
-        self._figure.subplots_adjust(
-            left=base_left,
-            right=right,
-            bottom=bottom,
-            top=top,
+        adjust_single_axes_layout(
+            self._figure,
+            self._axes,
+            self._canvas,
+            base_left=0.13,
+            right=0.985,
+            bottom=0.16,
+            top=0.965,
+            max_left=0.97,
         )
-        for _ in range(5):
-            try:
-                self._canvas.draw()
-                renderer = self._canvas.get_renderer()
-            except Exception:
-                return
-            if renderer is None:
-                return
-            try:
-                figure_bbox = self._figure.get_window_extent(renderer)
-                axes_bbox = self._axes.get_window_extent(renderer)
-                tight_bbox = self._axes.get_tightbbox(renderer)
-            except Exception:
-                return
-            if (
-                figure_bbox.width <= 0.0
-                or axes_bbox.width <= 0.0
-                or tight_bbox.width <= 0.0
-            ):
-                return
-
-            figure_width = float(figure_bbox.width)
-            current_left = float(self._figure.subplotpars.left)
-            desired_left = current_left
-
-            desired_left = max(
-                desired_left,
-                max(0.0, float(axes_bbox.x0) - float(tight_bbox.x0) + 8.0)
-                / figure_width,
-            )
-
-            # If labels still spill beyond the rendered figure edge, grow the
-            # left inset by the measured overflow plus a small safety margin.
-            overflow_px = 1.0 - float(tight_bbox.x0)
-            if overflow_px > 0.0:
-                desired_left = max(
-                    desired_left,
-                    current_left + (overflow_px + 4.0) / figure_width,
-                )
-
-            # Split-pane layouts can leave the plot canvas much narrower than
-            # the main window. Allow a substantially larger left inset so the
-            # y-axis label and wide tick labels stay inside the rendered figure.
-            bounded_left = min(max(base_left, desired_left), 0.92)
-            if abs(bounded_left - current_left) < 0.002:
-                break
-            self._figure.subplots_adjust(
-                left=bounded_left,
-                right=right,
-                bottom=bottom,
-                top=top,
-            )
 
     @staticmethod
     def _finite_range(values: np.ndarray) -> Optional[tuple[float, float]]:
@@ -335,11 +283,15 @@ class IrisGainPlotMixin:
         if self._figure is None:
             return
         parent = self._root if self._root is not None else None
-        file_path, selected_filter = qtw.QFileDialog.getSaveFileName(
+        file_path, selected_filter = choose_save_file(
             parent,
             "Export Plot",
             str(self._suggest_plot_export_path()),
-            "PNG Image (*.png);;JPEG Image (*.jpg *.jpeg);;PDF Document (*.pdf)",
+            name_filters=(
+                "PNG Image (*.png)",
+                "JPEG Image (*.jpg *.jpeg)",
+                "PDF Document (*.pdf)",
+            ),
         )
         if not file_path:
             return

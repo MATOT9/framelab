@@ -157,11 +157,6 @@ def _coerce_size(size: QtCore.QSize | tuple[int, int]) -> QtCore.QSize:
 def _current_frame_margins(window: qtw.QWidget) -> QtCore.QMargins:
     """Return frame margins for one top-level widget when available."""
 
-    try:
-        window.winId()
-    except Exception:
-        return QtCore.QMargins()
-
     handle = window.windowHandle()
     if handle is None:
         return QtCore.QMargins()
