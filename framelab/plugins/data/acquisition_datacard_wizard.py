@@ -149,7 +149,7 @@ class AcquisitionDatacardWizardDialog(qtw.QDialog):
         self._summary_strip = build_summary_strip()
         layout.addWidget(self._summary_strip)
 
-        self.tabs = qtw.QTabWidget()
+        self.tabs = qtw.QTabWidget(self)
         self.tabs.addTab(self._build_target_tab(initial_folder), "1. Target")
         self.tabs.addTab(self._build_metadata_tab(), "2. Identity/Paths/Intent")
         self.tabs.addTab(self._build_defaults_tab(), "3. Defaults")
@@ -159,17 +159,17 @@ class AcquisitionDatacardWizardDialog(qtw.QDialog):
         layout.addWidget(self.tabs, 1)
 
         buttons = qtw.QHBoxLayout()
-        self.validate_button = qtw.QPushButton("Validate")
+        self.validate_button = qtw.QPushButton("Validate", self)
         self.validate_button.clicked.connect(self._validate_current_model)
         buttons.addWidget(self.validate_button)
 
-        self.save_button = qtw.QPushButton("Save Datacard")
+        self.save_button = qtw.QPushButton("Save Datacard", self)
         self.save_button.setObjectName("AccentButton")
         self.save_button.clicked.connect(self._save)
         buttons.addWidget(self.save_button)
         buttons.addStretch(1)
 
-        self.close_button = qtw.QPushButton("Close")
+        self.close_button = qtw.QPushButton("Close", self)
         self.close_button.clicked.connect(self.reject)
         buttons.addWidget(self.close_button)
         layout.addLayout(buttons)
@@ -203,39 +203,39 @@ class AcquisitionDatacardWizardDialog(qtw.QDialog):
         ]
 
     def _build_target_tab(self, initial_folder: str) -> qtw.QWidget:
-        tab = qtw.QWidget()
+        tab = qtw.QWidget(self.tabs)
         layout = qtw.QVBoxLayout(tab)
         layout.setContentsMargins(6, 6, 6, 6)
         layout.setSpacing(8)
 
         path_row = qtw.QHBoxLayout()
-        self._folder_edit = qtw.QLineEdit(initial_folder)
+        self._folder_edit = qtw.QLineEdit(initial_folder, tab)
         self._folder_edit.setPlaceholderText("Select acquisition folder")
         path_row.addWidget(self._folder_edit, 1)
-        self._browse_button = qtw.QPushButton("Browse...")
+        self._browse_button = qtw.QPushButton("Browse...", tab)
         self._browse_button.clicked.connect(self._browse_folder)
         path_row.addWidget(self._browse_button)
-        self._load_target_button = qtw.QPushButton("Load Target")
+        self._load_target_button = qtw.QPushButton("Load Target", tab)
         self._load_target_button.setObjectName("AccentButton")
         self._load_target_button.clicked.connect(self._load_target)
         path_row.addWidget(self._load_target_button)
         layout.addLayout(path_row)
 
-        self._target_state_label = qtw.QLabel("No target loaded.")
+        self._target_state_label = qtw.QLabel("No target loaded.", tab)
         self._target_state_label.setObjectName("MutedLabel")
         self._target_state_label.setWordWrap(True)
         layout.addWidget(self._target_state_label)
 
-        self._frame_info_label = qtw.QLabel("Frame mapping: unknown")
+        self._frame_info_label = qtw.QLabel("Frame mapping: unknown", tab)
         self._frame_info_label.setObjectName("MutedLabel")
         self._frame_info_label.setWordWrap(True)
         layout.addWidget(self._frame_info_label)
 
         index_row = qtw.QHBoxLayout()
-        index_label = qtw.QLabel("Frame index base")
+        index_label = qtw.QLabel("Frame index base", tab)
         index_label.setObjectName("SectionTitle")
         index_row.addWidget(index_label)
-        self._index_base_combo = qtw.QComboBox()
+        self._index_base_combo = qtw.QComboBox(tab)
         self._index_base_combo.addItem("0-based", 0)
         self._index_base_combo.addItem("1-based", 1)
         self._index_base_combo.currentIndexChanged.connect(
@@ -245,28 +245,30 @@ class AcquisitionDatacardWizardDialog(qtw.QDialog):
         index_row.addStretch(1)
         layout.addLayout(index_row)
 
-        self._index_warning_label = qtw.QLabel("")
+        self._index_warning_label = qtw.QLabel("", tab)
         self._index_warning_label.setObjectName("MutedLabel")
         self._index_warning_label.setWordWrap(True)
         layout.addWidget(self._index_warning_label)
 
-        append_group = qtw.QGroupBox("Existing Override Strategy")
+        append_group = qtw.QGroupBox("Existing Override Strategy", tab)
         append_layout = qtw.QHBoxLayout(append_group)
         append_layout.setContentsMargins(10, 8, 10, 8)
         append_layout.setSpacing(8)
         self._append_existing_checkbox = qtw.QCheckBox(
             "Append new rows to existing overrides",
+            append_group,
         )
         self._append_existing_checkbox.setChecked(True)
         append_layout.addWidget(self._append_existing_checkbox)
         self._load_existing_button = qtw.QPushButton(
             "Load Existing Rows for Full Edit",
+            append_group,
         )
         self._load_existing_button.clicked.connect(
             self._load_existing_rows_into_editor,
         )
         append_layout.addWidget(self._load_existing_button)
-        self._existing_count_label = qtw.QLabel("Existing rows: 0")
+        self._existing_count_label = qtw.QLabel("Existing rows: 0", append_group)
         self._existing_count_label.setObjectName("MutedLabel")
         append_layout.addWidget(self._existing_count_label)
         append_layout.addStretch(1)
@@ -275,16 +277,17 @@ class AcquisitionDatacardWizardDialog(qtw.QDialog):
         mapping_row = qtw.QHBoxLayout()
         mapping_label = qtw.QLabel(
             f"Field mapping file: {mapping_config_path()}",
+            tab,
         )
         mapping_label.setObjectName("MutedLabel")
         mapping_label.setWordWrap(True)
         mapping_row.addWidget(mapping_label, 1)
-        self._reload_mapping_button = qtw.QPushButton("Reload Mapping")
+        self._reload_mapping_button = qtw.QPushButton("Reload Mapping", tab)
         self._reload_mapping_button.clicked.connect(self._reload_mapping)
         mapping_row.addWidget(self._reload_mapping_button)
         layout.addLayout(mapping_row)
 
-        self._mapping_warning_label = qtw.QLabel("")
+        self._mapping_warning_label = qtw.QLabel("", tab)
         self._mapping_warning_label.setObjectName("MutedLabel")
         self._mapping_warning_label.setWordWrap(True)
         layout.addWidget(self._mapping_warning_label)
@@ -294,20 +297,20 @@ class AcquisitionDatacardWizardDialog(qtw.QDialog):
         return tab
 
     def _build_metadata_tab(self) -> qtw.QWidget:
-        tab = qtw.QWidget()
+        tab = qtw.QWidget(self.tabs)
         outer = qtw.QVBoxLayout(tab)
         outer.setContentsMargins(6, 6, 6, 6)
         outer.setSpacing(8)
 
-        scroll = qtw.QScrollArea()
+        scroll = qtw.QScrollArea(tab)
         scroll.setWidgetResizable(True)
-        container = qtw.QWidget()
+        container = qtw.QWidget(scroll)
         self._configure_scroll_surface(scroll, container)
         layout = qtw.QVBoxLayout(container)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(8)
 
-        identity_body = qtw.QWidget()
+        identity_body = qtw.QWidget(container)
         identity_form = qtw.QFormLayout(identity_body)
         identity_form.setContentsMargins(0, 0, 0, 0)
         identity_fields = (
@@ -321,7 +324,7 @@ class AcquisitionDatacardWizardDialog(qtw.QDialog):
             ("timezone", "Timezone"),
         )
         for key, label in identity_fields:
-            edit = qtw.QLineEdit()
+            edit = qtw.QLineEdit(identity_body)
             if key in self._AUTO_IDENTITY_KEYS:
                 edit.setReadOnly(True)
             self._identity_edits[key] = edit
@@ -334,14 +337,14 @@ class AcquisitionDatacardWizardDialog(qtw.QDialog):
             ),
         )
 
-        paths_body = qtw.QWidget()
+        paths_body = qtw.QWidget(container)
         paths_form = qtw.QFormLayout(paths_body)
         paths_form.setContentsMargins(0, 0, 0, 0)
         path_fields = (
             ("frames_dir", "frames_dir"),
         )
         for key, label in path_fields:
-            edit = qtw.QLineEdit()
+            edit = qtw.QLineEdit(paths_body)
             self._paths_edits[key] = edit
             paths_form.addRow(label, edit)
         layout.addWidget(
@@ -352,7 +355,7 @@ class AcquisitionDatacardWizardDialog(qtw.QDialog):
             ),
         )
 
-        intent_body = qtw.QWidget()
+        intent_body = qtw.QWidget(container)
         intent_form = qtw.QFormLayout(intent_body)
         intent_form.setContentsMargins(0, 0, 0, 0)
         intent_fields = (
@@ -362,7 +365,7 @@ class AcquisitionDatacardWizardDialog(qtw.QDialog):
             ("tags", "Tags (comma-separated)"),
         )
         for key, label in intent_fields:
-            edit = qtw.QLineEdit()
+            edit = qtw.QLineEdit(intent_body)
             self._intent_edits[key] = edit
             intent_form.addRow(label, edit)
         layout.addWidget(
@@ -383,10 +386,11 @@ class AcquisitionDatacardWizardDialog(qtw.QDialog):
         spec: FieldSpec,
         *,
         allow_empty: bool = False,
+        parent: Optional[qtw.QWidget] = None,
     ) -> qtw.QWidget:
         """Create typed editor widget for one field specification."""
         if allow_empty and spec.value_type == "int":
-            widget = qtw.QLineEdit()
+            widget = qtw.QLineEdit(parent)
             validator = QtGui.QIntValidator(-2_000_000_000, 2_000_000_000, widget)
             if spec.minimum is not None:
                 validator.setBottom(int(spec.minimum))
@@ -397,7 +401,7 @@ class AcquisitionDatacardWizardDialog(qtw.QDialog):
             return widget
 
         if allow_empty and spec.value_type == "float":
-            widget = qtw.QLineEdit()
+            widget = qtw.QLineEdit(parent)
             minimum = float(spec.minimum) if spec.minimum is not None else -1.0e15
             maximum = float(spec.maximum) if spec.maximum is not None else 1.0e15
             validator = QtGui.QDoubleValidator(minimum, maximum, 9, widget)
@@ -407,7 +411,7 @@ class AcquisitionDatacardWizardDialog(qtw.QDialog):
             return widget
 
         if spec.value_type == "int":
-            widget = qtw.QSpinBox()
+            widget = qtw.QSpinBox(parent)
             widget.setRange(-2_000_000_000, 2_000_000_000)
             if spec.minimum is not None:
                 widget.setMinimum(int(spec.minimum))
@@ -418,7 +422,7 @@ class AcquisitionDatacardWizardDialog(qtw.QDialog):
             return widget
 
         if spec.value_type == "float":
-            widget = qtw.QDoubleSpinBox()
+            widget = qtw.QDoubleSpinBox(parent)
             widget.setDecimals(9)
             widget.setRange(-1.0e15, 1.0e15)
             if spec.minimum is not None:
@@ -430,7 +434,7 @@ class AcquisitionDatacardWizardDialog(qtw.QDialog):
             return widget
 
         if spec.value_type == "bool":
-            widget = qtw.QComboBox()
+            widget = qtw.QComboBox(parent)
             if allow_empty:
                 widget.addItem("", None)
             widget.addItem("False", False)
@@ -440,7 +444,7 @@ class AcquisitionDatacardWizardDialog(qtw.QDialog):
             return widget
 
         if spec.value_type == "enum":
-            widget = qtw.QComboBox()
+            widget = qtw.QComboBox(parent)
             if allow_empty:
                 widget.addItem("", None)
             for option in spec.options:
@@ -449,7 +453,7 @@ class AcquisitionDatacardWizardDialog(qtw.QDialog):
                 widget.setProperty("allow_empty", True)
             return widget
 
-        widget = qtw.QLineEdit()
+        widget = qtw.QLineEdit(parent)
         if allow_empty:
             widget.setProperty("allow_empty", True)
         return widget
@@ -538,14 +542,14 @@ class AcquisitionDatacardWizardDialog(qtw.QDialog):
         return None
 
     def _build_defaults_tab(self) -> qtw.QWidget:
-        tab = qtw.QWidget()
+        tab = qtw.QWidget(self.tabs)
         outer = qtw.QVBoxLayout(tab)
         outer.setContentsMargins(6, 6, 6, 6)
         outer.setSpacing(8)
 
-        scroll = qtw.QScrollArea()
+        scroll = qtw.QScrollArea(tab)
         scroll.setWidgetResizable(True)
-        self._defaults_container = qtw.QWidget()
+        self._defaults_container = qtw.QWidget(scroll)
         self._configure_scroll_surface(scroll, self._defaults_container)
         self._defaults_layout = qtw.QVBoxLayout(self._defaults_container)
         self._defaults_layout.setContentsMargins(0, 0, 0, 0)
@@ -570,17 +574,21 @@ class AcquisitionDatacardWizardDialog(qtw.QDialog):
             grouped.setdefault(spec.group, []).append(spec)
 
         for group_name, specs in grouped.items():
-            group_body = qtw.QWidget()
+            group_body = qtw.QWidget(self._defaults_container)
             form = qtw.QFormLayout(group_body)
             form.setContentsMargins(0, 0, 0, 0)
             for spec in specs:
-                editor = self._create_editor(spec, allow_empty=True)
-                row_widget = qtw.QWidget()
+                editor = self._create_editor(
+                    spec,
+                    allow_empty=True,
+                    parent=group_body,
+                )
+                row_widget = qtw.QWidget(group_body)
                 row_layout = qtw.QHBoxLayout(row_widget)
                 row_layout.setContentsMargins(0, 0, 0, 0)
                 row_layout.setSpacing(8)
                 row_layout.addWidget(editor, 1)
-                note_label = qtw.QLabel("")
+                note_label = qtw.QLabel("", row_widget)
                 note_label.setObjectName("MutedLabel")
                 note_label.setVisible(False)
                 row_layout.addWidget(note_label, 0, Qt.AlignRight)
@@ -603,12 +611,12 @@ class AcquisitionDatacardWizardDialog(qtw.QDialog):
         self._refresh_ebus_field_states()
 
     def _build_frames_tab(self) -> qtw.QWidget:
-        tab = qtw.QWidget()
+        tab = qtw.QWidget(self.tabs)
         layout = qtw.QVBoxLayout(tab)
         layout.setContentsMargins(6, 6, 6, 6)
         layout.setSpacing(8)
 
-        self._frame_mode_combo = qtw.QComboBox()
+        self._frame_mode_combo = qtw.QComboBox(tab)
         self._frame_mode_combo.addItem("Defaults only (unknown duration)", "defaults_only")
         self._frame_mode_combo.addItem("Generate rows", "generate")
         self._frame_mode_combo.addItem("Manual rows", "manual")
@@ -616,67 +624,84 @@ class AcquisitionDatacardWizardDialog(qtw.QDialog):
             self._update_frame_mode_visibility,
         )
         mode_row = qtw.QHBoxLayout()
-        mode_row.addWidget(self._make_title_label("Frame Mapping Mode"))
+        mode_row.addWidget(self._make_title_label("Frame Mapping Mode", tab))
         mode_row.addWidget(self._frame_mode_combo)
         mode_row.addStretch(1)
         layout.addLayout(mode_row)
 
-        self._generator_group = qtw.QGroupBox("Generator")
+        self._generator_group = qtw.QGroupBox("Generator", tab)
         gen_layout = qtw.QGridLayout(self._generator_group)
         gen_layout.setContentsMargins(10, 10, 10, 10)
         gen_layout.setHorizontalSpacing(8)
         gen_layout.setVerticalSpacing(6)
 
-        self._generator_field_combo = qtw.QComboBox()
+        self._generator_field_combo = qtw.QComboBox(self._generator_group)
         for spec in self._override_specs():
             self._generator_field_combo.addItem(spec.label, spec.key)
         self._generator_field_combo.currentIndexChanged.connect(
             self._on_generator_field_changed,
         )
-        gen_layout.addWidget(self._make_title_label("Field"), 0, 0)
+        gen_layout.addWidget(self._make_title_label("Field", self._generator_group), 0, 0)
         gen_layout.addWidget(self._generator_field_combo, 0, 1)
 
-        self._generator_type_combo = qtw.QComboBox()
+        self._generator_type_combo = qtw.QComboBox(self._generator_group)
         self._generator_type_combo.addItem("Explicit values list", "explicit_list")
         self._generator_type_combo.addItem("Numeric sweep", "numeric_sweep")
         self._generator_type_combo.addItem("Constant over frame range", "constant_range")
         self._generator_type_combo.currentIndexChanged.connect(
             self._update_generator_mode_widgets,
         )
-        gen_layout.addWidget(self._make_title_label("Generator Type"), 0, 2)
+        gen_layout.addWidget(
+            self._make_title_label("Generator Type", self._generator_group),
+            0,
+            2,
+        )
         gen_layout.addWidget(self._generator_type_combo, 0, 3)
 
         self._use_discovered_frames_checkbox = qtw.QCheckBox(
             "Use discovered frame order/count",
+            self._generator_group,
         )
         self._use_discovered_frames_checkbox.setChecked(True)
         gen_layout.addWidget(self._use_discovered_frames_checkbox, 0, 4, 1, 2)
 
-        self._gen_frame_start = qtw.QSpinBox()
+        self._gen_frame_start = qtw.QSpinBox(self._generator_group)
         self._gen_frame_start.setRange(0, 1_000_000_000)
-        self._gen_frame_end = qtw.QSpinBox()
+        self._gen_frame_end = qtw.QSpinBox(self._generator_group)
         self._gen_frame_end.setRange(0, 1_000_000_000)
-        gen_layout.addWidget(self._make_title_label("Frame Start"), 1, 0)
+        gen_layout.addWidget(
+            self._make_title_label("Frame Start", self._generator_group),
+            1,
+            0,
+        )
         gen_layout.addWidget(self._gen_frame_start, 1, 1)
-        gen_layout.addWidget(self._make_title_label("Frame End"), 1, 2)
+        gen_layout.addWidget(
+            self._make_title_label("Frame End", self._generator_group),
+            1,
+            2,
+        )
         gen_layout.addWidget(self._gen_frame_end, 1, 3)
 
-        self._gen_reason_edit = qtw.QLineEdit("generated")
-        gen_layout.addWidget(self._make_title_label("Reason"), 1, 4)
+        self._gen_reason_edit = qtw.QLineEdit("generated", self._generator_group)
+        gen_layout.addWidget(
+            self._make_title_label("Reason", self._generator_group),
+            1,
+            4,
+        )
         gen_layout.addWidget(self._gen_reason_edit, 1, 5)
 
-        self._generator_stack = qtw.QStackedWidget()
-        explicit_page = qtw.QWidget()
+        self._generator_stack = qtw.QStackedWidget(self._generator_group)
+        explicit_page = qtw.QWidget(self._generator_stack)
         explicit_layout = qtw.QHBoxLayout(explicit_page)
         explicit_layout.setContentsMargins(0, 0, 0, 0)
         explicit_layout.setSpacing(8)
-        explicit_layout.addWidget(self._make_title_label("Values"))
-        self._explicit_values_edit = qtw.QLineEdit()
+        explicit_layout.addWidget(self._make_title_label("Values", explicit_page))
+        self._explicit_values_edit = qtw.QLineEdit(explicit_page)
         self._explicit_values_edit.setPlaceholderText("e.g. 100, 200, 300")
         explicit_layout.addWidget(self._explicit_values_edit, 1)
         self._generator_stack.addWidget(explicit_page)
 
-        sweep_page = qtw.QWidget()
+        sweep_page = qtw.QWidget(self._generator_stack)
         sweep_layout = qtw.QHBoxLayout(sweep_page)
         sweep_layout.setContentsMargins(0, 0, 0, 0)
         sweep_layout.setSpacing(12)
@@ -688,6 +713,7 @@ class AcquisitionDatacardWizardDialog(qtw.QDialog):
                 value_type="float",
             ),
             allow_empty=True,
+            parent=sweep_page,
         )
         self._sweep_stop_edit = self._create_editor(
             FieldSpec(
@@ -697,6 +723,7 @@ class AcquisitionDatacardWizardDialog(qtw.QDialog):
                 value_type="float",
             ),
             allow_empty=True,
+            parent=sweep_page,
         )
         self._sweep_step_edit = self._create_editor(
             FieldSpec(
@@ -706,6 +733,7 @@ class AcquisitionDatacardWizardDialog(qtw.QDialog):
                 value_type="float",
             ),
             allow_empty=True,
+            parent=sweep_page,
         )
         for label_text, editor in (
             ("Start", self._sweep_start_edit),
@@ -715,91 +743,94 @@ class AcquisitionDatacardWizardDialog(qtw.QDialog):
             if isinstance(editor, qtw.QLineEdit):
                 editor.setMinimumWidth(180)
                 editor.setMaximumWidth(220)
-            pair_widget = qtw.QWidget()
+            pair_widget = qtw.QWidget(sweep_page)
             pair_layout = qtw.QHBoxLayout(pair_widget)
             pair_layout.setContentsMargins(0, 0, 0, 0)
             pair_layout.setSpacing(6)
-            pair_layout.addWidget(self._make_title_label(label_text))
+            pair_layout.addWidget(self._make_title_label(label_text, pair_widget))
             pair_layout.addWidget(editor)
             sweep_layout.addWidget(pair_widget)
         sweep_layout.addStretch(1)
         self._generator_stack.addWidget(sweep_page)
 
-        constant_page = qtw.QWidget()
+        constant_page = qtw.QWidget(self._generator_stack)
         constant_layout = qtw.QHBoxLayout(constant_page)
         constant_layout.setContentsMargins(0, 0, 0, 0)
         constant_layout.setSpacing(8)
-        constant_layout.addWidget(self._make_title_label("Value"))
-        self._constant_value_holder = qtw.QWidget()
+        constant_layout.addWidget(self._make_title_label("Value", constant_page))
+        self._constant_value_holder = qtw.QWidget(constant_page)
         self._constant_value_layout = qtw.QHBoxLayout(self._constant_value_holder)
         self._constant_value_layout.setContentsMargins(0, 0, 0, 0)
         self._constant_value_layout.setSpacing(0)
-        self._constant_value_editor = qtw.QLineEdit()
+        self._constant_value_editor = qtw.QLineEdit(self._constant_value_holder)
         self._constant_value_layout.addWidget(self._constant_value_editor, 1)
         constant_layout.addWidget(self._constant_value_holder, 1)
         self._generator_stack.addWidget(constant_page)
 
         gen_layout.addWidget(self._generator_stack, 2, 0, 1, 6)
-        self._generate_button = qtw.QPushButton("Generate and Append Rows")
+        self._generate_button = qtw.QPushButton(
+            "Generate and Append Rows",
+            self._generator_group,
+        )
         self._generate_button.clicked.connect(self._generate_rows)
         gen_layout.addWidget(self._generate_button, 3, 4, 1, 2)
         layout.addWidget(self._generator_group)
 
-        manual_group = qtw.QGroupBox("Manual Row Editor")
+        manual_group = qtw.QGroupBox("Manual Row Editor", tab)
         manual_layout = qtw.QGridLayout(manual_group)
         manual_layout.setContentsMargins(10, 10, 10, 10)
         manual_layout.setHorizontalSpacing(8)
         manual_layout.setVerticalSpacing(6)
 
-        self._manual_start_spin = qtw.QSpinBox()
+        self._manual_start_spin = qtw.QSpinBox(manual_group)
         self._manual_start_spin.setRange(0, 1_000_000_000)
-        self._manual_end_spin = qtw.QSpinBox()
+        self._manual_end_spin = qtw.QSpinBox(manual_group)
         self._manual_end_spin.setRange(0, 1_000_000_000)
-        manual_layout.addWidget(self._make_title_label("Start"), 0, 0)
+        manual_layout.addWidget(self._make_title_label("Start", manual_group), 0, 0)
         manual_layout.addWidget(self._manual_start_spin, 0, 1)
-        manual_layout.addWidget(self._make_title_label("End"), 0, 2)
+        manual_layout.addWidget(self._make_title_label("End", manual_group), 0, 2)
         manual_layout.addWidget(self._manual_end_spin, 0, 3)
 
-        self._manual_field_combo = qtw.QComboBox()
+        self._manual_field_combo = qtw.QComboBox(manual_group)
         for spec in self._override_specs():
             self._manual_field_combo.addItem(spec.label, spec.key)
         self._manual_field_combo.addItem("Custom key...", "__custom__")
         self._manual_field_combo.currentIndexChanged.connect(
             self._on_manual_field_changed,
         )
-        manual_layout.addWidget(self._make_title_label("Field"), 1, 0)
+        manual_layout.addWidget(self._make_title_label("Field", manual_group), 1, 0)
         manual_layout.addWidget(self._manual_field_combo, 1, 1, 1, 3)
 
-        self._manual_custom_key_edit = qtw.QLineEdit()
+        self._manual_custom_key_edit = qtw.QLineEdit(manual_group)
         self._manual_custom_key_edit.setPlaceholderText("camera_settings.some_key")
         self._manual_custom_key_edit.setVisible(False)
         manual_layout.addWidget(self._manual_custom_key_edit, 1, 4, 1, 2)
 
-        manual_layout.addWidget(self._make_title_label("Value"), 2, 0)
-        self._manual_value_holder = qtw.QWidget()
+        manual_layout.addWidget(self._make_title_label("Value", manual_group), 2, 0)
+        self._manual_value_holder = qtw.QWidget(manual_group)
         self._manual_value_layout = qtw.QHBoxLayout(self._manual_value_holder)
         self._manual_value_layout.setContentsMargins(0, 0, 0, 0)
         self._manual_value_layout.setSpacing(0)
-        self._manual_value_editor = qtw.QLineEdit()
+        self._manual_value_editor = qtw.QLineEdit(self._manual_value_holder)
         self._manual_value_layout.addWidget(self._manual_value_editor, 1)
         manual_layout.addWidget(self._manual_value_holder, 2, 1, 1, 3)
 
-        self._manual_reason_edit = qtw.QLineEdit("manual")
-        manual_layout.addWidget(self._make_title_label("Reason"), 2, 4)
+        self._manual_reason_edit = qtw.QLineEdit("manual", manual_group)
+        manual_layout.addWidget(self._make_title_label("Reason", manual_group), 2, 4)
         manual_layout.addWidget(self._manual_reason_edit, 2, 5)
 
-        self._add_row_button = qtw.QPushButton("Add / Update Row")
+        self._add_row_button = qtw.QPushButton("Add / Update Row", manual_group)
         self._add_row_button.clicked.connect(self._add_or_update_manual_row)
         manual_layout.addWidget(self._add_row_button, 3, 3)
-        self._remove_row_button = qtw.QPushButton("Remove Selected")
+        self._remove_row_button = qtw.QPushButton("Remove Selected", manual_group)
         self._remove_row_button.clicked.connect(self._remove_selected_rows)
         manual_layout.addWidget(self._remove_row_button, 3, 4)
-        self._clear_rows_button = qtw.QPushButton("Clear Editor Rows")
+        self._clear_rows_button = qtw.QPushButton("Clear Editor Rows", manual_group)
         self._clear_rows_button.clicked.connect(self._clear_editor_rows)
         manual_layout.addWidget(self._clear_rows_button, 3, 5)
         layout.addWidget(manual_group)
 
-        self._rows_table = qtw.QTableWidget(0, 5)
+        self._rows_table = qtw.QTableWidget(0, 5, tab)
         self._rows_table.setHorizontalHeaderLabels(
             ["Start", "End", "Field", "Value", "Reason"],
         )
@@ -818,7 +849,7 @@ class AcquisitionDatacardWizardDialog(qtw.QDialog):
         self._rows_table.cellClicked.connect(self._on_row_table_clicked)
         layout.addWidget(self._rows_table, 1)
 
-        self._rows_summary_label = qtw.QLabel("Editor rows: 0")
+        self._rows_summary_label = qtw.QLabel("Editor rows: 0", tab)
         self._rows_summary_label.setObjectName("MutedLabel")
         layout.addWidget(self._rows_summary_label)
 
@@ -828,23 +859,23 @@ class AcquisitionDatacardWizardDialog(qtw.QDialog):
         return tab
 
     def _build_review_tab(self) -> qtw.QWidget:
-        tab = qtw.QWidget()
+        tab = qtw.QWidget(self.tabs)
         layout = qtw.QVBoxLayout(tab)
         layout.setContentsMargins(6, 6, 6, 6)
         layout.setSpacing(8)
 
-        self._refresh_review_button = qtw.QPushButton("Refresh Preview")
+        self._refresh_review_button = qtw.QPushButton("Refresh Preview", tab)
         self._refresh_review_button.clicked.connect(self._refresh_review)
         layout.addWidget(self._refresh_review_button)
 
-        self._review_warnings = qtw.QPlainTextEdit()
+        self._review_warnings = qtw.QPlainTextEdit(tab)
         self._configure_review_editor(self._review_warnings)
         self._review_warnings.setReadOnly(True)
         self._review_warnings.setPlaceholderText("Validation and merge warnings")
         self._review_warnings.setMaximumHeight(160)
         layout.addWidget(self._review_warnings)
 
-        self._review_json = qtw.QPlainTextEdit()
+        self._review_json = qtw.QPlainTextEdit(tab)
         self._configure_review_editor(self._review_json)
         self._review_json.setReadOnly(True)
         self._review_json.setPlaceholderText("Datacard JSON preview")
@@ -852,8 +883,11 @@ class AcquisitionDatacardWizardDialog(qtw.QDialog):
         return tab
 
     @staticmethod
-    def _make_title_label(text: str) -> qtw.QLabel:
-        label = qtw.QLabel(text)
+    def _make_title_label(
+        text: str,
+        parent: Optional[qtw.QWidget] = None,
+    ) -> qtw.QLabel:
+        label = qtw.QLabel(text, parent)
         label.setObjectName("SectionTitle")
         return label
 
@@ -916,12 +950,12 @@ class AcquisitionDatacardWizardDialog(qtw.QDialog):
         expanded: bool = True,
         tooltip: str = "",
     ) -> qtw.QGroupBox:
-        group = qtw.QGroupBox(title)
+        group = qtw.QGroupBox(title, body.parentWidget())
         layout = qtw.QVBoxLayout(group)
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(8)
 
-        toggle = qtw.QToolButton()
+        toggle = qtw.QToolButton(group)
         toggle.setObjectName("DisclosureButton")
         toggle.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
         toggle.setCheckable(True)

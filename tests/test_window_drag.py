@@ -23,6 +23,28 @@ from framelab.window_drag import (
 pytestmark = [pytest.mark.ui, pytest.mark.core]
 
 
+class _TransientWindowRecorder(QtCore.QObject):
+    def __init__(self) -> None:
+        super().__init__()
+        self.windowed_children: list[tuple[str, str]] = []
+        self._tracked_object_names = {
+            "MutedLabel",
+            "SectionTitle",
+        }
+
+    def eventFilter(self, watched, event) -> bool:
+        if (
+            event.type() == QtCore.QEvent.Show
+            and isinstance(watched, qtw.QWidget)
+            and watched.isWindow()
+            and watched.objectName() in self._tracked_object_names
+        ):
+            self.windowed_children.append(
+                (type(watched).__name__, watched.objectName()),
+            )
+        return False
+
+
 def test_configure_secondary_window_uses_dialog_flags_by_default(qapp) -> None:
     dialog = qtw.QDialog()
     configure_secondary_window(dialog)
@@ -155,6 +177,36 @@ def test_acquisition_wizard_uses_host_parent_and_clamped_geometry(
     finally:
         dialog.close()
         dialog.deleteLater()
+        host.close()
+        host.deleteLater()
+        qapp.processEvents()
+
+
+def test_acquisition_wizard_does_not_promote_labels_to_top_level_windows(
+    tmp_path: Path,
+    qapp,
+) -> None:
+    host = qtw.QWidget()
+    host.show()
+    qapp.processEvents()
+
+    acquisition_root = tmp_path / "acquisition"
+    acquisition_root.mkdir(parents=True, exist_ok=True)
+
+    recorder = _TransientWindowRecorder()
+    qapp.installEventFilter(recorder)
+    dialog = None
+    try:
+        dialog = AcquisitionDatacardWizardDialog(host, str(acquisition_root))
+        dialog.show()
+        qapp.processEvents()
+
+        assert recorder.windowed_children == []
+    finally:
+        qapp.removeEventFilter(recorder)
+        if dialog is not None:
+            dialog.close()
+            dialog.deleteLater()
         host.close()
         host.deleteLater()
         qapp.processEvents()
