@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -24,6 +25,62 @@ def _normalize_subtree_root(root: str | Path) -> Path:
     if candidate.exists():
         return (candidate if candidate.is_dir() else candidate.parent).resolve()
     return (candidate.parent if candidate.suffix else candidate).resolve()
+
+
+def _finite_float(value: Any) -> float | None:
+    """Return one finite float or ``None`` when conversion fails."""
+
+    try:
+        number = float(value)
+    except Exception:
+        return None
+    if not math.isfinite(number):
+        return None
+    return float(number)
+
+
+def _normalize_path_metadata_payload(
+    payload: dict[str, object] | None,
+) -> dict[str, object]:
+    """Backfill canonical metadata keys from stable raw field fallbacks."""
+
+    normalized = dict(payload or {})
+
+    exposure_ms = _finite_float(normalized.get("exposure_ms"))
+    if exposure_ms is None:
+        exposure_ms = _finite_float(normalized.get("exposure_ms_datacard"))
+    if exposure_ms is None:
+        exposure_ms = _finite_float(normalized.get("exposure_ms_path"))
+    if exposure_ms is None:
+        exposure_us = _finite_float(normalized.get("camera_settings.exposure_us"))
+        if exposure_us is None:
+            camera_settings = normalized.get("camera_settings")
+            if isinstance(camera_settings, dict):
+                exposure_us = _finite_float(camera_settings.get("exposure_us"))
+        if exposure_us is not None:
+            exposure_ms = float(exposure_us / 1000.0)
+    if exposure_ms is not None:
+        normalized["exposure_ms"] = exposure_ms
+
+    iris_position = _finite_float(normalized.get("iris_position"))
+    if iris_position is None:
+        iris_position = _finite_float(normalized.get("iris_position_datacard"))
+    if iris_position is None:
+        iris_position = _finite_float(
+            normalized.get("instrument.optics.iris.position"),
+        )
+    if iris_position is None:
+        instrument = normalized.get("instrument")
+        if isinstance(instrument, dict):
+            optics = instrument.get("optics")
+            if isinstance(optics, dict):
+                iris = optics.get("iris")
+                if isinstance(iris, dict):
+                    iris_position = _finite_float(iris.get("position"))
+    if iris_position is not None:
+        normalized["iris_position"] = iris_position
+
+    return normalized
 
 
 @dataclass(frozen=True, slots=True)
@@ -236,7 +293,7 @@ class DatasetStateController:
     ) -> None:
         """Replace cached metadata for the currently loaded paths."""
         self.path_metadata = {
-            str(path): dict(payload)
+            str(path): _normalize_path_metadata_payload(payload)
             for path, payload in mapping.items()
         }
 
@@ -250,7 +307,7 @@ class DatasetStateController:
             return
         merged = dict(self.path_metadata)
         for path, payload in mapping.items():
-            merged[str(path)] = dict(payload)
+            merged[str(path)] = _normalize_path_metadata_payload(payload)
         self.path_metadata = merged
 
     def set_metadata_visible_paths(self, paths: Iterable[str]) -> None:

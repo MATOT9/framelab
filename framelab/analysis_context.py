@@ -7,7 +7,7 @@ from pathlib import Path
 
 import numpy as np
 
-from .dataset_state import DatasetStateController
+from .dataset_state import DatasetStateController, _normalize_path_metadata_payload
 from .metrics_state import MetricsPipelineController
 from .plugins.analysis import AnalysisContext, AnalysisRecord, AnalysisScopeNode
 
@@ -57,7 +57,9 @@ class AnalysisContextController:
         records: list[AnalysisRecord] = []
         metadata_fields: set[str] = set()
         for row, path in enumerate(dataset.paths):
-            metadata = dict(dataset.metadata_for_path(path))
+            metadata = _normalize_path_metadata_payload(
+                dataset.metadata_for_path(path),
+            )
             if metrics.maxs is not None and row < len(metrics.maxs):
                 metadata["max_pixel"] = float(metrics.maxs[row])
             if metrics.min_non_zero is not None and row < len(metrics.min_non_zero):

@@ -4,9 +4,13 @@ import numpy as np
 import pytest
 from PySide6 import QtCore, QtWidgets as qtw
 
+from framelab.dataset_state import DatasetStateController
 from framelab.background import BackgroundConfig
 from framelab.main_window.analysis import AnalysisPageMixin
 from framelab.main_window.inspect_page import InspectPageMixin
+from framelab.main_window.window_actions import WindowActionsMixin
+from framelab.metric_reducers import compute_roi_stats
+from framelab.metrics_state import MetricsPipelineController
 from framelab.models import MetricsTableModel
 
 
@@ -59,6 +63,96 @@ class _AnalysisHarness(AnalysisPageMixin):
         return f"ref:{path}"
 
 
+class _PreviewStub:
+    def __init__(self) -> None:
+        self.roi_rect = None
+
+    def set_roi_rect(self, rect) -> None:
+        self.roi_rect = rect
+
+
+class _RoiSelectionHarness(WindowActionsMixin, InspectPageMixin):
+    _compute_dn_per_ms_metrics = InspectPageMixin._compute_dn_per_ms_metrics
+    _metadata_numeric_arrays = InspectPageMixin._metadata_numeric_arrays
+
+    def __init__(self) -> None:
+        self.dataset_state = DatasetStateController()
+        self.metrics_state = MetricsPipelineController()
+        self.image_preview = _PreviewStub()
+        self._images: list[np.ndarray] = []
+        self.last_status = None
+
+    def load_images(
+        self,
+        images: list[np.ndarray],
+        path_metadata: dict[str, dict[str, object]],
+    ) -> None:
+        paths = [f"/tmp/image-{index}.tiff" for index in range(len(images))]
+        self._images = [np.asarray(image, dtype=np.float64) for image in images]
+        self.dataset_state.set_loaded_dataset(None, paths)
+        self.dataset_state.set_path_metadata(
+            {
+                path: dict(path_metadata.get(path, {}))
+                for path in paths
+            },
+        )
+        count = len(paths)
+        self.metrics_state.maxs = np.asarray(
+            [int(np.max(image)) for image in self._images],
+            dtype=np.int64,
+        )
+        self.metrics_state.min_non_zero = np.asarray(
+            [
+                int(np.min(image[np.nonzero(image)]))
+                if np.any(image)
+                else 0
+                for image in self._images
+            ],
+            dtype=np.int64,
+        )
+        self.metrics_state.sat_counts = np.zeros(count, dtype=np.int64)
+        self.metrics_state.reset_roi_metrics(count)
+
+    def _has_loaded_data(self) -> bool:
+        return self.dataset_state.has_loaded_data()
+
+    def _get_metric_image_by_index(self, index: int):
+        if not (0 <= index < len(self._images)):
+            return (None, False)
+        return (self._images[index], False)
+
+    def _reset_roi_metrics(self) -> None:
+        self.metrics_state.reset_roi_metrics(self.dataset_state.path_count())
+
+    def _compute_roi_stats_for_index(
+        self,
+        index: int,
+    ) -> tuple[float, float, float, float]:
+        roi_rect = self.metrics_state.roi_rect
+        if roi_rect is None:
+            return (np.nan, np.nan, np.nan, np.nan)
+        image = self._images[index]
+        x0, y0, x1, y1 = roi_rect
+        return compute_roi_stats(image[y0:y1, x0:x1])
+
+    def _update_average_controls(self) -> None:
+        return
+
+    def _refresh_table(self, *, update_analysis: bool = True) -> None:
+        _iris_positions, exposure_ms = self._metadata_numeric_arrays()
+        (
+            self.metrics_state.dn_per_ms_values,
+            self.metrics_state.dn_per_ms_stds,
+            self.metrics_state.dn_per_ms_sems,
+        ) = self._compute_dn_per_ms_metrics("roi", exposure_ms)
+
+    def _refresh_workspace_document_dirty_state(self) -> None:
+        return
+
+    def _set_status(self, warning: str | None = None) -> None:
+        self.last_status = warning
+
+
 pytestmark = [pytest.mark.fast, pytest.mark.analysis]
 
 
@@ -99,6 +193,56 @@ def test_compute_dn_per_ms_metrics_uses_roi_arrays_in_roi_mode() -> None:
     np.testing.assert_allclose(values, np.array([3.0]))
     np.testing.assert_allclose(stds, np.array([0.75]))
     np.testing.assert_allclose(sems, np.array([0.375]))
+
+
+def test_apply_roi_rect_uses_fallback_selection_for_dn_per_ms() -> None:
+    host = _RoiSelectionHarness()
+    path_metadata = {
+        "/tmp/image-0.tiff": {"exposure_ms": 10.0},
+        "/tmp/image-1.tiff": {"exposure_ms": 20.0},
+    }
+    host.load_images(
+        [
+            np.full((4, 4), 4.0, dtype=np.float64),
+            np.full((4, 4), 12.0, dtype=np.float64),
+        ],
+        path_metadata,
+    )
+    host.dataset_state.set_selected_index(None)
+
+    applied = host._apply_roi_rect_to_current_dataset(
+        (0, 0, 2, 2),
+        status_message=None,
+    )
+
+    assert applied
+    assert host.dataset_state.selected_index == 0
+    assert host.image_preview.roi_rect == (0, 0, 2, 2)
+    assert float(host.metrics_state.roi_means[0]) == pytest.approx(4.0)
+    assert np.isnan(host.metrics_state.roi_means[1])
+    assert float(host.metrics_state.dn_per_ms_values[0]) == pytest.approx(0.4)
+    assert np.isnan(host.metrics_state.dn_per_ms_values[1])
+
+
+def test_apply_roi_rect_derives_dn_per_ms_from_raw_exposure_metadata() -> None:
+    host = _RoiSelectionHarness()
+    path_metadata = {
+        "/tmp/image-0.tiff": {"camera_settings.exposure_us": 12500},
+    }
+    host.load_images(
+        [np.full((4, 4), 10.0, dtype=np.float64)],
+        path_metadata,
+    )
+    host.dataset_state.set_selected_index(0, path_count=1)
+
+    applied = host._apply_roi_rect_to_current_dataset(
+        (0, 0, 2, 2),
+        status_message=None,
+    )
+
+    assert applied
+    assert float(host.metrics_state.roi_means[0]) == pytest.approx(10.0)
+    assert float(host.metrics_state.dn_per_ms_values[0]) == pytest.approx(0.8)
 
 
 def test_normalization_scale_falls_back_to_one_for_empty_or_zero_max() -> None:

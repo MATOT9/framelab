@@ -747,6 +747,50 @@ class InspectPageMixin:
             return float(np.nan)
         return float(number)
 
+    def _metadata_exposure_ms(self, metadata: dict[str, object]) -> float:
+        """Resolve one exposure value in milliseconds from cached row metadata."""
+
+        for key in ("exposure_ms", "exposure_ms_datacard", "exposure_ms_path"):
+            value = self._as_finite_float(metadata.get(key))
+            if np.isfinite(value):
+                return value
+        exposure_us = self._as_finite_float(
+            metadata.get("camera_settings.exposure_us"),
+        )
+        if np.isfinite(exposure_us):
+            return float(exposure_us / 1000.0)
+        camera_settings = metadata.get("camera_settings")
+        if isinstance(camera_settings, dict):
+            exposure_us = self._as_finite_float(
+                camera_settings.get("exposure_us"),
+            )
+            if np.isfinite(exposure_us):
+                return float(exposure_us / 1000.0)
+        return float(np.nan)
+
+    def _metadata_iris_position(self, metadata: dict[str, object]) -> float:
+        """Resolve one iris-position value from cached row metadata."""
+
+        for key in ("iris_position", "iris_position_datacard"):
+            value = self._as_finite_float(metadata.get(key))
+            if np.isfinite(value):
+                return value
+        value = self._as_finite_float(
+            metadata.get("instrument.optics.iris.position"),
+        )
+        if np.isfinite(value):
+            return value
+        instrument = metadata.get("instrument")
+        if isinstance(instrument, dict):
+            optics = instrument.get("optics")
+            if isinstance(optics, dict):
+                iris = optics.get("iris")
+                if isinstance(iris, dict):
+                    value = self._as_finite_float(iris.get("position"))
+                    if np.isfinite(value):
+                        return value
+        return float(np.nan)
+
     def _metadata_numeric_arrays(self) -> tuple[np.ndarray, np.ndarray]:
         """Build per-row iris-position and exposure arrays from metadata."""
         dataset = self.dataset_state
@@ -755,12 +799,8 @@ class InspectPageMixin:
         exposure_values = np.full(n_rows, np.nan, dtype=np.float64)
         for row, path in enumerate(dataset.paths):
             metadata = dataset.metadata_for_path(path)
-            iris_values[row] = self._as_finite_float(
-                metadata.get("iris_position"),
-            )
-            exposure_values[row] = self._as_finite_float(
-                metadata.get("exposure_ms"),
-            )
+            iris_values[row] = self._metadata_iris_position(metadata)
+            exposure_values[row] = self._metadata_exposure_ms(metadata)
         return (iris_values, exposure_values)
 
     def _compute_dn_per_ms_metrics(

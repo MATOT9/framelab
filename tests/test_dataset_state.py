@@ -119,6 +119,24 @@ def test_visible_metadata_and_source_index_helpers_follow_loaded_paths(
     assert controller.source_index_for_path("/tmp/dataset/b.tif") == 1
     assert controller.metadata_for_path("/tmp/dataset/a.tif") == {"group": 1}
     assert controller.visible_metadata_path(9) is None
+
+
+def test_set_path_metadata_backfills_canonical_exposure_and_iris_keys(
+    controller: DatasetStateController,
+) -> None:
+    controller.set_loaded_dataset("/tmp/dataset", ["/tmp/dataset/a.tif"])
+    controller.set_path_metadata(
+        {
+            "/tmp/dataset/a.tif": {
+                "camera_settings.exposure_us": 12500,
+                "instrument.optics.iris.position": 7,
+            },
+        },
+    )
+
+    metadata = controller.metadata_for_path("/tmp/dataset/a.tif")
+    assert metadata["exposure_ms"] == pytest.approx(12.5)
+    assert metadata["iris_position"] == pytest.approx(7.0)
     assert controller.source_index_for_path("/tmp/dataset/missing.tif") is None
 
 

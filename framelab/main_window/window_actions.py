@@ -56,14 +56,18 @@ class WindowActionsMixin:
         self.image_preview.set_roi_rect(metrics.roi_rect)
         self._reset_roi_metrics()
 
-        if dataset.selected_index is not None:
+        active_index = dataset.set_selected_index(
+            idx,
+            path_count=dataset.path_count(),
+        )
+        if active_index is not None:
             roi_max, roi_mean, roi_std, roi_sem = self._compute_roi_stats_for_index(
-                dataset.selected_index,
+                active_index,
             )
-            metrics.roi_maxs[dataset.selected_index] = roi_max
-            metrics.roi_means[dataset.selected_index] = roi_mean
-            metrics.roi_stds[dataset.selected_index] = roi_std
-            metrics.roi_sems[dataset.selected_index] = roi_sem
+            metrics.roi_maxs[active_index] = roi_max
+            metrics.roi_means[active_index] = roi_mean
+            metrics.roi_stds[active_index] = roi_std
+            metrics.roi_sems[active_index] = roi_sem
 
         self._update_average_controls()
         self._refresh_table()

@@ -58,6 +58,17 @@
       "show_in_overrides": true
     },
     {
+      "key": "camera_settings.pixel_format",
+      "label": "Pixel Format",
+      "group": "Camera",
+      "type": "string",
+      "tooltip": "Camera image pixel format.",
+      "ebus_label": "device.PixelFormat",
+      "ebus_managed": true,
+      "show_in_defaults": true,
+      "show_in_overrides": true
+    },
+    {
       "key": "instrument.optics.iris.position",
       "label": "Iris Position",
       "group": "Instrument",
