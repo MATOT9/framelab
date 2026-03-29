@@ -6,9 +6,14 @@ import numpy as np
 import pytest
 import tifffile
 
+import framelab.main_window.dataset_loading as dataset_loading_module
+from framelab.background import freeze_background_array
+from framelab.byte_budget_cache import ByteBudgetCache
+from framelab.dataset_state import DatasetStateController
 from framelab.image_io import read_2d_image
 from framelab.main_window.dataset_loading import DatasetLoadingMixin
 from framelab.metrics_cache import MetricsCache
+from framelab.metrics_state import MetricsPipelineController
 from framelab.processing_failures import (
     ProcessingFailure,
     format_processing_failure_details,
@@ -33,6 +38,26 @@ class _DatasetScanHarness(DatasetLoadingMixin):
 
     def _cache_image(self, path: str, image: np.ndarray) -> None:
         self.cached[path] = image
+
+
+class _MetricPreviewHarness(DatasetLoadingMixin):
+    def __init__(self, image: np.ndarray, reference: np.ndarray) -> None:
+        self._image = np.asarray(image)
+        self.dataset_state = DatasetStateController()
+        self.metrics_state = MetricsPipelineController()
+        self.metrics_state.background_config.enabled = True
+        self.metrics_state.background_signature = 17
+        self.metrics_state.background_library.global_ref = freeze_background_array(
+            np.asarray(reference),
+        )
+        self._image_cache = ByteBudgetCache[str](1_000_000)
+        self._corrected_cache = ByteBudgetCache[tuple[str, int]](1_000_000)
+        self._path = "/tmp/preview-0.tif"
+        self.dataset_state.set_loaded_dataset(None, [self._path])
+        self.dataset_state.set_path_metadata({self._path: {}})
+
+    def _read_2d_image(self, path: Path) -> np.ndarray:
+        return self._image
 
 
 def test_merge_processing_failures_dedupes_and_replaces_stage() -> None:
@@ -144,3 +169,31 @@ def test_scan_tiffs_chunked_parallel_reuses_persisted_static_cache(
     assert first_maxs == second_maxs == [4]
     assert first_skipped == second_skipped == 0
     assert first_failures == second_failures == []
+
+
+def test_get_metric_image_by_index_uses_backend_corrected_cache(monkeypatch) -> None:
+    harness = _MetricPreviewHarness(
+        np.array([[5, 6], [7, 8]], dtype=np.uint16),
+        np.array([[1, 2], [3, 4]], dtype=np.uint16),
+    )
+    calls = 0
+
+    def _fake_apply_background_f32(image, **kwargs):
+        nonlocal calls
+        calls += 1
+        return np.full_like(np.asarray(image, dtype=np.float32), 9.0)
+
+    monkeypatch.setattr(
+        dataset_loading_module.native_backend,
+        "apply_background_f32",
+        _fake_apply_background_f32,
+    )
+
+    first, first_bg = harness._get_metric_image_by_index(0)
+    second, second_bg = harness._get_metric_image_by_index(0)
+
+    assert first_bg is True
+    assert second_bg is True
+    assert calls == 1
+    np.testing.assert_allclose(first, np.full((2, 2), 9.0, dtype=np.float32))
+    np.testing.assert_allclose(second, first)

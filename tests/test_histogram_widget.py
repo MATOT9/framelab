@@ -7,6 +7,7 @@ import numpy as np
 import pytest
 from PySide6 import QtWidgets as qtw
 
+import framelab.widgets as widgets_module
 from framelab.widgets import HistogramWidget, MATPLOTLIB_AVAILABLE
 
 
@@ -118,6 +119,90 @@ def test_histogram_layout_updates_after_widget_shrinks(qapp) -> None:
     tight_bbox = widget._axes.get_tightbbox(renderer)
     assert float(widget._figure.subplotpars.left) > wide_left
     assert float(tight_bbox.x0) >= -1.0
+    widget.deleteLater()
+
+
+def test_histogram_widget_uses_backend_counter_for_exact_histogram(
+    qapp,
+    monkeypatch,
+) -> None:
+    widget = HistogramWidget()
+    calls: list[dict[str, object]] = []
+
+    def _fake_compute_histogram(image, **kwargs):
+        calls.append(
+            {
+                "shape": tuple(np.asarray(image).shape),
+                "value_range": tuple(kwargs["value_range"]),
+                "bin_count": int(kwargs["bin_count"]),
+                "background": kwargs.get("background"),
+            },
+        )
+        return np.array([2, 1, 1], dtype=np.uint64)
+
+    monkeypatch.setattr(
+        widgets_module.native_backend,
+        "compute_histogram",
+        _fake_compute_histogram,
+    )
+
+    image = np.array([[0, 1], [2, 3]], dtype=np.uint16)
+    widget.set_image(image)
+    qapp.processEvents()
+
+    assert len(calls) == 1
+    assert calls[0]["shape"] == (2, 2)
+    assert calls[0]["background"] is None
+    assert int(np.asarray(widget._counts).sum()) == 4
+    widget.deleteLater()
+
+
+def test_histogram_widget_uses_backend_range_for_background_exact_histogram(
+    qapp,
+    monkeypatch,
+) -> None:
+    widget = HistogramWidget()
+    range_calls: list[dict[str, object]] = []
+    hist_calls: list[dict[str, object]] = []
+
+    monkeypatch.setattr(
+        widgets_module.native_backend,
+        "compute_value_range",
+        lambda image, **kwargs: (
+            range_calls.append(
+                {
+                    "shape": tuple(np.asarray(image).shape),
+                    "background_shape": tuple(np.asarray(kwargs["background"]).shape),
+                },
+            )
+            or (-2.0, 6.0)
+        ),
+    )
+    monkeypatch.setattr(
+        widgets_module.native_backend,
+        "compute_histogram",
+        lambda image, **kwargs: (
+            hist_calls.append(
+                {
+                    "shape": tuple(np.asarray(image).shape),
+                    "background_shape": tuple(np.asarray(kwargs["background"]).shape),
+                    "value_range": tuple(kwargs["value_range"]),
+                },
+            )
+            or np.array([1, 2, 1], dtype=np.uint64)
+        ),
+    )
+
+    image = np.array([[2, 4], [6, 8]], dtype=np.uint16)
+    background = np.array([[1, 1], [1, 1]], dtype=np.uint16)
+    widget.set_image(image, background=background)
+    qapp.processEvents()
+
+    assert len(range_calls) == 1
+    assert len(hist_calls) == 1
+    assert hist_calls[0]["value_range"] == (-2.0, 6.0)
+    assert np.asarray(widget._edges)[0] == pytest.approx(-2.0)
+    assert np.asarray(widget._edges)[-1] == pytest.approx(6.0)
     widget.deleteLater()
 
 

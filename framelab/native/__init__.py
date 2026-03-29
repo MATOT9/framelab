@@ -3,7 +3,10 @@
 from .backend import (
     NativeBackendUnavailable,
     active_metrics_backend,
+    apply_background_f32,
+    backend_status_snapshot,
     consume_backend_status_notice,
+    compute_histogram,
     compute_dynamic_metrics,
     compute_roi_metrics,
     compute_static_metrics,
@@ -16,7 +19,10 @@ from .backend import (
 __all__ = [
     "NativeBackendUnavailable",
     "active_metrics_backend",
+    "apply_background_f32",
+    "backend_status_snapshot",
     "consume_backend_status_notice",
+    "compute_histogram",
     "compute_dynamic_metrics",
     "compute_roi_metrics",
     "compute_static_metrics",

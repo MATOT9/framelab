@@ -11,6 +11,7 @@ from PySide6.QtCore import Qt, QPoint, QPointF, QRect, QRectF, QSize, Signal
 from .mpl_canvas import FigureCanvasQTAgg
 from .mpl_config import ensure_matplotlib_config_dir
 from .mpl_layout import adjust_single_axes_layout
+from .native import backend as native_backend
 
 ensure_matplotlib_config_dir()
 
@@ -1104,6 +1105,8 @@ class HistogramWidget(qtw.QWidget):
         self._x_max = 1.0
         self._theme_mode = "light"
         self._pending_image: Optional[np.ndarray] = None
+        self._pending_background: Optional[np.ndarray] = None
+        self._pending_clip_negative = True
         self._view_limits: Optional[tuple[float, float, float, float]] = None
         self._log_scale_y = False
         self._exact_refresh_suppressed = False
@@ -1199,6 +1202,7 @@ class HistogramWidget(qtw.QWidget):
         """Clear current histogram data and redraw empty state."""
         self._exact_timer.stop()
         self._pending_image = None
+        self._pending_background = None
         self._counts = None
         self._edges = None
         self._x_min = 0.0
@@ -1221,7 +1225,14 @@ class HistogramWidget(qtw.QWidget):
         if not requested and self._pending_image is not None:
             self._exact_timer.start()
 
-    def set_image(self, image: np.ndarray, *, exact: bool = True) -> None:
+    def set_image(
+        self,
+        image: np.ndarray,
+        *,
+        exact: bool = True,
+        background: np.ndarray | None = None,
+        clip_negative: bool = True,
+    ) -> None:
         """Build histogram data from a 2D intensity image.
 
         Parameters
@@ -1236,6 +1247,9 @@ class HistogramWidget(qtw.QWidget):
         if arr.ndim != 2 or arr.size == 0:
             self.clear_histogram()
             return
+        background_arr = None if background is None else np.asarray(background)
+        if background_arr is not None and background_arr.shape != arr.shape:
+            background_arr = None
         self._view_limits = None
         self._is_plot_panning = False
         self._is_plot_selecting = False
@@ -1245,12 +1259,22 @@ class HistogramWidget(qtw.QWidget):
         if exact or arr.size <= self._APPROXIMATE_SAMPLE_LIMIT:
             self._exact_timer.stop()
             self._pending_image = None
-            self._set_histogram_data(arr, sample_limit=None)
+            self._pending_background = None
+            self._set_histogram_data(
+                arr,
+                background=background_arr,
+                clip_negative=clip_negative,
+                sample_limit=None,
+            )
             return
 
         self._pending_image = arr
+        self._pending_background = background_arr
+        self._pending_clip_negative = bool(clip_negative)
         self._set_histogram_data(
             arr,
+            background=background_arr,
+            clip_negative=clip_negative,
             sample_limit=self._APPROXIMATE_SAMPLE_LIMIT,
         )
         if not self._exact_refresh_suppressed:
@@ -1258,36 +1282,77 @@ class HistogramWidget(qtw.QWidget):
 
     def _render_pending_image_exact(self) -> None:
         image = self._pending_image
+        background = self._pending_background
+        clip_negative = self._pending_clip_negative
         self._pending_image = None
+        self._pending_background = None
         if image is None:
             return
         if self._exact_refresh_suppressed:
             self._pending_image = image
+            self._pending_background = background
+            self._pending_clip_negative = clip_negative
             self._exact_timer.start()
             return
-        self._set_histogram_data(image, sample_limit=None)
+        self._set_histogram_data(
+            image,
+            background=background,
+            clip_negative=clip_negative,
+            sample_limit=None,
+        )
+
+    @staticmethod
+    def _sample_histogram_inputs(
+        image: np.ndarray,
+        *,
+        background: np.ndarray | None,
+        sample_limit: int | None,
+    ) -> tuple[np.ndarray, np.ndarray | None]:
+        arr = np.asarray(image)
+        flat = arr.ravel()
+        if sample_limit is None or flat.size <= sample_limit:
+            return (arr, None if background is None else np.asarray(background))
+
+        stride = max(1, int(np.ceil(float(flat.size) / float(sample_limit))))
+        sampled = flat[::stride].reshape(1, -1)
+        if background is None:
+            return (sampled, None)
+        sampled_background = np.asarray(background).ravel()[::stride].reshape(1, -1)
+        return (sampled, sampled_background)
 
     def _set_histogram_data(
         self,
         image: np.ndarray,
         *,
+        background: np.ndarray | None,
+        clip_negative: bool,
         sample_limit: int | None,
     ) -> None:
         arr = np.asarray(image)
-        flat = arr.ravel()
-        if sample_limit is not None and flat.size > sample_limit:
-            stride = max(1, int(np.ceil(float(flat.size) / float(sample_limit))))
-            flat = flat[::stride]
+        sampled_image, sampled_background = self._sample_histogram_inputs(
+            arr,
+            background=background,
+            sample_limit=sample_limit,
+        )
 
-        arrf = flat.astype(np.float64, copy=False)
-        if np.issubdtype(arrf.dtype, np.floating):
-            arrf = arrf[np.isfinite(arrf)]
-        if arrf.size == 0:
+        if sampled_background is None:
+            sampled_values = np.asarray(sampled_image).ravel().astype(np.float64, copy=False)
+            if np.issubdtype(sampled_values.dtype, np.floating):
+                sampled_values = sampled_values[np.isfinite(sampled_values)]
+            if sampled_values.size == 0:
+                self.clear_histogram()
+                return
+            data_min = float(np.min(sampled_values))
+            data_max = float(np.max(sampled_values))
+        else:
+            data_min, data_max = native_backend.compute_value_range(
+                sampled_image,
+                background=sampled_background,
+                clip_negative=clip_negative,
+            )
+        if not np.isfinite(data_min) or not np.isfinite(data_max):
             self.clear_histogram()
             return
-
-        data_min = float(np.min(arrf))
-        data_max = float(np.max(arrf))
 
         if data_max <= data_min:
             range_min = data_min - 0.5
@@ -1300,18 +1365,22 @@ class HistogramWidget(qtw.QWidget):
             if range_max <= range_min:
                 range_max = range_min + 1.0
 
-        bins = int(max(32, min(144, np.sqrt(float(arrf.size)) * 0.45)))
-        if np.issubdtype(arr.dtype, np.integer):
+        effective_size = int(np.asarray(sampled_image).size)
+        bins = int(max(32, min(144, np.sqrt(float(effective_size)) * 0.45)))
+        if sampled_background is None and np.issubdtype(arr.dtype, np.integer):
             span_int = int(round(range_max - range_min))
             if span_int > 0:
                 bins = min(bins, span_int + 1)
                 bins = max(24, bins)
 
-        counts, edges = np.histogram(
-            arrf,
-            bins=bins,
-            range=(range_min, range_max),
+        counts = native_backend.compute_histogram(
+            sampled_image,
+            value_range=(range_min, range_max),
+            bin_count=bins,
+            background=sampled_background,
+            clip_negative=clip_negative,
         )
+        edges = np.linspace(range_min, range_max, bins + 1, dtype=np.float64)
         self._counts = counts.astype(np.float64, copy=False)
         self._edges = edges.astype(np.float64, copy=False)
         self._x_min = float(range_min)

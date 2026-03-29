@@ -3,9 +3,8 @@
 
 #define FRAMELAB_NUMPY_API_IMPORT
 #include "python_bridge.h"
+#include "framelab_native/api.h"
 #include "framelab_native/common/pixel_formats.h"
-#include "framelab_native/loaders/raw_loader.h"
-#include "framelab_native/metrics/app_metrics.h"
 
 static PyObject *build_static_metrics_result(const FramelabStaticScanResult *result) {
     PyObject *tuple_obj = PyTuple_New(2);
@@ -103,6 +102,50 @@ static PyObject *build_roi_metrics_result(const FramelabRoiMetricsResult *result
     PyTuple_SET_ITEM(tuple_obj, 2, item2);
     PyTuple_SET_ITEM(tuple_obj, 3, item3);
     return tuple_obj;
+}
+
+static int parse_value_range(PyObject *obj, double *range_min, double *range_max) {
+    PyObject *seq = NULL;
+    PyObject *item0 = NULL;
+    PyObject *item1 = NULL;
+    double min_value;
+    double max_value;
+
+    if (obj == NULL || range_min == NULL || range_max == NULL) {
+        PyErr_SetString(PyExc_RuntimeError, "internal value_range argument error");
+        return 0;
+    }
+
+    seq = PySequence_Fast(obj, "value_range must be a 2-item iterable");
+    if (seq == NULL) {
+        return 0;
+    }
+    if (PySequence_Fast_GET_SIZE(seq) != 2) {
+        PyErr_SetString(PyExc_ValueError, "value_range must contain exactly 2 numbers");
+        Py_DECREF(seq);
+        return 0;
+    }
+    item0 = PySequence_Fast_GET_ITEM(seq, 0);
+    item1 = PySequence_Fast_GET_ITEM(seq, 1);
+    min_value = PyFloat_AsDouble(item0);
+    if (PyErr_Occurred()) {
+        Py_DECREF(seq);
+        return 0;
+    }
+    max_value = PyFloat_AsDouble(item1);
+    if (PyErr_Occurred()) {
+        Py_DECREF(seq);
+        return 0;
+    }
+    Py_DECREF(seq);
+
+    if (!(max_value > min_value)) {
+        PyErr_SetString(PyExc_ValueError, "value_range must contain increasing bounds");
+        return 0;
+    }
+    *range_min = min_value;
+    *range_max = max_value;
+    return 1;
 }
 
 static PyObject *py_compute_static_metrics(PyObject *self, PyObject *args) {
@@ -300,6 +343,245 @@ static PyObject *py_compute_roi_metrics(PyObject *self, PyObject *args, PyObject
     return ret;
 }
 
+static PyObject *py_apply_background_f32(PyObject *self, PyObject *args, PyObject *kwargs) {
+    static char *kwlist[] = {"image", "background", "clip_negative", NULL};
+    PyObject *image_obj = NULL;
+    PyObject *background_obj = NULL;
+    int clip_negative = 1;
+    PyArrayObject *image_array = NULL;
+    PyArrayObject *background_array = NULL;
+    FramelabImageView image_view;
+    FramelabImageView background_view;
+    FramelabBackgroundMode background_mode;
+    npy_intp dims[2];
+    PyArrayObject *out_array = NULL;
+    FramelabStatus status;
+    (void)self;
+
+    if (!PyArg_ParseTupleAndKeywords(
+            args,
+            kwargs,
+            "OO|p:apply_background_f32",
+            kwlist,
+            &image_obj,
+            &background_obj,
+            &clip_negative)) {
+        return NULL;
+    }
+    if (!framelab_py_image_view_from_object(image_obj, "image", &image_view, &image_array)) {
+        return NULL;
+    }
+    if (!framelab_py_image_view_from_object(
+            background_obj,
+            "background",
+            &background_view,
+            &background_array)) {
+        Py_DECREF(image_array);
+        return NULL;
+    }
+
+    dims[0] = (npy_intp)image_view.height;
+    dims[1] = (npy_intp)image_view.width;
+    out_array = (PyArrayObject *)PyArray_SimpleNew(2, dims, NPY_FLOAT32);
+    if (out_array == NULL) {
+        Py_DECREF(image_array);
+        Py_DECREF(background_array);
+        return NULL;
+    }
+
+    background_mode = clip_negative ? FRAMELAB_BG_SUBTRACT_CLAMP_ZERO : FRAMELAB_BG_SUBTRACT;
+    Py_BEGIN_ALLOW_THREADS
+    status = framelab_apply_background_to_f32(
+        &image_view,
+        &background_view,
+        background_mode,
+        (float *)PyArray_DATA(out_array),
+        image_view.width
+    );
+    Py_END_ALLOW_THREADS
+
+    if (status != FRAMELAB_STATUS_OK) {
+        Py_DECREF(image_array);
+        Py_DECREF(background_array);
+        Py_DECREF(out_array);
+        return framelab_py_status_error(status, "apply_background_f32 failed");
+    }
+
+    Py_DECREF(image_array);
+    Py_DECREF(background_array);
+    return (PyObject *)out_array;
+}
+
+static PyObject *py_compute_value_range(PyObject *self, PyObject *args, PyObject *kwargs) {
+    static char *kwlist[] = {"image", "background", "clip_negative", NULL};
+    PyObject *image_obj = NULL;
+    PyObject *background_obj = Py_None;
+    int clip_negative = 1;
+    PyArrayObject *image_array = NULL;
+    PyArrayObject *background_array = NULL;
+    FramelabImageView image_view;
+    FramelabImageView background_view;
+    int background_present = 0;
+    FramelabMetricsParams params;
+    FramelabMetricsResult result;
+    FramelabStatus status;
+    PyObject *ret = NULL;
+    (void)self;
+
+    if (!PyArg_ParseTupleAndKeywords(
+            args,
+            kwargs,
+            "O|Op:compute_value_range",
+            kwlist,
+            &image_obj,
+            &background_obj,
+            &clip_negative)) {
+        return NULL;
+    }
+    if (!framelab_py_image_view_from_object(image_obj, "image", &image_view, &image_array)) {
+        return NULL;
+    }
+    if (!framelab_py_optional_image_view_from_object(
+            background_obj,
+            "background",
+            &background_view,
+            &background_array,
+            &background_present)) {
+        Py_DECREF(image_array);
+        return NULL;
+    }
+
+    memset(&params, 0, sizeof(params));
+    params.image = image_view;
+    params.background = background_present ? &background_view : NULL;
+    params.background_mode = background_present
+        ? (clip_negative ? FRAMELAB_BG_SUBTRACT_CLAMP_ZERO : FRAMELAB_BG_SUBTRACT)
+        : FRAMELAB_BG_NONE;
+
+    Py_BEGIN_ALLOW_THREADS
+    status = framelab_compute_metrics(&params, &result);
+    Py_END_ALLOW_THREADS
+
+    if (status != FRAMELAB_STATUS_OK) {
+        Py_DECREF(image_array);
+        Py_XDECREF(background_array);
+        return framelab_py_status_error(status, "compute_value_range failed");
+    }
+
+    ret = Py_BuildValue("(dd)", result.min_value, result.max_value);
+    Py_DECREF(image_array);
+    Py_XDECREF(background_array);
+    return ret;
+}
+
+static PyObject *py_compute_histogram(PyObject *self, PyObject *args, PyObject *kwargs) {
+    static char *kwlist[] = {
+        "image",
+        "value_range",
+        "bin_count",
+        "background",
+        "clip_negative",
+        NULL
+    };
+    PyObject *image_obj = NULL;
+    PyObject *value_range_obj = NULL;
+    PyObject *background_obj = Py_None;
+    unsigned long bin_count = 0UL;
+    int clip_negative = 1;
+    double value_min = 0.0;
+    double value_max = 0.0;
+    PyArrayObject *image_array = NULL;
+    PyArrayObject *background_array = NULL;
+    FramelabImageView image_view;
+    FramelabImageView background_view;
+    int background_present = 0;
+    npy_intp dims[1];
+    PyArrayObject *bins_array = NULL;
+    FramelabStatus status;
+    (void)self;
+
+    if (!PyArg_ParseTupleAndKeywords(
+            args,
+            kwargs,
+            "OOk|Op:compute_histogram",
+            kwlist,
+            &image_obj,
+            &value_range_obj,
+            &bin_count,
+            &background_obj,
+            &clip_negative)) {
+        return NULL;
+    }
+    if (bin_count == 0UL || bin_count > (unsigned long)UINT32_MAX) {
+        PyErr_SetString(PyExc_ValueError, "bin_count must be a positive reasonable integer");
+        return NULL;
+    }
+    if (!parse_value_range(value_range_obj, &value_min, &value_max)) {
+        return NULL;
+    }
+    if (!framelab_py_image_view_from_object(image_obj, "image", &image_view, &image_array)) {
+        return NULL;
+    }
+    if (!framelab_py_optional_image_view_from_object(
+            background_obj,
+            "background",
+            &background_view,
+            &background_array,
+            &background_present)) {
+        Py_DECREF(image_array);
+        return NULL;
+    }
+
+    dims[0] = (npy_intp)bin_count;
+    bins_array = (PyArrayObject *)PyArray_SimpleNew(1, dims, NPY_UINT64);
+    if (bins_array == NULL) {
+        Py_DECREF(image_array);
+        Py_XDECREF(background_array);
+        return NULL;
+    }
+
+    if (background_present) {
+        FramelabMetricsParams params;
+        FramelabMetricsResult result;
+        memset(&params, 0, sizeof(params));
+        memset(&result, 0, sizeof(result));
+        params.image = image_view;
+        params.background = &background_view;
+        params.background_mode = clip_negative
+            ? FRAMELAB_BG_SUBTRACT_CLAMP_ZERO
+            : FRAMELAB_BG_SUBTRACT;
+        params.use_histogram = 1;
+        params.histogram_min = value_min;
+        params.histogram_max = value_max;
+        params.histogram_bin_count = (uint32_t)bin_count;
+        params.histogram_bins = (uint64_t *)PyArray_DATA(bins_array);
+        Py_BEGIN_ALLOW_THREADS
+        status = framelab_compute_metrics(&params, &result);
+        Py_END_ALLOW_THREADS
+    } else {
+        Py_BEGIN_ALLOW_THREADS
+        status = framelab_compute_histogram(
+            &image_view,
+            value_min,
+            value_max,
+            (uint32_t)bin_count,
+            (uint64_t *)PyArray_DATA(bins_array)
+        );
+        Py_END_ALLOW_THREADS
+    }
+
+    if (status != FRAMELAB_STATUS_OK) {
+        Py_DECREF(image_array);
+        Py_XDECREF(background_array);
+        Py_DECREF(bins_array);
+        return framelab_py_status_error(status, "compute_histogram failed");
+    }
+
+    Py_DECREF(image_array);
+    Py_XDECREF(background_array);
+    return (PyObject *)bins_array;
+}
+
 static PyObject *py_decode_raw_file(PyObject *self, PyObject *args, PyObject *kwargs) {
     static char *kwlist[] = {
         "path",
@@ -399,6 +681,30 @@ static PyMethodDef framelab_methods[] = {
         PyDoc_STR(
             "compute_roi_metrics(image, *, roi_rect, background=None, clip_negative=True)\n"
             "-> (roi_max, roi_mean, roi_std, roi_sem)"
+        )
+    },
+    {
+        "apply_background_f32",
+        (PyCFunction)py_apply_background_f32,
+        METH_VARARGS | METH_KEYWORDS,
+        PyDoc_STR(
+            "apply_background_f32(image, background, clip_negative=True) -> float32 ndarray"
+        )
+    },
+    {
+        "compute_value_range",
+        (PyCFunction)py_compute_value_range,
+        METH_VARARGS | METH_KEYWORDS,
+        PyDoc_STR(
+            "compute_value_range(image, background=None, clip_negative=True) -> (min_value, max_value)"
+        )
+    },
+    {
+        "compute_histogram",
+        (PyCFunction)py_compute_histogram,
+        METH_VARARGS | METH_KEYWORDS,
+        PyDoc_STR(
+            "compute_histogram(image, value_range, bin_count, background=None, clip_negative=True) -> uint64 ndarray"
         )
     },
     {

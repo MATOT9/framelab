@@ -89,6 +89,37 @@ def test_dynamic_metrics_use_native_when_available_and_emit_one_shot_notice(
     assert backend.consume_backend_status_notice() is None
 
 
+def test_backend_status_snapshot_reports_native_and_latched_failure(monkeypatch) -> None:
+    class _FailingNative:
+        @staticmethod
+        def compute_histogram(image, **kwargs):
+            raise RuntimeError("hist fail")
+
+    _set_backend_state(monkeypatch, _FailingNative())
+
+    initial = backend.backend_status_snapshot()
+    assert initial["native_available"] is True
+    assert initial["active_backend"] == "native"
+    assert initial["native_latched_off"] is False
+
+    result = backend.compute_histogram(
+        np.array([[1, 2], [3, 4]], dtype=np.uint16),
+        value_range=(1.0, 4.0),
+        bin_count=4,
+    )
+
+    assert int(np.sum(result)) == 4
+    snapshot = backend.backend_status_snapshot()
+    assert snapshot["native_available"] is True
+    assert snapshot["active_backend"] == "python"
+    assert snapshot["native_latched_off"] is True
+    assert "compute_histogram failed" in str(snapshot["last_fallback_reason"])
+    assert (
+        backend.consume_backend_status_notice()
+        == "Native metrics failed; using Python fallback"
+    )
+
+
 def test_dynamic_metrics_treat_roi_mode_as_none(monkeypatch) -> None:
     calls: list[dict[str, object]] = []
 
@@ -138,6 +169,96 @@ def test_roi_metrics_disable_native_after_failure_and_fall_back(monkeypatch) -> 
     assert result[3] == pytest.approx(result[2] / math.sqrt(4.0))
     assert backend.active_metrics_backend() == "python"
     assert "compute_roi_metrics failed" in str(backend.last_native_fallback_reason())
+
+
+def test_apply_background_f32_returns_float32_and_supports_force_python(
+    monkeypatch,
+) -> None:
+    class _FakeNative:
+        @staticmethod
+        def apply_background_f32(image, **kwargs):
+            return np.full_like(np.asarray(image, dtype=np.float32), 7.0)
+
+    image = np.array([[5, 6], [7, 8]], dtype=np.uint16)
+    background = np.array([[1, 2], [3, 4]], dtype=np.uint16)
+    _set_backend_state(monkeypatch, _FakeNative())
+
+    native_result = backend.apply_background_f32(
+        image,
+        background=background,
+    )
+    python_result = backend.apply_background_f32(
+        image,
+        background=background,
+        allow_native=False,
+    )
+
+    assert native_result.dtype == np.float32
+    np.testing.assert_allclose(native_result, np.full((2, 2), 7.0, dtype=np.float32))
+    np.testing.assert_allclose(
+        python_result,
+        np.array([[4.0, 4.0], [4.0, 4.0]], dtype=np.float32),
+    )
+
+
+def test_compute_histogram_uses_python_policy_but_can_force_python(monkeypatch) -> None:
+    calls: list[dict[str, object]] = []
+
+    class _FakeNative:
+        @staticmethod
+        def compute_histogram(image, **kwargs):
+            calls.append(dict(kwargs))
+            return np.array([1, 2, 3], dtype=np.uint64)
+
+        @staticmethod
+        def compute_value_range(image, **kwargs):
+            return (0.0, 5.0)
+
+    _set_backend_state(monkeypatch, _FakeNative())
+    image = np.array([[0, 1], [2, 3]], dtype=np.uint16)
+
+    native_counts = backend.compute_histogram(
+        image,
+        value_range=(0.0, 3.0),
+        bin_count=3,
+    )
+    python_counts = backend.compute_histogram(
+        image,
+        value_range=(0.0, 3.0),
+        bin_count=3,
+        allow_native=False,
+    )
+
+    assert len(calls) == 1
+    assert calls[0]["bin_count"] == 3
+    np.testing.assert_array_equal(native_counts, np.array([1, 2, 3], dtype=np.uint64))
+    np.testing.assert_array_equal(
+        python_counts,
+        np.array([1, 1, 2], dtype=np.uint64),
+    )
+
+
+def test_native_failure_stays_latched_for_subsequent_calls(monkeypatch) -> None:
+    call_count = 0
+
+    class _FlakyNative:
+        @staticmethod
+        def compute_value_range(image, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            raise RuntimeError("range boom")
+
+    _set_backend_state(monkeypatch, _FlakyNative())
+    image = np.array([[1, 2], [3, 4]], dtype=np.uint16)
+    background = np.array([[0, 0], [0, 0]], dtype=np.uint16)
+
+    first = backend.compute_value_range(image, background=background)
+    second = backend.compute_value_range(image, background=background)
+
+    assert first == pytest.approx((1.0, 4.0))
+    assert second == pytest.approx((1.0, 4.0))
+    assert call_count == 1
+    assert backend.backend_status_snapshot()["native_latched_off"] is True
 
 
 @pytest.mark.skipif(

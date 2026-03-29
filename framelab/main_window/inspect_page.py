@@ -18,6 +18,7 @@ from ..background import (
 from ..file_dialogs import choose_existing_directory, choose_open_file
 from ..formatting import format_metric_triplet
 from ..metadata import extract_path_metadata
+from ..native import backend as native_backend
 from ..processing_failures import (
     failure_reason_from_exception,
     make_processing_failure,
@@ -1200,6 +1201,30 @@ class InspectPageMixin:
             metrics.dn_per_ms_values is not None
             and np.any(np.isfinite(np.asarray(metrics.dn_per_ms_values, dtype=np.float64)))
         )
+        backend_snapshot = native_backend.backend_status_snapshot()
+        backend_active = str(backend_snapshot.get("active_backend", "python"))
+        backend_label = "Native" if backend_active == "native" else "Python"
+        backend_reason = backend_snapshot.get("last_fallback_reason")
+        if backend_active == "native":
+            backend_level = "success"
+            backend_tooltip = "Native metrics backend active for this process."
+        elif bool(backend_snapshot.get("native_latched_off")):
+            backend_level = "warning"
+            backend_tooltip = (
+                "Python fallback latched for this process."
+                + (
+                    f" Reason: {backend_reason}."
+                    if backend_reason
+                    else ""
+                )
+            )
+        else:
+            backend_level = "neutral"
+            backend_tooltip = (
+                str(backend_reason)
+                if backend_reason
+                else "Native metrics backend unavailable; using Python."
+            )
         chips = [
             ChipSpec(
                 "Dataset loaded" if has_data else "No dataset",
@@ -1217,6 +1242,11 @@ class InspectPageMixin:
             else ChipSpec(
                 "Preview active" if (self.show_image_preview or self.show_histogram_preview) else "Preview hidden",
                 level="info" if (self.show_image_preview or self.show_histogram_preview) else "neutral",
+            ),
+            ChipSpec(
+                f"Backend {backend_label}",
+                level=backend_level,
+                tooltip=backend_tooltip,
             ),
         ]
         if getattr(self, "_is_dataset_load_running", None) and self._is_dataset_load_running():
@@ -1305,6 +1335,12 @@ class InspectPageMixin:
                     "Display",
                     "Normalized" if metrics.normalize_intensity_values else "Raw DN",
                     level="info" if metrics.normalize_intensity_values else "neutral",
+                ),
+                SummaryItem(
+                    "Backend",
+                    backend_label,
+                    level=backend_level,
+                    tooltip=backend_tooltip,
                 ),
                 SummaryItem(
                     "DN/ms",

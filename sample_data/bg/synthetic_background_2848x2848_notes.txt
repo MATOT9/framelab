@@ -1,0 +1,15 @@
+Synthetic background image for subtraction tests
+Dimensions: 2848 x 2848
+Data type: uint16
+Content:
+- smooth illumination gradient
+- radial vignette
+- mild vertical/horizontal banding
+- small quadrant offsets
+- several dark Gaussian dust/shadow blobs
+- low-amplitude Gaussian pixel noise
+Min: 5247
+Max: 18793
+Mean: 15159.089
+Std: 2478.928
+Deterministic seed: 12345

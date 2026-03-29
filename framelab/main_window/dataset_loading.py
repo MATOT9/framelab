@@ -13,7 +13,6 @@ from PySide6.QtCore import QSignalBlocker, QThread, Qt
 
 from ..background import (
     BackgroundLibrary,
-    apply_background,
     canonical_exposure_key,
     select_reference,
     validate_reference_shape,
@@ -32,6 +31,7 @@ from ..processing_failures import (
     failure_reason_from_exception,
     make_processing_failure,
 )
+from ..native import backend as native_backend
 from ..workers import (
     DatasetLoadBatch,
     DatasetLoadProgress,
@@ -443,6 +443,20 @@ class DatasetLoadingMixin:
             f"{key:g} ms",
         )
 
+    def _validated_reference_for_image(
+        self,
+        image: np.ndarray,
+        path: str,
+    ) -> Optional[np.ndarray]:
+        """Return a shape-compatible background reference for one image."""
+
+        reference = self._get_reference_for_path(path)
+        if reference is None:
+            return None
+        if not validate_reference_shape(image.shape, reference.shape):
+            return None
+        return reference
+
     def _get_metric_image_by_index(
         self,
         index: int,
@@ -463,18 +477,16 @@ class DatasetLoadingMixin:
         if cached is not None:
             return (cached, True)
 
-        reference = self._get_reference_for_path(path)
+        reference = self._validated_reference_for_image(image, path)
         if reference is None:
             return (image, False)
-        if not validate_reference_shape(image.shape, reference.shape):
-            return (image, False)
 
-        corrected = apply_background(
+        corrected = native_backend.apply_background_f32(
             image,
-            reference,
+            background=reference,
             clip_negative=metrics.background_config.clip_negative,
         )
-        corrected = np.asarray(corrected, dtype=np.float32)
+        corrected = np.asarray(corrected, dtype=np.float32, order="C")
         self._cache_corrected_image(path, corrected)
         return (corrected, True)
 

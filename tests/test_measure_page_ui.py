@@ -10,6 +10,7 @@ import pytest
 from PySide6 import QtCore, QtTest, QtWidgets as qtw
 from tifffile import imwrite
 
+import framelab.main_window.inspect_page as inspect_page_module
 from framelab.ui_primitives import StatusChip
 from framelab.ui_density import VisibilityPolicy
 from framelab.ui_settings import DensityMode
@@ -247,3 +248,27 @@ def test_compact_measure_header_mirrors_low_signal_and_saturation_status(
     assert measure_window._measure_summary_strip.is_collapsed()
     assert header_levels["Saturated 1"] == "error"
     assert header_levels["Low Signal 1"] == "warning"
+
+
+def test_measure_header_shows_backend_badge_from_shared_snapshot(
+    measure_window: FrameLabWindow,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        inspect_page_module.native_backend,
+        "backend_status_snapshot",
+        lambda: {
+            "native_available": True,
+            "active_backend": "python",
+            "native_latched_off": True,
+            "last_fallback_reason": "compute_histogram failed: boom",
+        },
+    )
+
+    measure_window._refresh_measure_header_state()
+
+    header_levels = _measure_header_chip_levels(measure_window)
+    summary_values = _measure_summary_values(measure_window)
+
+    assert header_levels["Backend Python"] == "warning"
+    assert summary_values["Backend"] == "Python"

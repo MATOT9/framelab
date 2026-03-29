@@ -71,6 +71,43 @@ class MetricsRuntimeMixin:
         rgb[..., 2][hot_mask] = 0
         return rgb
 
+    @staticmethod
+    def _preview_downsample_step(
+        shape: tuple[int, ...],
+        *,
+        max_dim: int,
+    ) -> int:
+        if max_dim <= 0 or len(shape) < 2:
+            return 1
+        longest_edge = max(int(shape[0]), int(shape[1]))
+        if longest_edge <= max_dim:
+            return 1
+        return max(1, int(np.ceil(longest_edge / float(max_dim))))
+
+    def _build_fast_preview_metric_image(
+        self,
+        image: np.ndarray,
+        *,
+        reference: np.ndarray,
+    ) -> np.ndarray:
+        """Return a reduced corrected image for immediate preview refreshes."""
+
+        step = self._preview_downsample_step(
+            np.asarray(image).shape,
+            max_dim=self.PREVIEW_FAST_MAX_DIM,
+        )
+        sampled_image = image if step <= 1 else np.asarray(image)[::step, ::step]
+        sampled_reference = (
+            reference
+            if step <= 1
+            else np.asarray(reference)[::step, ::step]
+        )
+        return native_backend.apply_background_f32(
+            sampled_image,
+            background=sampled_reference,
+            clip_negative=self.metrics_state.background_config.clip_negative,
+        )
+
     def _background_signature_payload(self) -> dict[str, object]:
         """Return the stable background-input payload used for cache keys."""
 
@@ -1085,8 +1122,9 @@ class MetricsRuntimeMixin:
         ):
             return
 
-        metric_img, bg_applied = self._get_metric_image_by_index(idx)
-        if metric_img is None:
+        image_path = dataset.paths[idx]
+        raw_image = self._get_image_by_index(idx)
+        if raw_image is None:
             self.image_preview.clear_image()
             self.image_preview.set_intensity_image(None)
             self.histogram_widget.clear_histogram()
@@ -1095,21 +1133,47 @@ class MetricsRuntimeMixin:
                 self._refresh_measure_header_state()
             return
 
-        metric_arr = np.asarray(metric_img)
+        reference = None
+        if hasattr(self, "_validated_reference_for_image"):
+            reference = self._validated_reference_for_image(raw_image, image_path)
+        bg_applied = reference is not None
+
         if self.show_image_preview:
-            self.image_preview.set_rgb_image(
-                self._build_preview_rgb(
-                    metric_arr,
+            if exact_preview and bg_applied:
+                metric_img, _cached_bg_applied = self._get_metric_image_by_index(idx)
+                if metric_img is None:
+                    self.image_preview.clear_image()
+                    self.image_preview.set_intensity_image(None)
+                    self.info_label.setText("Could not build corrected preview.")
+                    return
+                preview_arr = np.asarray(metric_img)
+                preview_rgb = self._build_preview_rgb(
+                    preview_arr,
                     threshold_value=metrics.threshold_value,
-                    max_dim=(
-                        None
-                        if exact_preview
-                        else self.PREVIEW_FAST_MAX_DIM
-                    ),
-                ),
-                image_size=(int(metric_arr.shape[1]), int(metric_arr.shape[0])),
+                    max_dim=None,
+                )
+                intensity_image = preview_arr
+            else:
+                preview_arr = (
+                    self._build_fast_preview_metric_image(raw_image, reference=reference)
+                    if bg_applied
+                    else np.asarray(raw_image)
+                )
+                preview_rgb = self._build_preview_rgb(
+                    preview_arr,
+                    threshold_value=metrics.threshold_value,
+                    max_dim=None if bg_applied else self.PREVIEW_FAST_MAX_DIM,
+                )
+                intensity_image = (
+                    preview_arr
+                    if np.asarray(preview_arr).shape == np.asarray(raw_image).shape
+                    else None
+                )
+            self.image_preview.set_rgb_image(
+                preview_rgb,
+                image_size=(int(raw_image.shape[1]), int(raw_image.shape[0])),
             )
-            self.image_preview.set_intensity_image(metric_arr)
+            self.image_preview.set_intensity_image(intensity_image)
             self.image_preview.set_roi_rect(metrics.roi_rect)
         else:
             self.image_preview.clear_image()
@@ -1117,18 +1181,19 @@ class MetricsRuntimeMixin:
 
         if self.show_histogram_preview:
             self.histogram_widget.set_image(
-                metric_arr,
+                raw_image,
                 exact=(
                     exact_preview
                     and not self._is_dataset_load_running()
                     and not getattr(self, "_dataset_load_batch_applying", False)
                 ),
+                background=reference,
+                clip_negative=metrics.background_config.clip_negative,
             )
         else:
             self.histogram_widget.clear_histogram()
         self._update_average_controls()
 
-        image_path = dataset.paths[idx]
         image_name = Path(image_path).name
         info = (
             f"{image_name} | min_non_zero={int(metrics.min_non_zero[idx])} "
