@@ -18,13 +18,17 @@ from ..background import (
     validate_reference_shape,
 )
 from ..file_dialogs import choose_existing_directory
-from ..image_io import is_supported_image, read_2d_image, supported_suffixes
+from ..image_io import (
+    is_supported_image,
+    read_2d_image,
+    source_kind_for_path,
+    supported_suffixes,
+)
 from ..metadata import clear_metadata_cache
 from ..metrics_cache import (
     FileMetricIdentity,
     MetricCacheWrite,
     STATIC_METRIC_KIND,
-    build_file_metric_identity,
     static_metric_signature_hash,
 )
 from ..processing_failures import (
@@ -32,6 +36,12 @@ from ..processing_failures import (
     make_processing_failure,
 )
 from ..native import backend as native_backend
+from ..raw_decode import (
+    RawDecodeResolverContext,
+    build_image_metric_identity,
+    raw_decode_spec_fingerprint,
+    resolve_raw_decode_spec,
+)
 from ..workers import (
     DatasetLoadBatch,
     DatasetLoadProgress,
@@ -44,7 +54,58 @@ from ..workers import (
 
 
 class DatasetLoadingMixin:
-    """Dataset lifecycle helpers for TIFF discovery and image access."""
+    """Dataset lifecycle helpers for dataset discovery and image access."""
+
+    def _manual_raw_decode_overrides(self) -> dict[str, object]:
+        """Return session-local fallback RAW decode inputs from the Data page."""
+
+        getter = getattr(self, "_raw_decode_manual_overrides", None)
+        if callable(getter):
+            return dict(getter())
+        return {}
+
+    def _raw_decode_resolver_context(
+        self,
+        *,
+        path_metadata_by_path: dict[str, dict[str, object]] | None = None,
+    ) -> RawDecodeResolverContext:
+        """Build one shared RAW resolver context for image-loading call sites."""
+
+        boundary_root = (
+            self.dataset_state.scope_snapshot.root
+            if self.dataset_state.scope_snapshot.source == "workflow"
+            else None
+        )
+        return RawDecodeResolverContext(
+            path_metadata_by_path=(
+                path_metadata_by_path
+                if path_metadata_by_path is not None
+                else dict(self.dataset_state.path_metadata)
+            ),
+            scope_metadata=dict(self.dataset_state.scope_effective_metadata),
+            manual_overrides=self._manual_raw_decode_overrides(),
+            metadata_boundary_root=boundary_root,
+        )
+
+    def _image_cache_key_for_path(self, path: str | Path) -> object:
+        """Return the cache key for one image path, including RAW spec when needed."""
+
+        resolved = str(Path(path).expanduser().resolve())
+        if source_kind_for_path(resolved) != "raw":
+            return resolved
+        spec = resolve_raw_decode_spec(
+            resolved,
+            context=self._raw_decode_resolver_context(),
+        )
+        return (resolved, raw_decode_spec_fingerprint(spec))
+
+    def _corrected_image_cache_key_for_path(self, path: str | Path) -> tuple[object, int]:
+        """Return the corrected-image cache key for one path and background state."""
+
+        return (
+            self._image_cache_key_for_path(path),
+            self.metrics_state.background_signature,
+        )
 
     def _apply_dataset_load_summary_payload(
         self,
@@ -110,7 +171,7 @@ class DatasetLoadingMixin:
     def browse_folder(self) -> None:
         """Open a directory picker and trigger dataset loading."""
         initial_dir = self.folder_edit.text().strip() or str(Path.home())
-        selected = choose_existing_directory(self, "Select TIFF folder", initial_dir)
+        selected = choose_existing_directory(self, "Select image folder", initial_dir)
         if not selected:
             return
         self.folder_edit.setText(selected)
@@ -122,7 +183,7 @@ class DatasetLoadingMixin:
         *,
         apply_skip_patterns: bool = True,
     ) -> list[Path]:
-        """Recursively find TIFF files while pruning skipped paths."""
+        """Recursively find supported image files while pruning skipped paths."""
         found: list[Path] = []
         root = folder.resolve()
         pruned_dirs = 0
@@ -167,10 +228,14 @@ class DatasetLoadingMixin:
 
     def _read_2d_image(self, path: Path) -> np.ndarray:
         """Read one supported image file and coerce it to a single 2D frame."""
-        return read_2d_image(path)
+        return read_2d_image(
+            path,
+            raw_spec_resolver=resolve_raw_decode_spec,
+            raw_resolver_context=self._raw_decode_resolver_context(),
+        )
 
     def _scan_worker_count(self) -> int:
-        """Return worker count used for TIFF scanning."""
+        """Return worker count used for image scanning."""
         return dataset_scan_worker_count()
 
     @staticmethod
@@ -182,8 +247,11 @@ class DatasetLoadingMixin:
         self,
         path: Path,
     ) -> tuple[Optional[tuple[str, int, int]], tuple[object, ...]]:
-        """Read a single TIFF and derive quick static metrics."""
-        return scan_single_static_image(path)
+        """Read a single image and derive quick static metrics."""
+        return scan_single_static_image(
+            path,
+            raw_resolver_context=self._raw_decode_resolver_context(),
+        )
 
     def _scan_tiffs_chunked_parallel(
         self,
@@ -192,7 +260,7 @@ class DatasetLoadingMixin:
         update_status: bool = False,
         dataset_root: Path | None = None,
     ) -> tuple[list[str], list[int], list[int], int, list[object]]:
-        """Scan TIFF files in chunks and preserve source order."""
+        """Scan image files in chunks and preserve source order."""
         if not files:
             return ([], [], [], 0, [])
 
@@ -285,7 +353,7 @@ class DatasetLoadingMixin:
 
                     if update_status:
                         self.statusBar().showMessage(
-                            f"Scanning TIFFs... {processed}/{len(files)}"
+                            f"Scanning images... {processed}/{len(files)}"
                         )
 
         if cache is not None and cache_writes:
@@ -348,12 +416,13 @@ class DatasetLoadingMixin:
             if not candidate.exists():
                 continue
             try:
-                identity = build_file_metric_identity(
+                identity = build_image_metric_identity(
                     candidate,
                     dataset_root=context["dataset_root"],
                     workspace_root=context["workspace_root"],
+                    raw_resolver_context=self._raw_decode_resolver_context(),
                 )
-            except OSError:
+            except Exception:
                 continue
             identities[str(candidate.resolve())] = identity
         return identities
@@ -374,7 +443,7 @@ class DatasetLoadingMixin:
 
     def _cache_image(self, path: str, image: np.ndarray) -> None:
         """Store one raw image under the configured byte budget."""
-        self._image_cache.put(path, image)
+        self._image_cache.put(self._image_cache_key_for_path(path), image)
 
     def _cache_corrected_image(
         self,
@@ -382,7 +451,7 @@ class DatasetLoadingMixin:
         image: np.ndarray,
     ) -> None:
         """Cache a background-corrected image for the active signature."""
-        key = (path, self.metrics_state.background_signature)
+        key = self._corrected_image_cache_key_for_path(path)
         self._corrected_cache.put(key, image)
 
     def _get_image_by_index(self, index: int) -> Optional[np.ndarray]:
@@ -391,7 +460,22 @@ class DatasetLoadingMixin:
         if not (0 <= index < dataset.path_count()):
             return None
         path = dataset.paths[index]
-        cached = self._image_cache.get(path)
+        try:
+            cache_key = self._image_cache_key_for_path(path)
+        except Exception as exc:
+            if hasattr(self, "_record_processing_failures"):
+                self._record_processing_failures(
+                    [
+                        make_processing_failure(
+                            stage="preview",
+                            path=path,
+                            reason=failure_reason_from_exception(exc),
+                        ),
+                    ],
+                    replace_stage="preview",
+                )
+            return None
+        cached = self._image_cache.get(cache_key)
         if cached is not None:
             return cached
 
@@ -411,7 +495,7 @@ class DatasetLoadingMixin:
                 )
             return None
 
-        self._cache_image(path, img)
+        self._image_cache.put(cache_key, img)
         return img
 
     def _get_reference_for_path(self, path: str) -> Optional[np.ndarray]:
@@ -472,7 +556,7 @@ class DatasetLoadingMixin:
             return (image, False)
 
         path = self.dataset_state.paths[index]
-        cache_key = (path, metrics.background_signature)
+        cache_key = self._corrected_image_cache_key_for_path(path)
         cached = self._corrected_cache.get(cache_key)
         if cached is not None:
             return (cached, True)
@@ -487,7 +571,7 @@ class DatasetLoadingMixin:
             clip_negative=metrics.background_config.clip_negative,
         )
         corrected = np.asarray(corrected, dtype=np.float32, order="C")
-        self._cache_corrected_image(path, corrected)
+        self._corrected_cache.put(cache_key, corrected)
         return (corrected, True)
 
     def _reset_roi_metrics(self) -> None:
@@ -671,6 +755,8 @@ class DatasetLoadingMixin:
                 if metadata_boundary_root is not None
                 else None
             ),
+            scope_effective_metadata=dict(self.dataset_state.scope_effective_metadata),
+            raw_manual_overrides=self._manual_raw_decode_overrides(),
             cache_path=str(self.metrics_cache.path),
             workspace_root=(
                 str(self.workflow_state_controller.workspace_root)
@@ -704,7 +790,7 @@ class DatasetLoadingMixin:
             active=True,
             processed=0,
             total=0,
-            message="Discovering TIFF files...",
+            message="Discovering image files...",
         )
         thread.start()
         return job_id
@@ -778,9 +864,12 @@ class DatasetLoadingMixin:
             self._refresh_table(update_analysis=False)
             self._update_metadata_source_options(False)
             suffix_text = "/".join(supported_suffixes())
-            msg = f"No {suffix_text} files found."
+            msg = f"No supported image files ({suffix_text}) found."
             if self.skip_patterns:
-                msg = f"No {suffix_text} files found after applying skip patterns."
+                msg = (
+                    f"No supported image files ({suffix_text}) found after applying "
+                    "skip patterns."
+                )
                 details: list[str] = []
                 if self._last_scan_pruned_dirs > 0:
                     details.append(f"{self._last_scan_pruned_dirs} folders pruned")
@@ -789,7 +878,7 @@ class DatasetLoadingMixin:
                 if details:
                     msg += f"\n({', '.join(details)})"
             self.base_status = "Select a folder."
-            self._show_info("No TIFF files", msg)
+            self._show_info("No image files", msg)
             self._run_dataset_load_callbacks(summary)
             self.datasetLoadCompleted.emit(summary)
             return
@@ -803,7 +892,7 @@ class DatasetLoadingMixin:
             self._update_metadata_source_options(False)
             self.base_status = "Load failed"
             self._clear_image_cache()
-            self._show_error("Load failed", "No readable 2D TIFF images.")
+            self._show_error("Load failed", "No readable 2D image files.")
             self._run_dataset_load_callbacks(summary)
             self.datasetLoadCompleted.emit(summary)
             return

@@ -273,6 +273,44 @@ def test_scan_single_static_image_uses_backend_wrapper(
     assert result == (path, 7, 99)
 
 
+def test_scan_single_static_image_marks_raw_source_kind_and_uses_shared_resolver(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    path = tmp_path / "img.raw"
+    path.write_bytes(b"\x00" * 16)
+    read_calls: list[dict[str, object]] = []
+
+    def _fake_read(path_arg, **kwargs):
+        read_calls.append(
+            {
+                "path": str(path_arg),
+                "raw_spec_resolver": kwargs.get("raw_spec_resolver"),
+                "raw_resolver_context": kwargs.get("raw_resolver_context"),
+            },
+        )
+        return np.array([[1, 2], [3, 4]], dtype=np.uint16)
+
+    def _fake_static_metrics(image, **kwargs):
+        _ = image
+        assert kwargs["source_kind"] == "raw"
+        return (5, 123)
+
+    monkeypatch.setattr(workers_module, "read_2d_image", _fake_read)
+    monkeypatch.setattr(
+        workers_module.native_backend,
+        "compute_static_metrics",
+        _fake_static_metrics,
+    )
+
+    result, failures = workers_module.scan_single_static_image(path)
+
+    assert failures == ()
+    assert result == (str(path), 5, 123)
+    assert len(read_calls) == 1
+    assert read_calls[0]["raw_spec_resolver"] is workers_module.resolve_raw_decode_spec
+
+
 def test_dynamic_worker_uses_backend_wrapper(
     qapp,
     write_tiff,
@@ -316,6 +354,61 @@ def test_dynamic_worker_uses_backend_wrapper(
     np.testing.assert_allclose(result.avg_topk, np.array([11.5]))
     np.testing.assert_allclose(result.avg_topk_std, np.array([1.25]))
     np.testing.assert_allclose(result.avg_topk_sem, np.array([0.625]))
+
+
+def test_dynamic_worker_marks_raw_source_kind_and_uses_shared_resolver(
+    qapp,
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    path = tmp_path / "img.raw"
+    path.write_bytes(b"\x00" * 16)
+    read_calls: list[dict[str, object]] = []
+    compute_calls: list[dict[str, object]] = []
+
+    def _fake_read(path_arg, **kwargs):
+        read_calls.append(
+            {
+                "path": str(path_arg),
+                "raw_spec_resolver": kwargs.get("raw_spec_resolver"),
+                "raw_resolver_context": kwargs.get("raw_resolver_context"),
+            },
+        )
+        return np.array([[10, 20], [30, 40]], dtype=np.uint16)
+
+    def _fake_compute(image, **kwargs):
+        _ = image
+        compute_calls.append(dict(kwargs))
+        return {
+            "sat_count": 2,
+            "min_non_zero": 10,
+            "max_pixel": 40,
+            "avg_topk": 35.0,
+            "avg_topk_std": 5.0,
+            "avg_topk_sem": 5.0,
+        }
+
+    monkeypatch.setattr(workers_module, "read_2d_image", _fake_read)
+    monkeypatch.setattr(
+        workers_module.native_backend,
+        "compute_dynamic_metrics",
+        _fake_compute,
+    )
+
+    worker = DynamicStatsWorker(
+        job_id=59,
+        paths=[str(path)],
+        threshold_value=25,
+        mode="topk",
+        avg_count_value=2,
+    )
+    result = _run_dynamic_worker(worker)
+
+    assert len(read_calls) == 1
+    assert read_calls[0]["raw_spec_resolver"] is workers_module.resolve_raw_decode_spec
+    assert len(compute_calls) == 1
+    assert compute_calls[0]["source_kind"] == "raw"
+    np.testing.assert_array_equal(result.max_pixels, np.array([40], dtype=np.int64))
 
 
 def test_roi_worker_computes_mean_std_and_sem(qapp, write_tiff) -> None:

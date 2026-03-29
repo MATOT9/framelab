@@ -5,11 +5,16 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable
 
+from .native import backend as native_backend
+from .raw_decode import RawDecodeResolverContext, RawDecodeSpecError
+
 if TYPE_CHECKING:
     import numpy as np
+    from .raw_decode import RawDecodeSpec
 
 
-SUPPORTED_IMAGE_SUFFIXES = (".tif", ".tiff")
+SUPPORTED_IMAGE_SUFFIXES = (".tif", ".tiff", ".raw")
+_TIFF_SUFFIXES = (".tif", ".tiff")
 _SUFFIX_READER: dict[str, Callable[[Path], object]] = {}
 
 
@@ -33,7 +38,7 @@ def _read_tiff(path: Path) -> object:
     return np.asarray(tifffile.imread(str(path)))
 
 
-for _suffix in SUPPORTED_IMAGE_SUFFIXES:
+for _suffix in _TIFF_SUFFIXES:
     _SUFFIX_READER[_suffix] = _read_tiff
 
 
@@ -42,15 +47,48 @@ def supported_suffixes() -> tuple[str, ...]:
     return SUPPORTED_IMAGE_SUFFIXES
 
 
+def source_kind_for_path(path: str | Path) -> str:
+    """Return the normalized source kind for one supported image path."""
+
+    suffix = Path(path).suffix.lower()
+    if suffix == ".raw":
+        return "raw"
+    if suffix in {".tif", ".tiff"}:
+        return "tiff"
+    return "unknown"
+
+
 def is_supported_image(path: str | Path) -> bool:
     """Return whether the given path is supported by the shared image loader."""
-    return Path(path).suffix.lower() in _SUFFIX_READER
+    suffix = Path(path).suffix.lower()
+    return suffix in SUPPORTED_IMAGE_SUFFIXES
 
 
-def read_image(path: str | Path) -> object:
+def read_image(
+    path: str | Path,
+    *,
+    raw_spec_resolver: Callable[..., RawDecodeSpec] | None = None,
+    raw_resolver_context: RawDecodeResolverContext | None = None,
+) -> object:
     """Read one supported image file from disk."""
     resolved = Path(path)
-    reader = _SUFFIX_READER.get(resolved.suffix.lower())
+    suffix = resolved.suffix.lower()
+    if suffix == ".raw":
+        if raw_spec_resolver is None:
+            raise InvalidImageError(
+                "RAW decode spec resolver required for .raw image loading",
+            )
+        try:
+            spec = raw_spec_resolver(resolved, context=raw_resolver_context)
+            return native_backend.decode_raw_file(resolved, spec=spec)
+        except (RawDecodeSpecError, ValueError) as exc:
+            raise InvalidImageError(str(exc)) from exc
+        except ImageIoError:
+            raise
+        except Exception as exc:
+            raise InvalidImageError(str(exc)) from exc
+
+    reader = _SUFFIX_READER.get(suffix)
     if reader is None:
         supported = ", ".join(SUPPORTED_IMAGE_SUFFIXES)
         raise UnsupportedImageFormatError(
@@ -65,11 +103,22 @@ def read_image(path: str | Path) -> object:
         raise InvalidImageError(str(exc)) from exc
 
 
-def read_2d_image(path: str | Path) -> np.ndarray:
+def read_2d_image(
+    path: str | Path,
+    *,
+    raw_spec_resolver: Callable[..., RawDecodeSpec] | None = None,
+    raw_resolver_context: RawDecodeResolverContext | None = None,
+) -> np.ndarray:
     """Read one supported image file and coerce it to a single 2D frame."""
     import numpy as np
 
-    arr = np.asarray(read_image(path))
+    arr = np.asarray(
+        read_image(
+            path,
+            raw_spec_resolver=raw_spec_resolver,
+            raw_resolver_context=raw_resolver_context,
+        ),
+    )
     arr = np.squeeze(arr)
     while arr.ndim > 2:
         arr = arr[0]

@@ -136,6 +136,7 @@ def build_file_metric_identity(
     dataset_root: str | Path | None = None,
     workspace_root: str | Path | None = None,
     app_root: str | Path | None = None,
+    extra_fingerprint: object | None = None,
 ) -> FileMetricIdentity:
     """Build a portable file fingerprint from relative path, size, and mtime."""
 
@@ -152,6 +153,7 @@ def build_file_metric_identity(
             "relative_path": relative_path,
             "size_bytes": int(stat.st_size),
             "mtime_ns": int(stat.st_mtime_ns),
+            "extra": extra_fingerprint,
         },
     )
     return FileMetricIdentity(

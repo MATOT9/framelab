@@ -216,10 +216,10 @@ class FrameLabWindow(
         self._page_plugin_manifests: dict[str, list[PluginManifest]] = {
             page: [] for page in PAGE_IDS
         }
-        self._image_cache = ByteBudgetCache[str](
+        self._image_cache = ByteBudgetCache[object](
             self.RAW_IMAGE_CACHE_BUDGET_BYTES,
         )
-        self._corrected_cache = ByteBudgetCache[tuple[str, int]](
+        self._corrected_cache = ByteBudgetCache[tuple[object, int]](
             self.CORRECTED_IMAGE_CACHE_BUDGET_BYTES,
         )
         self.workspace_document_store = WorkspaceDocumentStore()

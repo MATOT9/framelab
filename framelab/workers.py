@@ -18,14 +18,13 @@ from .background import (
     select_reference,
     validate_reference_shape,
 )
-from .image_io import is_supported_image, read_2d_image
+from .image_io import is_supported_image, read_2d_image, source_kind_for_path
 from .metadata import extract_path_metadata
 from .metrics_cache import (
     FileMetricIdentity,
     MetricCacheWrite,
     MetricsCache,
     STATIC_METRIC_KIND,
-    build_file_metric_identity,
     static_metric_signature_hash,
 )
 from .metrics_state import DynamicStatsResult, RoiApplyResult
@@ -35,6 +34,11 @@ from .processing_failures import (
     make_processing_failure,
 )
 from .native import backend as native_backend
+from .raw_decode import (
+    RawDecodeResolverContext,
+    build_image_metric_identity,
+    resolve_raw_decode_spec,
+)
 from .roi_utils import normalize_roi_rect_like_numpy
 
 
@@ -175,7 +179,7 @@ def _find_supported_images(
 
 
 def dataset_scan_worker_count() -> int:
-    """Return a conservative worker count for large TIFF scans."""
+    """Return a conservative worker count for large image scans."""
 
     cpu = os.cpu_count() or 4
     return min(4, max(2, cpu // 4))
@@ -193,12 +197,18 @@ def dataset_scan_chunk_size(total_files: int) -> int:
 
 def scan_single_static_image(
     path: Path | str,
+    *,
+    raw_resolver_context: RawDecodeResolverContext | None = None,
 ) -> tuple[tuple[str, int, int] | None, tuple[ProcessingFailure, ...]]:
     """Read one image and compute quick static metrics."""
 
     source_path = Path(path)
     try:
-        image = read_2d_image(source_path)
+        image = read_2d_image(
+            source_path,
+            raw_spec_resolver=resolve_raw_decode_spec,
+            raw_resolver_context=raw_resolver_context,
+        )
     except Exception as exc:
         return (
             None,
@@ -213,7 +223,7 @@ def scan_single_static_image(
 
     min_non_zero, max_pixel = native_backend.compute_static_metrics(
         image,
-        source_kind="tiff",
+        source_kind=source_kind_for_path(source_path),
     )
     return ((str(source_path), min_non_zero, max_pixel), ())
 
@@ -238,6 +248,7 @@ class DynamicStatsWorker(QObject):
         background_config: Optional[BackgroundConfig] = None,
         background_library: Optional[BackgroundLibrary] = None,
         path_metadata: Optional[dict[str, dict[str, object]]] = None,
+        raw_resolver_context: RawDecodeResolverContext | None = None,
         existing_sat_counts: Optional[np.ndarray] = None,
         existing_avg_topk: Optional[np.ndarray] = None,
         existing_avg_topk_std: Optional[np.ndarray] = None,
@@ -264,6 +275,7 @@ class DynamicStatsWorker(QObject):
         self._background_config = background_config
         self._background_library = background_library
         self._path_metadata = path_metadata or {}
+        self._raw_resolver_context = raw_resolver_context
         self._existing_sat_counts = existing_sat_counts
         self._existing_avg_topk = existing_avg_topk
         self._existing_avg_topk_std = existing_avg_topk_std
@@ -412,7 +424,11 @@ class DynamicStatsWorker(QObject):
                 if thread.isInterruptionRequested():
                     return
                 try:
-                    img = read_2d_image(path)
+                    img = read_2d_image(
+                        path,
+                        raw_spec_resolver=resolve_raw_decode_spec,
+                        raw_resolver_context=self._raw_resolver_context,
+                    )
                 except Exception as exc:
                     failures.append(
                         make_processing_failure(
@@ -438,7 +454,7 @@ class DynamicStatsWorker(QObject):
                         background=background_img,
                         clip_negative=clip_negative,
                         threshold_only=threshold_only,
-                        source_kind="tiff",
+                        source_kind=source_kind_for_path(path),
                     )
                 except Exception as exc:
                     failures.append(
@@ -503,6 +519,7 @@ class RoiApplyWorker(QObject):
         background_config: Optional[BackgroundConfig] = None,
         background_library: Optional[BackgroundLibrary] = None,
         path_metadata: Optional[dict[str, dict[str, object]]] = None,
+        raw_resolver_context: RawDecodeResolverContext | None = None,
         existing_maxs: Optional[np.ndarray] = None,
         existing_means: Optional[np.ndarray] = None,
         existing_stds: Optional[np.ndarray] = None,
@@ -521,6 +538,7 @@ class RoiApplyWorker(QObject):
         self._background_config = background_config
         self._background_library = background_library
         self._path_metadata = path_metadata or {}
+        self._raw_resolver_context = raw_resolver_context
         self._existing_maxs = existing_maxs
         self._existing_means = existing_means
         self._existing_stds = existing_stds
@@ -591,7 +609,11 @@ class RoiApplyWorker(QObject):
                     return
 
                 try:
-                    img = read_2d_image(path)
+                    img = read_2d_image(
+                        path,
+                        raw_spec_resolver=resolve_raw_decode_spec,
+                        raw_resolver_context=self._raw_resolver_context,
+                    )
                 except Exception as exc:
                     failures.append(
                         make_processing_failure(
@@ -689,6 +711,8 @@ class DatasetLoadWorker(QObject):
         skip_patterns: tuple[str, ...] = (),
         metadata_source: str = "json",
         metadata_boundary_root: str | None = None,
+        scope_effective_metadata: dict[str, object] | None = None,
+        raw_manual_overrides: dict[str, object] | None = None,
         cache_path: str | None = None,
         workspace_root: str | None = None,
     ) -> None:
@@ -706,6 +730,8 @@ class DatasetLoadWorker(QObject):
             if metadata_boundary_root
             else None
         )
+        self._scope_effective_metadata = dict(scope_effective_metadata or {})
+        self._raw_manual_overrides = dict(raw_manual_overrides or {})
         self._cache_path = str(cache_path).strip() or None
         self._workspace_root = (
             Path(workspace_root).expanduser().resolve()
@@ -739,15 +765,25 @@ class DatasetLoadWorker(QObject):
         identities: dict[str, FileMetricIdentity] = {}
         for path in paths:
             try:
-                identity = build_file_metric_identity(
+                identity = build_image_metric_identity(
                     path,
                     dataset_root=dataset_root,
                     workspace_root=self._workspace_root,
+                    raw_resolver_context=self._raw_resolver_context(),
                 )
-            except OSError:
+            except Exception:
                 continue
             identities[str(path.resolve())] = identity
         return identities
+
+    def _raw_resolver_context(self) -> RawDecodeResolverContext:
+        """Return the shared RAW spec resolution inputs for this load job."""
+
+        return RawDecodeResolverContext(
+            scope_metadata=self._scope_effective_metadata,
+            manual_overrides=self._raw_manual_overrides,
+            metadata_boundary_root=self._metadata_boundary_root,
+        )
 
     def run(self) -> None:
         """Discover, statically scan, and emit dataset rows in ordered batches."""
@@ -767,7 +803,7 @@ class DatasetLoadWorker(QObject):
                 phase="discover",
                 processed=0,
                 total=0,
-                message="Discovering TIFF files...",
+                message="Discovering image files...",
             )
             files, pruned_dirs, skipped_files = _find_supported_images(
                 folder,
@@ -859,12 +895,17 @@ class DatasetLoadWorker(QObject):
                     if uncached_paths:
                         if executor is None:
                             for path in uncached_paths:
-                                computed_results[str(path.resolve())] = (
-                                    scan_single_static_image(path)
+                                computed_results[str(path.resolve())] = scan_single_static_image(
+                                    path,
+                                    raw_resolver_context=self._raw_resolver_context(),
                                 )
                         else:
                             future_to_path = {
-                                executor.submit(scan_single_static_image, path): path
+                                executor.submit(
+                                    scan_single_static_image,
+                                    path,
+                                    raw_resolver_context=self._raw_resolver_context(),
+                                ): path
                                 for path in uncached_paths
                             }
                             for future in as_completed(future_to_path):

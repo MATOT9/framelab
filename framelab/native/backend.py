@@ -28,6 +28,7 @@ from ..metric_reducers import (
     compute_topk_stats_inplace,
     count_at_or_above_threshold,
 )
+from ..raw_decode import RawDecodeSpec, validate_raw_decode_spec
 from ..roi_utils import normalize_roi_rect_like_numpy
 
 
@@ -663,19 +664,38 @@ def compute_histogram(
 def decode_raw_file(
     path: str,
     *,
-    pixel_format: str,
-    width: int,
-    height: int,
+    pixel_format: str | None = None,
+    width: int | None = None,
+    height: int | None = None,
     stride_bytes: int = 0,
     offset_bytes: int = 0,
+    spec: RawDecodeSpec | None = None,
 ):
     """Decode one raw image through the native backend and return a uint16 ndarray."""
 
+    if spec is not None:
+        if pixel_format is not None or width is not None or height is not None:
+            raise ValueError(
+                "Provide either spec=RawDecodeSpec or explicit decode fields, not both",
+            )
+        validated = validate_raw_decode_spec(spec)
+    else:
+        validated = validate_raw_decode_spec(
+            RawDecodeSpec(
+                source_kind="raw",
+                pixel_format=str(pixel_format or ""),
+                width=0 if width is None else int(width),
+                height=0 if height is None else int(height),
+                stride_bytes=None if int(stride_bytes) == 0 else int(stride_bytes),
+                offset_bytes=int(offset_bytes),
+            ),
+        )
+
     return require_native().decode_raw_file(
         path,
-        pixel_format,
-        width,
-        height,
-        stride_bytes=stride_bytes,
-        offset_bytes=offset_bytes,
+        validated.pixel_format,
+        validated.width,
+        validated.height,
+        stride_bytes=0 if validated.stride_bytes is None else validated.stride_bytes,
+        offset_bytes=validated.offset_bytes,
     )

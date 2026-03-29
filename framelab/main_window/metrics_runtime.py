@@ -540,6 +540,9 @@ class MetricsRuntimeMixin:
             background_config=self._background_config_snapshot(),
             background_library=self._background_library_snapshot(),
             path_metadata=dict(dataset.path_metadata),
+            raw_resolver_context=self._raw_decode_resolver_context(
+                path_metadata_by_path=dict(dataset.path_metadata),
+            ),
             existing_sat_counts=existing_sat_counts,
             existing_avg_topk=existing_avg_topk,
             existing_avg_topk_std=existing_avg_topk_std,
@@ -709,6 +712,9 @@ class MetricsRuntimeMixin:
             background_config=self._background_config_snapshot(),
             background_library=self._background_library_snapshot(),
             path_metadata=dict(dataset.path_metadata),
+            raw_resolver_context=self._raw_decode_resolver_context(
+                path_metadata_by_path=dict(dataset.path_metadata),
+            ),
             existing_maxs=existing_maxs,
             existing_means=existing_means,
             existing_stds=existing_stds,

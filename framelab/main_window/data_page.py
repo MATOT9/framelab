@@ -23,6 +23,7 @@ from ..metadata import (
 )
 from ..node_metadata import NODECARD_DIR_NAME, NODECARD_FILE_NAME
 from ..scan_settings import save_skip_patterns
+from ..raw_decode import SUPPORTED_MONO_RAW_PIXEL_FORMATS
 from ..ui_primitives import (
     ChipSpec,
     SummaryItem,
@@ -233,10 +234,10 @@ class DataPageMixin:
 
         self.folder_edit = qtw.QLineEdit()
         self.folder_edit.setPlaceholderText(
-            "Select folder containing TIFF files",
+            "Select folder containing TIFF/RAW files",
         )
         self.folder_edit.setToolTip(
-            "Root folder to scan recursively for TIFF images.",
+            "Root folder to scan recursively for supported image files.",
         )
         self.folder_edit.textChanged.connect(
             lambda text: self._refresh_ebus_config_status(
@@ -435,6 +436,69 @@ class DataPageMixin:
         )
         metadata_row.addWidget(self.metadata_source_combo)
         metadata_group_layout.addLayout(metadata_row)
+
+        raw_decode_panel = qtw.QGroupBox("RAW Decode Fallback", self.metadata_controls_body)
+        raw_decode_panel.setToolTip(
+            "Session-local fallback values used only when RAW decode metadata "
+            "cannot be resolved from structured metadata.",
+        )
+        raw_decode_layout = qtw.QGridLayout(raw_decode_panel)
+        raw_decode_layout.setContentsMargins(10, 8, 10, 8)
+        raw_decode_layout.setHorizontalSpacing(8)
+        raw_decode_layout.setVerticalSpacing(6)
+
+        self.raw_pixel_format_combo = qtw.QComboBox(raw_decode_panel)
+        self.raw_pixel_format_combo.addItem("Metadata / Auto", None)
+        for pixel_format in SUPPORTED_MONO_RAW_PIXEL_FORMATS:
+            self.raw_pixel_format_combo.addItem(pixel_format, pixel_format)
+        self.raw_pixel_format_combo.currentIndexChanged.connect(
+            lambda _index: self._on_raw_decode_override_changed(),
+        )
+        raw_decode_layout.addWidget(qtw.QLabel("Pixel Format", raw_decode_panel), 0, 0)
+        raw_decode_layout.addWidget(self.raw_pixel_format_combo, 0, 1)
+
+        self.raw_width_spin = qtw.QSpinBox(raw_decode_panel)
+        self.raw_width_spin.setRange(0, 1_000_000)
+        self.raw_width_spin.setSpecialValueText("Metadata / Auto")
+        self.raw_width_spin.valueChanged.connect(
+            lambda _value: self._on_raw_decode_override_changed(),
+        )
+        raw_decode_layout.addWidget(qtw.QLabel("Width", raw_decode_panel), 0, 2)
+        raw_decode_layout.addWidget(self.raw_width_spin, 0, 3)
+
+        self.raw_height_spin = qtw.QSpinBox(raw_decode_panel)
+        self.raw_height_spin.setRange(0, 1_000_000)
+        self.raw_height_spin.setSpecialValueText("Metadata / Auto")
+        self.raw_height_spin.valueChanged.connect(
+            lambda _value: self._on_raw_decode_override_changed(),
+        )
+        raw_decode_layout.addWidget(qtw.QLabel("Height", raw_decode_panel), 1, 0)
+        raw_decode_layout.addWidget(self.raw_height_spin, 1, 1)
+
+        self.raw_stride_spin = qtw.QSpinBox(raw_decode_panel)
+        self.raw_stride_spin.setRange(0, 10_000_000)
+        self.raw_stride_spin.setSpecialValueText("Metadata / Auto")
+        self.raw_stride_spin.valueChanged.connect(
+            lambda _value: self._on_raw_decode_override_changed(),
+        )
+        raw_decode_layout.addWidget(qtw.QLabel("Stride Bytes", raw_decode_panel), 1, 2)
+        raw_decode_layout.addWidget(self.raw_stride_spin, 1, 3)
+
+        self.raw_offset_spin = qtw.QSpinBox(raw_decode_panel)
+        self.raw_offset_spin.setRange(0, 10_000_000)
+        self.raw_offset_spin.setSpecialValueText("Metadata / Auto")
+        self.raw_offset_spin.valueChanged.connect(
+            lambda _value: self._on_raw_decode_override_changed(),
+        )
+        raw_decode_layout.addWidget(qtw.QLabel("Offset Bytes", raw_decode_panel), 2, 0)
+        raw_decode_layout.addWidget(self.raw_offset_spin, 2, 1)
+
+        self.raw_decode_hint_label = qtw.QLabel(raw_decode_panel)
+        self.raw_decode_hint_label.setObjectName("MutedLabel")
+        self.raw_decode_hint_label.setWordWrap(True)
+        raw_decode_layout.addWidget(self.raw_decode_hint_label, 2, 2, 1, 2)
+        metadata_group_layout.addWidget(raw_decode_panel)
+        self._refresh_raw_decode_override_summary()
         self._update_metadata_source_options(has_json=False)
 
         metadata_outer_layout.addWidget(self.metadata_controls_body)
@@ -861,11 +925,6 @@ class DataPageMixin:
                     level="success" if has_loaded else "neutral",
                 ),
                 SummaryItem(
-                    "Scope",
-                    dataset.scope_summary_value(),
-                    level="info" if dataset.scope_snapshot.root is not None else "neutral",
-                ),
-                SummaryItem(
                     "Metadata Source",
                     metadata_mode,
                     level=metadata_level,
@@ -1060,6 +1119,72 @@ class DataPageMixin:
         caps = self._active_plugin_capabilities()
         if caps.show_metadata_controls:
             self._set_data_advanced_row_expanded(True)
+
+    def _raw_decode_manual_overrides(self) -> dict[str, object]:
+        """Return session-local fallback RAW decode fields from the Data page."""
+
+        overrides: dict[str, object] = {}
+        combo = getattr(self, "raw_pixel_format_combo", None)
+        if combo is not None:
+            pixel_format = combo.currentData()
+            if pixel_format:
+                overrides["camera_settings.pixel_format"] = str(pixel_format)
+        for attr_name, key in (
+            ("raw_width_spin", "camera_settings.resolution_x"),
+            ("raw_height_spin", "camera_settings.resolution_y"),
+            ("raw_stride_spin", "camera_settings.stride_bytes"),
+            ("raw_offset_spin", "camera_settings.offset_bytes"),
+        ):
+            spin = getattr(self, attr_name, None)
+            if spin is None:
+                continue
+            value = int(spin.value())
+            if value > 0:
+                overrides[key] = value
+        return overrides
+
+    def _refresh_raw_decode_override_summary(self) -> None:
+        """Update compact helper text describing active RAW fallback values."""
+
+        label = getattr(self, "raw_decode_hint_label", None)
+        if label is None:
+            return
+        overrides = self._raw_decode_manual_overrides()
+        if not overrides:
+            label.setText(
+                "Structured metadata remains the primary RAW decode source. "
+                "These fallback values apply only when metadata is unresolved.",
+            )
+            return
+        preview = ", ".join(
+            f"{key.rsplit('.', 1)[-1]}={value}"
+            for key, value in overrides.items()
+        )
+        label.setText(
+            "Session-local RAW fallback values active: "
+            f"{preview}. Re-scan folder to apply them to loaded RAW datasets.",
+        )
+
+    def _on_raw_decode_override_changed(self) -> None:
+        """Handle changes to session-local RAW decode fallback inputs."""
+
+        self._refresh_raw_decode_override_summary()
+        if hasattr(self, "_clear_image_cache"):
+            self._clear_image_cache()
+        if (
+            self.dataset_state.has_loaded_data()
+            and any(
+                str(Path(path).suffix).lower() == ".raw"
+                for path in self.dataset_state.paths
+            )
+        ):
+            status_bar = self.statusBar() if hasattr(self, "statusBar") else None
+            if status_bar is not None:
+                status_bar.showMessage(
+                    "RAW decode fallback values updated. Re-scan folder to apply.",
+                    5000,
+                )
+        self._refresh_workspace_document_dirty_state()
 
     def _set_metadata_source_combo_value(self, mode: str) -> None:
         """Select a metadata-source combo entry without emitting signals."""

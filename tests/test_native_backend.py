@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 import framelab.native.backend as backend
+from framelab.raw_decode import RawDecodeSpec, RawDecodeSpecError
 
 
 pytestmark = [pytest.mark.core]
@@ -350,6 +351,98 @@ def test_histogram_native_paths_coerce_non_contiguous_inputs(monkeypatch) -> Non
         },
     ]
     np.testing.assert_array_equal(counts, np.array([1, 1, 2], dtype=np.uint64))
+
+
+def test_decode_raw_file_accepts_validated_spec_and_calls_native(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    path = tmp_path / "frame.raw"
+    path.write_bytes(b"\x00" * 16)
+    calls: list[dict[str, object]] = []
+
+    class _FakeNative:
+        @staticmethod
+        def decode_raw_file(
+            candidate,
+            pixel_format,
+            width,
+            height,
+            *,
+            stride_bytes,
+            offset_bytes,
+        ):
+            calls.append(
+                {
+                    "path": candidate,
+                    "pixel_format": pixel_format,
+                    "width": width,
+                    "height": height,
+                    "stride_bytes": stride_bytes,
+                    "offset_bytes": offset_bytes,
+                },
+            )
+            return np.arange(width * height, dtype=np.uint16).reshape(height, width)
+
+    monkeypatch.setattr(backend, "_native", _FakeNative(), raising=False)
+
+    result = backend.decode_raw_file(
+        str(path),
+        spec=RawDecodeSpec(
+            source_kind="raw",
+            pixel_format=" MONO8 ",
+            width=4,
+            height=2,
+            stride_bytes=0,
+            offset_bytes=6,
+        ),
+    )
+
+    assert calls == [
+        {
+            "path": str(path),
+            "pixel_format": "mono8",
+            "width": 4,
+            "height": 2,
+            "stride_bytes": 0,
+            "offset_bytes": 6,
+        },
+    ]
+    np.testing.assert_array_equal(result, np.arange(8, dtype=np.uint16).reshape(2, 4))
+
+
+def test_decode_raw_file_rejects_mixed_spec_and_explicit_fields(
+    tmp_path,
+) -> None:
+    path = tmp_path / "mixed.raw"
+    path.write_bytes(b"\x00" * 8)
+
+    with pytest.raises(ValueError, match="Provide either spec=RawDecodeSpec"):
+        backend.decode_raw_file(
+            str(path),
+            pixel_format="mono8",
+            width=2,
+            height=2,
+            spec=RawDecodeSpec(
+                source_kind="raw",
+                pixel_format="mono8",
+                width=2,
+                height=2,
+            ),
+        )
+
+
+def test_decode_raw_file_validates_python_side_spec_before_native(tmp_path) -> None:
+    path = tmp_path / "bad.raw"
+    path.write_bytes(b"\x00" * 8)
+
+    with pytest.raises(RawDecodeSpecError, match="Unsupported RAW pixel format"):
+        backend.decode_raw_file(
+            str(path),
+            pixel_format="rgb8",
+            width=2,
+            height=2,
+        )
     assert backend.backend_status_snapshot()["native_latched_off"] is False
 
 

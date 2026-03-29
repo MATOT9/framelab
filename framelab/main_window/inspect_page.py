@@ -1039,9 +1039,9 @@ class InspectPageMixin:
     ) -> str:
         """Update and return placeholder text for one background source input."""
         placeholder = (
-            "Folder containing background TIFF files..."
+            "Folder containing background image files..."
             if self._background_source_mode(mode) == "folder_library"
-            else "Background TIFF file..."
+            else "Background image file..."
         )
         line_edit = target
         if line_edit is None:
@@ -1270,16 +1270,14 @@ class InspectPageMixin:
                 level="warning",
             )
             if metrics.is_roi_applying
-            else ChipSpec(
-                "Preview active" if (self.show_image_preview or self.show_histogram_preview) else "Preview hidden",
-                level="info" if (self.show_image_preview or self.show_histogram_preview) else "neutral",
-            ),
+            else None,
             ChipSpec(
                 f"Backend {backend_label}",
                 level=backend_level,
                 tooltip=backend_tooltip,
             ),
         ]
+        chips = [chip for chip in chips if chip is not None]
         if getattr(self, "_is_dataset_load_running", None) and self._is_dataset_load_running():
             processed = (
                 self.measure_load_progress.value()
@@ -1341,11 +1339,6 @@ class InspectPageMixin:
                     level="success" if selection != "None" else "neutral",
                 ),
                 SummaryItem(
-                    "Scope",
-                    dataset.scope_summary_value(),
-                    level="info" if dataset.scope_snapshot.root is not None else "neutral",
-                ),
-                SummaryItem(
                     "ROI",
                     roi_text,
                     level=roi_level,
@@ -1366,12 +1359,6 @@ class InspectPageMixin:
                     "Display",
                     "Normalized" if metrics.normalize_intensity_values else "Raw DN",
                     level="info" if metrics.normalize_intensity_values else "neutral",
-                ),
-                SummaryItem(
-                    "Backend",
-                    backend_label,
-                    level=backend_level,
-                    tooltip=backend_tooltip,
                 ),
                 SummaryItem(
                     "DN/ms",
@@ -1465,13 +1452,13 @@ class InspectPageMixin:
 
         selected_path = choose_open_file(
             dialog_parent,
-            "Select background TIFF",
+            "Select background image",
             initial,
             name_filters=(
-                "TIFF files (*.tif *.tiff *.TIF *.TIFF)",
+                "Image files (*.tif *.tiff *.TIF *.TIFF *.raw *.RAW)",
                 "All files (*)",
             ),
-            selected_name_filter="TIFF files (*.tif *.tiff *.TIF *.TIFF)",
+            selected_name_filter="Image files (*.tif *.tiff *.TIF *.TIFF *.raw *.RAW)",
         )
         if not selected_path:
             return None
@@ -1488,7 +1475,7 @@ class InspectPageMixin:
         *,
         quiet: bool = False,
     ) -> bool:
-        """Load one TIFF as global background reference."""
+        """Load one image as global background reference."""
         metrics = self.metrics_state
         if not source_path.is_file():
             if hasattr(self, "_record_processing_failures"):
@@ -1505,7 +1492,7 @@ class InspectPageMixin:
             if not quiet:
                 self._show_error(
                     "Invalid background file",
-                    "Select a valid TIFF file.",
+                    "Select a valid image file.",
                 )
             return False
         try:
@@ -1528,7 +1515,7 @@ class InspectPageMixin:
             if not quiet:
                 self._show_error(
                     "Background load failed",
-                    f"Could not read background TIFF:\n{exc}",
+                    f"Could not read background image:\n{exc}",
                 )
             return False
         metrics.background_library = BackgroundLibrary(
@@ -1551,7 +1538,7 @@ class InspectPageMixin:
             if not quiet:
                 self._show_error(
                     "Invalid background folder",
-                    "Select a valid folder containing TIFF files.",
+                    "Select a valid folder containing supported image files.",
                 )
             return False
 
@@ -1559,8 +1546,8 @@ class InspectPageMixin:
         if not files:
             if not quiet:
                 self._show_error(
-                    "No TIFF files",
-                    "No TIFF background files were found in this folder.",
+                    "No image files",
+                    "No supported background image files were found in this folder.",
                 )
             return False
 

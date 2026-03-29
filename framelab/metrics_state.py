@@ -66,7 +66,7 @@ class MetricsPipelineController:
         self.bg_applied_mask: np.ndarray | None = None
         self.bg_unmatched_count = 0
         self.bg_total_count = 0
-        self.threshold_value = 4095.0
+        self.threshold_value = 65520.0
         self.low_signal_threshold_value = 0.0
         self.avg_count_value = 32
         self.stats_job_id = 0

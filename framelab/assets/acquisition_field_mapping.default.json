@@ -69,6 +69,34 @@
       "show_in_overrides": true
     },
     {
+      "key": "camera_settings.stride_bytes",
+      "label": "Stride Bytes",
+      "group": "Camera",
+      "type": "int",
+      "tooltip": "Optional RAW row stride in bytes for native decode.",
+      "ebus_label": "",
+      "ebus_managed": false,
+      "min": 0,
+      "max": null,
+      "step": 1,
+      "show_in_defaults": true,
+      "show_in_overrides": true
+    },
+    {
+      "key": "camera_settings.offset_bytes",
+      "label": "Offset Bytes",
+      "group": "Camera",
+      "type": "int",
+      "tooltip": "Optional byte offset before RAW pixel data begins.",
+      "ebus_label": "",
+      "ebus_managed": false,
+      "min": 0,
+      "max": null,
+      "step": 1,
+      "show_in_defaults": true,
+      "show_in_overrides": true
+    },
+    {
       "key": "instrument.optics.iris.position",
       "label": "Iris Position",
       "group": "Instrument",
