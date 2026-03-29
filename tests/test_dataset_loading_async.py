@@ -64,6 +64,7 @@ def test_load_folder_runs_async_and_streams_rows_progressively(
 
     assert window.dataset_state.dataset_root == dataset_root.resolve()
     assert window.dataset_state.path_count() == 8
+    assert window.table_proxy.rowCount() == 8
 
 
 def test_cancelling_dataset_load_keeps_loaded_subset(

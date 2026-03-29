@@ -385,17 +385,76 @@ class InspectPageMixin:
         header.setSectionResizeMode(10, qtw.QHeaderView.ResizeToContents)
         header.setSectionResizeMode(11, qtw.QHeaderView.ResizeToContents)
         install_large_header_resize_cursor(header)
-        selection_model = self.table.selectionModel()
-        if selection_model is not None:
-            selection_model.currentChanged.connect(
-                lambda _current, _previous: self.on_row_selected()
-            )
-            selection_model.selectionChanged.connect(
-                lambda _selected, _deselected: self.on_row_selected()
-            )
+        self._connect_measure_table_selection_model()
         layout.addWidget(self.table, 1)
         self._apply_measure_table_visibility()
         return panel
+
+    def _connect_measure_table_selection_model(self) -> None:
+        """Connect current table selection model to row-selection refresh hooks."""
+
+        selection_model = self.table.selectionModel()
+        if selection_model is None:
+            return
+        selection_model.currentChanged.connect(
+            self._on_measure_table_current_changed,
+        )
+        selection_model.selectionChanged.connect(
+            self._on_measure_table_selection_changed,
+        )
+
+    def _on_measure_table_current_changed(
+        self,
+        _current: QModelIndex,
+        _previous: QModelIndex,
+    ) -> None:
+        """Refresh preview state when the current table cell changes."""
+
+        self.on_row_selected()
+
+    def _on_measure_table_selection_changed(
+        self,
+        _selected,
+        _deselected,
+    ) -> None:
+        """Refresh preview state when the table selection changes."""
+
+        self.on_row_selected()
+
+    def _rebind_measure_table_model(self, *, prefer_proxy: bool = True) -> None:
+        """Rebind the measure table model to recover from stale Qt view state."""
+
+        if prefer_proxy:
+            self.table.setModel(self.table_proxy)
+        else:
+            self.table.setModel(self.table_model)
+            self.table_model.set_sort_indicator(-1, Qt.AscendingOrder, False)
+        self._connect_measure_table_selection_model()
+
+    def _ensure_measure_table_row_visibility(self, expected_rows: int) -> None:
+        """Repair table/proxy binding when the live view shows too few rows."""
+
+        if expected_rows <= 0:
+            return
+        if self.table_model.rowCount() != expected_rows:
+            return
+
+        active_model = self.table.model()
+        if active_model is None:
+            self._rebind_measure_table_model(prefer_proxy=True)
+            active_model = self.table.model()
+        if active_model is not None and active_model.rowCount() == expected_rows:
+            return
+
+        self._rebind_measure_table_model(prefer_proxy=True)
+        self._apply_table_sort()
+        active_model = self.table.model()
+        if active_model is not None and active_model.rowCount() == expected_rows:
+            return
+
+        # Last-resort fallback: bind the source model directly so every row
+        # remains visible even if the proxy/view stack gets stuck.
+        self._rebind_measure_table_model(prefer_proxy=False)
 
     def _source_row_from_proxy_index(
         self,
@@ -404,10 +463,13 @@ class InspectPageMixin:
         """Map proxy index to source-row index used by metric arrays."""
         if not proxy_index.isValid():
             return None
-        source_index = self.table_proxy.mapToSource(proxy_index)
-        if not source_index.isValid():
-            return None
-        row = source_index.row()
+        if self.table.model() is self.table_model:
+            row = proxy_index.row()
+        else:
+            source_index = self.table_proxy.mapToSource(proxy_index)
+            if not source_index.isValid():
+                return None
+            row = source_index.row()
         if 0 <= row < self.dataset_state.path_count():
             return row
         return None
@@ -416,23 +478,33 @@ class InspectPageMixin:
         """Select a row in the view using a source-model row index."""
         if not (0 <= source_row < self.table_model.rowCount()):
             return
-        source_index = self.table_model.index(source_row, 1)
-        proxy_index = self.table_proxy.mapFromSource(source_index)
-        if not proxy_index.isValid():
-            source_index = self.table_model.index(source_row, 0)
-            proxy_index = self.table_proxy.mapFromSource(source_index)
-        if not proxy_index.isValid():
-            return
+        if self.table.model() is self.table_model:
+            target_index = self.table_model.index(source_row, 1)
+            if not target_index.isValid():
+                target_index = self.table_model.index(source_row, 0)
+            if not target_index.isValid():
+                return
+        else:
+            source_index = self.table_model.index(source_row, 1)
+            target_index = self.table_proxy.mapFromSource(source_index)
+            if not target_index.isValid():
+                source_index = self.table_model.index(source_row, 0)
+                target_index = self.table_proxy.mapFromSource(source_index)
+            if not target_index.isValid():
+                return
         selection_model = self.table.selectionModel()
         blocker: Optional[QSignalBlocker] = None
         if selection_model is not None:
             blocker = QSignalBlocker(selection_model)
-        self.table.setCurrentIndex(proxy_index)
+        self.table.setCurrentIndex(target_index)
         if blocker is not None:
             del blocker
 
     def _apply_table_sort(self) -> None:
         """Apply active table sort state and update header indicator."""
+        if self.table.model() is self.table_model:
+            self.table_model.set_sort_indicator(-1, Qt.AscendingOrder, False)
+            return
         if self._sort_column < 0:
             self.table_proxy.sort(-1, Qt.AscendingOrder)
             self.table_model.set_sort_indicator(-1, Qt.AscendingOrder, False)
@@ -447,6 +519,8 @@ class InspectPageMixin:
     def _on_table_header_clicked(self, logical_index: int) -> None:
         """Cycle sort mode for a clicked table header section."""
         dataset = self.dataset_state
+        if self.table.model() is self.table_model:
+            self._rebind_measure_table_model(prefer_proxy=True)
         if logical_index == 0:
             self._sort_column = -1
             self._sort_order = Qt.AscendingOrder

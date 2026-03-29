@@ -576,15 +576,11 @@ class MetricsTableModel(QAbstractTableModel):
         Returns
         -------
         str
-            One of ``"reset"``, ``"append"``, or ``"updated"``.
+            One of ``"reset"`` or ``"updated"``.
         """
         row_changed = len(paths) != len(self._paths)
         path_changed = not row_changed and self._paths != paths
-        append_only = (
-            len(paths) > len(self._paths)
-            and paths[:len(self._paths)] == self._paths
-        )
-        if (row_changed or path_changed) and not append_only:
+        if row_changed or path_changed:
             self.beginResetModel()
             self._paths = paths
             self._iris_positions = iris_positions
@@ -623,12 +619,6 @@ class MetricsTableModel(QAbstractTableModel):
         old_avg_roi_sem = self._avg_roi_sem
         old_dn_per_ms = self._dn_per_ms
 
-        if append_only:
-            self.beginInsertRows(
-                QModelIndex(),
-                old_count,
-                len(paths) - 1,
-            )
         self._paths = paths
         self._iris_positions = iris_positions
         self._exposure_ms = exposure_ms
@@ -645,12 +635,10 @@ class MetricsTableModel(QAbstractTableModel):
         self._avg_roi_std = avg_roi_std
         self._avg_roi_sem = avg_roi_sem
         self._dn_per_ms = dn_per_ms
-        if append_only:
-            self.endInsertRows()
 
-        n_rows = old_count if append_only else len(self._paths)
+        n_rows = len(self._paths)
         if n_rows == 0:
-            return "append" if append_only else "updated"
+            return "updated"
 
         self._emit_changes_for_mask(
             2,
@@ -747,7 +735,7 @@ class MetricsTableModel(QAbstractTableModel):
             11,
             self._diff_mask_float(old_dn_per_ms, self._dn_per_ms, n_rows),
         )
-        return "append" if append_only else "updated"
+        return "updated"
 
 
 class MetricsSortProxyModel(QtCore.QSortFilterProxyModel):

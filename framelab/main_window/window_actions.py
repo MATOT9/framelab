@@ -10,6 +10,7 @@ from PySide6 import QtWidgets as qtw
 from PySide6.QtCore import Qt
 
 from ..file_dialogs import choose_open_file, choose_save_file
+from ..native.backend import consume_backend_status_notice
 from ..stylesheets import DARK_THEME, LIGHT_THEME
 from ..payload_utils import read_json_dict, write_json_dict
 from ..processing_failures import (
@@ -420,6 +421,9 @@ class WindowActionsMixin:
             msg += f" | Hint: {self.context_hint}"
         if warning:
             msg += f" | {warning}"
+        backend_notice = consume_backend_status_notice()
+        if backend_notice:
+            msg += f" | {backend_notice}"
         self.statusBar().showMessage(msg)
 
     def _collect_visible_table_values(

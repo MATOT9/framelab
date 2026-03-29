@@ -7,7 +7,6 @@ from pathlib import Path
 import numpy as np
 from PySide6.QtCore import QThread
 
-from ..metric_reducers import compute_roi_stats
 from ..metrics_cache import (
     DYNAMIC_METRIC_KIND,
     ROI_METRIC_KIND,
@@ -17,6 +16,7 @@ from ..metrics_cache import (
     roi_metric_signature_hash,
 )
 from ..metrics_state import DynamicStatsResult, RoiApplyResult
+from ..native import backend as native_backend
 from ..processing_failures import make_processing_failure
 from ..workers import DynamicStatsWorker, RoiApplyWorker
 
@@ -25,6 +25,12 @@ class MetricsRuntimeMixin:
     """Live metric computation and preview refresh helpers."""
 
     PREVIEW_FAST_MAX_DIM = 768
+
+    @staticmethod
+    def _dynamic_stats_mode_for_average_mode(mode: str) -> str:
+        """Map UI average mode onto the dynamic metrics worker mode."""
+
+        return "topk" if mode == "topk" else "none"
 
     @staticmethod
     def _build_preview_rgb(
@@ -81,8 +87,9 @@ class MetricsRuntimeMixin:
         """Return cache signature for the current dynamic row-metric settings."""
 
         metrics = self.metrics_state
+        normalized_mode = self._dynamic_stats_mode_for_average_mode(mode)
         return dynamic_metric_signature_hash(
-            mode=mode,
+            mode=normalized_mode,
             threshold_value=metrics.threshold_value,
             avg_count_value=metrics.avg_count_value,
             background_payload=self._background_signature_payload(),
@@ -442,7 +449,9 @@ class MetricsRuntimeMixin:
             update_kind=update_kind,
             refresh_analysis=refresh_analysis,
         )
-        mode = self._current_average_mode()
+        mode = self._dynamic_stats_mode_for_average_mode(
+            self._current_average_mode(),
+        )
         dataset = self.dataset_state
         signature_hash = self._dynamic_metric_signature_hash(mode)
         identities, cached_payloads = self._cached_dynamic_payloads(signature_hash)
@@ -940,9 +949,9 @@ class MetricsRuntimeMixin:
             dn_per_ms=metrics.dn_per_ms_values,
         )
         self._apply_table_sort()
-        self._update_table_columns()
-
         n_rows = dataset.path_count()
+        self._ensure_measure_table_row_visibility(n_rows)
+        self._update_table_columns()
         if n_rows == 0:
             dataset.set_selected_index(None)
             return
@@ -1236,15 +1245,16 @@ class MetricsRuntimeMixin:
                         float(cached_payload.get("sem", np.nan)),
                     )
 
-        metric_img, _bg_applied = self._get_metric_image_by_index(index)
-        if metric_img is None:
+        image = self._get_image_by_index(index)
+        if image is None:
             return (np.nan, np.nan, np.nan, np.nan)
 
-        x0, y0, x1, y1 = roi_rect
-        roi = metric_img[y0:y1, x0:x1]
-        if roi.size == 0:
-            return (np.nan, np.nan, np.nan, np.nan)
-        roi_max, roi_mean, roi_std, roi_sem = compute_roi_stats(roi)
+        roi_max, roi_mean, roi_std, roi_sem = native_backend.compute_roi_metrics(
+            image,
+            roi_rect=roi_rect,
+            background=self._get_reference_for_path(path),
+            clip_negative=self.metrics_state.background_config.clip_negative,
+        )
         if (
             cache is not None
             and identity is not None

@@ -4,14 +4,16 @@ import numpy as np
 import pytest
 from PySide6 import QtCore, QtWidgets as qtw
 
+import framelab.main_window.metrics_runtime as metrics_runtime_module
 from framelab.dataset_state import DatasetStateController
 from framelab.background import BackgroundConfig
 from framelab.main_window.analysis import AnalysisPageMixin
 from framelab.main_window.inspect_page import InspectPageMixin
+from framelab.main_window.metrics_runtime import MetricsRuntimeMixin
 from framelab.main_window.window_actions import WindowActionsMixin
 from framelab.metric_reducers import compute_roi_stats
 from framelab.metrics_state import MetricsPipelineController
-from framelab.models import MetricsTableModel
+from framelab.models import MetricsSortProxyModel, MetricsTableModel
 
 
 class _InspectMathHarness:
@@ -153,6 +155,36 @@ class _RoiSelectionHarness(WindowActionsMixin, InspectPageMixin):
         self.last_status = warning
 
 
+class _SingleRoiStatsHarness(MetricsRuntimeMixin):
+    _compute_roi_stats_for_index = MetricsRuntimeMixin._compute_roi_stats_for_index
+
+    def __init__(self, image: np.ndarray, *, reference: np.ndarray | None = None) -> None:
+        self.dataset_state = DatasetStateController()
+        self.metrics_state = MetricsPipelineController()
+        self.metrics_cache = None
+        self._image = np.asarray(image, dtype=np.float64)
+        self._reference = (
+            None if reference is None else np.asarray(reference, dtype=np.float64)
+        )
+        self._path = "/tmp/image-0.tiff"
+        self.dataset_state.set_loaded_dataset(None, [self._path])
+
+    def _has_loaded_data(self) -> bool:
+        return True
+
+    def _roi_metric_signature_hash(self) -> str | None:
+        return None
+
+    def _get_image_by_index(self, index: int):
+        if index != 0:
+            return None
+        return self._image
+
+    def _get_reference_for_path(self, path: str):
+        assert path == self._path
+        return self._reference
+
+
 pytestmark = [pytest.mark.fast, pytest.mark.analysis]
 
 
@@ -245,6 +277,21 @@ def test_apply_roi_rect_derives_dn_per_ms_from_raw_exposure_metadata() -> None:
     assert float(host.metrics_state.dn_per_ms_values[0]) == pytest.approx(0.8)
 
 
+def test_compute_roi_stats_for_index_uses_native_backend_wrapper(
+    monkeypatch,
+) -> None:
+    host = _SingleRoiStatsHarness(np.arange(16, dtype=np.float64).reshape(4, 4))
+    host.metrics_state.roi_rect = (1, 1, 3, 3)
+
+    monkeypatch.setattr(
+        metrics_runtime_module.native_backend,
+        "compute_roi_metrics",
+        lambda image, **kwargs: (9.0, 8.0, 7.0, 6.0),
+    )
+
+    assert host._compute_roi_stats_for_index(0) == (9.0, 8.0, 7.0, 6.0)
+
+
 def test_normalization_scale_falls_back_to_one_for_empty_or_zero_max() -> None:
     host = _InspectMathHarness()
     assert host._normalization_scale() == 1.0
@@ -313,6 +360,41 @@ def test_metrics_table_uses_distinct_low_signal_row_highlight_with_saturation_pr
 
     assert model.data(model.index(0, 0), QtCore.Qt.BackgroundRole) == model.LOW_SIGNAL_ROW_BRUSH
     assert model.data(model.index(1, 0), QtCore.Qt.BackgroundRole) == model.SATURATED_ROW_BRUSH
+
+
+def test_metrics_table_proxy_keeps_all_rows_when_dataset_grows(qapp) -> None:
+    model = MetricsTableModel()
+    proxy = MetricsSortProxyModel()
+    proxy.setSourceModel(model)
+    proxy.setDynamicSortFilter(True)
+
+    def _update(count: int) -> str:
+        return model.update_metrics(
+            paths=[f"/tmp/frame_{index:03d}.tif" for index in range(count)],
+            iris_positions=np.full(count, np.nan, dtype=np.float64),
+            exposure_ms=np.full(count, np.nan, dtype=np.float64),
+            maxs=np.zeros(count, dtype=np.int64),
+            roi_maxs=np.full(count, np.nan, dtype=np.float64),
+            min_non_zero=np.zeros(count, dtype=np.int64),
+            sat_counts=np.zeros(count, dtype=np.int64),
+            low_signal_flags=np.zeros(count, dtype=bool),
+            avg_mode="none",
+            avg_topk=None,
+            avg_topk_std=None,
+            avg_topk_sem=None,
+            avg_roi=None,
+            avg_roi_std=None,
+            avg_roi_sem=None,
+            dn_per_ms=None,
+        )
+
+    assert _update(32) == "reset"
+    assert model.rowCount() == 32
+    assert proxy.rowCount() == 32
+
+    assert _update(65) == "reset"
+    assert model.rowCount() == 65
+    assert proxy.rowCount() == 65
 
 
 def test_analysis_context_normalizes_active_metric_and_dn_per_ms_but_keeps_raw_metadata() -> None:

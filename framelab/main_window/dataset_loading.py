@@ -9,7 +9,7 @@ from typing import Optional
 
 import numpy as np
 from PySide6 import QtWidgets as qtw
-from PySide6.QtCore import QSignalBlocker, QThread
+from PySide6.QtCore import QSignalBlocker, QThread, Qt
 
 from ..background import (
     BackgroundLibrary,
@@ -45,6 +45,38 @@ from ..workers import (
 
 class DatasetLoadingMixin:
     """Dataset lifecycle helpers for TIFF discovery and image access."""
+
+    def _apply_dataset_load_summary_payload(
+        self,
+        folder: Path,
+        summary: DatasetLoadSummary,
+    ) -> None:
+        """Canonicalize loaded dataset state from the worker's final summary."""
+
+        paths = list(getattr(summary, "loaded_paths", ()) or ())
+        if not paths:
+            return
+
+        min_non_zero = getattr(summary, "min_non_zero", None)
+        max_pixels = getattr(summary, "max_pixels", None)
+        metadata_by_path = dict(getattr(summary, "metadata_by_path", {}) or {})
+        count = len(paths)
+        mins = (
+            np.asarray(min_non_zero, dtype=np.int64).copy()
+            if min_non_zero is not None and len(min_non_zero) == count
+            else np.zeros(count, dtype=np.int64)
+        )
+        maxs = (
+            np.asarray(max_pixels, dtype=np.int64).copy()
+            if max_pixels is not None and len(max_pixels) == count
+            else np.zeros(count, dtype=np.int64)
+        )
+
+        self.dataset_state.set_loaded_dataset(folder, paths)
+        self.dataset_state.update_path_metadata(metadata_by_path)
+        self.metrics_state.initialize_loaded_dataset(count)
+        self.metrics_state.min_non_zero = mins
+        self.metrics_state.maxs = maxs
 
     def unload_folder(self, *, clear_folder_edit: bool = False) -> None:
         """Clear the currently loaded dataset and reset dependent UI state."""
@@ -638,7 +670,13 @@ class DatasetLoadingMixin:
         thread = QThread(self)
         worker.moveToThread(thread)
         thread.started.connect(worker.run)
-        worker.batch_ready.connect(self._on_dataset_load_batch)
+        # Consume streamed batches synchronously on the GUI thread so the
+        # worker cannot reach `finished` and tear down before later batches
+        # have been appended into the live dataset/table state.
+        worker.batch_ready.connect(
+            self._on_dataset_load_batch,
+            Qt.BlockingQueuedConnection,
+        )
         worker.progress.connect(self._on_dataset_load_progress)
         worker.finished.connect(self._on_dataset_load_finished)
         worker.failed.connect(self._on_dataset_load_failed)
@@ -744,6 +782,8 @@ class DatasetLoadingMixin:
             self.datasetLoadCompleted.emit(summary)
             return
 
+        self._apply_dataset_load_summary_payload(folder, summary)
+
         if summary.loaded_count <= 0 or not self.dataset_state.has_loaded_data():
             self.dataset_state.clear_loaded_dataset()
             self.metrics_state.clear_dataset_state()
@@ -795,6 +835,7 @@ class DatasetLoadingMixin:
             "",
         )
         if auto_metrics:
+            self._refresh_table(update_analysis=False)
             self._apply_live_update()
         else:
             self._refresh_table(update_analysis=False)

@@ -29,4 +29,5 @@ mathjax  # Provides MathJax assets staged into the offline help bundle.
 # FrameLab currently ships as a folder-based application.
 # No extra Python build packages are required by repo scripts at this time.
 # Packages listed here are for future support
+cmake
 nuitka

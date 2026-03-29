@@ -1,0 +1,7 @@
+filename,pixel_format,width,height,stride_bytes,expected_min,expected_max,expected_nonzero_count,preview_png,notes
+mono8_scene.raw,mono8,128,96,128,0,255,4136,sample_data/previews/expected_scene.png,Same logical scene as preview.
+mono12_lsb_scene.raw,mono12_lsb,128,96,256,0,4095,4136,sample_data/previews/expected_scene.png,Same logical scene as preview.
+mono12_msb_scene.raw,mono12_msb,128,96,256,0,4095,4136,sample_data/previews/expected_scene.png,Same logical scene as preview.
+mono12p_scene.raw,mono12p,128,96,192,0,4095,4136,sample_data/previews/expected_scene.png,Same logical scene as preview.
+mono16_scene.raw,mono16,128,96,256,0,65535,4136,sample_data/previews/expected_scene.png,Same logical scene as preview.
+mono12p_scene_stride.raw,mono12p,128,96,200,0,4095,4136,sample_data/previews/expected_scene.png,Same logical scene as preview; stride variant includes 8 bytes padding per row.

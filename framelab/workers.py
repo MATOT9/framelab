@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from fnmatch import fnmatch
 import os
 from pathlib import Path
@@ -15,18 +15,11 @@ from PySide6.QtCore import QObject, QThread, Signal
 from .background import (
     BackgroundConfig,
     BackgroundLibrary,
-    apply_background,
     select_reference,
     validate_reference_shape,
 )
 from .image_io import is_supported_image, read_2d_image
 from .metadata import extract_path_metadata
-from .metric_reducers import (
-    compute_min_non_zero_and_max,
-    compute_roi_stats,
-    compute_topk_stats_inplace,
-    count_at_or_above_threshold,
-)
 from .metrics_cache import (
     FileMetricIdentity,
     MetricCacheWrite,
@@ -41,6 +34,8 @@ from .processing_failures import (
     failure_reason_from_exception,
     make_processing_failure,
 )
+from .native import backend as native_backend
+from .roi_utils import normalize_roi_rect_like_numpy
 
 
 @dataclass(frozen=True, slots=True)
@@ -76,6 +71,10 @@ class DatasetLoadSummary:
     dataset_root: str
     loaded_count: int
     total_candidates: int
+    loaded_paths: tuple[str, ...] = ()
+    min_non_zero: np.ndarray | None = None
+    max_pixels: np.ndarray | None = None
+    metadata_by_path: dict[str, dict[str, object]] = field(default_factory=dict)
     failures: tuple[ProcessingFailure, ...] = ()
     skipped_unreadable: int = 0
     pruned_dirs: int = 0
@@ -212,7 +211,7 @@ def scan_single_static_image(
             ),
         )
 
-    min_non_zero, max_pixel = compute_min_non_zero_and_max(image)
+    min_non_zero, max_pixel = native_backend.compute_static_metrics(image)
     return ((str(source_path), min_non_zero, max_pixel), ())
 
 
@@ -286,19 +285,17 @@ class DynamicStatsWorker(QObject):
             config.exposure_policy,
         )
 
-    def _metric_image(
+    def _metric_background(
         self,
         path: str,
         image: np.ndarray,
-    ) -> tuple[np.ndarray, bool]:
-        config = self._background_config
+    ) -> tuple[np.ndarray | None, bool]:
         reference = self._reference_for_path(path)
         if reference is None:
-            return (image, False)
+            return (None, False)
         if not validate_reference_shape(image.shape, reference.shape):
-            return (image, False)
-        clip_negative = True if config is None else config.clip_negative
-        return (apply_background(image, reference, clip_negative), True)
+            return (None, False)
+        return (reference, True)
 
     def run(self) -> None:
         """Compute dynamic per-image stats (threshold/top-k/static)."""
@@ -406,7 +403,6 @@ class DynamicStatsWorker(QObject):
                 avg_topk = np.full(n, np.nan, dtype=np.float64)
                 avg_topk_std = np.full(n, np.nan, dtype=np.float64)
                 avg_topk_sem = np.full(n, np.nan, dtype=np.float64)
-        threshold_mask: np.ndarray | None = None
         thread = QThread.currentThread()
         try:
             for source_index, path in zip(self._source_indices, self._paths):
@@ -425,14 +421,28 @@ class DynamicStatsWorker(QObject):
                     continue
 
                 try:
-                    metric_img, bg_applied = self._metric_image(path, img)
+                    background_img, bg_applied = self._metric_background(path, img)
+                    clip_negative = (
+                        True
+                        if self._background_config is None
+                        else self._background_config.clip_negative
+                    )
+                    metric_result = native_backend.compute_dynamic_metrics(
+                        img,
+                        threshold_value=self._threshold_value,
+                        mode=self._mode,
+                        avg_count_value=self._avg_count_value,
+                        background=background_img,
+                        clip_negative=clip_negative,
+                        threshold_only=threshold_only,
+                    )
                 except Exception as exc:
                     failures.append(
                         make_processing_failure(
                             stage="metrics",
                             path=path,
                             reason=(
-                                "Background application failed: "
+                                "Metric computation failed: "
                                 f"{failure_reason_from_exception(exc)}"
                             ),
                         ),
@@ -440,26 +450,17 @@ class DynamicStatsWorker(QObject):
                     continue
                 if not threshold_only:
                     bg_applied_mask[source_index] = bool(bg_applied)
-                    min_nz, max_px = compute_min_non_zero_and_max(metric_img)
-                    min_non_zero[source_index] = min_nz
-                    max_pixels[source_index] = max_px
-                sat_counts[source_index], threshold_mask = count_at_or_above_threshold(
-                    metric_img,
-                    self._threshold_value,
-                    scratch_mask=threshold_mask,
-                )
+                    min_non_zero[source_index] = int(metric_result["min_non_zero"])
+                    max_pixels[source_index] = int(metric_result["max_pixel"])
+                sat_counts[source_index] = int(metric_result["sat_count"])
 
                 if threshold_only or avg_topk is None:
                     continue
-                top_k_mean, top_k_std, top_k_sem = compute_topk_stats_inplace(
-                    metric_img,
-                    self._avg_count_value,
-                )
-                avg_topk[source_index] = top_k_mean
+                avg_topk[source_index] = float(metric_result["avg_topk"])
                 if avg_topk_std is not None:
-                    avg_topk_std[source_index] = top_k_std
+                    avg_topk_std[source_index] = float(metric_result["avg_topk_std"])
                 if avg_topk_sem is not None:
-                    avg_topk_sem[source_index] = top_k_sem
+                    avg_topk_sem[source_index] = float(metric_result["avg_topk_sem"])
         except Exception as exc:
             self.failed.emit(self._job_id, str(exc))
             return
@@ -537,15 +538,17 @@ class RoiApplyWorker(QObject):
             config.exposure_policy,
         )
 
-    def _metric_image(self, path: str, image: np.ndarray) -> np.ndarray:
+    def _metric_background(
+        self,
+        path: str,
+        image: np.ndarray,
+    ) -> np.ndarray | None:
         reference = self._reference_for_path(path)
-        config = self._background_config
         if reference is None:
-            return image
+            return None
         if not validate_reference_shape(image.shape, reference.shape):
-            return image
-        clip_negative = True if config is None else config.clip_negative
-        return apply_background(image, reference, clip_negative)
+            return None
+        return reference
 
     def run(self) -> None:
         """Compute ROI mean/std/stderr for each image."""
@@ -573,8 +576,6 @@ class RoiApplyWorker(QObject):
         valid_count = int(np.count_nonzero(np.isfinite(means)))
         failures = []
         thread = QThread.currentThread()
-        x0, y0, x1, y1 = self._roi_rect
-
         try:
             total = len(self._paths)
             for processed_index, (source_index, path) in enumerate(
@@ -599,28 +600,55 @@ class RoiApplyWorker(QObject):
                     continue
 
                 try:
-                    metric_img = self._metric_image(path, img)
+                    background_img = self._metric_background(path, img)
+                    clip_negative = (
+                        True
+                        if self._background_config is None
+                        else self._background_config.clip_negative
+                    )
+                    normalized_roi = normalize_roi_rect_like_numpy(
+                        self._roi_rect,
+                        img.shape,
+                    )
                 except Exception as exc:
                     failures.append(
                         make_processing_failure(
                             stage="roi",
                             path=path,
                             reason=(
-                                "Background application failed: "
+                                "ROI preparation failed: "
                                 f"{failure_reason_from_exception(exc)}"
                             ),
                         ),
                     )
                     self.progress.emit(processed_index, total)
                     continue
-                roi = metric_img[y0:y1, x0:x1]
-                if roi.size > 0:
+                try:
                     (
                         maxs[source_index],
                         means[source_index],
                         stds[source_index],
                         sems[source_index],
-                    ) = compute_roi_stats(roi)
+                    ) = native_backend.compute_roi_metrics(
+                        img,
+                        roi_rect=normalized_roi,
+                        background=background_img,
+                        clip_negative=clip_negative,
+                    )
+                except Exception as exc:
+                    failures.append(
+                        make_processing_failure(
+                            stage="roi",
+                            path=path,
+                            reason=(
+                                "ROI computation failed: "
+                                f"{failure_reason_from_exception(exc)}"
+                            ),
+                        ),
+                    )
+                    self.progress.emit(processed_index, total)
+                    continue
+                if normalized_roi[0] < normalized_roi[2] and normalized_roi[1] < normalized_roi[3]:
                     valid_count += 1
 
                 self.progress.emit(processed_index, total)
@@ -725,6 +753,10 @@ class DatasetLoadWorker(QObject):
         failures: list[ProcessingFailure] = []
         skipped_unreadable = 0
         loaded_count = 0
+        all_loaded_paths: list[str] = []
+        all_loaded_mins: list[int] = []
+        all_loaded_maxs: list[int] = []
+        all_loaded_metadata: dict[str, dict[str, object]] = {}
 
         try:
             self._emit_progress(
@@ -782,6 +814,16 @@ class DatasetLoadWorker(QObject):
                                 dataset_root=str(folder),
                                 loaded_count=loaded_count,
                                 total_candidates=total_files,
+                                loaded_paths=tuple(all_loaded_paths),
+                                min_non_zero=np.asarray(
+                                    all_loaded_mins,
+                                    dtype=np.int64,
+                                ),
+                                max_pixels=np.asarray(
+                                    all_loaded_maxs,
+                                    dtype=np.int64,
+                                ),
+                                metadata_by_path=dict(all_loaded_metadata),
                                 failures=tuple(failures),
                                 skipped_unreadable=skipped_unreadable,
                                 pruned_dirs=pruned_dirs,
@@ -892,6 +934,11 @@ class DatasetLoadWorker(QObject):
 
                     loaded_count += len(batch_paths)
                     if batch_paths:
+                        all_loaded_paths.extend(batch_paths)
+                        all_loaded_mins.extend(int(value) for value in batch_mins)
+                        all_loaded_maxs.extend(int(value) for value in batch_maxs)
+                        all_loaded_metadata.update(batch_metadata)
+                    if batch_paths:
                         self.batch_ready.emit(
                             DatasetLoadBatch(
                                 job_id=self._job_id,
@@ -923,6 +970,16 @@ class DatasetLoadWorker(QObject):
                     dataset_root=str(folder),
                     loaded_count=loaded_count,
                     total_candidates=total_files,
+                    loaded_paths=tuple(all_loaded_paths),
+                    min_non_zero=np.asarray(
+                        all_loaded_mins,
+                        dtype=np.int64,
+                    ),
+                    max_pixels=np.asarray(
+                        all_loaded_maxs,
+                        dtype=np.int64,
+                    ),
+                    metadata_by_path=dict(all_loaded_metadata),
                     failures=tuple(failures),
                     skipped_unreadable=skipped_unreadable,
                     pruned_dirs=pruned_dirs,

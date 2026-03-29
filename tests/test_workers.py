@@ -7,6 +7,7 @@ import numpy as np
 import pytest
 import tifffile
 
+import framelab.workers as workers_module
 from framelab.background import BackgroundConfig, BackgroundLibrary
 from framelab.metrics_state import DynamicStatsResult, RoiApplyResult
 from framelab.workers import DynamicStatsWorker, RoiApplyWorker
@@ -250,6 +251,68 @@ def test_dynamic_worker_fills_only_missing_source_indices(
     assert tuple(result.failures) == ()
 
 
+def test_scan_single_static_image_uses_backend_wrapper(
+    write_tiff,
+    monkeypatch,
+) -> None:
+    path = write_tiff("img.tif", np.array([[1, 2], [3, 4]], dtype=np.uint16))
+
+    monkeypatch.setattr(
+        workers_module.native_backend,
+        "compute_static_metrics",
+        lambda image, **kwargs: (7, 99),
+    )
+
+    result, failures = workers_module.scan_single_static_image(path)
+
+    assert failures == ()
+    assert result == (path, 7, 99)
+
+
+def test_dynamic_worker_uses_backend_wrapper(
+    qapp,
+    write_tiff,
+    monkeypatch,
+) -> None:
+    path = write_tiff("img.tif", np.array([[1, 2], [3, 4]], dtype=np.uint16))
+    calls: list[dict[str, object]] = []
+
+    def _fake_compute(image, **kwargs):
+        calls.append(dict(kwargs))
+        return {
+            "sat_count": 13,
+            "min_non_zero": 5,
+            "max_pixel": 42,
+            "avg_topk": 11.5,
+            "avg_topk_std": 1.25,
+            "avg_topk_sem": 0.625,
+        }
+
+    monkeypatch.setattr(
+        workers_module.native_backend,
+        "compute_dynamic_metrics",
+        _fake_compute,
+    )
+
+    worker = DynamicStatsWorker(
+        job_id=58,
+        paths=[path],
+        threshold_value=4,
+        mode="topk",
+        avg_count_value=2,
+    )
+    result = _run_dynamic_worker(worker)
+
+    assert len(calls) == 1
+    assert calls[0]["threshold_only"] is False
+    np.testing.assert_array_equal(result.sat_counts, np.array([13], dtype=np.int64))
+    np.testing.assert_array_equal(result.min_non_zero, np.array([5], dtype=np.int64))
+    np.testing.assert_array_equal(result.max_pixels, np.array([42], dtype=np.int64))
+    np.testing.assert_allclose(result.avg_topk, np.array([11.5]))
+    np.testing.assert_allclose(result.avg_topk_std, np.array([1.25]))
+    np.testing.assert_allclose(result.avg_topk_sem, np.array([0.625]))
+
+
 def test_roi_worker_computes_mean_std_and_sem(qapp, write_tiff) -> None:
     path = write_tiff("img.tif", np.array([[1, 2], [3, 4]], dtype=np.uint16))
     worker = RoiApplyWorker(
@@ -380,3 +443,37 @@ def test_roi_worker_fills_only_missing_source_indices(
         ),
     )
     assert tuple(finished.failures) == ()
+
+
+def test_roi_worker_uses_backend_wrapper(
+    qapp,
+    write_tiff,
+    monkeypatch,
+) -> None:
+    path = write_tiff("img.tif", np.array([[1, 2], [3, 4]], dtype=np.uint16))
+    calls: list[dict[str, object]] = []
+
+    def _fake_compute(image, **kwargs):
+        calls.append(dict(kwargs))
+        return (9.0, 8.0, 7.0, 6.0)
+
+    monkeypatch.setattr(
+        workers_module.native_backend,
+        "compute_roi_metrics",
+        _fake_compute,
+    )
+
+    worker = RoiApplyWorker(
+        job_id=97,
+        paths=[path],
+        roi_rect=(0, 0, 2, 2),
+    )
+    progress, finished, _failed = _run_roi_worker(worker)
+
+    assert progress == [(1, 1)]
+    assert len(calls) == 1
+    assert calls[0]["roi_rect"] == (0, 0, 2, 2)
+    np.testing.assert_allclose(finished.maxs, np.array([9.0]))
+    np.testing.assert_allclose(finished.means, np.array([8.0]))
+    np.testing.assert_allclose(finished.stds, np.array([7.0]))
+    np.testing.assert_allclose(finished.sems, np.array([6.0]))

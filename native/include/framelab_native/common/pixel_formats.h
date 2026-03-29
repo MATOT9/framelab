@@ -1,0 +1,29 @@
+#ifndef FRAMELAB_NATIVE_COMMON_PIXEL_FORMATS_H
+#define FRAMELAB_NATIVE_COMMON_PIXEL_FORMATS_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+typedef enum FramelabPixelFormat {
+    FRAMELAB_PIXFMT_UNKNOWN = 0,
+    FRAMELAB_PIXFMT_MONO8,
+    FRAMELAB_PIXFMT_MONO12_LSB,
+    FRAMELAB_PIXFMT_MONO12_MSB,
+    FRAMELAB_PIXFMT_MONO12P,
+    FRAMELAB_PIXFMT_MONO16,
+    FRAMELAB_PIXFMT_BAYER_RG8,
+    FRAMELAB_PIXFMT_BAYER_RG12_LSB,
+    FRAMELAB_PIXFMT_BAYER_RG12_MSB,
+    FRAMELAB_PIXFMT_BAYER_RG12P,
+    FRAMELAB_PIXFMT_BAYER_RG16
+} FramelabPixelFormat;
+
+const char *framelab_pixel_format_name(FramelabPixelFormat format);
+FramelabPixelFormat framelab_pixel_format_from_string(const char *name);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif
