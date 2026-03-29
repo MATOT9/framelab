@@ -288,8 +288,25 @@ class FrameLabWindow(
         self._preview_refresh_timer.timeout.connect(
             self._flush_pending_preview_refresh,
         )
+        self._preview_selection_timer = QTimer(self)
+        self._preview_selection_timer.setSingleShot(True)
+        self._preview_selection_timer.setInterval(100)
+        self._preview_selection_timer.timeout.connect(
+            self._flush_pending_selection_preview,
+        )
+        self._pending_selection_preview_index: int | None = None
+        self._pending_selection_preview_generation = 0
         self._pending_preview_index: int | None = None
+        self._pending_preview_generation = 0
+        self._preview_generation = 0
         self._pause_preview_updates = False
+        self._workflow_scope_refresh_timer = QTimer(self)
+        self._workflow_scope_refresh_timer.setSingleShot(True)
+        self._workflow_scope_refresh_timer.setInterval(0)
+        self._workflow_scope_refresh_timer.timeout.connect(
+            self._flush_pending_workflow_scope_refresh,
+        )
+        self._pending_workflow_scope_refresh_origin: str | None = None
         self._sort_column = -1
         self._sort_order = Qt.AscendingOrder
         self._theme_mode = self.ui_preferences.theme_mode
@@ -469,7 +486,11 @@ class FrameLabWindow(
         ):
             self.unload_folder(clear_folder_edit=False)
 
-    def _refresh_manager_dialogs(self) -> None:
+    def _refresh_manager_dialogs(
+        self,
+        *,
+        origin: str | None = None,
+    ) -> None:
         """Refresh open workflow surfaces after host-state changes."""
 
         for attr_name in (
@@ -479,6 +500,30 @@ class FrameLabWindow(
             "_metadata_inspector_dock",
         ):
             dialog = getattr(self, attr_name, None)
+            if dialog is None:
+                continue
+            if origin == "workflow_explorer" and attr_name == "_workflow_explorer_dock":
+                continue
+            if origin == "workflow_explorer" and isinstance(dialog, qtw.QWidget):
+                if (
+                    attr_name == "_metadata_inspector_dock"
+                    and not dialog.isVisible()
+                    and hasattr(dialog, "mark_dirty")
+                ):
+                    try:
+                        dialog.mark_dirty()
+                    except Exception:
+                        pass
+                    continue
+                if not dialog.isVisible():
+                    continue
+                schedule_refresh = getattr(dialog, "schedule_sync_from_host", None)
+                if callable(schedule_refresh):
+                    try:
+                        schedule_refresh()
+                    except Exception:
+                        continue
+                    continue
             refresh = getattr(dialog, "sync_from_host", None)
             if callable(refresh):
                 try:
@@ -486,11 +531,22 @@ class FrameLabWindow(
                 except Exception:
                     continue
 
-    def _notify_workflow_scope_changed(self) -> None:
-        """Refresh page summaries and dialogs after the active workflow node changes."""
+    def _schedule_workflow_scope_refresh(
+        self,
+        *,
+        origin: str | None = None,
+    ) -> None:
+        """Coalesce expensive scope-change refreshes onto the next event-loop turn."""
 
-        if hasattr(self, "_refresh_workflow_shell_context"):
-            self._refresh_workflow_shell_context()
+        self._pending_workflow_scope_refresh_origin = origin
+        self._workflow_scope_refresh_timer.start()
+
+    def _flush_pending_workflow_scope_refresh(self) -> None:
+        """Apply deferred scope-change fanout after the UI selection settles."""
+
+        origin = self._pending_workflow_scope_refresh_origin
+        self._pending_workflow_scope_refresh_origin = None
+
         if hasattr(self, "_refresh_data_header_state"):
             self._refresh_data_header_state()
         if hasattr(self, "_refresh_measure_header_state"):
@@ -505,7 +561,18 @@ class FrameLabWindow(
             self._apply_dynamic_visibility_policy()
         if hasattr(self, "_set_status"):
             self._set_status()
-        self._refresh_manager_dialogs()
+        self._refresh_manager_dialogs(origin=origin)
+
+    def _notify_workflow_scope_changed(
+        self,
+        *,
+        origin: str | None = None,
+    ) -> None:
+        """Refresh cheap scope UI immediately, then defer heavier fanout."""
+
+        if hasattr(self, "_refresh_workflow_shell_context"):
+            self._refresh_workflow_shell_context()
+        self._schedule_workflow_scope_refresh(origin=origin)
 
     def _notify_metadata_context_changed(
         self,
@@ -1002,6 +1069,7 @@ class FrameLabWindow(
         *,
         sync_scope: bool = True,
         unload_mismatched_dataset: bool = True,
+        notify_origin: str | None = None,
     ) -> str | None:
         """Update the active workflow node inside the loaded controller state."""
 
@@ -1022,7 +1090,7 @@ class FrameLabWindow(
                 update_folder_edit=True,
                 unload_mismatched_dataset=unload_mismatched_dataset,
             )
-        self._notify_workflow_scope_changed()
+        self._notify_workflow_scope_changed(origin=notify_origin)
         self._refresh_workspace_document_dirty_state()
         return self.ui_state_snapshot.workflow_active_node_id
 

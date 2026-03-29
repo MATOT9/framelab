@@ -57,6 +57,58 @@ def test_static_metrics_fall_back_cleanly_when_native_unavailable(monkeypatch) -
     assert backend.consume_backend_status_notice() is None
 
 
+def test_describe_metric_route_uses_python_for_tiff_static_scan(monkeypatch) -> None:
+    _set_backend_state(monkeypatch, object())
+
+    decision = backend.describe_metric_route(
+        "static_scan",
+        source_kind="tiff",
+    )
+
+    assert decision["route_used"] == "python"
+    assert decision["route_reason"] == "tiff_static_python"
+
+
+def test_describe_metric_route_uses_python_for_tiff_dynamic_none(monkeypatch) -> None:
+    _set_backend_state(monkeypatch, object())
+
+    decision = backend.describe_metric_route(
+        "dynamic_metrics",
+        source_kind="tiff",
+        mode="none",
+    )
+
+    assert decision["route_used"] == "python"
+    assert decision["route_reason"] == "tiff_dynamic_none_python"
+    assert decision["effective_mode"] == "none"
+
+
+def test_describe_metric_route_uses_native_for_tiff_dynamic_topk(monkeypatch) -> None:
+    _set_backend_state(monkeypatch, object())
+
+    decision = backend.describe_metric_route(
+        "dynamic_metrics",
+        source_kind="tiff",
+        mode="topk",
+    )
+
+    assert decision["route_used"] == "native"
+    assert decision["route_reason"] == "topk_native"
+    assert decision["effective_mode"] == "topk"
+
+
+def test_describe_metric_route_uses_native_for_raw_static_scan(monkeypatch) -> None:
+    _set_backend_state(monkeypatch, object())
+
+    decision = backend.describe_metric_route(
+        "static_scan",
+        source_kind="raw",
+    )
+
+    assert decision["route_used"] == "native"
+    assert decision["route_reason"] == "raw_native"
+
+
 def test_dynamic_metrics_use_native_when_available_and_emit_one_shot_notice(
     monkeypatch,
 ) -> None:
@@ -81,6 +133,7 @@ def test_dynamic_metrics_use_native_when_available_and_emit_one_shot_notice(
         mode="topk",
         avg_count_value=2,
         threshold_only=True,
+        backend_override="native",
     )
 
     assert result["sat_count"] == 12
@@ -143,6 +196,7 @@ def test_dynamic_metrics_treat_roi_mode_as_none(monkeypatch) -> None:
         threshold_value=2,
         mode="roi",
         avg_count_value=8,
+        backend_override="native",
     )
 
     assert result["sat_count"] == 4
@@ -238,6 +292,151 @@ def test_compute_histogram_uses_python_policy_but_can_force_python(monkeypatch) 
     )
 
 
+def test_histogram_native_paths_coerce_non_contiguous_inputs(monkeypatch) -> None:
+    calls: list[dict[str, object]] = []
+
+    class _FakeNative:
+        @staticmethod
+        def compute_value_range(image, **kwargs):
+            image_arr = np.asarray(image)
+            background_arr = np.asarray(kwargs["background"])
+            calls.append(
+                {
+                    "kind": "range",
+                    "image_contiguous": bool(image_arr.flags.c_contiguous),
+                    "background_contiguous": bool(background_arr.flags.c_contiguous),
+                },
+            )
+            return (float(np.min(image_arr)), float(np.max(image_arr)))
+
+        @staticmethod
+        def compute_histogram(image, **kwargs):
+            image_arr = np.asarray(image)
+            background_arr = np.asarray(kwargs["background"])
+            calls.append(
+                {
+                    "kind": "hist",
+                    "image_contiguous": bool(image_arr.flags.c_contiguous),
+                    "background_contiguous": bool(background_arr.flags.c_contiguous),
+                },
+            )
+            return np.array([1, 1, 2], dtype=np.uint64)
+
+    _set_backend_state(monkeypatch, _FakeNative())
+    image = np.arange(64, dtype=np.float32).reshape(8, 8)[:, ::2]
+    background = np.ones_like(image)
+
+    value_range = backend.compute_value_range(
+        image,
+        background=background,
+    )
+    counts = backend.compute_histogram(
+        image,
+        value_range=value_range,
+        bin_count=3,
+        background=background,
+    )
+
+    assert calls == [
+        {
+            "kind": "range",
+            "image_contiguous": True,
+            "background_contiguous": True,
+        },
+        {
+            "kind": "hist",
+            "image_contiguous": True,
+            "background_contiguous": True,
+        },
+    ]
+    np.testing.assert_array_equal(counts, np.array([1, 1, 2], dtype=np.uint64))
+    assert backend.backend_status_snapshot()["native_latched_off"] is False
+
+
+def test_compute_static_metrics_obeys_describe_metric_route(monkeypatch) -> None:
+    class _FakeNative:
+        @staticmethod
+        def compute_static_metrics(image):
+            raise AssertionError("native path should not be called")
+
+    _set_backend_state(monkeypatch, _FakeNative())
+    monkeypatch.setattr(
+        backend,
+        "describe_metric_route",
+        lambda *args, **kwargs: {
+            "operation": "static_scan",
+            "route_used": "python",
+            "route_reason": "override_python",
+            "source_kind": "tiff",
+            "effective_mode": None,
+        },
+    )
+    monkeypatch.setattr(
+        backend,
+        "_python_compute_static_metrics",
+        lambda image: (4, 9),
+    )
+
+    result = backend.compute_static_metrics(
+        np.array([[1, 2], [3, 4]], dtype=np.uint16),
+        source_kind="tiff",
+    )
+
+    assert result == (4, 9)
+
+
+def test_static_metrics_backend_override_can_force_native_or_python(monkeypatch) -> None:
+    native_calls = 0
+    python_calls = 0
+
+    class _FakeNative:
+        @staticmethod
+        def compute_static_metrics(image):
+            nonlocal native_calls
+            native_calls += 1
+            return (8, 77)
+
+    def _fake_python(image):
+        nonlocal python_calls
+        python_calls += 1
+        return (1, 4)
+
+    _set_backend_state(monkeypatch, _FakeNative())
+    monkeypatch.setattr(backend, "_python_compute_static_metrics", _fake_python)
+    image = np.array([[0, 1], [4, 8]], dtype=np.uint16)
+
+    native_result = backend.compute_static_metrics(
+        image,
+        source_kind="tiff",
+        backend_override="native",
+    )
+    python_result = backend.compute_static_metrics(
+        image,
+        source_kind="raw",
+        backend_override="python",
+    )
+
+    assert native_result == (8, 77)
+    assert python_result == (1, 4)
+    assert native_calls == 1
+    assert python_calls == 1
+
+
+def test_threshold_only_routes_like_effective_none(monkeypatch) -> None:
+    _set_backend_state(monkeypatch, object())
+
+    decision = backend.describe_metric_route(
+        "dynamic_metrics",
+        source_kind="tiff",
+        mode="topk",
+        threshold_only=True,
+    )
+
+    assert decision["route_used"] == "python"
+    assert decision["route_reason"] == "tiff_dynamic_none_python"
+    assert decision["effective_mode"] == "none"
+
+
 def test_native_failure_stays_latched_for_subsequent_calls(monkeypatch) -> None:
     call_count = 0
 
@@ -259,6 +458,13 @@ def test_native_failure_stays_latched_for_subsequent_calls(monkeypatch) -> None:
     assert second == pytest.approx((1.0, 4.0))
     assert call_count == 1
     assert backend.backend_status_snapshot()["native_latched_off"] is True
+    decision = backend.describe_metric_route(
+        "dynamic_metrics",
+        source_kind="raw",
+        mode="topk",
+    )
+    assert decision["route_used"] == "python"
+    assert decision["route_reason"] == "native_latched_off"
 
 
 @pytest.mark.skipif(
@@ -269,11 +475,19 @@ def test_native_and_python_static_metrics_match_when_extension_is_present(monkey
     image = np.array([[0, 5], [7, 1]], dtype=np.uint16)
 
     monkeypatch.setattr(backend, "_metrics_native_enabled", True, raising=False)
-    native_result = backend.compute_static_metrics(image)
+    native_result = backend.compute_static_metrics(
+        image,
+        source_kind="tiff",
+        backend_override="native",
+    )
 
     monkeypatch.setattr(backend, "_metrics_native_enabled", False, raising=False)
     monkeypatch.setattr(backend, "_active_metrics_backend", "python", raising=False)
-    python_result = backend.compute_static_metrics(image)
+    python_result = backend.compute_static_metrics(
+        image,
+        source_kind="tiff",
+        backend_override="python",
+    )
 
     assert native_result == python_result
 
@@ -295,6 +509,8 @@ def test_native_and_python_dynamic_metrics_match_when_extension_is_present(
         mode="topk",
         avg_count_value=2,
         background=background,
+        source_kind="tiff",
+        backend_override="native",
     )
 
     monkeypatch.setattr(backend, "_metrics_native_enabled", False, raising=False)
@@ -305,6 +521,8 @@ def test_native_and_python_dynamic_metrics_match_when_extension_is_present(
         mode="topk",
         avg_count_value=2,
         background=background,
+        source_kind="tiff",
+        backend_override="python",
     )
 
     assert native_result["sat_count"] == python_result["sat_count"]

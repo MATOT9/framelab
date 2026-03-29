@@ -257,10 +257,14 @@ def test_scan_single_static_image_uses_backend_wrapper(
 ) -> None:
     path = write_tiff("img.tif", np.array([[1, 2], [3, 4]], dtype=np.uint16))
 
+    def _fake_static_metrics(image, **kwargs):
+        assert kwargs["source_kind"] == "tiff"
+        return (7, 99)
+
     monkeypatch.setattr(
         workers_module.native_backend,
         "compute_static_metrics",
-        lambda image, **kwargs: (7, 99),
+        _fake_static_metrics,
     )
 
     result, failures = workers_module.scan_single_static_image(path)
@@ -304,6 +308,7 @@ def test_dynamic_worker_uses_backend_wrapper(
     result = _run_dynamic_worker(worker)
 
     assert len(calls) == 1
+    assert calls[0]["source_kind"] == "tiff"
     assert calls[0]["threshold_only"] is False
     np.testing.assert_array_equal(result.sat_counts, np.array([13], dtype=np.int64))
     np.testing.assert_array_equal(result.min_non_zero, np.array([5], dtype=np.int64))

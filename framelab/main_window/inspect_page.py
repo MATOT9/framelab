@@ -418,9 +418,16 @@ class InspectPageMixin:
         _selected,
         _deselected,
     ) -> None:
-        """Refresh preview state when the table selection changes."""
+        """Keep preview pause state in sync with table multi-selection."""
 
-        self.on_row_selected()
+        was_paused = self._pause_preview_updates
+        if self._is_multi_cell_selection():
+            self._pause_preview_updates = True
+            self._clear_pending_preview_requests()
+            return
+        if was_paused:
+            self._pause_preview_updates = False
+            self.on_row_selected()
 
     def _rebind_measure_table_model(self, *, prefer_proxy: bool = True) -> None:
         """Rebind the measure table model to recover from stale Qt view state."""
@@ -557,6 +564,7 @@ class InspectPageMixin:
         self.preview_pages.customContextMenuRequested.connect(
             self._show_preview_context_menu,
         )
+        self.preview_pages.currentChanged.connect(self._on_preview_page_changed)
 
         image_page = qtw.QWidget()
         image_layout = qtw.QVBoxLayout(image_page)
@@ -712,6 +720,7 @@ class InspectPageMixin:
             self.histogram_widget.clear_histogram()
 
         if not show_any:
+            self._clear_pending_preview_requests()
             self.info_label.setText("Preview disabled.")
             self._set_measure_help_visibility(False)
             return
@@ -774,13 +783,35 @@ class InspectPageMixin:
             dataset.selected_index is not None
             and 0 <= dataset.selected_index < dataset.path_count()
         ):
-            self._display_image(dataset.selected_index)
+            if self.show_image_preview or self.show_histogram_preview:
+                self._schedule_row_preview_refresh(
+                    dataset.selected_index,
+                    debounce=True,
+                )
+            else:
+                self._clear_pending_preview_requests()
         if not self.show_image_preview:
             self.image_preview.clear_image()
             self.image_preview.set_intensity_image(None)
         if hasattr(self, "_apply_dynamic_visibility_policy"):
             self._apply_dynamic_visibility_policy()
         self._refresh_workspace_document_dirty_state()
+
+    def _on_preview_page_changed(self, index: int) -> None:
+        """Refresh histogram lazily when its tab becomes active."""
+
+        dataset = self.dataset_state
+        if index != 1:
+            return
+        if (
+            dataset.selected_index is None
+            or not (0 <= dataset.selected_index < dataset.path_count())
+        ):
+            return
+        self._schedule_row_preview_refresh(
+            dataset.selected_index,
+            debounce=True,
+        )
 
     def _set_rounding_mode(self, mode: str) -> None:
         """Update scientific rounding mode from compact display controls."""

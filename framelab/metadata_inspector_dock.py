@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from PySide6 import QtCore
 from PySide6 import QtWidgets as qtw
 from PySide6.QtCore import Qt
 
@@ -20,6 +21,8 @@ class MetadataInspectorDock(qtw.QDockWidget):
         super().__init__("Metadata Inspector", host_window)
         self._host_window = host_window
         self._density_tokens = comfortable_density_tokens()
+        self._dirty = False
+        self._sync_scheduled = False
 
         self.setObjectName("MetadataInspectorDock")
         self.setAllowedAreas(Qt.AllDockWidgetAreas)
@@ -83,13 +86,38 @@ class MetadataInspectorDock(qtw.QDockWidget):
     def sync_from_host(self) -> None:
         """Refresh the inspector from the host metadata/workflow state."""
 
+        self._dirty = False
         self._panel.sync_from_host()
+
+    def mark_dirty(self) -> None:
+        """Record that host state changed while the dock was not refreshed."""
+
+        self._dirty = True
+
+    def schedule_sync_from_host(self) -> None:
+        """Refresh the inspector on the next event-loop turn when visible."""
+
+        self._dirty = True
+        if self._sync_scheduled or not self.isVisible():
+            return
+        self._sync_scheduled = True
+        QtCore.QTimer.singleShot(0, self._flush_scheduled_sync_from_host)
+
+    def _flush_scheduled_sync_from_host(self) -> None:
+        """Apply one deferred sync after the dock becomes visible."""
+
+        self._sync_scheduled = False
+        if not self.isVisible():
+            return
+        self.sync_from_host()
 
     def reveal(self) -> None:
         """Show and focus the dock."""
 
         self.show()
         self.raise_()
+        if self._dirty:
+            self.schedule_sync_from_host()
 
     def _on_visibility_changed(self, visible: bool) -> None:
         """Persist dock visibility using the host panel-state store."""
@@ -97,3 +125,5 @@ class MetadataInspectorDock(qtw.QDockWidget):
         remember = getattr(self._host_window, "_remember_panel_state", None)
         if callable(remember):
             remember(self.PANEL_STATE_KEY, bool(visible))
+        if visible and self._dirty:
+            self.schedule_sync_from_host()

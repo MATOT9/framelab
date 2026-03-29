@@ -1262,6 +1262,9 @@ class WindowChromeMixin:
         dock = getattr(self, "_metadata_inspector_dock", None)
         if dock is None:
             return
+        if hasattr(dock, "reveal"):
+            dock.reveal()
+            return
         dock.show()
         dock.raise_()
 

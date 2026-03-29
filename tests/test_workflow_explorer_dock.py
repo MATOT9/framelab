@@ -192,6 +192,7 @@ def test_workflow_explorer_dock_selection_updates_active_scope(
     tmp_path: Path,
     framelab_window_factory,
     process_events,
+    wait_until,
 ) -> None:
     workspace_root, _session_root, acquisition_root, session_node_id, acquisition_node_id = (
         _make_workspace(tmp_path)
@@ -218,12 +219,47 @@ def test_workflow_explorer_dock_selection_updates_active_scope(
     item = dock._item_by_node_id[acquisition_node_id]
     dock._tree.setCurrentItem(item)
     process_events()
+    wait_until(
+        lambda: window.workflow_state_controller.active_node_id == acquisition_node_id,
+        timeout_ms=1000,
+    )
 
     assert window.workflow_state_controller.active_node_id == acquisition_node_id
     assert window.folder_edit.text() == str(acquisition_root.resolve())
     assert window.dataset_state.scope_snapshot.active_node_id == acquisition_node_id
     assert not dock._lineage_scroll.isHidden()
     assert dock._lineage_rail.entry_labels()[-1] == acquisition_root.name
+
+
+def test_workflow_explorer_dock_defers_host_activation_until_timer_fires(
+    tmp_path: Path,
+    framelab_window_factory,
+    monkeypatch,
+    wait_until,
+) -> None:
+    workspace_root, _session_root, _acquisition_root, session_node_id, acquisition_node_id = (
+        _make_workspace(tmp_path)
+    )
+    window = framelab_window_factory(enabled_plugin_ids=())
+    window.set_workflow_context(
+        str(workspace_root),
+        "calibration",
+        active_node_id=session_node_id,
+    )
+    dock = window._workflow_explorer_dock
+    calls: list[str | None] = []
+    original = window.set_active_workflow_node
+
+    def _wrapped_set_active_workflow_node(node_id, **kwargs):
+        calls.append(node_id)
+        return original(node_id, **kwargs)
+
+    monkeypatch.setattr(window, "set_active_workflow_node", _wrapped_set_active_workflow_node)
+
+    dock._tree.setCurrentItem(dock._item_by_node_id[acquisition_node_id])
+
+    assert calls == []
+    wait_until(lambda: calls == [acquisition_node_id], timeout_ms=1000)
 
 
 def test_workflow_explorer_keeps_active_path_visible_without_loaded_workflow(
@@ -255,6 +291,7 @@ def test_workflow_explorer_active_path_expands_with_top_pane_resize(
     tmp_path: Path,
     framelab_window_factory,
     process_events,
+    wait_until,
 ) -> None:
     workspace_root, _session_root, _acquisition_root, session_node_id, acquisition_node_id = (
         _make_workspace(tmp_path)
@@ -269,11 +306,17 @@ def test_workflow_explorer_active_path_expands_with_top_pane_resize(
     process_events()
 
     dock._tree.setCurrentItem(dock._item_by_node_id["calibration:root"])
-    process_events()
+    wait_until(
+        lambda: window.workflow_state_controller.active_node_id == "calibration:root",
+        timeout_ms=1000,
+    )
     before_height = dock._lineage_scroll.height()
 
     dock._tree.setCurrentItem(dock._item_by_node_id[acquisition_node_id])
-    process_events()
+    wait_until(
+        lambda: window.workflow_state_controller.active_node_id == acquisition_node_id,
+        timeout_ms=1000,
+    )
     dock._main_splitter.setSizes([420, 260])
     process_events()
     after_height = dock._lineage_scroll.height()
@@ -377,6 +420,7 @@ def test_workflow_explorer_dock_preserves_scroll_position_on_selection(
     tmp_path: Path,
     framelab_window_factory,
     process_events,
+    wait_until,
 ) -> None:
     workspace_root, last_acquisition_node_id = _make_large_workspace(tmp_path)
     window = framelab_window_factory(
@@ -398,7 +442,10 @@ def test_workflow_explorer_dock_preserves_scroll_position_on_selection(
     before = scrollbar.value()
 
     dock._tree.setCurrentItem(dock._item_by_node_id[last_acquisition_node_id])
-    process_events()
+    wait_until(
+        lambda: window.workflow_state_controller.active_node_id == last_acquisition_node_id,
+        timeout_ms=1000,
+    )
 
     assert scrollbar.value() >= max(0, before - 5)
 
@@ -407,6 +454,7 @@ def test_workflow_explorer_dock_does_not_rebuild_tree_for_selection_only(
     tmp_path: Path,
     framelab_window_factory,
     process_events,
+    wait_until,
 ) -> None:
     workspace_root, _session_root, _acquisition_root, session_node_id, acquisition_node_id = (
         _make_workspace(tmp_path)
@@ -421,7 +469,10 @@ def test_workflow_explorer_dock_does_not_rebuild_tree_for_selection_only(
     original_item = dock._item_by_node_id[acquisition_node_id]
 
     dock._tree.setCurrentItem(original_item)
-    process_events()
+    wait_until(
+        lambda: window.workflow_state_controller.active_node_id == acquisition_node_id,
+        timeout_ms=1000,
+    )
 
     assert dock._item_by_node_id[acquisition_node_id] is original_item
 

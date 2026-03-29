@@ -1311,13 +1311,20 @@ class HistogramWidget(qtw.QWidget):
         arr = np.asarray(image)
         flat = arr.ravel()
         if sample_limit is None or flat.size <= sample_limit:
-            return (arr, None if background is None else np.asarray(background))
+            contiguous_background = (
+                None
+                if background is None
+                else np.ascontiguousarray(np.asarray(background))
+            )
+            return (np.ascontiguousarray(arr), contiguous_background)
 
         stride = max(1, int(np.ceil(float(flat.size) / float(sample_limit))))
-        sampled = flat[::stride].reshape(1, -1)
+        sampled = np.ascontiguousarray(flat[::stride].reshape(1, -1))
         if background is None:
             return (sampled, None)
-        sampled_background = np.asarray(background).ravel()[::stride].reshape(1, -1)
+        sampled_background = np.ascontiguousarray(
+            np.asarray(background).ravel()[::stride].reshape(1, -1),
+        )
         return (sampled, sampled_background)
 
     def _set_histogram_data(

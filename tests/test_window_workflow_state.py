@@ -564,6 +564,93 @@ def test_custom_workflow_can_scan_plain_tiff_subfolder_without_reverting_to_root
     assert window.dataset_state.scope_snapshot.source == "manual"
 
 
+def test_workflow_scope_click_does_not_unload_mismatched_loaded_dataset(
+    tmp_path: Path,
+    framelab_window_factory,
+    wait_for_dataset_load,
+    wait_until,
+) -> None:
+    workspace_root, _session_root, first, second, session_node_id, _acquisition_node_id = (
+        _make_calibration_workspace_with_frames(tmp_path)
+    )
+    second_node_id = (
+        "calibration:acquisition:"
+        "camera-a/campaign-2026/2026-03-05__sess01/acquisitions/acq-0012__bright"
+    )
+    window = framelab_window_factory(enabled_plugin_ids=())
+    window.set_workflow_context(
+        str(workspace_root),
+        "calibration",
+        active_node_id=session_node_id,
+    )
+    window.folder_edit.setText(str(first))
+    window.load_folder()
+    wait_for_dataset_load(window)
+
+    dock = window._workflow_explorer_dock
+    dock._tree.setCurrentItem(dock._item_by_node_id[second_node_id])
+    wait_until(
+        lambda: window.workflow_state_controller.active_node_id == second_node_id,
+        timeout_ms=1000,
+    )
+
+    assert window.dataset_state.has_loaded_data()
+    assert window.dataset_state.dataset_root == first.resolve()
+    assert window.folder_edit.text() == str(second.resolve())
+
+
+def test_hidden_metadata_inspector_is_marked_dirty_instead_of_refreshing_inline(
+    tmp_path: Path,
+    framelab_window_factory,
+    monkeypatch,
+    wait_until,
+) -> None:
+    workspace_root, _session_root, _first, second, session_node_id, _acquisition_node_id = (
+        _make_calibration_workspace_with_frames(tmp_path)
+    )
+    second_node_id = (
+        "calibration:acquisition:"
+        "camera-a/campaign-2026/2026-03-05__sess01/acquisitions/acq-0012__bright"
+    )
+    window = framelab_window_factory(enabled_plugin_ids=())
+    window.set_workflow_context(
+        str(workspace_root),
+        "calibration",
+        active_node_id=session_node_id,
+    )
+    wait_until(
+        lambda: not window._workflow_scope_refresh_timer.isActive(),
+        timeout_ms=1000,
+    )
+
+    dock = window._metadata_inspector_dock
+    assert dock.isHidden()
+    sync_calls = 0
+    dirty_calls = 0
+    original_mark_dirty = dock.mark_dirty
+
+    monkeypatch.setattr(
+        dock,
+        "sync_from_host",
+        lambda: (_ for _ in ()).throw(AssertionError("hidden dock should not sync")),
+    )
+
+    def _wrapped_mark_dirty() -> None:
+        nonlocal dirty_calls
+        dirty_calls += 1
+        original_mark_dirty()
+
+    monkeypatch.setattr(dock, "mark_dirty", _wrapped_mark_dirty)
+
+    explorer = window._workflow_explorer_dock
+    explorer._tree.setCurrentItem(explorer._item_by_node_id[second_node_id])
+
+    assert dirty_calls == 0
+    assert sync_calls == 0
+    wait_until(lambda: dirty_calls == 1, timeout_ms=1000)
+    assert sync_calls == 0
+
+
 def test_scaffolded_empty_calibration_root_enables_root_create_actions(
     tmp_path: Path,
     framelab_window_factory,

@@ -211,7 +211,10 @@ def scan_single_static_image(
             ),
         )
 
-    min_non_zero, max_pixel = native_backend.compute_static_metrics(image)
+    min_non_zero, max_pixel = native_backend.compute_static_metrics(
+        image,
+        source_kind="tiff",
+    )
     return ((str(source_path), min_non_zero, max_pixel), ())
 
 
@@ -435,6 +438,7 @@ class DynamicStatsWorker(QObject):
                         background=background_img,
                         clip_negative=clip_negative,
                         threshold_only=threshold_only,
+                        source_kind="tiff",
                     )
                 except Exception as exc:
                     failures.append(

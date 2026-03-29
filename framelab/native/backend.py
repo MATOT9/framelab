@@ -35,6 +35,17 @@ class NativeBackendUnavailable(RuntimeError):
     """Raised when the optional native extension is not available."""
 
 
+_VALID_SOURCE_KINDS = {"tiff", "raw", "unknown"}
+_VALID_BACKEND_OVERRIDES = {None, "python", "native"}
+_VALID_ROUTE_OPERATIONS = {
+    "static_scan",
+    "dynamic_metrics",
+    "roi_metrics",
+    "apply_background_f32",
+    "compute_value_range",
+    "compute_histogram",
+}
+
 _metrics_backend_lock = Lock()
 _metrics_native_enabled = _native is not None
 _active_metrics_backend = "native" if _native is not None else "python"
@@ -141,6 +152,97 @@ def _native_metrics_enabled_now() -> bool:
         return bool(_metrics_native_enabled and _native is not None)
 
 
+def _normalize_source_kind(source_kind: str | None) -> str:
+    value = str(source_kind or "unknown").strip().lower()
+    return value if value in _VALID_SOURCE_KINDS else "unknown"
+
+
+def _normalize_backend_override(backend_override: str | None) -> str | None:
+    if backend_override is None:
+        return None
+    value = str(backend_override).strip().lower()
+    if value not in _VALID_BACKEND_OVERRIDES:
+        raise ValueError("backend_override must be None, 'python', or 'native'")
+    return value
+
+
+def _native_route_block_reason(*, allow_native: bool) -> str | None:
+    with _metrics_backend_lock:
+        if _native is None:
+            return "native_unavailable"
+        if not allow_native:
+            return "allow_native_false"
+        if not _metrics_native_enabled:
+            return "native_latched_off"
+    return None
+
+
+def describe_metric_route(
+    operation: str,
+    *,
+    source_kind: str = "unknown",
+    mode: str | None = None,
+    threshold_only: bool = False,
+    allow_native: bool = True,
+    backend_override: str | None = None,
+) -> dict[str, object]:
+    """Describe the backend route that should be used for one metric operation."""
+
+    normalized_operation = str(operation).strip().lower()
+    if normalized_operation not in _VALID_ROUTE_OPERATIONS:
+        raise ValueError(f"Unsupported metric routing operation: {operation!r}")
+    normalized_source_kind = _normalize_source_kind(source_kind)
+    normalized_override = _normalize_backend_override(backend_override)
+    effective_mode: str | None = None
+
+    if normalized_operation == "dynamic_metrics":
+        normalized_mode = "none" if mode == "roi" else str(mode or "").strip().lower()
+        if normalized_mode not in {"none", "topk"}:
+            raise ValueError("mode must be 'none' or 'topk'")
+        effective_mode = "none" if threshold_only else normalized_mode
+
+    def _decision(route_used: str, route_reason: str) -> dict[str, object]:
+        return {
+            "operation": normalized_operation,
+            "route_used": route_used,
+            "route_reason": route_reason,
+            "source_kind": normalized_source_kind,
+            "effective_mode": effective_mode,
+        }
+
+    if normalized_override == "python":
+        return _decision("python", "override_python")
+
+    if normalized_override == "native":
+        block_reason = _native_route_block_reason(allow_native=True)
+        if block_reason is not None:
+            return _decision("python", block_reason)
+        return _decision("native", "override_native")
+
+    block_reason = _native_route_block_reason(allow_native=allow_native)
+    if block_reason is not None:
+        return _decision("python", block_reason)
+
+    if normalized_operation == "static_scan":
+        if normalized_source_kind == "raw":
+            return _decision("native", "raw_native")
+        if normalized_source_kind == "tiff":
+            return _decision("python", "tiff_static_python")
+        return _decision("python", "unknown_python")
+
+    if normalized_operation == "dynamic_metrics":
+        assert effective_mode is not None
+        if effective_mode == "topk":
+            return _decision("native", "topk_native")
+        if normalized_source_kind == "raw":
+            return _decision("native", "raw_native")
+        if normalized_source_kind == "tiff":
+            return _decision("python", "tiff_dynamic_none_python")
+        return _decision("python", "unknown_python")
+
+    return _decision("native", "native_default")
+
+
 def _coerce_image(image) -> np.ndarray:
     return np.asarray(image)
 
@@ -152,6 +254,14 @@ def _compatible_background(image: np.ndarray, background) -> np.ndarray | None:
     if not validate_reference_shape(image.shape, background_arr.shape):
         return None
     return background_arr
+
+
+def _native_row_contiguous(array: np.ndarray | None) -> np.ndarray | None:
+    """Return one row-contiguous array for native histogram/value-range calls."""
+
+    if array is None:
+        return None
+    return np.ascontiguousarray(array)
 
 
 def _python_compute_static_metrics(image) -> tuple[int, int]:
@@ -283,21 +393,49 @@ def _python_compute_histogram(
     return np.asarray(counts, dtype=np.uint64)
 
 
-def compute_static_metrics(image, *, allow_native: bool = True):
+def _execute_routed_metric(
+    *,
+    decision: dict[str, object],
+    python_fn,
+    native_fn,
+    failure_label: str,
+):
+    if str(decision["route_used"]) != "native":
+        return python_fn()
+    try:
+        result = native_fn()
+    except Exception as exc:
+        _disable_native_metrics(f"{failure_label} failed: {exc}")
+        return python_fn()
+    _record_native_success()
+    return result
+
+
+def compute_static_metrics(
+    image,
+    *,
+    source_kind: str = "unknown",
+    allow_native: bool = True,
+    backend_override: str | None = None,
+):
     """Compute dataset-load static metrics for one 2D image.
 
     Expected native return contract:
         (min_non_zero: int, max_pixel: int)
     """
-    if not allow_native or not _native_metrics_enabled_now():
-        return _python_compute_static_metrics(image)
-    try:
-        result = require_native().compute_static_metrics(image)
-    except Exception as exc:
-        _disable_native_metrics(f"compute_static_metrics failed: {exc}")
-        return _python_compute_static_metrics(image)
-    _record_native_success()
-    return result
+    decision = describe_metric_route(
+        "static_scan",
+        source_kind=source_kind,
+        allow_native=allow_native,
+        backend_override=backend_override,
+    )
+    image_arr = _coerce_image(image)
+    return _execute_routed_metric(
+        decision=decision,
+        python_fn=lambda: _python_compute_static_metrics(image_arr),
+        native_fn=lambda: require_native().compute_static_metrics(image_arr),
+        failure_label="compute_static_metrics",
+    )
 
 
 def compute_dynamic_metrics(
@@ -309,7 +447,9 @@ def compute_dynamic_metrics(
     background=None,
     clip_negative: bool = True,
     threshold_only: bool = False,
+    source_kind: str = "unknown",
     allow_native: bool = True,
+    backend_override: str | None = None,
 ):
     """Compute one image's dynamic metrics through the native backend.
 
@@ -321,47 +461,38 @@ def compute_dynamic_metrics(
         avg_topk_std
         avg_topk_sem
     """
-    normalized_mode = "none" if mode == "roi" else mode
-    if normalized_mode not in {"none", "topk"}:
-        raise ValueError("mode must be 'none' or 'topk'")
-
+    decision = describe_metric_route(
+        "dynamic_metrics",
+        source_kind=source_kind,
+        mode=mode,
+        threshold_only=threshold_only,
+        allow_native=allow_native,
+        backend_override=backend_override,
+    )
+    resolved_mode = str(decision["effective_mode"] or "none")
     image_arr = _coerce_image(image)
     background_arr = _compatible_background(image_arr, background)
-    native_mode = "none" if threshold_only else normalized_mode
-
-    if not allow_native or not _native_metrics_enabled_now():
-        return _python_compute_dynamic_metrics(
+    return _execute_routed_metric(
+        decision=decision,
+        python_fn=lambda: _python_compute_dynamic_metrics(
             image_arr,
             threshold_value=threshold_value,
-            mode=normalized_mode,
+            mode=resolved_mode,
             avg_count_value=avg_count_value,
             background=background_arr,
             clip_negative=clip_negative,
             threshold_only=threshold_only,
-        )
-
-    try:
-        result = require_native().compute_dynamic_metrics(
+        ),
+        native_fn=lambda: require_native().compute_dynamic_metrics(
             image_arr,
             threshold_value=threshold_value,
-            mode=native_mode,
+            mode=resolved_mode,
             avg_count_value=avg_count_value,
             background=background_arr,
             clip_negative=clip_negative,
-        )
-    except Exception as exc:
-        _disable_native_metrics(f"compute_dynamic_metrics failed: {exc}")
-        return _python_compute_dynamic_metrics(
-            image_arr,
-            threshold_value=threshold_value,
-            mode=normalized_mode,
-            avg_count_value=avg_count_value,
-            background=background_arr,
-            clip_negative=clip_negative,
-            threshold_only=threshold_only,
-        )
-    _record_native_success()
-    return result
+        ),
+        failure_label="compute_dynamic_metrics",
+    )
 
 
 def compute_roi_metrics(
@@ -373,35 +504,29 @@ def compute_roi_metrics(
     allow_native: bool = True,
 ):
     """Compute one image's ROI statistics through the native backend."""
+    decision = describe_metric_route(
+        "roi_metrics",
+        allow_native=allow_native,
+    )
     image_arr = _coerce_image(image)
     normalized_roi = normalize_roi_rect_like_numpy(roi_rect, image_arr.shape)
     background_arr = _compatible_background(image_arr, background)
-
-    if not allow_native or not _native_metrics_enabled_now():
-        return _python_compute_roi_metrics(
+    return _execute_routed_metric(
+        decision=decision,
+        python_fn=lambda: _python_compute_roi_metrics(
             image_arr,
             roi_rect=normalized_roi,
             background=background_arr,
             clip_negative=clip_negative,
-        )
-
-    try:
-        result = require_native().compute_roi_metrics(
+        ),
+        native_fn=lambda: require_native().compute_roi_metrics(
             image_arr,
             roi_rect=normalized_roi,
             background=background_arr,
             clip_negative=clip_negative,
-        )
-    except Exception as exc:
-        _disable_native_metrics(f"compute_roi_metrics failed: {exc}")
-        return _python_compute_roi_metrics(
-            image_arr,
-            roi_rect=normalized_roi,
-            background=background_arr,
-            clip_negative=clip_negative,
-        )
-    _record_native_success()
-    return result
+        ),
+        failure_label="compute_roi_metrics",
+    )
 
 
 def apply_background_f32(
@@ -413,30 +538,28 @@ def apply_background_f32(
 ) -> np.ndarray:
     """Return the metric/preview corrected-image buffer as float32."""
 
+    decision = describe_metric_route(
+        "apply_background_f32",
+        allow_native=allow_native,
+    )
     image_arr = _coerce_image(image)
     background_arr = _compatible_background(image_arr, background)
     if background_arr is None:
         return np.asarray(image_arr, dtype=np.float32, order="C")
-    if not allow_native or not _native_metrics_enabled_now():
-        return _python_apply_background_f32(
+    result = _execute_routed_metric(
+        decision=decision,
+        python_fn=lambda: _python_apply_background_f32(
             image_arr,
             background=background_arr,
             clip_negative=clip_negative,
-        )
-    try:
-        result = require_native().apply_background_f32(
+        ),
+        native_fn=lambda: require_native().apply_background_f32(
             image_arr,
             background=background_arr,
             clip_negative=clip_negative,
-        )
-    except Exception as exc:
-        _disable_native_metrics(f"apply_background_f32 failed: {exc}")
-        return _python_apply_background_f32(
-            image_arr,
-            background=background_arr,
-            clip_negative=clip_negative,
-        )
-    _record_native_success()
+        ),
+        failure_label="apply_background_f32",
+    )
     return np.asarray(result, dtype=np.float32, order="C")
 
 
@@ -449,28 +572,36 @@ def compute_value_range(
 ) -> tuple[float, float]:
     """Return min/max values for histogram policy selection."""
 
+    decision = describe_metric_route(
+        "compute_value_range",
+        allow_native=allow_native,
+    )
     image_arr = _coerce_image(image)
     background_arr = _compatible_background(image_arr, background)
-    if not allow_native or not _native_metrics_enabled_now():
-        return _python_compute_value_range(
+    native_image_arr = (
+        _native_row_contiguous(image_arr)
+        if str(decision["route_used"]) == "native"
+        else image_arr
+    )
+    native_background_arr = (
+        _native_row_contiguous(background_arr)
+        if str(decision["route_used"]) == "native"
+        else background_arr
+    )
+    result = _execute_routed_metric(
+        decision=decision,
+        python_fn=lambda: _python_compute_value_range(
             image_arr,
             background=background_arr,
             clip_negative=clip_negative,
-        )
-    try:
-        result = require_native().compute_value_range(
-            image_arr,
-            background=background_arr,
+        ),
+        native_fn=lambda: require_native().compute_value_range(
+            native_image_arr,
+            background=native_background_arr,
             clip_negative=clip_negative,
-        )
-    except Exception as exc:
-        _disable_native_metrics(f"compute_value_range failed: {exc}")
-        return _python_compute_value_range(
-            image_arr,
-            background=background_arr,
-            clip_negative=clip_negative,
-        )
-    _record_native_success()
+        ),
+        failure_label="compute_value_range",
+    )
     return (float(result[0]), float(result[1]))
 
 
@@ -485,6 +616,10 @@ def compute_histogram(
 ) -> np.ndarray:
     """Count histogram bins for one chosen numeric policy."""
 
+    decision = describe_metric_route(
+        "compute_histogram",
+        allow_native=allow_native,
+    )
     range_min, range_max = (float(value_range[0]), float(value_range[1]))
     resolved_bin_count = int(bin_count)
     if resolved_bin_count <= 0:
@@ -494,32 +629,34 @@ def compute_histogram(
 
     image_arr = _coerce_image(image)
     background_arr = _compatible_background(image_arr, background)
-    if not allow_native or not _native_metrics_enabled_now():
-        return _python_compute_histogram(
+    native_image_arr = (
+        _native_row_contiguous(image_arr)
+        if str(decision["route_used"]) == "native"
+        else image_arr
+    )
+    native_background_arr = (
+        _native_row_contiguous(background_arr)
+        if str(decision["route_used"]) == "native"
+        else background_arr
+    )
+    result = _execute_routed_metric(
+        decision=decision,
+        python_fn=lambda: _python_compute_histogram(
             image_arr,
             value_range=(range_min, range_max),
             bin_count=resolved_bin_count,
             background=background_arr,
             clip_negative=clip_negative,
-        )
-    try:
-        result = require_native().compute_histogram(
-            image_arr,
+        ),
+        native_fn=lambda: require_native().compute_histogram(
+            native_image_arr,
             value_range=(range_min, range_max),
             bin_count=resolved_bin_count,
-            background=background_arr,
+            background=native_background_arr,
             clip_negative=clip_negative,
-        )
-    except Exception as exc:
-        _disable_native_metrics(f"compute_histogram failed: {exc}")
-        return _python_compute_histogram(
-            image_arr,
-            value_range=(range_min, range_max),
-            bin_count=resolved_bin_count,
-            background=background_arr,
-            clip_negative=clip_negative,
-        )
-    _record_native_success()
+        ),
+        failure_label="compute_histogram",
+    )
     return np.asarray(result, dtype=np.uint64)
 
 

@@ -596,10 +596,15 @@ class WindowActionsMixin:
         roi_thread = self._roi_apply_thread
         thread = self._stats_thread
         load_thread = getattr(self, "_dataset_load_thread", None)
+        ebus_thread = getattr(self, "_ebus_config_discovery_thread", None)
         if hasattr(self, "_cancel_dataset_load_job"):
             self._cancel_dataset_load_job()
         self._cancel_roi_apply_job()
         self._cancel_stats_job()
+        if ebus_thread is not None and ebus_thread.isRunning():
+            ebus_thread.requestInterruption()
+            ebus_thread.quit()
+            ebus_thread.wait(1500)
         if load_thread is not None and load_thread.isRunning():
             load_thread.wait(1500)
         if roi_thread is not None and roi_thread.isRunning():

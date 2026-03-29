@@ -7,7 +7,7 @@ from fnmatch import fnmatch
 from pathlib import Path
 
 from PySide6 import QtWidgets as qtw
-from PySide6.QtCore import Qt, QSignalBlocker
+from PySide6.QtCore import QObject, QSignalBlocker, QThread, Qt, Signal
 
 from ..acquisition_datacard import (
     ACQUISITION_DATACARD_NAME,
@@ -32,6 +32,47 @@ from ..ui_primitives import (
 )
 from ..window_drag import apply_secondary_window_geometry, configure_secondary_window
 from ..widgets import install_large_header_resize_cursor
+
+
+class _EbusConfigDiscoveryWorker(QObject):
+    """Background worker that scans one selected root for `.pvcfg` files."""
+
+    finished = Signal(int, str, object, bool)
+
+    def __init__(self, request_id: int, folder: Path) -> None:
+        super().__init__()
+        self._request_id = int(request_id)
+        self._folder = folder.expanduser().resolve(strict=False)
+
+    def run(self) -> None:
+        """Scan the configured root unless the worker thread is interrupted."""
+
+        discovered: list[Path] = []
+        thread = QThread.currentThread()
+        cancelled = False
+        folder = self._folder
+        if folder.is_dir():
+            for root, _dirs, files in os.walk(folder, onerror=lambda _err: None):
+                if thread.isInterruptionRequested():
+                    cancelled = True
+                    break
+                for name in sorted(files):
+                    if thread.isInterruptionRequested():
+                        cancelled = True
+                        break
+                    if Path(name).suffix.lower() != ".pvcfg":
+                        continue
+                    discovered.append(Path(root).joinpath(name))
+                if cancelled:
+                    break
+        if not cancelled:
+            discovered.sort(key=lambda path: str(path).lower())
+        self.finished.emit(
+            self._request_id,
+            str(folder),
+            tuple(discovered),
+            bool(cancelled),
+        )
 
 
 class _SkipRulesEditorDialog(qtw.QDialog):
@@ -599,13 +640,145 @@ class DataPageMixin:
             return
         self._set_data_advanced_row_expanded(bool(checked))
 
+    def _ensure_ebus_discovery_state(self) -> None:
+        """Initialize lazy eBUS discovery caches and worker state."""
+
+        if hasattr(self, "_ebus_config_cache"):
+            return
+        self._ebus_config_cache: dict[str, tuple[Path, ...]] = {}
+        self._ebus_config_scan_request_id = 0
+        self._ebus_config_scan_inflight_root_key: str | None = None
+        self._ebus_config_scan_pending_root: Path | None = None
+        self._ebus_config_discovery_thread: QThread | None = None
+        self._ebus_config_discovery_worker: _EbusConfigDiscoveryWorker | None = None
+
+    @staticmethod
+    def _canonical_ebus_root(folder: Path | None) -> Path | None:
+        """Return one normalized eBUS scan root when the folder is usable."""
+
+        if folder is None:
+            return None
+        candidate = folder.expanduser().resolve(strict=False)
+        if not candidate.is_dir():
+            return None
+        return candidate
+
+    def _cached_recursive_ebus_configs(
+        self,
+        folder: Path | None,
+    ) -> tuple[list[Path], bool]:
+        """Return cached `.pvcfg` results and whether discovery is still pending."""
+
+        candidate = self._canonical_ebus_root(folder)
+        if candidate is None:
+            return ([], False)
+        self._ensure_ebus_discovery_state()
+        key = str(candidate)
+        cached = self._ebus_config_cache.get(key)
+        if cached is not None:
+            return (list(cached), False)
+        self._request_ebus_config_discovery(candidate)
+        return ([], True)
+
+    def _request_ebus_config_discovery(self, folder: Path) -> None:
+        """Start or queue one background `.pvcfg` discovery for the target root."""
+
+        self._ensure_ebus_discovery_state()
+        candidate = folder.expanduser().resolve(strict=False)
+        key = str(candidate)
+        if key in self._ebus_config_cache:
+            return
+        thread = self._ebus_config_discovery_thread
+        if thread is not None and thread.isRunning():
+            if self._ebus_config_scan_inflight_root_key == key:
+                return
+            self._ebus_config_scan_pending_root = candidate
+            thread.requestInterruption()
+            return
+        self._start_ebus_config_discovery(candidate)
+
+    def _start_ebus_config_discovery(self, folder: Path) -> None:
+        """Spawn one worker thread that discovers `.pvcfg` files for one root."""
+
+        self._ensure_ebus_discovery_state()
+        self._ebus_config_scan_request_id += 1
+        request_id = int(self._ebus_config_scan_request_id)
+        candidate = folder.expanduser().resolve(strict=False)
+        key = str(candidate)
+        thread = QThread(self)
+        worker = _EbusConfigDiscoveryWorker(request_id, candidate)
+        worker.moveToThread(thread)
+        thread.started.connect(worker.run)
+        worker.finished.connect(self._on_ebus_config_discovery_finished)
+        worker.finished.connect(thread.quit)
+        thread.finished.connect(
+            lambda t=thread, w=worker: self._on_ebus_config_discovery_thread_finished(
+                t,
+                w,
+            ),
+        )
+        self._ebus_config_scan_inflight_root_key = key
+        self._ebus_config_discovery_thread = thread
+        self._ebus_config_discovery_worker = worker
+        thread.start()
+
+    def _on_ebus_config_discovery_finished(
+        self,
+        request_id: int,
+        folder_text: str,
+        configs_payload,
+        cancelled: bool,
+    ) -> None:
+        """Store one discovery result and refresh the header when it is current."""
+
+        self._ensure_ebus_discovery_state()
+        candidate = Path(folder_text).expanduser().resolve(strict=False)
+        key = str(candidate)
+        if self._ebus_config_scan_inflight_root_key == key:
+            self._ebus_config_scan_inflight_root_key = None
+        if not cancelled:
+            self._ebus_config_cache[key] = tuple(configs_payload)
+        if cancelled or int(request_id) != int(self._ebus_config_scan_request_id):
+            return
+        current_folder_text = (
+            self.folder_edit.text().strip()
+            if hasattr(self, "folder_edit")
+            else ""
+        )
+        current_folder = (
+            Path(current_folder_text).expanduser().resolve(strict=False)
+            if current_folder_text
+            else None
+        )
+        if current_folder is not None and str(current_folder) == key:
+            self._refresh_ebus_config_status(current_folder)
+
+    def _on_ebus_config_discovery_thread_finished(
+        self,
+        thread: QThread,
+        worker: _EbusConfigDiscoveryWorker,
+    ) -> None:
+        """Clean up one finished discovery thread and start any queued request."""
+
+        if self._ebus_config_discovery_worker is worker:
+            self._ebus_config_discovery_worker = None
+        if self._ebus_config_discovery_thread is thread:
+            self._ebus_config_discovery_thread = None
+        worker.deleteLater()
+        thread.deleteLater()
+
+        pending_root = self._ebus_config_scan_pending_root
+        self._ebus_config_scan_pending_root = None
+        if pending_root is not None:
+            self._request_ebus_config_discovery(pending_root)
+
     def _refresh_data_header_state(self) -> None:
         """Refresh page header and summary-strip state for the Data tab."""
         dataset = self.dataset_state
         has_loaded = dataset.has_loaded_data()
         folder_text = self.folder_edit.text().strip() if hasattr(self, "folder_edit") else ""
         folder = Path(folder_text).expanduser() if folder_text else None
-        ebus_configs = self._discover_recursive_ebus_configs(folder)
+        ebus_configs, ebus_scanning = self._cached_recursive_ebus_configs(folder)
         ebus_tooltip = self._ebus_config_tooltip(folder, ebus_configs)
         metadata_mode = "JSON" if dataset.metadata_source_mode == "json" else "Path"
         metadata_level = (
@@ -664,8 +837,10 @@ class DataPageMixin:
         elif folder is not None and folder.is_dir():
             chips.append(
                 ChipSpec(
-                    "No eBUS config",
-                    level="neutral",
+                    "Scanning eBUS..."
+                    if ebus_scanning
+                    else "No eBUS config",
+                    level="warning" if ebus_scanning else "neutral",
                 ),
             )
         failure_count = len(getattr(self, "_processing_failures", []))
@@ -702,8 +877,14 @@ class DataPageMixin:
                 ),
                 SummaryItem(
                     "eBUS",
-                    self._ebus_summary_value(ebus_configs),
-                    level="success" if ebus_configs else "neutral",
+                    "Scanning..."
+                    if ebus_scanning
+                    else self._ebus_summary_value(ebus_configs),
+                    level=(
+                        "warning"
+                        if ebus_scanning
+                        else ("success" if ebus_configs else "neutral")
+                    ),
                     tooltip=ebus_tooltip,
                 ),
                 SummaryItem(
@@ -1046,7 +1227,12 @@ class DataPageMixin:
             self.ebus_config_status_label.setToolTip("")
             self._refresh_data_header_state()
             return
-        ebus_configs = self._discover_recursive_ebus_configs(candidate)
+        ebus_configs, ebus_scanning = self._cached_recursive_ebus_configs(candidate)
+        if ebus_scanning and not ebus_configs:
+            self.ebus_config_status_label.setText("Scanning eBUS configs...")
+            self.ebus_config_status_label.setToolTip(str(candidate))
+            self._refresh_data_header_state()
+            return
         if not ebus_configs:
             self.ebus_config_status_label.setText("")
             self.ebus_config_status_label.setToolTip("")

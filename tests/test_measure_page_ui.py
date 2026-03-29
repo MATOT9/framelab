@@ -53,6 +53,16 @@ def _write_measure_dataset(tmp_path: Path) -> Path:
     return dataset_root
 
 
+def _set_measure_current_row(window: FrameLabWindow, source_row: int) -> None:
+    model = window.table.model()
+    assert model is not None
+    index = model.index(source_row, 1)
+    if not index.isValid():
+        index = model.index(source_row, 0)
+    assert index.isValid()
+    window.table.setCurrentIndex(index)
+
+
 def test_measure_display_menu_updates_rounding_and_normalization(
     measure_window: FrameLabWindow,
 ) -> None:
@@ -272,3 +282,128 @@ def test_measure_header_shows_backend_badge_from_shared_snapshot(
 
     assert header_levels["Backend Python"] == "warning"
     assert summary_values["Backend"] == "Python"
+
+
+def test_measure_selection_debounces_preview_refresh_but_updates_selection_immediately(
+    tmp_path: Path,
+    measure_window: FrameLabWindow,
+    monkeypatch,
+    wait_for_dataset_load,
+    wait_until,
+) -> None:
+    dataset_root = _write_measure_dataset(tmp_path)
+    measure_window.folder_edit.setText(str(dataset_root))
+    measure_window.load_folder()
+    wait_for_dataset_load(measure_window)
+
+    renders: list[tuple[int, bool]] = []
+    monkeypatch.setattr(
+        measure_window,
+        "_render_display_image",
+        lambda idx, *, exact_preview, preview_generation=None: renders.append(
+            (int(idx), bool(exact_preview)),
+        ),
+    )
+    monkeypatch.setattr(
+        measure_window,
+        "_schedule_exact_preview_refresh",
+        lambda idx, *, preview_generation: None,
+    )
+
+    _set_measure_current_row(measure_window, 1)
+
+    assert measure_window.dataset_state.selected_index == 1
+    assert renders == []
+
+    wait_until(lambda: renders == [(1, False)], timeout_ms=1000)
+
+
+def test_measure_selection_burst_coalesces_to_latest_preview_row(
+    tmp_path: Path,
+    measure_window: FrameLabWindow,
+    monkeypatch,
+    wait_for_dataset_load,
+    wait_until,
+) -> None:
+    dataset_root = _write_measure_dataset(tmp_path)
+    measure_window.folder_edit.setText(str(dataset_root))
+    measure_window.load_folder()
+    wait_for_dataset_load(measure_window)
+
+    renders: list[tuple[int, bool]] = []
+    monkeypatch.setattr(
+        measure_window,
+        "_render_display_image",
+        lambda idx, *, exact_preview, preview_generation=None: renders.append(
+            (int(idx), bool(exact_preview)),
+        ),
+    )
+    monkeypatch.setattr(
+        measure_window,
+        "_schedule_exact_preview_refresh",
+        lambda idx, *, preview_generation: None,
+    )
+
+    _set_measure_current_row(measure_window, 1)
+    _set_measure_current_row(measure_window, 0)
+    _set_measure_current_row(measure_window, 1)
+
+    wait_until(lambda: renders == [(1, False)], timeout_ms=1000)
+    assert measure_window.dataset_state.selected_index == 1
+
+
+def test_measure_exact_preview_discards_stale_selection_results(
+    tmp_path: Path,
+    measure_window: FrameLabWindow,
+    monkeypatch,
+    wait_for_dataset_load,
+    wait_until,
+) -> None:
+    dataset_root = _write_measure_dataset(tmp_path)
+    measure_window.folder_edit.setText(str(dataset_root))
+    measure_window.load_folder()
+    wait_for_dataset_load(measure_window)
+
+    renders: list[tuple[int, bool]] = []
+    monkeypatch.setattr(
+        measure_window,
+        "_render_display_image",
+        lambda idx, *, exact_preview, preview_generation=None: renders.append(
+            (int(idx), bool(exact_preview)),
+        ),
+    )
+
+    _set_measure_current_row(measure_window, 1)
+    wait_until(lambda: (1, False) in renders, timeout_ms=1000)
+
+    _set_measure_current_row(measure_window, 0)
+    wait_until(lambda: (0, True) in renders, timeout_ms=1500)
+
+    assert (1, True) not in renders
+
+
+def test_measure_histogram_waits_until_histogram_tab_is_active(
+    tmp_path: Path,
+    measure_window: FrameLabWindow,
+    monkeypatch,
+    wait_for_dataset_load,
+    wait_until,
+) -> None:
+    dataset_root = _write_measure_dataset(tmp_path)
+    measure_window.folder_edit.setText(str(dataset_root))
+    measure_window.load_folder()
+    wait_for_dataset_load(measure_window)
+
+    histogram_calls: list[bool] = []
+    monkeypatch.setattr(
+        measure_window.histogram_widget,
+        "set_image",
+        lambda *args, **kwargs: histogram_calls.append(True),
+    )
+
+    _set_measure_current_row(measure_window, 1)
+    QtTest.QTest.qWait(180)
+    assert histogram_calls == []
+
+    measure_window.preview_pages.setCurrentIndex(1)
+    wait_until(lambda: len(histogram_calls) == 1, timeout_ms=1000)

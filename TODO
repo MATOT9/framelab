@@ -1,0 +1,56 @@
+# FrameLab TODO list
+
+## Repo level tasks
+
+1. Refractor pytest suite to avoid stalls and insanely long runners
+2. Make a numpy docstring and pep8 compliance pass
+3. Update envs requirements
+4. Update docs
+5. Optimize modules in folders and divide by responsabilities
+
+## Bug fixes
+
+1. Fix permission error in build script when trying to delete .pyd file
+2. Auto apply saturation treshold
+3. App lags when changing tabs
+4. Badges and chips disappears when clicking on other scopes
+5. right click menu no longer possible when no active preview
+
+## Core features implementation
+
+1. Implement .raw image file support with C backend
+2. Merge acquisition datacard and node metadata handling in a single mechanism
+3. Add ROI sum to metrics
+4. Begin setup builder development by implementing pre-registered cameras, lenses and filters to metadata handling and acquisition/session management
+5. Develop a UI-based setup builder to draw experimental setups
+
+## Software generic features
+
+1. Migrate the ui_state config to the FrameLab workspace saved files and start with factory settings otherwise
+2. Populate preferences menu with relevant settings
+
+## Performance optimizations
+
+1. Add mmap support to .raw file loader
+2. Add SIMD operations support to native backend
+3. Add LTO support to native backend compilation
+4. Add PGO support to native backend compilation
+
+## Plugins
+
+1. Dead pixel detection
+2. Spectral responsivity assessment
+3. Support for RGB images (Bayer pixel format)
+
+## Nice to have / Aesthetics
+
+1. Remove "scope" and "backend" chips since the info is already in badges
+2. Remove "preview active" badge
+3. Add external references menu beside help to open usefull references like GenICam, EMVA and GigE vision standards (each with their icon in drop down menu)
+4. Adaptative splash screen size
+5. Change software logo
+6. Move splash screen after the plugin selector and implement highly detailed status messages and progress bar (initializing plugins...)
+7. Clean unecessary badges and chips on UI
+8. Add a Qt icon package and update current icons for better ones
+9. Move functionnalities to icons in toolbar to save space
+10. Implement Qt advanced docking system

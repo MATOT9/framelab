@@ -96,15 +96,19 @@ class MetricsRuntimeMixin:
             np.asarray(image).shape,
             max_dim=self.PREVIEW_FAST_MAX_DIM,
         )
-        sampled_image = image if step <= 1 else np.asarray(image)[::step, ::step]
+        sampled_image = (
+            image
+            if step <= 1
+            else np.asarray(image)[::step, ::step]
+        )
         sampled_reference = (
             reference
             if step <= 1
             else np.asarray(reference)[::step, ::step]
         )
         return native_backend.apply_background_f32(
-            sampled_image,
-            background=sampled_reference,
+            np.ascontiguousarray(sampled_image),
+            background=np.ascontiguousarray(sampled_reference),
             clip_negative=self.metrics_state.background_config.clip_negative,
         )
 
@@ -933,6 +937,7 @@ class MetricsRuntimeMixin:
         ):
             dataset = self.dataset_state
             metrics = self.metrics_state
+            self._clear_pending_preview_requests()
             self.table_model.clear()
             dataset.set_selected_index(None)
             self.image_preview.clear_image()
@@ -1012,6 +1017,7 @@ class MetricsRuntimeMixin:
 
         if self._is_multi_cell_selection():
             self._pause_preview_updates = True
+            self._clear_pending_preview_requests()
             if update_analysis:
                 self._invalidate_analysis_context(refresh_visible_plugin=True)
             self._update_background_status_label()
@@ -1023,7 +1029,7 @@ class MetricsRuntimeMixin:
             and current_index.isValid()
         )
         if should_refresh_preview:
-            self._display_image(target_index)
+            self._schedule_row_preview_refresh(target_index, debounce=True)
         if update_analysis:
             self._invalidate_analysis_context(refresh_visible_plugin=True)
         self._update_background_status_label()
@@ -1044,6 +1050,7 @@ class MetricsRuntimeMixin:
             return
         if self._is_multi_cell_selection():
             self._pause_preview_updates = True
+            self._clear_pending_preview_requests()
             return
 
         current = self.table.currentIndex()
@@ -1062,23 +1069,107 @@ class MetricsRuntimeMixin:
         if not (0 <= row < dataset.path_count()):
             return
         was_paused = self._pause_preview_updates
-        if dataset.selected_index == row:
-            self._pause_preview_updates = False
-            if was_paused:
-                self._display_image(row)
-            return
         self._pause_preview_updates = False
+        if dataset.selected_index == row:
+            if was_paused:
+                self._schedule_row_preview_refresh(row, debounce=True)
+            return
         dataset.set_selected_index(row, path_count=dataset.path_count())
-        self._display_image(row)
+        self._schedule_row_preview_refresh(row, debounce=True)
         self._refresh_workspace_document_dirty_state()
 
-    def _schedule_exact_preview_refresh(self, idx: int) -> None:
+    def _clear_pending_preview_requests(self) -> None:
+        """Cancel any queued selection-driven preview refreshes."""
+
+        self._preview_selection_timer.stop()
+        self._preview_refresh_timer.stop()
+        self._pending_selection_preview_index = None
+        self._pending_selection_preview_generation = 0
+        self._pending_preview_index = None
+        self._pending_preview_generation = 0
+
+    def _histogram_preview_is_active(self) -> bool:
+        """Return whether histogram rendering is currently user-visible."""
+
+        if not self.show_histogram_preview:
+            return False
+        preview_pages = getattr(self, "preview_pages", None)
+        if preview_pages is None or not preview_pages.isVisible():
+            return bool(self.show_histogram_preview)
+        if hasattr(preview_pages, "isTabVisible") and not preview_pages.isTabVisible(1):
+            return False
+        return preview_pages.currentIndex() == 1
+
+    def _schedule_row_preview_refresh(
+        self,
+        idx: int,
+        *,
+        debounce: bool,
+    ) -> None:
+        """Queue one selection-driven preview refresh for the latest stable row."""
+
+        if not (0 <= idx < self.dataset_state.path_count()):
+            return
+        self._preview_generation += 1
+        generation = int(self._preview_generation)
+        self._pending_selection_preview_index = idx
+        self._pending_selection_preview_generation = generation
+        self._preview_selection_timer.stop()
+        self._preview_refresh_timer.stop()
+        self._pending_preview_index = None
+        self._pending_preview_generation = 0
+        if self._histogram_preview_is_active():
+            self.histogram_widget.clear_histogram()
+        if not (self.show_image_preview or self.show_histogram_preview):
+            return
+        if debounce:
+            self._preview_selection_timer.start()
+            return
+        self._flush_pending_selection_preview()
+
+    def _flush_pending_selection_preview(self) -> None:
+        """Render one debounced fast preview for the latest selected row."""
+
+        idx = self._pending_selection_preview_index
+        generation = int(self._pending_selection_preview_generation)
+        if idx is None or self._pause_preview_updates:
+            return
+        if self._is_dataset_load_running() or getattr(
+            self,
+            "_dataset_load_batch_applying",
+            False,
+        ):
+            self._preview_selection_timer.start()
+            return
+        if self.dataset_state.selected_index != idx:
+            return
+        if generation != int(self._preview_generation):
+            return
+        self._pending_selection_preview_index = None
+        self._pending_selection_preview_generation = 0
+        self._render_display_image(
+            idx,
+            exact_preview=False,
+            preview_generation=generation,
+        )
+        self._schedule_exact_preview_refresh(
+            idx,
+            preview_generation=generation,
+        )
+
+    def _schedule_exact_preview_refresh(
+        self,
+        idx: int,
+        *,
+        preview_generation: int,
+    ) -> None:
         """Queue one exact preview refresh after selection settles."""
 
         self._pending_preview_index = idx
+        self._pending_preview_generation = int(preview_generation)
         self._preview_refresh_timer.stop()
         if (
-            (self.show_image_preview or self.show_histogram_preview)
+            (self.show_image_preview or self._histogram_preview_is_active())
             and not self._is_dataset_load_running()
             and not getattr(self, "_dataset_load_batch_applying", False)
         ):
@@ -1088,6 +1179,7 @@ class MetricsRuntimeMixin:
         """Render the exact preview once selection and loading have settled."""
 
         idx = self._pending_preview_index
+        generation = int(self._pending_preview_generation)
         if idx is None or self._pause_preview_updates:
             return
         if self._is_dataset_load_running() or getattr(
@@ -1099,19 +1191,48 @@ class MetricsRuntimeMixin:
             return
         if self.dataset_state.selected_index != idx:
             return
-        self._render_display_image(idx, exact_preview=True)
+        if generation != int(self._preview_generation):
+            return
+        self._render_display_image(
+            idx,
+            exact_preview=True,
+            preview_generation=generation,
+        )
 
     def _display_image(self, idx: int) -> None:
         """Refresh one row preview immediately, then queue its exact redraw."""
 
-        self._render_display_image(idx, exact_preview=False)
-        self._schedule_exact_preview_refresh(idx)
+        if not (0 <= idx < self.dataset_state.path_count()):
+            return
+        self._preview_generation += 1
+        generation = int(self._preview_generation)
+        self._clear_pending_preview_requests()
+        self._render_display_image(
+            idx,
+            exact_preview=False,
+            preview_generation=generation,
+        )
+        self._schedule_exact_preview_refresh(
+            idx,
+            preview_generation=generation,
+        )
 
-    def _render_display_image(self, idx: int, *, exact_preview: bool) -> None:
+    def _render_display_image(
+        self,
+        idx: int,
+        *,
+        exact_preview: bool,
+        preview_generation: int | None = None,
+    ) -> None:
         """Render image preview, histogram, and info text for a row."""
         dataset = self.dataset_state
         metrics = self.metrics_state
         if self._pause_preview_updates:
+            return
+        if (
+            preview_generation is not None
+            and int(preview_generation) != int(self._preview_generation)
+        ):
             return
         if (
             not self._has_loaded_data()
@@ -1179,7 +1300,13 @@ class MetricsRuntimeMixin:
             self.image_preview.clear_image()
             self.image_preview.set_intensity_image(None)
 
-        if self.show_histogram_preview:
+        if (
+            preview_generation is not None
+            and int(preview_generation) != int(self._preview_generation)
+        ):
+            return
+
+        if self._histogram_preview_is_active():
             self.histogram_widget.set_image(
                 raw_image,
                 exact=(
@@ -1191,7 +1318,8 @@ class MetricsRuntimeMixin:
                 clip_negative=metrics.background_config.clip_negative,
             )
         else:
-            self.histogram_widget.clear_histogram()
+            if not self.show_histogram_preview:
+                self.histogram_widget.clear_histogram()
         self._update_average_controls()
 
         image_name = Path(image_path).name

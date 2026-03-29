@@ -86,12 +86,61 @@ def _default_roi_rect(shape: tuple[int, int]) -> tuple[int, int, int, int]:
     return (x0, y0, x1, y1)
 
 
+def _phase_backend_options(
+    *,
+    backend_mode: str,
+    operation: str,
+) -> dict[str, object]:
+    if backend_mode not in {"native", "python", "production"}:
+        raise ValueError(f"Unsupported backend mode: {backend_mode!r}")
+
+    allow_native = backend_mode != "python"
+    source_kind = "unknown"
+    backend_override = None
+
+    if operation in {"static_scan", "dynamic_metrics"}:
+        source_kind = "tiff"
+        if backend_mode == "native":
+            backend_override = "native"
+        elif backend_mode == "python":
+            backend_override = "python"
+
+    return {
+        "allow_native": bool(allow_native),
+        "source_kind": str(source_kind),
+        "backend_override": backend_override,
+    }
+
+
+def _phase_route(
+    *,
+    backend_mode: str,
+    operation: str,
+    mode: str | None = None,
+    threshold_only: bool = False,
+) -> tuple[dict[str, object], dict[str, object]]:
+    options = _phase_backend_options(
+        backend_mode=backend_mode,
+        operation=operation,
+    )
+    decision = native_backend.describe_metric_route(
+        operation,
+        source_kind=str(options["source_kind"]),
+        mode=mode,
+        threshold_only=threshold_only,
+        allow_native=bool(options["allow_native"]),
+        backend_override=options["backend_override"],
+    )
+    return (dict(decision), options)
+
+
 def _phase_summary(
     *,
     name: str,
     started_at: float,
     item_count: int,
     checksum: float,
+    route_info: dict[str, object] | None = None,
     background_applied_images: int | None = None,
     raw_fallback_images: int | None = None,
     skipped_reason: str | None = None,
@@ -104,6 +153,11 @@ def _phase_summary(
         "per_image_ms": round((elapsed * 1000.0 / item_count), 6) if item_count else 0.0,
         "checksum": float(checksum),
     }
+    if route_info is not None:
+        summary["route_used"] = str(route_info.get("route_used") or "")
+        summary["route_reason"] = str(route_info.get("route_reason") or "")
+        summary["source_kind"] = str(route_info.get("source_kind") or "")
+        summary["effective_mode"] = route_info.get("effective_mode")
     if background_applied_images is not None:
         summary["background_applied_images"] = int(background_applied_images)
     if raw_fallback_images is not None:
@@ -201,7 +255,6 @@ def _run_once(
     parity_check: str,
     parity_limit: int,
 ) -> dict[str, object]:
-    allow_native = backend_mode == "native"
     image_paths = _find_images(dataset_root)
     if not image_paths:
         raise SystemExit(f"No supported TIFF images found under {dataset_root}")
@@ -217,12 +270,18 @@ def _run_once(
     raw_fallback_total = len(images) - background_applicable_total
     phases: list[dict[str, object]] = []
 
+    static_route, static_options = _phase_route(
+        backend_mode=backend_mode,
+        operation="static_scan",
+    )
     started = time.perf_counter()
     checksum = 0.0
     for _path, image in images:
         min_non_zero, max_pixel = native_backend.compute_static_metrics(
             image,
-            allow_native=allow_native,
+            source_kind=str(static_options["source_kind"]),
+            allow_native=bool(static_options["allow_native"]),
+            backend_override=static_options["backend_override"],
         )
         checksum += float(min_non_zero) + float(max_pixel)
     phases.append(
@@ -231,12 +290,18 @@ def _run_once(
             started_at=started,
             item_count=len(images),
             checksum=checksum,
+            route_info=static_route,
         ),
     )
 
+    dynamic_none_route, dynamic_none_options = _phase_route(
+        backend_mode=backend_mode,
+        operation="dynamic_metrics",
+        mode="none",
+    )
     started = time.perf_counter()
     checksum = 0.0
-    for path, image in images:
+    for _path, image in images:
         reference = _resolved_background(image, background)
         result = native_backend.compute_dynamic_metrics(
             image,
@@ -244,7 +309,9 @@ def _run_once(
             mode="none",
             avg_count_value=avg_count_value,
             background=reference,
-            allow_native=allow_native,
+            source_kind=str(dynamic_none_options["source_kind"]),
+            allow_native=bool(dynamic_none_options["allow_native"]),
+            backend_override=dynamic_none_options["backend_override"],
         )
         checksum += (
             float(result["sat_count"])
@@ -257,6 +324,7 @@ def _run_once(
             started_at=started,
             item_count=len(images),
             checksum=checksum,
+            route_info=dynamic_none_route,
             background_applied_images=background_applicable_total,
             raw_fallback_images=raw_fallback_total,
             skipped_reason=(
@@ -267,6 +335,11 @@ def _run_once(
         ),
     )
 
+    dynamic_topk_route, dynamic_topk_options = _phase_route(
+        backend_mode=backend_mode,
+        operation="dynamic_metrics",
+        mode="topk",
+    )
     started = time.perf_counter()
     checksum = 0.0
     for _path, image in images:
@@ -277,7 +350,9 @@ def _run_once(
             mode="topk",
             avg_count_value=avg_count_value,
             background=reference,
-            allow_native=allow_native,
+            source_kind=str(dynamic_topk_options["source_kind"]),
+            allow_native=bool(dynamic_topk_options["allow_native"]),
+            backend_override=dynamic_topk_options["backend_override"],
         )
         checksum += (
             float(result["sat_count"])
@@ -291,6 +366,7 @@ def _run_once(
             started_at=started,
             item_count=len(images),
             checksum=checksum,
+            route_info=dynamic_topk_route,
             background_applied_images=background_applicable_total,
             raw_fallback_images=raw_fallback_total,
             skipped_reason=(
@@ -301,6 +377,10 @@ def _run_once(
         ),
     )
 
+    roi_route, roi_options = _phase_route(
+        backend_mode=backend_mode,
+        operation="roi_metrics",
+    )
     started = time.perf_counter()
     checksum = 0.0
     for _path, image in images:
@@ -309,7 +389,7 @@ def _run_once(
             image,
             roi_rect=_default_roi_rect(tuple(np.asarray(image).shape)),
             background=reference,
-            allow_native=allow_native,
+            allow_native=bool(roi_options["allow_native"]),
         )
         checksum += float(roi_max) + float(roi_mean) + float(roi_std) + float(roi_sem)
     phases.append(
@@ -318,6 +398,7 @@ def _run_once(
             started_at=started,
             item_count=len(images),
             checksum=checksum,
+            route_info=roi_route,
             background_applied_images=background_applicable_total,
             raw_fallback_images=raw_fallback_total,
             skipped_reason=(
@@ -328,6 +409,10 @@ def _run_once(
         ),
     )
 
+    preview_route, preview_options = _phase_route(
+        backend_mode=backend_mode,
+        operation="apply_background_f32",
+    )
     corrected_ready = 0
     started = time.perf_counter()
     checksum = 0.0
@@ -338,7 +423,7 @@ def _run_once(
         corrected = native_backend.apply_background_f32(
             image,
             background=reference,
-            allow_native=allow_native,
+            allow_native=bool(preview_options["allow_native"]),
         )
         checksum += float(np.sum(corrected, dtype=np.float64))
         corrected_ready += 1
@@ -348,6 +433,7 @@ def _run_once(
             started_at=started,
             item_count=corrected_ready,
             checksum=checksum,
+            route_info=preview_route,
             background_applied_images=background_applicable_total,
             raw_fallback_images=raw_fallback_total,
             skipped_reason=(
@@ -362,6 +448,14 @@ def _run_once(
         ),
     )
 
+    histogram_route, histogram_options = _phase_route(
+        backend_mode=backend_mode,
+        operation="compute_histogram",
+    )
+    range_options = _phase_backend_options(
+        backend_mode=backend_mode,
+        operation="compute_value_range",
+    )
     started = time.perf_counter()
     checksum = 0.0
     histogram_count = 0
@@ -373,7 +467,7 @@ def _run_once(
             data_min, data_max = native_backend.compute_value_range(
                 image,
                 background=reference,
-                allow_native=allow_native,
+                allow_native=bool(range_options["allow_native"]),
             )
         range_min, range_max = _histogram_range(data_min, data_max)
         bin_count = _histogram_bins(
@@ -387,7 +481,7 @@ def _run_once(
             value_range=(range_min, range_max),
             bin_count=bin_count,
             background=reference,
-            allow_native=allow_native,
+            allow_native=bool(histogram_options["allow_native"]),
         )
         checksum += float(np.sum(counts, dtype=np.float64))
         histogram_count += 1
@@ -397,6 +491,7 @@ def _run_once(
             started_at=started,
             item_count=histogram_count,
             checksum=checksum,
+            route_info=histogram_route,
             background_applied_images=background_applicable_total,
             raw_fallback_images=raw_fallback_total,
             skipped_reason=(
@@ -413,7 +508,12 @@ def _run_once(
 
     report = {
         "requested_backend": backend_mode,
-        "allow_native": bool(allow_native),
+        "forced_backend": (
+            backend_mode
+            if backend_mode in {"native", "python"}
+            else None
+        ),
+        "allow_native": bool(backend_mode != "python"),
         "dataset_root": str(dataset_root),
         "background_path": None if background_path is None else str(background_path),
         "image_count": len(images),
@@ -482,42 +582,90 @@ def _run_subprocess(
     return json.loads(completed.stdout)
 
 
-def _print_summary(report: dict[str, object]) -> None:
+def _render_summary(report: dict[str, object]) -> str:
     status = dict(report["backend_status"])
-    print(
-        f"[{report['requested_backend']}] forced={report.get('requested_backend')} "
-        f"wrapper_active={status.get('active_backend')} "
-        f"native_available={status.get('native_available')} "
-        f"latched={status.get('native_latched_off')}\n",
+    lines: list[str] = []
+    requested_backend = str(report.get("requested_backend") or "unknown")
+    forced_backend = report.get("forced_backend")
+    header = f"[{requested_backend}]"
+    if forced_backend:
+        header += f" forced={forced_backend}"
+    else:
+        header += " forced=policy"
+    header += (
+        f" wrapper_active={status.get('active_backend')}"
+        f" native_available={status.get('native_available')}"
+        f" latched={status.get('native_latched_off')}"
     )
+    lines.append(header)
     reason = status.get("last_fallback_reason")
     if reason:
-        print(f"  reason: {reason}")
-    print(
-        "  background_applicable="
-        f"{report.get('background_applicable_images', 0)} "
-        f"raw_fallback={report.get('background_raw_fallback_images', 0)}",
+        lines.append(f"  reason: {reason}")
+    lines.append(
+        "  dataset:"
+        f" images={int(report.get('image_count', 0))}"
+        f" background_applicable={int(report.get('background_applicable_images', 0))}"
+        f" raw_fallback={int(report.get('background_raw_fallback_images', 0))}",
     )
+
+    phase_headers = [
+        ("phase", "Phase"),
+        ("route_used", "Route"),
+        ("route_reason", "Reason"),
+        ("images", "Images"),
+        ("elapsed_s", "Total(s)"),
+        ("per_image_ms", "ms/img"),
+        ("checksum", "Checksum"),
+    ]
+    formatted_rows: list[dict[str, str]] = []
     for phase in report["phases"]:
-        line = (
-            f"  {phase['phase']}: images={phase['images']} "
-            f"time={phase['elapsed_s']}s per_image={phase['per_image_ms']}ms "
-            f"checksum={phase['checksum']}"
+        formatted_rows.append(
+            {
+                "phase": str(phase.get("phase") or ""),
+                "route_used": str(phase.get("route_used") or "-"),
+                "route_reason": str(phase.get("route_reason") or "-"),
+                "images": str(int(phase.get("images") or 0)),
+                "elapsed_s": str(phase.get("elapsed_s")),
+                "per_image_ms": str(phase.get("per_image_ms")),
+                "checksum": str(phase.get("checksum")),
+            },
         )
-        background_applied = phase.get("background_applied_images")
-        raw_fallback = phase.get("raw_fallback_images")
-        if background_applied is not None or raw_fallback is not None:
-            line += (
-                f" | background_applied={int(background_applied or 0)}"
-                f" raw_fallback={int(raw_fallback or 0)}"
-            )
-        skipped_reason = phase.get("skipped_reason")
-        if skipped_reason:
-            line += f" | note={skipped_reason}"
-        print(line)
+
+    widths: dict[str, int] = {}
+    for key, label in phase_headers:
+        widths[key] = max(
+            len(label),
+            *(len(row[key]) for row in formatted_rows),
+        )
+
+    lines.append("  phases:")
+    lines.append(
+        "    "
+        + "  ".join(label.ljust(widths[key]) for key, label in phase_headers),
+    )
+    lines.append(
+        "    "
+        + "  ".join("-" * widths[key] for key, _label in phase_headers),
+    )
+    for row in formatted_rows:
+        lines.append(
+            "    "
+            + "  ".join(row[key].ljust(widths[key]) for key, _label in phase_headers),
+        )
+
+    notes = [
+        f"{phase.get('phase')}: {phase.get('skipped_reason')}"
+        for phase in report["phases"]
+        if phase.get("skipped_reason")
+    ]
+    if notes:
+        lines.append("  notes:")
+        for note in notes:
+            lines.append(f"    - {note}")
+
     roi_parity = report.get("roi_parity")
     if isinstance(roi_parity, dict):
-        print(
+        lines.append(
             "  roi_parity:"
             f" checked={roi_parity.get('checked_images', 0)}"
             f" mismatches={roi_parity.get('mismatch_count', 0)}"
@@ -527,11 +675,16 @@ def _print_summary(report: dict[str, object]) -> None:
         mismatches = roi_parity.get("mismatches") or []
         if mismatches:
             first = mismatches[0]
-            print(f"    first_mismatch_path={first.get('path')}")
-            print(f"    roi_rect={first.get('roi_rect')}")
-            print(f"    background_applied={first.get('background_applied')}")
-            print(f"    native={first.get('native')}")
-            print(f"    python={first.get('python')}")
+            lines.append(f"    first_mismatch_path={first.get('path')}")
+            lines.append(f"    roi_rect={first.get('roi_rect')}")
+            lines.append(f"    background_applied={first.get('background_applied')}")
+            lines.append(f"    native={first.get('native')}")
+            lines.append(f"    python={first.get('python')}")
+    return "\n".join(lines)
+
+
+def _print_summary(report: dict[str, object]) -> None:
+    print(_render_summary(report))
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -542,7 +695,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--background", type=Path, default=None)
     parser.add_argument(
         "--backend",
-        choices=("native", "python", "both"),
+        choices=("native", "python", "both", "production"),
         default="both",
     )
     parser.add_argument("--threshold", type=float, default=65520.0)
@@ -589,15 +742,19 @@ def main(argv: list[str] | None = None) -> int:
             backend_mode=backend_mode,
             threshold_value=float(args.threshold),
             avg_count_value=int(args.avg_count),
-            parity_check="none",
+            parity_check=(
+                str(args.parity_check)
+                if len(backends) == 1
+                else "none"
+            ),
             parity_limit=int(args.parity_limit),
         )
         _print_summary(report)
-    if str(args.parity_check) == "roi":
+    if str(args.parity_check) == "roi" and len(backends) > 1:
         parity_report = _run_once(
             dataset_root=dataset_root,
             background_path=background_path,
-            backend_mode="native",
+            backend_mode="production",
             threshold_value=float(args.threshold),
             avg_count_value=int(args.avg_count),
             parity_check="roi",

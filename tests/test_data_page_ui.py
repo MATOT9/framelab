@@ -100,6 +100,7 @@ def test_metadata_controls_row_is_no_longer_collapsible(
 def test_ebus_status_scans_selected_root_recursively(
     data_window: FrameLabWindow,
     tmp_path: Path,
+    wait_until,
 ) -> None:
     dataset_root = tmp_path / "dataset"
     acquisition_root = dataset_root / "session-01" / "acq-0001"
@@ -113,6 +114,10 @@ def test_ebus_status_scans_selected_root_recursively(
 
     data_window.folder_edit.setText(str(dataset_root))
     data_window._refresh_ebus_config_status(dataset_root)
+    wait_until(
+        lambda: data_window.ebus_config_status_label.text() == "eBUS config: camera_snapshot.pvcfg",
+        timeout_ms=1000,
+    )
 
     assert data_window.ebus_config_status_label.text() == "eBUS config: camera_snapshot.pvcfg"
     assert data_window.ebus_config_status_label.toolTip() == str(snapshot_path)
@@ -132,6 +137,37 @@ def test_ebus_status_scans_selected_root_recursively(
         summary_values[label.text()] = value.text()
 
     assert summary_values.get("eBUS") == "1 file"
+
+
+def test_data_header_defers_recursive_ebus_discovery_to_background_scan(
+    data_window: FrameLabWindow,
+    tmp_path: Path,
+    wait_until,
+) -> None:
+    dataset_root = tmp_path / "dataset"
+    acquisition_root = dataset_root / "session-01" / "acq-0001"
+    acquisition_root.mkdir(parents=True)
+    snapshot_path = acquisition_root / "camera_snapshot.pvcfg"
+    snapshot_path.write_text("DeviceModelName=Test Camera\n", encoding="utf-8")
+
+    data_window.folder_edit.setText(str(dataset_root))
+    data_window._refresh_data_header_state()
+
+    assert any(
+        chip.text() == "Scanning eBUS..."
+        for chip in data_window._data_header.findChildren(StatusChip)
+    )
+    wait_until(
+        lambda: getattr(data_window, "_ebus_config_discovery_thread", None) is None,
+        timeout_ms=1000,
+    )
+    wait_until(
+        lambda: data_window._ebus_summary_value(
+            data_window._cached_recursive_ebus_configs(dataset_root)[0],
+        ) == "1 file",
+        timeout_ms=1000,
+    )
+    assert snapshot_path.exists()
 
 
 def test_folder_json_metadata_scan_detects_nodecards_recursively(

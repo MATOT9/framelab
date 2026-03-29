@@ -90,6 +90,7 @@ class WorkflowExplorerDock(qtw.QDockWidget):
         ] = ()
         self._syncing_selection = False
         self._pending_scroll_restore: tuple[int, int] | None = None
+        self._pending_activation_node_id: str | None = None
         self._pending_session_parent_node_id: str | None = None
         self._pending_session_item: qtw.QTreeWidgetItem | None = None
         self._pending_session_editor: qtw.QLineEdit | None = None
@@ -324,6 +325,10 @@ class WorkflowExplorerDock(qtw.QDockWidget):
         self._main_splitter.setSizes([240, 640])
 
         self.setWidget(container)
+        self._activation_timer = QtCore.QTimer(self)
+        self._activation_timer.setSingleShot(True)
+        self._activation_timer.setInterval(75)
+        self._activation_timer.timeout.connect(self._activate_pending_selection)
         self.visibilityChanged.connect(self._on_visibility_changed)
         self.apply_density(self._density_tokens)
         self.sync_from_host()
@@ -708,8 +713,10 @@ class WorkflowExplorerDock(qtw.QDockWidget):
         if self._syncing_selection:
             return
         node = self._selected_node()
+        self._sync_action_state()
         if node is None:
-            self._sync_action_state()
+            self._pending_activation_node_id = None
+            self._activation_timer.stop()
             return
         controller = getattr(self._host_window, "workflow_state_controller", None)
         if controller is not None and node.node_id != controller.active_node_id:
@@ -717,9 +724,24 @@ class WorkflowExplorerDock(qtw.QDockWidget):
                 self._tree.verticalScrollBar().value(),
                 self._tree.horizontalScrollBar().value(),
             )
-            self._host_window.set_active_workflow_node(node.node_id)
+            self._pending_activation_node_id = node.node_id
+            self._activation_timer.start()
             return
-        self._sync_action_state()
+        self._pending_activation_node_id = None
+        self._activation_timer.stop()
+
+    def _activate_pending_selection(self) -> None:
+        """Apply the latest selected scope after a short debounce."""
+
+        node_id = self._pending_activation_node_id
+        self._pending_activation_node_id = None
+        if not node_id:
+            return
+        self._host_window.set_active_workflow_node(
+            node_id,
+            unload_mismatched_dataset=False,
+            notify_origin="workflow_explorer",
+        )
 
     def _open_workflow_selector(self) -> None:
         """Open the host workflow selector dialog."""

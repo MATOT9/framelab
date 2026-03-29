@@ -206,6 +206,63 @@ def test_histogram_widget_uses_backend_range_for_background_exact_histogram(
     widget.deleteLater()
 
 
+def test_histogram_widget_makes_approximate_sampled_inputs_contiguous(
+    qapp,
+    monkeypatch,
+) -> None:
+    widget = HistogramWidget()
+    widget.set_exact_refresh_suppressed(True)
+    calls: list[dict[str, object]] = []
+
+    monkeypatch.setattr(
+        widgets_module.native_backend,
+        "compute_value_range",
+        lambda image, **kwargs: (
+            calls.append(
+                {
+                    "kind": "range",
+                    "shape": tuple(np.asarray(image).shape),
+                    "image_contiguous": bool(np.asarray(image).flags.c_contiguous),
+                    "background_contiguous": bool(
+                        np.asarray(kwargs["background"]).flags.c_contiguous,
+                    ),
+                },
+            )
+            or (0.0, 1.0)
+        ),
+    )
+    monkeypatch.setattr(
+        widgets_module.native_backend,
+        "compute_histogram",
+        lambda image, **kwargs: (
+            calls.append(
+                {
+                    "kind": "hist",
+                    "shape": tuple(np.asarray(image).shape),
+                    "image_contiguous": bool(np.asarray(image).flags.c_contiguous),
+                    "background_contiguous": bool(
+                        np.asarray(kwargs["background"]).flags.c_contiguous,
+                    ),
+                },
+            )
+            or np.array([4, 5, 6], dtype=np.uint64)
+        ),
+    )
+
+    image = np.arange(900_000, dtype=np.float32).reshape(1000, 900)
+    background = np.zeros_like(image)
+    widget.set_image(image, exact=False, background=background)
+    qapp.processEvents()
+
+    assert [call["kind"] for call in calls] == ["range", "hist"]
+    assert calls[0]["shape"][0] == 1
+    assert calls[1]["shape"] == calls[0]["shape"]
+    assert calls[0]["shape"][1] <= widget._APPROXIMATE_SAMPLE_LIMIT
+    assert all(call["image_contiguous"] for call in calls)
+    assert all(call["background_contiguous"] for call in calls)
+    widget.deleteLater()
+
+
 def test_histogram_widget_supports_zoom_pan_and_reset(qapp) -> None:
     widget = HistogramWidget()
     image = np.arange(100, dtype=np.float32).reshape(10, 10)
