@@ -12,6 +12,12 @@
 #define NPY_NO_DEPRECATED_API NPY_1_20_API_VERSION
 #include <numpy/arrayobject.h>
 
+#ifdef _PyCFunction_CAST
+#define FRAMELAB_PY_CFUNCTION_CAST(func) _PyCFunction_CAST(func)
+#else
+#define FRAMELAB_PY_CFUNCTION_CAST(func) ((PyCFunction)(void (*)(void))(func))
+#endif
+
 #include "framelab_native/common/types.h"
 #include "framelab_native/common/status.h"
 

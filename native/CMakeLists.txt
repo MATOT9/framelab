@@ -159,6 +159,9 @@ if(FRAMELAB_BUILD_PYTHON_MODULE)
     target_include_directories(_native PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/src/api
+    )
+    target_include_directories(_native SYSTEM PRIVATE
+        ${Python3_INCLUDE_DIRS}
         ${Python3_NumPy_INCLUDE_DIRS}
     )
     target_link_libraries(_native PRIVATE
@@ -178,7 +181,9 @@ if(FRAMELAB_BUILD_PYTHON_MODULE)
             target_compile_options(_native PRIVATE /WX)
         endif()
     else()
-        target_compile_options(_native PRIVATE -Wall -Wextra -Wpedantic -Wshadow -Wconversion -Wstrict-prototypes)
+        # The Python and NumPy C APIs intentionally use extension patterns that
+        # GCC reports under -Wpedantic, which drowns out warnings in our code.
+        target_compile_options(_native PRIVATE -Wall -Wextra -Wshadow -Wconversion -Wstrict-prototypes)
         if(FRAMELAB_WARNINGS_AS_ERRORS)
             target_compile_options(_native PRIVATE -Werror)
         endif()

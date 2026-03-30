@@ -667,7 +667,7 @@ static PyMethodDef framelab_methods[] = {
     },
     {
         "compute_dynamic_metrics",
-        (PyCFunction)py_compute_dynamic_metrics,
+        FRAMELAB_PY_CFUNCTION_CAST(py_compute_dynamic_metrics),
         METH_VARARGS | METH_KEYWORDS,
         PyDoc_STR(
             "compute_dynamic_metrics(image, *, threshold_value, mode, avg_count_value, background=None, clip_negative=True)\n"
@@ -676,7 +676,7 @@ static PyMethodDef framelab_methods[] = {
     },
     {
         "compute_roi_metrics",
-        (PyCFunction)py_compute_roi_metrics,
+        FRAMELAB_PY_CFUNCTION_CAST(py_compute_roi_metrics),
         METH_VARARGS | METH_KEYWORDS,
         PyDoc_STR(
             "compute_roi_metrics(image, *, roi_rect, background=None, clip_negative=True)\n"
@@ -685,7 +685,7 @@ static PyMethodDef framelab_methods[] = {
     },
     {
         "apply_background_f32",
-        (PyCFunction)py_apply_background_f32,
+        FRAMELAB_PY_CFUNCTION_CAST(py_apply_background_f32),
         METH_VARARGS | METH_KEYWORDS,
         PyDoc_STR(
             "apply_background_f32(image, background, clip_negative=True) -> float32 ndarray"
@@ -693,7 +693,7 @@ static PyMethodDef framelab_methods[] = {
     },
     {
         "compute_value_range",
-        (PyCFunction)py_compute_value_range,
+        FRAMELAB_PY_CFUNCTION_CAST(py_compute_value_range),
         METH_VARARGS | METH_KEYWORDS,
         PyDoc_STR(
             "compute_value_range(image, background=None, clip_negative=True) -> (min_value, max_value)"
@@ -701,7 +701,7 @@ static PyMethodDef framelab_methods[] = {
     },
     {
         "compute_histogram",
-        (PyCFunction)py_compute_histogram,
+        FRAMELAB_PY_CFUNCTION_CAST(py_compute_histogram),
         METH_VARARGS | METH_KEYWORDS,
         PyDoc_STR(
             "compute_histogram(image, value_range, bin_count, background=None, clip_negative=True) -> uint64 ndarray"
@@ -709,7 +709,7 @@ static PyMethodDef framelab_methods[] = {
     },
     {
         "decode_raw_file",
-        (PyCFunction)py_decode_raw_file,
+        FRAMELAB_PY_CFUNCTION_CAST(py_decode_raw_file),
         METH_VARARGS | METH_KEYWORDS,
         PyDoc_STR(
             "decode_raw_file(path, pixel_format, width, height, stride_bytes=0, offset_bytes=0) -> uint16 ndarray"
