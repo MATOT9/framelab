@@ -417,3 +417,38 @@ def test_detect_supported_workspace_walks_up_from_frames_dir(
     assert detection.profile_id == "trials"
     assert detection.anchor_type_id == "acquisition"
     assert detection.workspace_root == acquisition_root.resolve()
+
+
+def test_detect_supported_workspace_skips_inaccessible_campaign_children(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    workspace_root = tmp_path / "calibration"
+    campaign_root = workspace_root / "camera-a" / "campaign-2026"
+    session_root = campaign_root / "2026-03-05__sess01"
+    acquisitions_root = session_root / "acquisitions"
+    acquisition_root = acquisitions_root / "acq-0011__scene"
+    frames_root = acquisition_root / "frames"
+    frames_root.mkdir(parents=True, exist_ok=True)
+    _write_session_datacard(session_root)
+    _make_acquisition(acquisitions_root, "acq-0012")
+    blocked_sessions_root = campaign_root / "01_sessions"
+    blocked_sessions_root.mkdir(parents=True, exist_ok=True)
+
+    original_iterdir = Path.iterdir
+    blocked_text = str(blocked_sessions_root.resolve())
+
+    def _guarded_iterdir(path: Path):
+        if str(path.resolve(strict=False)) == blocked_text:
+            raise PermissionError("access denied")
+        return original_iterdir(path)
+
+    monkeypatch.setattr(Path, "iterdir", _guarded_iterdir)
+
+    controller = WorkflowStateController()
+    detection = controller.detect_supported_workspace(frames_root)
+
+    assert detection is not None
+    assert detection.profile_id == "calibration"
+    assert detection.anchor_type_id == "acquisition"
+    assert detection.workspace_root == acquisition_root.resolve()

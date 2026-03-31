@@ -20,6 +20,27 @@ _SESSION_CONTAINER_NAMES = {"01_sessions", "sessions"}
 _CUSTOM_WORKFLOW_PROFILE_ID = "custom"
 
 
+def _sorted_child_dirs(folder_path: Path) -> tuple[Path, ...]:
+    """Return readable child directories only, skipping inaccessible folders."""
+
+    if not folder_path.is_dir():
+        return ()
+    try:
+        children = sorted(folder_path.iterdir(), key=lambda item: item.name.lower())
+    except OSError:
+        return ()
+    discovered: list[Path] = []
+    for child in children:
+        try:
+            is_dir = child.is_dir()
+        except OSError:
+            continue
+        if not is_dir:
+            continue
+        discovered.append(child)
+    return tuple(discovered)
+
+
 @dataclass(frozen=True, slots=True)
 class WorkflowLoadResult:
     """Summary of one workflow load into controller state."""
@@ -476,14 +497,13 @@ class WorkflowStateController:
     @staticmethod
     def _discover_generic_child_dirs(folder_path: Path) -> tuple[Path, ...]:
         children: list[Path] = []
-        if not folder_path.is_dir():
-            return ()
-        for child in sorted(folder_path.iterdir(), key=lambda item: item.name.lower()):
-            if not child.is_dir():
-                continue
+        for child in _sorted_child_dirs(folder_path):
             if child.name in _SKIPPED_DIR_NAMES or child.name.startswith("."):
                 continue
-            children.append(child.resolve())
+            try:
+                children.append(child.resolve())
+            except OSError:
+                continue
         return tuple(children)
 
     @classmethod
@@ -496,21 +516,20 @@ class WorkflowStateController:
         seen: set[Path] = set()
 
         def _append_session_candidates(root: Path) -> None:
-            for child in sorted(root.iterdir(), key=lambda item: item.name.lower()):
-                if not child.is_dir():
-                    continue
+            for child in _sorted_child_dirs(root):
                 if child.name in _SKIPPED_DIR_NAMES or child.name.startswith("."):
                     continue
-                resolved = child.resolve()
+                try:
+                    resolved = child.resolve()
+                except OSError:
+                    continue
                 if resolved in seen or not cls._looks_like_session_anchor(resolved):
                     continue
                 seen.add(resolved)
                 session_dirs.append(resolved)
 
         _append_session_candidates(campaign_root)
-        for child in sorted(campaign_root.iterdir(), key=lambda item: item.name.lower()):
-            if not child.is_dir():
-                continue
+        for child in _sorted_child_dirs(campaign_root):
             if child.name.lower() not in _SESSION_CONTAINER_NAMES:
                 continue
             _append_session_candidates(child)
@@ -533,20 +552,21 @@ class WorkflowStateController:
         seen: set[Path] = set()
         acquisition_dirs: list[Path] = []
         for candidate_root in candidate_roots:
-            resolved_root = candidate_root.resolve()
+            try:
+                resolved_root = candidate_root.resolve()
+            except OSError:
+                continue
             if resolved_root in seen or not resolved_root.is_dir():
                 continue
             seen.add(resolved_root)
-            for child in sorted(
-                resolved_root.iterdir(),
-                key=lambda item: item.name.lower(),
-            ):
-                if not child.is_dir():
-                    continue
+            for child in _sorted_child_dirs(resolved_root):
                 parsed = parse_acquisition_folder_name(child.name)
                 if parsed is None and not resolve_acquisition_datacard_path(child).is_file():
                     continue
-                acquisition_dirs.append(child.resolve())
+                try:
+                    acquisition_dirs.append(child.resolve())
+                except OSError:
+                    continue
             if acquisition_dirs:
                 break
         return tuple(acquisition_dirs)

@@ -756,6 +756,28 @@ def test_workflow_context_reframes_folder_actions_as_scope_actions(
     assert window.folder_edit.text() == str(session_root.resolve())
 
 
+def test_workflow_tab_changes_coalesce_visibility_refresh_until_settled(
+    framelab_window_factory,
+    monkeypatch,
+    wait_until,
+) -> None:
+    window = framelab_window_factory(enabled_plugin_ids=())
+    refresh_calls: list[int] = []
+
+    monkeypatch.setattr(
+        window,
+        "_apply_dynamic_visibility_policy",
+        lambda: refresh_calls.append(window.workflow_tabs.currentIndex()),
+    )
+
+    window.workflow_tabs.setCurrentIndex(1)
+    window.workflow_tabs.setCurrentIndex(0)
+    window.workflow_tabs.setCurrentIndex(1)
+
+    assert refresh_calls == []
+    wait_until(lambda: refresh_calls == [1], timeout_ms=1000)
+
+
 def test_window_can_rename_acquisition_from_workflow_structure_tools(
     tmp_path: Path,
     framelab_window_factory,

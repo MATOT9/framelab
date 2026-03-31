@@ -262,6 +262,46 @@ def test_workflow_explorer_dock_defers_host_activation_until_timer_fires(
     wait_until(lambda: calls == [acquisition_node_id], timeout_ms=1000)
 
 
+def test_workflow_explorer_scan_scope_switches_tab_then_starts_load_after_defer(
+    tmp_path: Path,
+    framelab_window_factory,
+    monkeypatch,
+    wait_until,
+) -> None:
+    workspace_root, _session_root, _acquisition_root, session_node_id, acquisition_node_id = (
+        _make_workspace(tmp_path)
+    )
+    window = framelab_window_factory(enabled_plugin_ids=())
+    window.set_workflow_context(
+        str(workspace_root),
+        "calibration",
+        active_node_id=session_node_id,
+    )
+    window.workflow_tabs.setCurrentIndex(1)
+
+    dock = window._workflow_explorer_dock
+    load_calls: list[tuple[int, str | None]] = []
+
+    def _fake_load_folder(*args, **kwargs) -> None:
+        load_calls.append(
+            (
+                window.workflow_tabs.currentIndex(),
+                window.workflow_state_controller.active_node_id,
+            ),
+        )
+
+    monkeypatch.setattr(window, "load_folder", _fake_load_folder)
+
+    dock._tree.setCurrentItem(dock._item_by_node_id[acquisition_node_id])
+    dock._scan_scope()
+
+    assert window.workflow_tabs.currentIndex() == 0
+    assert load_calls == []
+
+    wait_until(lambda: len(load_calls) == 1, timeout_ms=1000)
+    assert load_calls == [(0, acquisition_node_id)]
+
+
 def test_workflow_explorer_keeps_active_path_visible_without_loaded_workflow(
     framelab_window_factory,
     process_events,

@@ -34,6 +34,7 @@ class AnalysisPageMixin:
             return False
         return (
             self.workflow_tabs.currentWidget() is getattr(self, "analysis_page", None)
+            and bool(getattr(self, "_analysis_plugin_engaged", False))
         )
 
     def _apply_analysis_page_density(self, tokens) -> None:

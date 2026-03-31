@@ -7,7 +7,7 @@ from dataclasses import replace
 from typing import Any, Optional
 
 from PySide6 import QtGui, QtWidgets as qtw
-from PySide6.QtCore import Qt, QSignalBlocker, QSize, QTimer
+from PySide6.QtCore import Qt, QSignalBlocker, QSize
 
 from ..stylesheets import (
     DARK_THEME,
@@ -706,19 +706,39 @@ class WindowChromeMixin:
 
     def _on_workflow_tab_changed(self, index: int) -> None:
         """Update contextual status hint when user changes main tab."""
-        if hasattr(self, "analysis_page") and hasattr(self, "workflow_tabs"):
+        self._pending_workflow_tab_index = int(index)
+        timer = getattr(self, "_workflow_tab_settle_timer", None)
+        if timer is not None:
+            timer.start()
+        else:
+            self._flush_pending_workflow_tab_change()
+        self.context_hint = self._workflow_hint_for_index(index)
+        if hasattr(self, "_schedule_workspace_document_dirty_state_refresh"):
+            self._schedule_workspace_document_dirty_state_refresh()
+        else:
+            self._refresh_workspace_document_dirty_state()
+        self._set_status()
+
+    def _flush_pending_workflow_tab_change(self) -> None:
+        """Apply one settled main-tab transition after rapid tab switching stops."""
+
+        if not hasattr(self, "workflow_tabs"):
+            return
+        index = self.workflow_tabs.currentIndex()
+        self._pending_workflow_tab_index = None
+
+        engaged = False
+        if hasattr(self, "analysis_page"):
             analysis_index = self.workflow_tabs.indexOf(self.analysis_page)
             engaged = analysis_index >= 0 and index == analysis_index
-            if self._analysis_plugin_engaged != engaged:
-                self._analysis_plugin_engaged = engaged
-                self._apply_dynamic_visibility_policy()
-            if engaged and hasattr(self, "_restore_visible_analysis_layout"):
-                QTimer.singleShot(0, self._restore_visible_analysis_layout)
-            if engaged and hasattr(self, "_flush_dirty_analysis_context_if_visible"):
-                QTimer.singleShot(0, self._flush_dirty_analysis_context_if_visible)
-        self.context_hint = self._workflow_hint_for_index(index)
-        self._refresh_workspace_document_dirty_state()
-        self._set_status()
+        if self._analysis_plugin_engaged != engaged:
+            self._analysis_plugin_engaged = engaged
+
+        self._apply_dynamic_visibility_policy()
+        if engaged and hasattr(self, "_restore_visible_analysis_layout"):
+            self._restore_visible_analysis_layout()
+        if engaged and hasattr(self, "_flush_dirty_analysis_context_if_visible"):
+            self._flush_dirty_analysis_context_if_visible()
 
     def _copy_table_selection(self) -> None:
         """Copy selected metrics-table cells to clipboard."""

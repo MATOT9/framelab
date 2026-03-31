@@ -743,6 +743,13 @@ class WorkflowExplorerDock(qtw.QDockWidget):
             notify_origin="workflow_explorer",
         )
 
+    def flush_pending_activation(self) -> None:
+        """Apply any queued scope activation immediately."""
+
+        if self._activation_timer.isActive():
+            self._activation_timer.stop()
+        self._activate_pending_selection()
+
     def _open_workflow_selector(self) -> None:
         """Open the host workflow selector dialog."""
 
@@ -764,6 +771,11 @@ class WorkflowExplorerDock(qtw.QDockWidget):
 
     def _scan_scope(self) -> None:
         """Scan the currently active workflow scope through the Data page."""
+
+        request_scan = getattr(self._host_window, "_request_scan_selected_scope", None)
+        if callable(request_scan):
+            request_scan()
+            return
 
         load_folder = getattr(self._host_window, "load_folder", None)
         tabs = getattr(self._host_window, "workflow_tabs", None)

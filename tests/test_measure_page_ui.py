@@ -304,18 +304,13 @@ def test_measure_selection_debounces_preview_refresh_but_updates_selection_immed
             (int(idx), bool(exact_preview)),
         ),
     )
-    monkeypatch.setattr(
-        measure_window,
-        "_schedule_exact_preview_refresh",
-        lambda idx, *, preview_generation: None,
-    )
 
     _set_measure_current_row(measure_window, 1)
 
     assert measure_window.dataset_state.selected_index == 1
     assert renders == []
 
-    wait_until(lambda: renders == [(1, False)], timeout_ms=1000)
+    wait_until(lambda: renders == [(1, True)], timeout_ms=1000)
 
 
 def test_measure_selection_burst_coalesces_to_latest_preview_row(
@@ -338,21 +333,16 @@ def test_measure_selection_burst_coalesces_to_latest_preview_row(
             (int(idx), bool(exact_preview)),
         ),
     )
-    monkeypatch.setattr(
-        measure_window,
-        "_schedule_exact_preview_refresh",
-        lambda idx, *, preview_generation: None,
-    )
 
     _set_measure_current_row(measure_window, 1)
     _set_measure_current_row(measure_window, 0)
     _set_measure_current_row(measure_window, 1)
 
-    wait_until(lambda: renders == [(1, False)], timeout_ms=1000)
+    wait_until(lambda: renders == [(1, True)], timeout_ms=1000)
     assert measure_window.dataset_state.selected_index == 1
 
 
-def test_measure_exact_preview_discards_stale_selection_results(
+def test_measure_settled_preview_discards_stale_selection_results(
     tmp_path: Path,
     measure_window: FrameLabWindow,
     monkeypatch,
@@ -374,12 +364,8 @@ def test_measure_exact_preview_discards_stale_selection_results(
     )
 
     _set_measure_current_row(measure_window, 1)
-    wait_until(lambda: (1, False) in renders, timeout_ms=1000)
-
     _set_measure_current_row(measure_window, 0)
-    wait_until(lambda: (0, True) in renders, timeout_ms=1500)
-
-    assert (1, True) not in renders
+    wait_until(lambda: renders == [(0, True)], timeout_ms=1000)
 
 
 def test_measure_histogram_waits_until_histogram_tab_is_active(

@@ -205,6 +205,13 @@ class FrameLabWindow(
         self._analysis_context_refresh_timer.timeout.connect(
             self._flush_dirty_analysis_context_if_visible,
         )
+        self._workflow_tab_settle_timer = QTimer(self)
+        self._workflow_tab_settle_timer.setSingleShot(True)
+        self._workflow_tab_settle_timer.setInterval(150)
+        self._workflow_tab_settle_timer.timeout.connect(
+            self._flush_pending_workflow_tab_change,
+        )
+        self._pending_workflow_tab_index: int | None = None
         self._analysis_plugins: list[AnalysisPlugin] = []
         self.metrics_cache = MetricsCache()
         self._dynamic_cache_pending: dict[str, object] | None = None
@@ -282,22 +289,14 @@ class FrameLabWindow(
         )
         self._roi_apply_thread: Optional[QThread] = None
         self._roi_apply_worker: Optional[RoiApplyWorker] = None
-        self._preview_refresh_timer = QTimer(self)
-        self._preview_refresh_timer.setSingleShot(True)
-        self._preview_refresh_timer.setInterval(120)
-        self._preview_refresh_timer.timeout.connect(
-            self._flush_pending_preview_refresh,
-        )
         self._preview_selection_timer = QTimer(self)
         self._preview_selection_timer.setSingleShot(True)
-        self._preview_selection_timer.setInterval(100)
+        self._preview_selection_timer.setInterval(150)
         self._preview_selection_timer.timeout.connect(
             self._flush_pending_selection_preview,
         )
         self._pending_selection_preview_index: int | None = None
         self._pending_selection_preview_generation = 0
-        self._pending_preview_index: int | None = None
-        self._pending_preview_generation = 0
         self._preview_generation = 0
         self._pause_preview_updates = False
         self._workflow_scope_refresh_timer = QTimer(self)
@@ -307,6 +306,19 @@ class FrameLabWindow(
             self._flush_pending_workflow_scope_refresh,
         )
         self._pending_workflow_scope_refresh_origin: str | None = None
+        self._scan_selected_scope_timer = QTimer(self)
+        self._scan_selected_scope_timer.setSingleShot(True)
+        self._scan_selected_scope_timer.setInterval(25)
+        self._scan_selected_scope_timer.timeout.connect(
+            self._flush_pending_scan_selected_scope,
+        )
+        self._pending_scan_selected_scope = False
+        self._workspace_document_dirty_timer = QTimer(self)
+        self._workspace_document_dirty_timer.setSingleShot(True)
+        self._workspace_document_dirty_timer.setInterval(200)
+        self._workspace_document_dirty_timer.timeout.connect(
+            self._refresh_workspace_document_dirty_state,
+        )
         self._sort_column = -1
         self._sort_order = Qt.AscendingOrder
         self._theme_mode = self.ui_preferences.theme_mode
@@ -504,26 +516,21 @@ class FrameLabWindow(
                 continue
             if origin == "workflow_explorer" and attr_name == "_workflow_explorer_dock":
                 continue
-            if origin == "workflow_explorer" and isinstance(dialog, qtw.QWidget):
-                if (
-                    attr_name == "_metadata_inspector_dock"
-                    and not dialog.isVisible()
-                    and hasattr(dialog, "mark_dirty")
-                ):
+            if isinstance(dialog, qtw.QWidget) and not dialog.isVisible():
+                mark_dirty = getattr(dialog, "mark_dirty", None)
+                if callable(mark_dirty):
                     try:
-                        dialog.mark_dirty()
+                        mark_dirty()
                     except Exception:
                         pass
+                continue
+            schedule_refresh = getattr(dialog, "schedule_sync_from_host", None)
+            if callable(schedule_refresh):
+                try:
+                    schedule_refresh()
+                except Exception:
                     continue
-                if not dialog.isVisible():
-                    continue
-                schedule_refresh = getattr(dialog, "schedule_sync_from_host", None)
-                if callable(schedule_refresh):
-                    try:
-                        schedule_refresh()
-                    except Exception:
-                        continue
-                    continue
+                continue
             refresh = getattr(dialog, "sync_from_host", None)
             if callable(refresh):
                 try:
@@ -573,6 +580,30 @@ class FrameLabWindow(
         if hasattr(self, "_refresh_workflow_shell_context"):
             self._refresh_workflow_shell_context()
         self._schedule_workflow_scope_refresh(origin=origin)
+
+    def _request_scan_selected_scope(self) -> None:
+        """Switch to Data, then start scanning after scope activation settles."""
+
+        explorer = getattr(self, "_workflow_explorer_dock", None)
+        flush_pending = getattr(explorer, "flush_pending_activation", None)
+        if callable(flush_pending):
+            try:
+                flush_pending()
+            except Exception:
+                pass
+        if hasattr(self, "workflow_tabs"):
+            self.workflow_tabs.setCurrentIndex(0)
+        self._pending_scan_selected_scope = True
+        self._scan_selected_scope_timer.start()
+
+    def _flush_pending_scan_selected_scope(self) -> None:
+        """Kick off one pending scope scan after tab switching has settled."""
+
+        if not self._pending_scan_selected_scope:
+            return
+        self._pending_scan_selected_scope = False
+        if hasattr(self, "load_folder"):
+            self.load_folder()
 
     def _notify_metadata_context_changed(
         self,
@@ -1034,7 +1065,7 @@ class FrameLabWindow(
             )
             self._set_manual_dataset_scope(current_folder)
             self._notify_workflow_scope_changed()
-            self._refresh_workspace_document_dirty_state()
+            self._schedule_workspace_document_dirty_state_refresh()
             return None
 
         load_result = self.workflow_state_controller.load_workspace(
@@ -1060,7 +1091,7 @@ class FrameLabWindow(
                 unload_mismatched_dataset=True,
             )
         self._notify_workflow_scope_changed()
-        self._refresh_workspace_document_dirty_state()
+        self._schedule_workspace_document_dirty_state_refresh()
         return load_result.active_node_id
 
     def set_active_workflow_node(
@@ -1091,7 +1122,7 @@ class FrameLabWindow(
                 unload_mismatched_dataset=unload_mismatched_dataset,
             )
         self._notify_workflow_scope_changed(origin=notify_origin)
-        self._refresh_workspace_document_dirty_state()
+        self._schedule_workspace_document_dirty_state_refresh()
         return self.ui_state_snapshot.workflow_active_node_id
 
     def recent_workflow_entries(self) -> tuple[RecentWorkflowEntry, ...]:
@@ -1905,6 +1936,15 @@ class FrameLabWindow(
             return
         self._workspace_document_dirty = dirty
         self._update_workspace_document_window_title()
+
+    def _schedule_workspace_document_dirty_state_refresh(self) -> None:
+        """Coalesce expensive dirty-state recomputation after transient UI changes."""
+
+        timer = getattr(self, "_workspace_document_dirty_timer", None)
+        if timer is None:
+            self._refresh_workspace_document_dirty_state()
+            return
+        timer.start()
 
     def _capture_workspace_document_snapshot(self) -> WorkspaceDocumentSnapshot:
         """Capture the current reopenable session as one workspace document."""
