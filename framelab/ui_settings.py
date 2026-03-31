@@ -45,6 +45,7 @@ class UiPreferences:
     collapse_analysis_plugin_controls_by_default: bool = True
     collapse_data_advanced_row_by_default: bool = True
     collapse_summary_strips_by_default: bool = False
+    scan_worker_count_override: int | None = None
 
 
 @dataclass(slots=True)
@@ -118,6 +119,13 @@ def _parse_int(value: object, fallback: int | None = None) -> int | None:
         return int(str(value).strip())
     except (TypeError, ValueError):
         return fallback
+
+
+def _parse_positive_optional_int(value: object, fallback: int | None = None) -> int | None:
+    parsed = _parse_int(value, fallback)
+    if parsed is None or parsed <= 0:
+        return None
+    return parsed
 
 
 def _parse_splitter_sizes(value: object) -> list[int] | None:
@@ -287,6 +295,14 @@ class UiStateStore:
                     defaults.collapse_summary_strips_by_default,
                 ),
             ),
+            scan_worker_count_override=_parse_positive_optional_int(
+                config.get(
+                    _SECTION_DATA_PAGE,
+                    "scan_worker_count_override",
+                    fallback=defaults.scan_worker_count_override,
+                ),
+                defaults.scan_worker_count_override,
+            ),
         )
 
         panel_states: dict[str, bool] = {}
@@ -428,6 +444,14 @@ class UiStateStore:
             _SECTION_DATA_PAGE,
             "collapse_advanced_row_by_default",
             _serialize_bool(snapshot.preferences.collapse_data_advanced_row_by_default),
+        )
+        self._set_option(
+            config,
+            _SECTION_DATA_PAGE,
+            "scan_worker_count_override",
+            None
+            if snapshot.preferences.scan_worker_count_override is None
+            else str(max(1, int(snapshot.preferences.scan_worker_count_override))),
         )
         self._set_option(
             config,

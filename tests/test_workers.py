@@ -10,7 +10,12 @@ import tifffile
 import framelab.workers as workers_module
 from framelab.background import BackgroundConfig, BackgroundLibrary
 from framelab.metrics_state import DynamicStatsResult, RoiApplyResult
-from framelab.workers import DynamicStatsWorker, RoiApplyWorker
+from framelab.workers import (
+    DynamicStatsWorker,
+    RoiApplyWorker,
+    auto_dataset_scan_worker_count,
+    dataset_scan_worker_count,
+)
 
 
 pytestmark = [pytest.mark.core]
@@ -79,6 +84,15 @@ def test_dynamic_worker_computes_topk_stats_and_saturation_counts(
     np.testing.assert_array_equal(result.max_pixels, np.array([4, 5], dtype=np.int64))
     np.testing.assert_array_equal(result.min_non_zero, np.array([1, 1], dtype=np.int64))
     np.testing.assert_array_equal(result.bg_applied_mask, np.array([False, False]))
+
+
+def test_dataset_scan_worker_count_supports_auto_and_manual_override() -> None:
+    assert auto_dataset_scan_worker_count(cpu_count=1) == 1
+    assert auto_dataset_scan_worker_count(cpu_count=4) == 2
+    assert auto_dataset_scan_worker_count(cpu_count=12) == 6
+    assert dataset_scan_worker_count(None, cpu_count=12) == 6
+    assert dataset_scan_worker_count(3, cpu_count=12) == 3
+    assert dataset_scan_worker_count(0, cpu_count=12) == 6
 
 
 def test_dynamic_worker_handles_k_equals_one_and_k_larger_than_pixel_count(

@@ -236,7 +236,13 @@ class DatasetLoadingMixin:
 
     def _scan_worker_count(self) -> int:
         """Return worker count used for image scanning."""
-        return dataset_scan_worker_count()
+        prefs = getattr(self, "ui_preferences", None)
+        worker_override = (
+            getattr(prefs, "scan_worker_count_override", None)
+            if prefs is not None
+            else None
+        )
+        return dataset_scan_worker_count(worker_override)
 
     @staticmethod
     def _chunk_size_for_scan(total_files: int) -> int:
@@ -749,6 +755,11 @@ class DatasetLoadingMixin:
             job_id=job_id,
             folder=str(folder),
             skip_patterns=tuple(self.skip_patterns),
+            scan_worker_count_override=(
+                getattr(self.ui_preferences, "scan_worker_count_override", None)
+                if hasattr(self, "ui_preferences")
+                else None
+            ),
             metadata_source=self.dataset_state.metadata_source_mode,
             metadata_boundary_root=(
                 str(metadata_boundary_root)

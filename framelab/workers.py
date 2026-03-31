@@ -178,11 +178,55 @@ def _find_supported_images(
     return (sorted(found), pruned_dirs, skipped_files)
 
 
-def dataset_scan_worker_count() -> int:
-    """Return a conservative worker count for large image scans."""
+def dataset_scan_worker_count(
+    worker_count: int | None = None,
+    *,
+    cpu_count: int | None = None,
+) -> int:
+    """Return the effective worker count for large image scans."""
 
-    cpu = os.cpu_count() or 4
-    return min(4, max(2, cpu // 4))
+    return dataset_scan_worker_count_for_override(
+        worker_count,
+        cpu_count=cpu_count,
+    )
+
+
+def _normalize_scan_worker_count_override(worker_count: int | None) -> int | None:
+    """Normalize persisted/manual scan-worker overrides."""
+
+    if worker_count is None:
+        return None
+    try:
+        resolved = int(worker_count)
+    except (TypeError, ValueError):
+        return None
+    if resolved <= 0:
+        return None
+    return resolved
+
+
+def auto_dataset_scan_worker_count(*, cpu_count: int | None = None) -> int:
+    """Return the auto-detected worker count based on available CPU cores."""
+
+    cpu = max(1, int(cpu_count or os.cpu_count() or 1))
+    if cpu <= 2:
+        return 1
+    if cpu <= 4:
+        return 2
+    return min(8, max(2, (cpu + 1) // 2))
+
+
+def dataset_scan_worker_count_for_override(
+    worker_count: int | None,
+    *,
+    cpu_count: int | None = None,
+) -> int:
+    """Resolve a manual-or-auto dataset scan worker count."""
+
+    normalized = _normalize_scan_worker_count_override(worker_count)
+    if normalized is not None:
+        return normalized
+    return auto_dataset_scan_worker_count(cpu_count=cpu_count)
 
 
 def dataset_scan_chunk_size(total_files: int) -> int:
@@ -709,6 +753,7 @@ class DatasetLoadWorker(QObject):
         job_id: int,
         folder: str,
         skip_patterns: tuple[str, ...] = (),
+        scan_worker_count_override: int | None = None,
         metadata_source: str = "json",
         metadata_boundary_root: str | None = None,
         scope_effective_metadata: dict[str, object] | None = None,
@@ -723,6 +768,9 @@ class DatasetLoadWorker(QObject):
             str(pattern).strip()
             for pattern in skip_patterns
             if str(pattern).strip()
+        )
+        self._scan_worker_count_override = _normalize_scan_worker_count_override(
+            scan_worker_count_override,
         )
         self._metadata_source = str(metadata_source or "path")
         self._metadata_boundary_root = (
@@ -839,7 +887,7 @@ class DatasetLoadWorker(QObject):
 
             total_files = len(files)
             chunk_size = dataset_scan_chunk_size(total_files)
-            max_workers = dataset_scan_worker_count()
+            max_workers = dataset_scan_worker_count(self._scan_worker_count_override)
             cache = MetricsCache(Path(self._cache_path)) if self._cache_path else None
             static_signature = static_metric_signature_hash()
             executor: ThreadPoolExecutor | None = None

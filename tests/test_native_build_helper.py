@@ -61,6 +61,43 @@ def test_build_commands_match_expected_cross_platform_shape(tmp_path: Path) -> N
     ]
 
 
+def test_build_plan_supports_cross_compile_toolchain_and_python_artifacts(
+    tmp_path: Path,
+) -> None:
+    toolchain = tmp_path / "native" / "cmake" / "toolchains" / "mingw.cmake"
+    toolchain.parent.mkdir(parents=True, exist_ok=True)
+    toolchain.write_text("# toolchain\n", encoding="utf-8")
+
+    plan = build_helper.build_plan(
+        repo_root=tmp_path,
+        build_dir=tmp_path / "build-win",
+        output_dir=tmp_path / "out-win",
+        cmake_executable="cmake",
+        target_system="windows",
+        toolchain_file=toolchain,
+        python_include_dir=tmp_path / "py-win" / "include",
+        python_numpy_include_dir=tmp_path / "py-win" / "numpy",
+        python_library=tmp_path / "py-win" / "libs" / "libpython312.a",
+    )
+
+    configure_cmd = plan.configure_command()
+
+    assert f"-DFRAMELAB_TARGET_SYSTEM=windows" in configure_cmd
+    assert f"-DCMAKE_TOOLCHAIN_FILE={toolchain.resolve()}" in configure_cmd
+    assert (
+        f"-DFRAMELAB_PYTHON_INCLUDE_DIR={(tmp_path / 'py-win' / 'include').resolve()}"
+        in configure_cmd
+    )
+    assert (
+        f"-DFRAMELAB_PYTHON_NUMPY_INCLUDE_DIR={(tmp_path / 'py-win' / 'numpy').resolve()}"
+        in configure_cmd
+    )
+    assert (
+        f"-DFRAMELAB_PYTHON_LIBRARY={(tmp_path / 'py-win' / 'libs' / 'libpython312.a').resolve()}"
+        in configure_cmd
+    )
+
+
 def test_run_build_executes_configure_then_build(tmp_path: Path) -> None:
     plan = build_helper.build_plan(
         repo_root=tmp_path,

@@ -39,6 +39,7 @@ def test_load_returns_defaults_when_config_missing(store: UiStateStore) -> None:
     assert not snapshot.preferences.show_histogram_preview
     assert snapshot.preferences.restore_panel_states
     assert snapshot.preferences.restore_last_tab
+    assert snapshot.preferences.scan_worker_count_override is None
     assert snapshot.panel_states == {}
     assert snapshot.splitter_sizes == {}
     assert snapshot.last_tab_index is None
@@ -65,6 +66,7 @@ def test_save_and_reload_round_trips_preferences_and_state(
             collapse_analysis_plugin_controls_by_default=False,
             collapse_data_advanced_row_by_default=False,
             collapse_summary_strips_by_default=True,
+            scan_worker_count_override=5,
         ),
         panel_states={
             "analysis.plugin_controls": False,
@@ -106,6 +108,7 @@ def test_save_and_reload_round_trips_preferences_and_state(
     assert not reloaded.preferences.collapse_analysis_plugin_controls_by_default
     assert not reloaded.preferences.collapse_data_advanced_row_by_default
     assert reloaded.preferences.collapse_summary_strips_by_default
+    assert reloaded.preferences.scan_worker_count_override == 5
     assert reloaded.panel_states == {
         "analysis.plugin_controls": False,
         "data.advanced_row": True,
@@ -200,6 +203,7 @@ def test_invalid_values_fall_back_to_defaults(
     assert not snapshot.preferences.restore_last_tab
     assert not snapshot.preferences.collapse_data_advanced_row_by_default
     assert snapshot.preferences.collapse_analysis_plugin_controls_by_default
+    assert snapshot.preferences.scan_worker_count_override is None
     assert snapshot.panel_states == {}
     assert snapshot.splitter_sizes == {}
     assert snapshot.last_tab_index is None

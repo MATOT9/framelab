@@ -14,6 +14,7 @@ from typing import Sequence
 DEFAULT_BUILD_TYPE = "Release"
 DEFAULT_ENABLE_IPO = sys.platform != "win32"
 EXTENSION_OUTPUT_GLOBS = ("_native*.pyd", "_native*.so")
+_VALID_TARGET_SYSTEMS = {"native", "linux", "windows"}
 
 
 @dataclass(frozen=True, slots=True)
@@ -27,22 +28,48 @@ class NativeBuildPlan:
     python_executable: str
     build_type: str = DEFAULT_BUILD_TYPE
     enable_ipo: bool = DEFAULT_ENABLE_IPO
+    target_system: str = "native"
+    generator: str | None = None
+    platform: str | None = None
+    toolchain_file: Path | None = None
+    python_include_dir: Path | None = None
+    python_library: Path | None = None
+    python_numpy_include_dir: Path | None = None
 
     def configure_command(self) -> list[str]:
         """Return the CMake configure command."""
 
-        return [
-            self.cmake_executable,
-            "-S",
-            str(self.native_dir),
-            "-B",
-            str(self.build_dir),
-            "-DFRAMELAB_BUILD_PYTHON_MODULE=ON",
-            f"-DFRAMELAB_ENABLE_IPO={'ON' if self.enable_ipo else 'OFF'}",
-            f"-DPython3_EXECUTABLE={self.python_executable}",
-            f"-DFRAMELAB_PYTHON_OUTPUT_DIR={self.output_dir}",
-            f"-DCMAKE_BUILD_TYPE={self.build_type}",
-        ]
+        command = [self.cmake_executable]
+        if self.generator:
+            command.extend(["-G", self.generator])
+        if self.platform:
+            command.extend(["-A", self.platform])
+        command.extend(
+            [
+                "-S",
+                str(self.native_dir),
+                "-B",
+                str(self.build_dir),
+                "-DFRAMELAB_BUILD_PYTHON_MODULE=ON",
+                f"-DFRAMELAB_ENABLE_IPO={'ON' if self.enable_ipo else 'OFF'}",
+                f"-DPython3_EXECUTABLE={self.python_executable}",
+                f"-DFRAMELAB_PYTHON_OUTPUT_DIR={self.output_dir}",
+                f"-DCMAKE_BUILD_TYPE={self.build_type}",
+            ]
+        )
+        if self.target_system != "native":
+            command.append(f"-DFRAMELAB_TARGET_SYSTEM={self.target_system}")
+        if self.toolchain_file is not None:
+            command.append(f"-DCMAKE_TOOLCHAIN_FILE={self.toolchain_file}")
+        if self.python_include_dir is not None:
+            command.append(f"-DFRAMELAB_PYTHON_INCLUDE_DIR={self.python_include_dir}")
+        if self.python_library is not None:
+            command.append(f"-DFRAMELAB_PYTHON_LIBRARY={self.python_library}")
+        if self.python_numpy_include_dir is not None:
+            command.append(
+                f"-DFRAMELAB_PYTHON_NUMPY_INCLUDE_DIR={self.python_numpy_include_dir}"
+            )
+        return command
 
     def build_command(self) -> list[str]:
         """Return the CMake build command."""
@@ -69,6 +96,25 @@ def find_cmake_executable() -> str | None:
     return shutil.which("cmake")
 
 
+def default_cross_toolchain_file(
+    *,
+    repo_root: str | Path | None = None,
+    target_system: str = "native",
+) -> Path | None:
+    """Return the default bundled toolchain file for a cross target, if any."""
+
+    normalized_target = str(target_system or "native").strip().lower()
+    if normalized_target != "windows":
+        return None
+    root = (
+        Path(repo_root).resolve()
+        if repo_root is not None
+        else repo_root_from_file(__file__)
+    )
+    candidate = root / "native" / "cmake" / "toolchains" / "mingw-w64-x86_64.cmake"
+    return candidate if candidate.exists() else None
+
+
 def build_plan(
     *,
     repo_root: str | Path | None = None,
@@ -78,6 +124,13 @@ def build_plan(
     build_type: str = DEFAULT_BUILD_TYPE,
     enable_ipo: bool = DEFAULT_ENABLE_IPO,
     cmake_executable: str | None = None,
+    target_system: str = "native",
+    generator: str | None = None,
+    platform: str | None = None,
+    toolchain_file: str | Path | None = None,
+    python_include_dir: str | Path | None = None,
+    python_library: str | Path | None = None,
+    python_numpy_include_dir: str | Path | None = None,
 ) -> NativeBuildPlan:
     """Return a fully resolved native-extension build plan."""
 
@@ -97,11 +150,37 @@ def build_plan(
         if output_dir is not None
         else root / "framelab" / "native"
     )
+    normalized_target_system = str(target_system or "native").strip().lower()
+    if normalized_target_system not in _VALID_TARGET_SYSTEMS:
+        raise RuntimeError(
+            "target_system must be one of: native, linux, windows",
+        )
+    resolved_toolchain_file = (
+        Path(toolchain_file).resolve()
+        if toolchain_file is not None
+        else (
+            default_cross_toolchain_file(
+                repo_root=root,
+                target_system=normalized_target_system,
+            )
+            if normalized_target_system != "native" and sys.platform != "win32"
+            else None
+        )
+    )
     cmake_path = cmake_executable or find_cmake_executable()
     if not cmake_path:
         raise RuntimeError(
             "CMake was not found on PATH. Install CMake and ensure `cmake` is "
             "available before building the FrameLab native backend.",
+        )
+    if (python_include_dir is None) != (python_numpy_include_dir is None):
+        raise RuntimeError(
+            "Provide both --python-include-dir and --python-numpy-include-dir "
+            "together when overriding target Python artifacts.",
+        )
+    if resolved_toolchain_file is not None and not resolved_toolchain_file.exists():
+        raise RuntimeError(
+            f"Requested toolchain file does not exist: {resolved_toolchain_file}",
         )
     return NativeBuildPlan(
         cmake_executable=cmake_path,
@@ -111,6 +190,25 @@ def build_plan(
         python_executable=python_executable or sys.executable,
         build_type=str(build_type or DEFAULT_BUILD_TYPE),
         enable_ipo=bool(enable_ipo),
+        target_system=normalized_target_system,
+        generator=(str(generator).strip() or None) if generator is not None else None,
+        platform=(str(platform).strip() or None) if platform is not None else None,
+        toolchain_file=resolved_toolchain_file,
+        python_include_dir=(
+            Path(python_include_dir).resolve()
+            if python_include_dir is not None
+            else None
+        ),
+        python_library=(
+            Path(python_library).resolve()
+            if python_library is not None
+            else None
+        ),
+        python_numpy_include_dir=(
+            Path(python_numpy_include_dir).resolve()
+            if python_numpy_include_dir is not None
+            else None
+        ),
     )
 
 
@@ -208,6 +306,46 @@ def _parser() -> argparse.ArgumentParser:
         default=sys.executable,
         help="Python interpreter CMake should bind the extension against.",
     )
+    parser.add_argument(
+        "--target-system",
+        choices=sorted(_VALID_TARGET_SYSTEMS),
+        default="native",
+        help="Target system for the native build (default: native).",
+    )
+    parser.add_argument(
+        "--generator",
+        default=None,
+        help="Optional CMake generator name, for example 'Ninja' or 'Visual Studio 17 2022'.",
+    )
+    parser.add_argument(
+        "--platform",
+        default=None,
+        help="Optional CMake generator platform value passed with -A.",
+    )
+    parser.add_argument(
+        "--toolchain-file",
+        type=Path,
+        default=None,
+        help="Optional CMake toolchain file for cross compilation.",
+    )
+    parser.add_argument(
+        "--python-include-dir",
+        type=Path,
+        default=None,
+        help="Optional target Python include directory for explicit/native-cross artifact selection.",
+    )
+    parser.add_argument(
+        "--python-library",
+        type=Path,
+        default=None,
+        help="Optional target Python library or import library path.",
+    )
+    parser.add_argument(
+        "--python-numpy-include-dir",
+        type=Path,
+        default=None,
+        help="Optional target NumPy include directory for explicit/native-cross artifact selection.",
+    )
     return parser
 
 
@@ -223,6 +361,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             output_dir=args.output_dir,
             build_type=args.build_type,
             enable_ipo=args.enable_ipo,
+            target_system=args.target_system,
+            generator=args.generator,
+            platform=args.platform,
+            toolchain_file=args.toolchain_file,
+            python_include_dir=args.python_include_dir,
+            python_library=args.python_library,
+            python_numpy_include_dir=args.python_numpy_include_dir,
         )
     except RuntimeError as exc:
         print(str(exc), file=sys.stderr)

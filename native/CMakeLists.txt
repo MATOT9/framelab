@@ -31,6 +31,10 @@ option(
 option(FRAMELAB_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
 option(FRAMELAB_BUILD_PYTHON_MODULE "Build the Python extension module (_native)" ON)
 set(FRAMELAB_PYTHON_OUTPUT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../framelab/native" CACHE PATH "Directory for the built Python extension")
+set(FRAMELAB_TARGET_SYSTEM "native" CACHE STRING "Requested helper target system label")
+set(FRAMELAB_PYTHON_INCLUDE_DIR "" CACHE PATH "Explicit Python include directory for native/cross builds")
+set(FRAMELAB_PYTHON_LIBRARY "" CACHE FILEPATH "Explicit Python library or import library for native/cross builds")
+set(FRAMELAB_PYTHON_NUMPY_INCLUDE_DIR "" CACHE PATH "Explicit NumPy include directory for native/cross builds")
 
 set(FRAMELAB_CORE_HEADERS
     include/framelab_native/api.h
@@ -150,9 +154,15 @@ if(FRAMELAB_ENABLE_IPO)
 endif()
 
 if(FRAMELAB_BUILD_PYTHON_MODULE)
-    find_package(Python3 COMPONENTS Interpreter Development.Module NumPy REQUIRED)
+    if((FRAMELAB_PYTHON_INCLUDE_DIR AND NOT FRAMELAB_PYTHON_NUMPY_INCLUDE_DIR) OR
+       (FRAMELAB_PYTHON_NUMPY_INCLUDE_DIR AND NOT FRAMELAB_PYTHON_INCLUDE_DIR))
+        message(FATAL_ERROR
+            "Provide both FRAMELAB_PYTHON_INCLUDE_DIR and FRAMELAB_PYTHON_NUMPY_INCLUDE_DIR "
+            "when overriding Python build artifacts."
+        )
+    endif()
 
-    Python3_add_library(_native MODULE
+    add_library(_native MODULE
         ${FRAMELAB_API_SOURCES}
     )
 
@@ -160,19 +170,39 @@ if(FRAMELAB_BUILD_PYTHON_MODULE)
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/src/api
     )
-    target_include_directories(_native SYSTEM PRIVATE
-        ${Python3_INCLUDE_DIRS}
-        ${Python3_NumPy_INCLUDE_DIRS}
-    )
-    target_link_libraries(_native PRIVATE
-        framelab_native
-        Python3::Module
-    )
+    target_link_libraries(_native PRIVATE framelab_native)
+
+    if(FRAMELAB_PYTHON_INCLUDE_DIR AND FRAMELAB_PYTHON_NUMPY_INCLUDE_DIR)
+        target_include_directories(_native SYSTEM PRIVATE
+            ${FRAMELAB_PYTHON_INCLUDE_DIR}
+            ${FRAMELAB_PYTHON_NUMPY_INCLUDE_DIR}
+        )
+        if(FRAMELAB_PYTHON_LIBRARY)
+            target_link_libraries(_native PRIVATE "${FRAMELAB_PYTHON_LIBRARY}")
+        elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+            message(FATAL_ERROR
+                "Cross/native Windows Python module builds with explicit Python artifacts "
+                "require FRAMELAB_PYTHON_LIBRARY to point at a target Python import library."
+            )
+        endif()
+        set(FRAMELAB_PYTHON_DISCOVERY_MODE "manual-artifacts")
+    else()
+        find_package(Python3 COMPONENTS Interpreter Development.Module NumPy REQUIRED)
+        target_include_directories(_native SYSTEM PRIVATE
+            ${Python3_INCLUDE_DIRS}
+            ${Python3_NumPy_INCLUDE_DIRS}
+        )
+        target_link_libraries(_native PRIVATE Python3::Module)
+        set(FRAMELAB_PYTHON_DISCOVERY_MODE "find-package")
+    endif()
     target_compile_features(_native PRIVATE c_std_11)
     set_target_properties(_native PROPERTIES
         PREFIX ""
         OUTPUT_NAME "_native"
     )
+    if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+        set_target_properties(_native PROPERTIES SUFFIX ".pyd")
+    endif()
 
     if(MSVC)
         target_compile_options(_native PRIVATE /W4 /permissive- /Zc:preprocessor /wd4200)
@@ -271,8 +301,21 @@ else()
 endif()
 message(STATUS "  Build tools       : ${FRAMELAB_BUILD_TOOLS}")
 message(STATUS "  Build Python mod  : ${FRAMELAB_BUILD_PYTHON_MODULE}")
+message(STATUS "  Helper target     : ${FRAMELAB_TARGET_SYSTEM}")
 message(STATUS "  IPO/LTO requested : ${FRAMELAB_ENABLE_IPO}")
 if(DEFINED FRAMELAB_IPO_SUPPORTED)
     message(STATUS "  IPO/LTO supported : ${FRAMELAB_IPO_SUPPORTED}")
+endif()
+if(FRAMELAB_BUILD_PYTHON_MODULE)
+    message(STATUS "  Python discovery  : ${FRAMELAB_PYTHON_DISCOVERY_MODE}")
+    if(FRAMELAB_PYTHON_INCLUDE_DIR)
+        message(STATUS "  Python include    : ${FRAMELAB_PYTHON_INCLUDE_DIR}")
+    endif()
+    if(FRAMELAB_PYTHON_LIBRARY)
+        message(STATUS "  Python library    : ${FRAMELAB_PYTHON_LIBRARY}")
+    endif()
+    if(FRAMELAB_PYTHON_NUMPY_INCLUDE_DIR)
+        message(STATUS "  NumPy include     : ${FRAMELAB_PYTHON_NUMPY_INCLUDE_DIR}")
+    endif()
 endif()
 message(STATUS "----------------------------------------")

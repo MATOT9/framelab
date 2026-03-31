@@ -197,6 +197,121 @@ The dependency files were trimmed to packages that are actually referenced by th
 
 There is currently no dedicated Python freeze toolchain checked into the repo, so the `Build` block is intentionally empty for now.
 
+## Native Backend Build
+
+The native backend builds as:
+
+- core static library: `framelab_native`
+- Python extension module: `_native` written into `framelab/native/`
+
+The supported helper entrypoint is:
+
+```bash
+python tools/build_native_backend.py
+```
+
+That script configures CMake against the active interpreter by default and writes the resulting extension into `framelab/native/`.
+
+### Common Build Dependencies
+
+- CMake 3.21 or newer
+- a C11-capable compiler
+- Python headers for the target interpreter
+- NumPy headers for the target interpreter
+
+### Native Build on Linux
+
+Ubuntu/Debian example dependencies:
+
+```bash
+sudo apt update
+sudo apt install -y build-essential cmake python3-dev
+python -m pip install -r requirements.txt
+```
+
+Build the extension:
+
+```bash
+python tools/build_native_backend.py --build-type Release
+```
+
+### Native Build on Windows
+
+Recommended dependencies:
+
+- Visual Studio Build Tools 2022 or Visual Studio 2022 with the Desktop C++ workload
+- CMake on `PATH`
+- the target Python environment with `numpy` installed
+
+Build from a developer shell or any shell where MSVC and CMake are available:
+
+```powershell
+python tools\build_native_backend.py --build-type Release
+```
+
+Optional generator/platform example:
+
+```powershell
+python tools\build_native_backend.py --generator "Visual Studio 17 2022" --platform x64
+```
+
+### Cross-Compile on Ubuntu for Windows
+
+The repo now ships a MinGW-w64 toolchain file:
+
+- `native/cmake/toolchains/mingw-w64-x86_64.cmake`
+
+Install the host-side cross toolchain:
+
+```bash
+sudo apt update
+sudo apt install -y cmake mingw-w64
+python -m pip install -r requirements.txt
+```
+
+Cross-compiling the Python extension requires Windows-target Python artifacts, not just the host Linux interpreter. You must provide:
+
+- Windows Python include directory
+- Windows NumPy include directory
+- Windows Python import library compatible with your toolchain
+
+Example:
+
+```bash
+python tools/build_native_backend.py \
+  --target-system windows \
+  --toolchain-file native/cmake/toolchains/mingw-w64-x86_64.cmake \
+  --output-dir native/staging-windows \
+  --python-include-dir /opt/python-win/include \
+  --python-numpy-include-dir /opt/python-win/Lib/site-packages/numpy/_core/include \
+  --python-library /opt/python-win/libs/libpython312.a
+```
+
+Notes:
+
+- `--python-include-dir` and `--python-numpy-include-dir` must be provided together when overriding target Python artifacts.
+- For Windows cross builds, the Python import library is required.
+- If you want the helper to keep the built binary out of the source tree while iterating, point `--output-dir` at a staging folder and copy `_native.pyd` into `framelab/native/` only after the app is closed.
+
+### Useful Build Helper Options
+
+- `--build-type Release|RelWithDebInfo|Debug`
+- `--generator <cmake-generator>`
+- `--platform <cmake-platform>`
+- `--toolchain-file <path>`
+- `--target-system native|linux|windows`
+- `--python <python-executable>`
+- `--python-include-dir <path>`
+- `--python-numpy-include-dir <path>`
+- `--python-library <path>`
+- `--enable-ipo` / `--disable-ipo`
+
+### Troubleshooting
+
+- If the build fails with a linker error saying `_native.pyd` or `_native.so` cannot be opened, close any running FrameLab or `python.exe` process that has loaded the extension.
+- If CMake cannot find Python/NumPy during a cross build, provide explicit target artifact paths instead of relying on interpreter discovery.
+- On Windows, IPO/LTO is disabled by default for conservative extension builds. Enable it explicitly only when the toolchain is known-good.
+
 ## Where To Go Next
 
 - New operator: start with [docs/user-guide/quick-start.md](docs/user-guide/quick-start.md)

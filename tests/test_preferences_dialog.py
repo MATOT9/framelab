@@ -43,10 +43,19 @@ def test_current_preferences_reflect_initial_snapshot(dialog_factory) -> None:
         collapse_analysis_plugin_controls_by_default=False,
         collapse_data_advanced_row_by_default=False,
         collapse_summary_strips_by_default=True,
+        scan_worker_count_override=6,
     )
     dialog = dialog_factory(UiStateSnapshot(preferences=prefs))
 
     assert dialog.current_preferences() == prefs
+
+
+def test_scan_worker_auto_detect_round_trips_as_none(dialog_factory) -> None:
+    dialog = dialog_factory(UiStateSnapshot(preferences=UiPreferences()))
+
+    dialog._scan_worker_count_spin.setValue(0)
+
+    assert dialog.current_preferences().scan_worker_count_override is None
 
 
 def test_reject_emits_revert_after_live_preview_change(

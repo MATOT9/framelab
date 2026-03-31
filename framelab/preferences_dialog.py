@@ -80,6 +80,13 @@ class PreferencesDialog(qtw.QDialog):
         self._collapse_data_advanced_checkbox = qtw.QCheckBox(
             "Collapse data advanced controls by default"
         )
+        self._scan_worker_count_spin = qtw.QSpinBox()
+        self._scan_worker_count_spin.setRange(0, 64)
+        self._scan_worker_count_spin.setSpecialValueText("Auto-detect")
+        self._scan_worker_count_spin.setToolTip(
+            "Maximum worker count used for dataset scanning. Set to Auto-detect "
+            "to let FrameLab choose based on CPU cores.",
+        )
 
         self._add_page(
             "Appearance",
@@ -113,7 +120,10 @@ class PreferencesDialog(qtw.QDialog):
             "Data & Measure",
             "Data & Measure",
             "Defaults for metadata intake and measurement workspace behavior.",
-            [self._collapse_data_advanced_checkbox],
+            [
+                self._collapse_data_advanced_checkbox,
+                self._form_row("Scan Workers", self._scan_worker_count_spin),
+            ],
         )
 
         buttons = qtw.QDialogButtonBox(
@@ -156,6 +166,11 @@ class PreferencesDialog(qtw.QDialog):
             ),
             collapse_summary_strips_by_default=(
                 self._collapse_summary_strips_checkbox.isChecked()
+            ),
+            scan_worker_count_override=(
+                None
+                if int(self._scan_worker_count_spin.value()) <= 0
+                else int(self._scan_worker_count_spin.value())
             ),
         )
 
@@ -209,10 +224,13 @@ class PreferencesDialog(qtw.QDialog):
             self._collapse_summary_strips_checkbox,
             self._collapse_analysis_controls_checkbox,
             self._collapse_data_advanced_checkbox,
+            self._scan_worker_count_spin,
         ]
         for control in controls:
             if isinstance(control, qtw.QComboBox):
                 control.currentIndexChanged.connect(self._emit_live_preview)
+            elif isinstance(control, qtw.QSpinBox):
+                control.valueChanged.connect(self._emit_live_preview)
             elif isinstance(control, qtw.QAbstractButton):
                 control.toggled.connect(self._emit_live_preview)
 
@@ -245,6 +263,11 @@ class PreferencesDialog(qtw.QDialog):
         )
         self._collapse_data_advanced_checkbox.setChecked(
             prefs.collapse_data_advanced_row_by_default
+        )
+        self._scan_worker_count_spin.setValue(
+            0
+            if prefs.scan_worker_count_override is None
+            else max(1, int(prefs.scan_worker_count_override))
         )
 
     @staticmethod
