@@ -381,6 +381,36 @@ class AcquisitionDatacardWizardDialog(qtw.QDialog):
         outer.addWidget(scroll, 1)
         return tab
 
+    @staticmethod
+    def _apply_string_completer(
+        widget: qtw.QLineEdit,
+        spec: FieldSpec,
+    ) -> None:
+        """Attach non-blocking suggestions for string-backed field editors."""
+
+        if spec.value_type != "string" or not spec.options:
+            return
+
+        suggestions: list[str] = []
+        seen: set[str] = set()
+        for option in spec.options:
+            text = str(option).strip()
+            if not text:
+                continue
+            token = text.casefold()
+            if token in seen:
+                continue
+            seen.add(token)
+            suggestions.append(text)
+        if not suggestions:
+            return
+
+        completer = qtw.QCompleter(suggestions, widget)
+        completer.setCaseSensitivity(Qt.CaseInsensitive)
+        completer.setFilterMode(Qt.MatchContains)
+        completer.setCompletionMode(qtw.QCompleter.PopupCompletion)
+        widget.setCompleter(completer)
+
     def _create_editor(
         self,
         spec: FieldSpec,
@@ -454,6 +484,7 @@ class AcquisitionDatacardWizardDialog(qtw.QDialog):
             return widget
 
         widget = qtw.QLineEdit(parent)
+        self._apply_string_completer(widget, spec)
         if allow_empty:
             widget.setProperty("allow_empty", True)
         return widget

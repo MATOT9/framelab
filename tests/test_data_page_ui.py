@@ -8,9 +8,11 @@ from pathlib import Path
 import pytest
 from PySide6 import QtWidgets as qtw
 
+from framelab.processing_failures import make_processing_failure
 from framelab.node_metadata import save_nodecard
 from framelab.ui_primitives import StatusChip
 from framelab.window import FrameLabWindow
+from framelab.workers import DatasetLoadSummary
 
 
 pytestmark = [pytest.mark.ui, pytest.mark.data]
@@ -184,3 +186,108 @@ def test_folder_json_metadata_scan_detects_nodecards_recursively(
     )
 
     assert FrameLabWindow._folder_has_json_metadata(dataset_root)
+
+
+def test_dataset_load_failure_surfaces_primary_raw_cause_and_hint(
+    framelab_window_factory,
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    window = framelab_window_factory(enabled_plugin_ids=())
+    job_id = 17
+    captured: list[tuple[str, str]] = []
+    reason = (
+        "RawDecodeSpecError: Missing RAW decode spec fields: "
+        "pixel_format, width, height"
+    )
+
+    monkeypatch.setattr(
+        window,
+        "_show_error",
+        lambda title, message: captured.append((title, message)),
+    )
+    window._dataset_load_job_id = job_id
+    window._on_dataset_load_finished(
+        DatasetLoadSummary(
+            job_id=job_id,
+            dataset_root=str(tmp_path),
+            loaded_count=0,
+            total_candidates=2,
+            failures=(
+                make_processing_failure(
+                    stage="scan",
+                    path=tmp_path / "frame_a.bin",
+                    reason=reason,
+                ),
+                make_processing_failure(
+                    stage="scan",
+                    path=tmp_path / "frame_b.bin",
+                    reason=reason,
+                ),
+            ),
+        ),
+    )
+
+    assert captured
+    assert captured[0][0] == "Load failed"
+    message = captured[0][1]
+    assert "All 2 supported image files failed to load." in message
+    assert f"Most likely cause: {reason}" in message
+    assert (
+        "Add acquisition/session/campaign datacard metadata or session-local "
+        "RAW fallback values, then re-scan."
+    ) in message
+    assert "Open Processing Issues for per-file details." in message
+    assert ".pvcfg" not in message
+    assert window._processing_failure_count() == 2
+
+
+def test_dataset_load_failure_summarizes_mixed_reasons_without_fake_root_cause(
+    framelab_window_factory,
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    window = framelab_window_factory(enabled_plugin_ids=())
+    job_id = 18
+    captured: list[tuple[str, str]] = []
+    reason_a = (
+        "RawDecodeSpecError: Missing RAW decode spec fields: "
+        "pixel_format, width, height"
+    )
+    reason_b = "InvalidImageError: Expected 2D image, got shape (3, 4, 5)"
+
+    monkeypatch.setattr(
+        window,
+        "_show_error",
+        lambda title, message: captured.append((title, message)),
+    )
+    window._dataset_load_job_id = job_id
+    window._on_dataset_load_finished(
+        DatasetLoadSummary(
+            job_id=job_id,
+            dataset_root=str(tmp_path),
+            loaded_count=0,
+            total_candidates=2,
+            failures=(
+                make_processing_failure(
+                    stage="scan",
+                    path=tmp_path / "frame_a.bin",
+                    reason=reason_a,
+                ),
+                make_processing_failure(
+                    stage="scan",
+                    path=tmp_path / "frame_b.bin",
+                    reason=reason_b,
+                ),
+            ),
+        ),
+    )
+
+    assert captured
+    message = captured[0][1]
+    assert "All 2 supported image files failed to load." in message
+    assert "Observed failure types:" in message
+    assert "Most likely cause:" not in message
+    assert reason_a in message
+    assert reason_b in message
+    assert "Open Processing Issues for per-file details." in message

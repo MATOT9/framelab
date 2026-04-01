@@ -32,11 +32,13 @@ def _write_tiff(root: Path, name: str, array: np.ndarray) -> Path:
 
 
 def test_supported_suffixes_and_detection_are_canonical() -> None:
-    assert supported_suffixes() == (".tif", ".tiff", ".raw")
+    assert supported_suffixes() == (".tif", ".tiff", ".bin", ".raw")
     assert is_supported_image("frame.TIF")
     assert is_supported_image(Path("frame.tiff"))
+    assert is_supported_image("frame.BIN")
     assert is_supported_image("frame.RAW")
     assert not is_supported_image("frame.png")
+    assert source_kind_for_path("frame.bin") == "raw"
     assert source_kind_for_path("frame.raw") == "raw"
     assert source_kind_for_path("frame.tif") == "tiff"
 
@@ -84,10 +86,10 @@ def test_read_2d_image_rejects_non_2d_result(tmp_path: Path) -> None:
 
 
 def test_read_image_requires_shared_raw_resolver(tmp_path: Path) -> None:
-    path = tmp_path / "frame.raw"
+    path = tmp_path / "frame.bin"
     path.write_bytes(b"\x00" * 8)
 
-    with pytest.raises(InvalidImageError, match="RAW decode spec resolver required"):
+    with pytest.raises(InvalidImageError, match=r"RAW decode spec resolver required for \.bin/\.raw"):
         read_image(path)
 
 
@@ -95,7 +97,7 @@ def test_read_image_routes_raw_through_shared_resolver_and_native_decode(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
-    path = tmp_path / "frame.raw"
+    path = tmp_path / "frame.bin"
     path.write_bytes(b"\x00" * 8)
     context = RawDecodeResolverContext(
         manual_overrides={"camera_settings.offset_bytes": 4},
@@ -117,7 +119,8 @@ def test_read_image_routes_raw_through_shared_resolver_and_native_decode(
         return spec
 
     def _fake_decode(candidate, *, spec=None, **_kwargs):
-        calls["decode_path"] = str(candidate)
+        calls["decode_path"] = candidate
+        calls["decode_path_type"] = type(candidate)
         calls["decode_spec"] = spec
         return expected
 
@@ -135,12 +138,13 @@ def test_read_image_routes_raw_through_shared_resolver_and_native_decode(
     assert calls["resolver_path"] == str(path)
     assert calls["resolver_context"] == context
     assert calls["decode_path"] == str(path)
+    assert calls["decode_path_type"] is str
     assert calls["decode_spec"] == spec
     np.testing.assert_array_equal(actual, expected)
 
 
 def test_read_image_wraps_raw_spec_errors(tmp_path: Path) -> None:
-    path = tmp_path / "broken.raw"
+    path = tmp_path / "broken.bin"
     path.write_bytes(b"\x00" * 4)
 
     def _bad_resolver(candidate, *, context=None):

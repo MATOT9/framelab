@@ -23,7 +23,7 @@ from ..metadata import (
 )
 from ..node_metadata import NODECARD_DIR_NAME, NODECARD_FILE_NAME
 from ..scan_settings import save_skip_patterns
-from ..raw_decode import SUPPORTED_MONO_RAW_PIXEL_FORMATS
+from ..raw_decode import SUPPORTED_MONO_RAW_PIXEL_FORMATS, is_raw_image_path
 from ..ui_primitives import (
     ChipSpec,
     SummaryItem,
@@ -234,7 +234,7 @@ class DataPageMixin:
 
         self.folder_edit = qtw.QLineEdit()
         self.folder_edit.setPlaceholderText(
-            "Select folder containing TIFF/RAW files",
+            "Select folder containing TIFF/BIN files",
         )
         self.folder_edit.setToolTip(
             "Root folder to scan recursively for supported image files.",
@@ -1173,10 +1173,7 @@ class DataPageMixin:
             self._clear_image_cache()
         if (
             self.dataset_state.has_loaded_data()
-            and any(
-                str(Path(path).suffix).lower() == ".raw"
-                for path in self.dataset_state.paths
-            )
+            and any(is_raw_image_path(path) for path in self.dataset_state.paths)
         ):
             status_bar = self.statusBar() if hasattr(self, "statusBar") else None
             if status_bar is not None:

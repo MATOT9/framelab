@@ -6,14 +6,19 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Callable
 
 from .native import backend as native_backend
-from .raw_decode import RawDecodeResolverContext, RawDecodeSpecError
+from .raw_decode import (
+    RawDecodeResolverContext,
+    RawDecodeSpecError,
+    SUPPORTED_RAW_IMAGE_SUFFIXES,
+    is_raw_image_path,
+)
 
 if TYPE_CHECKING:
     import numpy as np
     from .raw_decode import RawDecodeSpec
 
 
-SUPPORTED_IMAGE_SUFFIXES = (".tif", ".tiff", ".raw")
+SUPPORTED_IMAGE_SUFFIXES = (".tif", ".tiff", *SUPPORTED_RAW_IMAGE_SUFFIXES)
 _TIFF_SUFFIXES = (".tif", ".tiff")
 _SUFFIX_READER: dict[str, Callable[[Path], object]] = {}
 
@@ -50,9 +55,9 @@ def supported_suffixes() -> tuple[str, ...]:
 def source_kind_for_path(path: str | Path) -> str:
     """Return the normalized source kind for one supported image path."""
 
-    suffix = Path(path).suffix.lower()
-    if suffix == ".raw":
+    if is_raw_image_path(path):
         return "raw"
+    suffix = Path(path).suffix.lower()
     if suffix in {".tif", ".tiff"}:
         return "tiff"
     return "unknown"
@@ -60,8 +65,7 @@ def source_kind_for_path(path: str | Path) -> str:
 
 def is_supported_image(path: str | Path) -> bool:
     """Return whether the given path is supported by the shared image loader."""
-    suffix = Path(path).suffix.lower()
-    return suffix in SUPPORTED_IMAGE_SUFFIXES
+    return Path(path).suffix.lower() in SUPPORTED_IMAGE_SUFFIXES
 
 
 def read_image(
@@ -72,15 +76,14 @@ def read_image(
 ) -> object:
     """Read one supported image file from disk."""
     resolved = Path(path)
-    suffix = resolved.suffix.lower()
-    if suffix == ".raw":
+    if is_raw_image_path(resolved):
         if raw_spec_resolver is None:
             raise InvalidImageError(
-                "RAW decode spec resolver required for .raw image loading",
+                "RAW decode spec resolver required for .bin/.raw image loading",
             )
         try:
             spec = raw_spec_resolver(resolved, context=raw_resolver_context)
-            return native_backend.decode_raw_file(resolved, spec=spec)
+            return native_backend.decode_raw_file(str(resolved), spec=spec)
         except (RawDecodeSpecError, ValueError) as exc:
             raise InvalidImageError(str(exc)) from exc
         except ImageIoError:
@@ -88,6 +91,7 @@ def read_image(
         except Exception as exc:
             raise InvalidImageError(str(exc)) from exc
 
+    suffix = resolved.suffix.lower()
     reader = _SUFFIX_READER.get(suffix)
     if reader is None:
         supported = ", ".join(SUPPORTED_IMAGE_SUFFIXES)

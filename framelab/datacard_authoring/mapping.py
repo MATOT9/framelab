@@ -126,8 +126,70 @@ def _fields_from_payload(payload: dict[str, Any]) -> tuple[FieldSpec, ...]:
     return tuple(fields)
 
 
+def _pixel_format_options() -> list[str]:
+    """Return canonical pixel-format suggestions for datacard authoring."""
+
+    from ..raw_decode import SUPPORTED_MONO_RAW_PIXEL_FORMATS
+
+    return [str(option).strip() for option in SUPPORTED_MONO_RAW_PIXEL_FORMATS]
+
+
+def _clean_string_options(values: Any) -> list[str]:
+    """Return one de-duplicated list of non-empty string options."""
+
+    if not isinstance(values, list):
+        return []
+    cleaned: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        text = str(value).strip()
+        if not text:
+            continue
+        token = text.casefold()
+        if token in seen:
+            continue
+        seen.add(token)
+        cleaned.append(text)
+    return cleaned
+
+
+def _merge_pixel_format_options(
+    existing_values: Any,
+    default_values: Any,
+) -> list[str]:
+    """Merge saved and built-in pixel-format options.
+
+    Built-in canonical formats stay first so older editable mapping files pick up
+    newly supported formats automatically, while custom user-added values are
+    preserved after the canonical list.
+    """
+
+    merged: list[str] = []
+    seen: set[str] = set()
+    for source in (default_values, existing_values):
+        for text in _clean_string_options(source):
+            token = text.casefold()
+            if token in seen:
+                continue
+            seen.add(token)
+            merged.append(text)
+    return merged
+
+
+def _default_field_entry_for_key(
+    defaults_by_key: dict[str, dict[str, Any]],
+    key: str,
+) -> dict[str, Any]:
+    """Return one default mapping entry augmented with built-in suggestions."""
+
+    default_entry = dict(defaults_by_key.get(key, {}))
+    if key == "camera_settings.pixel_format" and "options" not in default_entry:
+        default_entry["options"] = _pixel_format_options()
+    return default_entry
+
+
 def _ensure_mapping_metadata_fields(path: Path) -> None:
-    """Seed missing built-in metadata keys in editable mapping JSON."""
+    """Seed missing built-in field metadata in editable mapping JSON."""
     payload = read_json_dict(path)
     default_payload = read_json_dict(DEFAULT_MAPPING_FILE)
     if payload is None or default_payload is None:
@@ -148,13 +210,28 @@ def _ensure_mapping_metadata_fields(path: Path) -> None:
         defaults_by_key[key] = entry
 
     changed = False
+    present_keys = {
+        str(entry.get("key", "")).strip()
+        for entry in raw_fields
+        if isinstance(entry, dict)
+    }
+    for key in ("camera_settings.pixel_format",):
+        if key in present_keys:
+            continue
+        default_entry = _default_field_entry_for_key(defaults_by_key, key)
+        if not default_entry:
+            continue
+        raw_fields.append(default_entry)
+        present_keys.add(key)
+        changed = True
+
     for entry in raw_fields:
         if not isinstance(entry, dict):
             continue
         key = str(entry.get("key", "")).strip()
         if not key:
             continue
-        default_entry = defaults_by_key.get(key, {})
+        default_entry = _default_field_entry_for_key(defaults_by_key, key)
         for field_name in ("tooltip", "ebus_label", "ebus_managed"):
             if field_name in entry:
                 continue
@@ -163,6 +240,24 @@ def _ensure_mapping_metadata_fields(path: Path) -> None:
             else:
                 entry[field_name] = str(default_entry.get(field_name, "")).strip()
             changed = True
+        if key == "camera_settings.pixel_format":
+            merged_options = _merge_pixel_format_options(
+                entry.get("options"),
+                default_entry.get("options"),
+            )
+            current_options = _clean_string_options(entry.get("options"))
+            if merged_options and merged_options != current_options:
+                entry["options"] = merged_options
+                changed = True
+        elif "options" not in entry:
+            default_options = default_entry.get("options")
+            if isinstance(default_options, list):
+                entry["options"] = [
+                    str(value).strip()
+                    for value in default_options
+                    if str(value).strip()
+                ]
+                changed = True
 
     if changed:
         write_json_dict(path, payload)

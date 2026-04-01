@@ -895,6 +895,16 @@ class WorkflowExplorerDock(qtw.QDockWidget):
         if callable(handler):
             handler(node.node_id)
 
+    def _rename_context_node(self) -> None:
+        """Trigger the primary rename action for the selected workflow node."""
+
+        node = self._selected_node()
+        if node is None:
+            return
+        handler = getattr(self._host_window, "_rename_workflow_node", None)
+        if callable(handler):
+            handler(node.node_id)
+
     def _build_tree_context_menu(self) -> qtw.QMenu:
         """Build the right-click menu for the current tree selection."""
 
@@ -912,7 +922,7 @@ class WorkflowExplorerDock(qtw.QDockWidget):
             (
                 self._batch_create_action.isEnabled(),
                 self._reindex_action.isEnabled(),
-                self._rename_acquisition_action.isEnabled(),
+                bool(state.get("can_rename_node", False)),
             ),
         )
         if has_secondary_actions:
@@ -923,9 +933,11 @@ class WorkflowExplorerDock(qtw.QDockWidget):
         if self._reindex_action.isEnabled():
             action = menu.addAction("Normalize/Reindex...")
             action.triggered.connect(self._reindex_session)
-        if self._rename_acquisition_action.isEnabled():
-            action = menu.addAction("Rename / Relabel...")
-            action.triggered.connect(self._rename_acquisition)
+        if bool(state.get("can_rename_node", False)):
+            action = menu.addAction(
+                str(state.get("rename_action_text", "Rename...") or "Rename..."),
+            )
+            action.triggered.connect(self._rename_context_node)
 
         menu.addSeparator()
         delete_action = menu.addAction(

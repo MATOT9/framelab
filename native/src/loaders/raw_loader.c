@@ -1,15 +1,27 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
 
 #include "framelab_native/loaders/raw_loader.h"
 #include "framelab_native/decode/decode.h"
+
+static uint32_t packed_row_bytes(uint32_t width, uint32_t bits_per_pixel) {
+    uint64_t total_bits = (uint64_t)width * (uint64_t)bits_per_pixel;
+    uint64_t total_bytes = (total_bits + 7U) / 8U;
+    if (total_bytes > UINT32_MAX) {
+        return 0U;
+    }
+    return (uint32_t)total_bytes;
+}
 
 static uint32_t bytes_per_row_for_format(FramelabPixelFormat format, uint32_t width) {
     switch (format) {
         case FRAMELAB_PIXFMT_MONO8:
         case FRAMELAB_PIXFMT_BAYER_RG8:
             return width;
+        case FRAMELAB_PIXFMT_MONO10_LSB:
+        case FRAMELAB_PIXFMT_MONO10_MSB:
         case FRAMELAB_PIXFMT_MONO12_LSB:
         case FRAMELAB_PIXFMT_MONO12_MSB:
         case FRAMELAB_PIXFMT_MONO16:
@@ -17,12 +29,13 @@ static uint32_t bytes_per_row_for_format(FramelabPixelFormat format, uint32_t wi
         case FRAMELAB_PIXFMT_BAYER_RG12_MSB:
         case FRAMELAB_PIXFMT_BAYER_RG16:
             return width * 2U;
+        case FRAMELAB_PIXFMT_MONO10P:
+        case FRAMELAB_PIXFMT_MONO10PACKED:
+            return packed_row_bytes(width, 10U);
         case FRAMELAB_PIXFMT_MONO12P:
+        case FRAMELAB_PIXFMT_MONO12PACKED:
         case FRAMELAB_PIXFMT_BAYER_RG12P:
-            if ((width & 1U) != 0U) {
-                return 0U;
-            }
-            return (width / 2U) * 3U;
+            return packed_row_bytes(width, 12U);
         default:
             return 0U;
     }

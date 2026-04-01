@@ -357,7 +357,7 @@ def test_decode_raw_file_accepts_validated_spec_and_calls_native(
     tmp_path,
     monkeypatch,
 ) -> None:
-    path = tmp_path / "frame.raw"
+    path = tmp_path / "frame.bin"
     path.write_bytes(b"\x00" * 16)
     calls: list[dict[str, object]] = []
 
@@ -411,10 +411,110 @@ def test_decode_raw_file_accepts_validated_spec_and_calls_native(
     np.testing.assert_array_equal(result, np.arange(8, dtype=np.uint16).reshape(2, 4))
 
 
+def test_decode_raw_file_normalizes_camera_style_pixel_format_aliases(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    path = tmp_path / "frame.bin"
+    path.write_bytes(b"\x00" * 8)
+    calls: list[str] = []
+
+    class _FakeNative:
+        @staticmethod
+        def decode_raw_file(
+            candidate,
+            pixel_format,
+            width,
+            height,
+            *,
+            stride_bytes,
+            offset_bytes,
+        ):
+            _ = candidate
+            _ = width
+            _ = height
+            _ = stride_bytes
+            _ = offset_bytes
+            calls.append(pixel_format)
+            return np.zeros((1, 2), dtype=np.uint16)
+
+    monkeypatch.setattr(backend, "_native", _FakeNative(), raising=False)
+
+    backend.decode_raw_file(
+        path,
+        pixel_format="Mono12Packed",
+        width=2,
+        height=1,
+    )
+    backend.decode_raw_file(
+        path,
+        pixel_format="Mono10",
+        width=2,
+        height=1,
+    )
+
+    assert calls == ["mono12packed", "mono10_msb"]
+
+
+def test_decode_raw_file_accepts_path_objects_and_normalizes_for_native(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    path = tmp_path / "frame.bin"
+    path.write_bytes(b"\x00" * 4)
+    calls: list[dict[str, object]] = []
+
+    class _FakeNative:
+        @staticmethod
+        def decode_raw_file(
+            candidate,
+            pixel_format,
+            width,
+            height,
+            *,
+            stride_bytes,
+            offset_bytes,
+        ):
+            calls.append(
+                {
+                    "path": candidate,
+                    "path_type": type(candidate),
+                    "pixel_format": pixel_format,
+                    "width": width,
+                    "height": height,
+                    "stride_bytes": stride_bytes,
+                    "offset_bytes": offset_bytes,
+                },
+            )
+            return np.zeros((height, width), dtype=np.uint16)
+
+    monkeypatch.setattr(backend, "_native", _FakeNative(), raising=False)
+
+    result = backend.decode_raw_file(
+        path,
+        pixel_format="mono8",
+        width=2,
+        height=2,
+    )
+
+    assert calls == [
+        {
+            "path": str(path),
+            "path_type": str,
+            "pixel_format": "mono8",
+            "width": 2,
+            "height": 2,
+            "stride_bytes": 0,
+            "offset_bytes": 0,
+        },
+    ]
+    np.testing.assert_array_equal(result, np.zeros((2, 2), dtype=np.uint16))
+
+
 def test_decode_raw_file_rejects_mixed_spec_and_explicit_fields(
     tmp_path,
 ) -> None:
-    path = tmp_path / "mixed.raw"
+    path = tmp_path / "mixed.bin"
     path.write_bytes(b"\x00" * 8)
 
     with pytest.raises(ValueError, match="Provide either spec=RawDecodeSpec"):
@@ -433,7 +533,7 @@ def test_decode_raw_file_rejects_mixed_spec_and_explicit_fields(
 
 
 def test_decode_raw_file_validates_python_side_spec_before_native(tmp_path) -> None:
-    path = tmp_path / "bad.raw"
+    path = tmp_path / "bad.bin"
     path.write_bytes(b"\x00" * 8)
 
     with pytest.raises(RawDecodeSpecError, match="Unsupported RAW pixel format"):
@@ -654,3 +754,64 @@ def test_native_and_python_roi_metrics_match_when_extension_is_present(monkeypat
     assert native_result[1] == pytest.approx(python_result[1])
     assert native_result[2] == pytest.approx(python_result[2])
     assert native_result[3] == pytest.approx(python_result[3])
+
+
+@pytest.mark.skipif(
+    not backend.native_available(),
+    reason="native extension not built in this environment",
+)
+def test_native_decode_raw_file_distinguishes_mono12p_and_mono12packed(tmp_path) -> None:
+    path = tmp_path / "mono12.bin"
+    path.write_bytes(bytes((0x12, 0x34, 0x56)))
+
+    mono12p = backend.decode_raw_file(
+        path,
+        pixel_format="mono12p",
+        width=2,
+        height=1,
+    )
+    mono12packed = backend.decode_raw_file(
+        path,
+        pixel_format="Mono12Packed",
+        width=2,
+        height=1,
+    )
+
+    np.testing.assert_array_equal(mono12p, np.array([[1042, 1379]], dtype=np.uint16))
+    np.testing.assert_array_equal(
+        mono12packed,
+        np.array([[292, 1379]], dtype=np.uint16),
+    )
+
+
+@pytest.mark.skipif(
+    not backend.native_available(),
+    reason="native extension not built in this environment",
+)
+def test_native_decode_raw_file_supports_mono10p_and_mono10packed(tmp_path) -> None:
+    mono10p_path = tmp_path / "mono10p.bin"
+    mono10p_path.write_bytes(bytes((0xAB, 0xCD, 0xEF, 0x12, 0x34)))
+    mono10packed_path = tmp_path / "mono10packed.bin"
+    mono10packed_path.write_bytes(bytes((0xAB, 0xCD, 0xEF)))
+
+    mono10p = backend.decode_raw_file(
+        mono10p_path,
+        pixel_format="mono10p",
+        width=4,
+        height=1,
+    )
+    mono10packed = backend.decode_raw_file(
+        mono10packed_path,
+        pixel_format="Mono10Packed",
+        width=2,
+        height=1,
+    )
+
+    np.testing.assert_array_equal(
+        mono10p,
+        np.array([[427, 1011, 302, 208]], dtype=np.uint16),
+    )
+    np.testing.assert_array_equal(
+        mono10packed,
+        np.array([[685, 956]], dtype=np.uint16),
+    )

@@ -59,6 +59,7 @@ class WorkflowBreadcrumbBar(qtw.QFrame):
             widget = item.widget()
             if widget is not None:
                 widget.hide()
+                widget.setParent(None)
                 widget.deleteLater()
 
         breadcrumb_nodes = [(str(label), str(tooltip)) for label, tooltip in nodes if str(label).strip()]

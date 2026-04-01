@@ -12,12 +12,22 @@ FramelabStatus framelab_decode(const FramelabDecodeParams *params) {
     switch (params->pixel_format) {
         case FRAMELAB_PIXFMT_MONO8:
             return decode_mono8(params);
+        case FRAMELAB_PIXFMT_MONO10_LSB:
+            return decode_mono10_lsb(params);
+        case FRAMELAB_PIXFMT_MONO10_MSB:
+            return decode_mono10_msb(params);
+        case FRAMELAB_PIXFMT_MONO10P:
+            return decode_mono10p(params);
+        case FRAMELAB_PIXFMT_MONO10PACKED:
+            return decode_mono10packed(params);
         case FRAMELAB_PIXFMT_MONO12_LSB:
             return decode_mono12_lsb(params);
         case FRAMELAB_PIXFMT_MONO12_MSB:
             return decode_mono12_msb(params);
         case FRAMELAB_PIXFMT_MONO12P:
             return decode_mono12p(params);
+        case FRAMELAB_PIXFMT_MONO12PACKED:
+            return decode_mono12packed(params);
         case FRAMELAB_PIXFMT_MONO16:
             return decode_mono16(params);
         case FRAMELAB_PIXFMT_BAYER_RG8:

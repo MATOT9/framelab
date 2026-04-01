@@ -10,6 +10,7 @@ from framelab.raw_decode import (
     RawDecodeSpec,
     RawDecodeSpecError,
     build_image_metric_identity,
+    normalize_raw_pixel_format,
     raw_decode_spec_fingerprint,
     resolve_raw_decode_spec,
     validate_raw_decode_spec,
@@ -23,7 +24,7 @@ def test_validate_raw_decode_spec_normalizes_supported_values() -> None:
     spec = validate_raw_decode_spec(
         RawDecodeSpec(
             source_kind="raw",
-            pixel_format=" MONO12P ",
+            pixel_format=" Mono12Packed ",
             width=640,
             height=512,
             stride_bytes=0,
@@ -31,12 +32,20 @@ def test_validate_raw_decode_spec_normalizes_supported_values() -> None:
         ),
     )
 
-    assert spec.pixel_format == "mono12p"
+    assert spec.pixel_format == "mono12packed"
     assert spec.width == 640
     assert spec.height == 512
     assert spec.stride_bytes is None
     assert spec.offset_bytes == 0
-    assert raw_decode_spec_fingerprint(spec) == "mono12p|640x512|stride=0|offset=0"
+    assert raw_decode_spec_fingerprint(spec) == "mono12packed|640x512|stride=0|offset=0"
+
+
+def test_normalize_raw_pixel_format_supports_standard_aliases() -> None:
+    assert normalize_raw_pixel_format("Mono10") == "mono10_msb"
+    assert normalize_raw_pixel_format("mono10lsb") == "mono10_lsb"
+    assert normalize_raw_pixel_format("Mono10Packed") == "mono10packed"
+    assert normalize_raw_pixel_format("Mono12") == "mono12_msb"
+    assert normalize_raw_pixel_format("Mono12Packed") == "mono12packed"
 
 
 def test_validate_raw_decode_spec_rejects_invalid_fields() -> None:
@@ -65,7 +74,7 @@ def test_resolve_raw_decode_spec_uses_json_metadata_and_precedence(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
-    path = tmp_path / "frame.raw"
+    path = tmp_path / "frame.bin"
     path.write_bytes(b"\x00" * 16)
     calls: list[dict[str, object]] = []
 
@@ -120,7 +129,7 @@ def test_resolve_raw_decode_spec_reuses_cached_json_metadata_without_reresolving
     tmp_path: Path,
     monkeypatch,
 ) -> None:
-    path = tmp_path / "cached.raw"
+    path = tmp_path / "cached.bin"
     path.write_bytes(b"\x00" * 16)
     cached_metadata = {
         str(path.resolve()): {
@@ -155,7 +164,7 @@ def test_build_image_metric_identity_changes_when_raw_spec_changes(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
-    path = tmp_path / "identity.raw"
+    path = tmp_path / "identity.bin"
     path.write_bytes(b"\x00" * 64)
 
     def _fake_resolve(candidate, *, context=None):

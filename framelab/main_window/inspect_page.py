@@ -1455,10 +1455,10 @@ class InspectPageMixin:
             "Select background image",
             initial,
             name_filters=(
-                "Image files (*.tif *.tiff *.TIF *.TIFF *.raw *.RAW)",
+                "Image files (*.tif *.tiff *.TIF *.TIFF *.bin *.BIN *.raw *.RAW)",
                 "All files (*)",
             ),
-            selected_name_filter="Image files (*.tif *.tiff *.TIF *.TIFF *.raw *.RAW)",
+            selected_name_filter="Image files (*.tif *.tiff *.TIF *.TIFF *.bin *.BIN *.raw *.RAW)",
         )
         if not selected_path:
             return None

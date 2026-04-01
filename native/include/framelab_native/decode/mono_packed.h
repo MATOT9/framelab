@@ -9,6 +9,9 @@ extern "C" {
 #endif
 
 FramelabStatus decode_mono12p(const FramelabDecodeParams *params);
+FramelabStatus decode_mono10p(const FramelabDecodeParams *params);
+FramelabStatus decode_mono10packed(const FramelabDecodeParams *params);
+FramelabStatus decode_mono12packed(const FramelabDecodeParams *params);
 
 #ifdef __cplusplus
 }

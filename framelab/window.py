@@ -14,6 +14,10 @@ from PySide6 import QtGui, QtWidgets as qtw
 from PySide6.QtCore import Qt, QSignalBlocker, QThread, QTimer, Signal
 
 from .analysis_context import AnalysisContextController
+from .acquisition_datacard import (
+    resolve_campaign_datacard_path,
+    resolve_session_datacard_path,
+)
 from .byte_budget_cache import ByteBudgetCache
 from .datacard_authoring.mapping import load_field_mapping
 from .datacard_authoring.service import (
@@ -38,7 +42,13 @@ from .metrics_state import MetricsPipelineController
 from .metadata import clear_metadata_cache, invalidate_metadata_cache
 from .metadata_state import MetadataStateController
 from .node_metadata import load_nodecard, save_nodecard
-from .payload_utils import delete_dot_path, flatten_payload_dict, set_dot_path
+from .payload_utils import (
+    delete_dot_path,
+    flatten_payload_dict,
+    read_json_dict,
+    set_dot_path,
+    write_json_dict,
+)
 from .plugins import (
     PAGE_IDS,
     PluginManifest,
@@ -579,6 +589,13 @@ class FrameLabWindow(
 
         if hasattr(self, "_refresh_workflow_shell_context"):
             self._refresh_workflow_shell_context()
+        explorer = getattr(self, "_workflow_explorer_dock", None)
+        refresh = getattr(explorer, "sync_from_host", None)
+        if callable(refresh):
+            try:
+                refresh()
+            except Exception:
+                pass
         self._schedule_workflow_scope_refresh(origin=origin)
 
     def _request_scan_selected_scope(self) -> None:
@@ -1194,6 +1211,15 @@ class FrameLabWindow(
         can_delete_node = node is not None and node.type_id != "root"
         if node is not None and node.type_id == "acquisition":
             can_delete_node = selected_entry is not None and numbering_valid
+        can_rename_node = False
+        rename_action_text = "Rename..."
+        if node is not None and node.type_id != "root":
+            can_rename_node = node.type_id != "acquisition" or selected_entry is not None
+            rename_action_text = (
+                "Rename / Relabel..."
+                if node.type_id == "acquisition"
+                else f"Rename {self._workflow_node_type_label(node.type_id)}..."
+            )
         return {
             "node": node,
             "session_node": session_node,
@@ -1204,6 +1230,7 @@ class FrameLabWindow(
             "can_create": session_node is not None and numbering_valid,
             "can_batch_create": session_node is not None and numbering_valid,
             "can_rename": selected_entry is not None,
+            "can_rename_node": can_rename_node,
             "can_delete": selected_entry is not None and numbering_valid,
             "can_reindex": session_index is not None and bool(session_index.entries),
             "can_create_child": can_create_child,
@@ -1219,6 +1246,7 @@ class FrameLabWindow(
                 if node is not None
                 else "Delete..."
             ),
+            "rename_action_text": rename_action_text,
             "can_open_folder": node is not None,
             "warning_text": session_index.warning_text if session_index is not None else "",
         }
@@ -1455,6 +1483,86 @@ class FrameLabWindow(
         self._refresh_workflow_after_structure_mutation(
             result,
             preferred_active_path=preferred,
+            force_refresh_if_loaded=True,
+        )
+
+    @staticmethod
+    def _update_workflow_folder_identity_label(
+        payload_path: Path,
+        *,
+        folder_name: str,
+    ) -> None:
+        """Keep structural datacard labels aligned with renamed workflow folders."""
+
+        payload = read_json_dict(payload_path)
+        if not isinstance(payload, dict):
+            return
+        identity = payload.get("identity")
+        if not isinstance(identity, dict):
+            identity = {}
+        identity["label"] = folder_name
+        payload["identity"] = identity
+        write_json_dict(payload_path, payload)
+
+    def _rename_workflow_node(
+        self,
+        node_id: str | None = None,
+    ) -> None:
+        """Rename the selected workflow node from the workflow shell."""
+
+        controller = self.workflow_state_controller
+        node = controller.node(node_id) if node_id else controller.active_node()
+        if node is None or node.type_id == "root":
+            return
+        if node.type_id == "acquisition":
+            self._rename_workflow_acquisition(node.node_id)
+            return
+
+        node_label = self._workflow_node_type_label(node.type_id)
+        folder_label, accepted = qtw.QInputDialog.getText(
+            self,
+            f"Rename {node_label}",
+            f"{node_label} folder name:",
+            text=node.folder_path.name,
+        )
+        if not accepted:
+            return
+
+        try:
+            clean_label = self._clean_workflow_folder_label(folder_label, node_label)
+            new_path = node.folder_path.with_name(clean_label)
+            if new_path != node.folder_path and new_path.exists():
+                raise FileExistsError(
+                    f"{node_label} folder already exists: {new_path.name}",
+                )
+            if new_path != node.folder_path:
+                node.folder_path.rename(new_path)
+                if node.type_id == "session":
+                    self._update_workflow_folder_identity_label(
+                        resolve_session_datacard_path(new_path),
+                        folder_name=new_path.name,
+                    )
+                elif node.type_id == "campaign":
+                    self._update_workflow_folder_identity_label(
+                        resolve_campaign_datacard_path(new_path),
+                        folder_name=new_path.name,
+                    )
+        except Exception as exc:
+            qtw.QMessageBox.warning(
+                self,
+                f"Rename {node_label}",
+                str(exc),
+            )
+            return
+
+        result = WorkflowTreeMutationResult(
+            renamed_paths=((node.folder_path, new_path),)
+            if new_path != node.folder_path
+            else (),
+        )
+        self._refresh_workflow_after_structure_mutation(
+            result,
+            preferred_active_path=new_path,
             force_refresh_if_loaded=True,
         )
 

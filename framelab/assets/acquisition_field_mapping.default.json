@@ -62,6 +62,18 @@
       "label": "Pixel Format",
       "group": "Camera",
       "type": "string",
+      "options": [
+        "mono8",
+        "mono10_lsb",
+        "mono10_msb",
+        "mono10p",
+        "mono10packed",
+        "mono12_lsb",
+        "mono12_msb",
+        "mono12p",
+        "mono12packed",
+        "mono16"
+      ],
       "tooltip": "Camera image pixel format.",
       "ebus_label": "device.PixelFormat",
       "ebus_managed": true,

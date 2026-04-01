@@ -12,11 +12,37 @@ from .payload_utils import get_dot_path
 
 SUPPORTED_MONO_RAW_PIXEL_FORMATS = (
     "mono8",
+    "mono10_lsb",
+    "mono10_msb",
+    "mono10p",
+    "mono10packed",
     "mono12_lsb",
     "mono12_msb",
     "mono12p",
+    "mono12packed",
     "mono16",
 )
+SUPPORTED_RAW_IMAGE_SUFFIXES = (".bin", ".raw")
+_RAW_PIXEL_FORMAT_ALIASES = {
+    "mono8": "mono8",
+    "mono10": "mono10_msb",
+    "mono10_lsb": "mono10_lsb",
+    "mono10lsb": "mono10_lsb",
+    "mono10_msb": "mono10_msb",
+    "mono10msb": "mono10_msb",
+    "mono10p": "mono10p",
+    "mono10packed": "mono10packed",
+    "mono10_packed": "mono10packed",
+    "mono12": "mono12_msb",
+    "mono12_lsb": "mono12_lsb",
+    "mono12lsb": "mono12_lsb",
+    "mono12_msb": "mono12_msb",
+    "mono12msb": "mono12_msb",
+    "mono12p": "mono12p",
+    "mono12packed": "mono12packed",
+    "mono12_packed": "mono12packed",
+    "mono16": "mono16",
+}
 
 _RAW_REQUIRED_FIELD_KEYS = {
     "pixel_format": "camera_settings.pixel_format",
@@ -53,6 +79,20 @@ class RawDecodeResolverContext:
     scope_metadata: Mapping[str, object] | None = None
     manual_overrides: Mapping[str, object] | None = None
     metadata_boundary_root: str | Path | None = None
+
+
+def is_raw_image_path(path: str | Path) -> bool:
+    """Return whether one path should route through RAW decode handling."""
+
+    return Path(path).suffix.lower() in SUPPORTED_RAW_IMAGE_SUFFIXES
+
+
+def extract_path_metadata(*args, **kwargs):
+    """Proxy metadata extraction so tests can monkeypatch this module seam."""
+
+    from .metadata import extract_path_metadata as _extract_path_metadata
+
+    return _extract_path_metadata(*args, **kwargs)
 
 
 def _lookup_metadata_value(
@@ -109,10 +149,17 @@ def _first_non_negative_int(*values: object | None) -> int | None:
     return None
 
 
+def normalize_raw_pixel_format(value: object | None) -> str:
+    """Normalize one RAW pixel-format label to the canonical internal name."""
+
+    normalized = str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+    return _RAW_PIXEL_FORMAT_ALIASES.get(normalized, normalized)
+
+
 def validate_raw_decode_spec(spec: RawDecodeSpec) -> RawDecodeSpec:
     """Validate one RAW decode spec and return a normalized copy."""
 
-    pixel_format = str(spec.pixel_format or "").strip().lower()
+    pixel_format = normalize_raw_pixel_format(spec.pixel_format)
     if pixel_format not in SUPPORTED_MONO_RAW_PIXEL_FORMATS:
         supported = ", ".join(SUPPORTED_MONO_RAW_PIXEL_FORMATS)
         raise RawDecodeSpecError(
@@ -160,8 +207,6 @@ def _structured_path_metadata(
     *,
     context: RawDecodeResolverContext | None,
 ) -> Mapping[str, object]:
-    from .metadata import extract_path_metadata
-
     mapping = context.path_metadata_by_path if context is not None else None
     resolved = str(path.resolve())
     cached = mapping.get(resolved) if mapping is not None else None
@@ -247,9 +292,8 @@ def build_image_metric_identity(
     """Build one cache identity that is sensitive to RAW decode spec changes."""
 
     candidate = Path(path).expanduser().resolve()
-    suffix = candidate.suffix.lower()
     extra_fingerprint = None
-    if suffix == ".raw":
+    if is_raw_image_path(candidate):
         extra_fingerprint = {
             "source_kind": "raw",
             "decode_spec": raw_decode_spec_fingerprint(

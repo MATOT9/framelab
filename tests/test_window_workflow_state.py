@@ -815,6 +815,39 @@ def test_window_can_rename_acquisition_from_workflow_structure_tools(
     assert window.folder_edit.text() == str(renamed_root.resolve())
 
 
+def test_window_can_rename_session_from_workflow_explorer_context_tools(
+    tmp_path: Path,
+    framelab_window_factory,
+    monkeypatch,
+) -> None:
+    workspace_root, session_root, _first, _second, session_node_id, _acq_node_id = (
+        _make_calibration_workspace_with_frames(tmp_path)
+    )
+    window = framelab_window_factory(enabled_plugin_ids=())
+    window.set_workflow_context(
+        str(workspace_root),
+        "calibration",
+        active_node_id=session_node_id,
+    )
+    monkeypatch.setattr(
+        qtw.QInputDialog,
+        "getText",
+        lambda *args, **kwargs: ("2026-03-05__sess02", True),
+    )
+
+    window._rename_workflow_node(session_node_id)
+
+    renamed_root = session_root.with_name("2026-03-05__sess02")
+    renamed_node_id = (
+        "calibration:session:"
+        "camera-a/campaign-2026/2026-03-05__sess02"
+    )
+    assert renamed_root.is_dir()
+    assert not session_root.exists()
+    assert window.workflow_state_controller.active_node_id == renamed_node_id
+    assert window.folder_edit.text() == str(renamed_root.resolve())
+
+
 def test_window_can_delete_acquisition_from_workflow_structure_tools(
     tmp_path: Path,
     framelab_window_factory,

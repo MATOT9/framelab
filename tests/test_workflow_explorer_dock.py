@@ -608,21 +608,25 @@ def test_workflow_explorer_context_menu_covers_every_calibration_level(
         },
         "calibration:camera:camera-a": {
             "New Campaign...": True,
+            "Rename Camera...": True,
             "Delete Camera...": True,
             "Open in File Explorer": True,
         },
         "calibration:campaign:camera-a/campaign-2026": {
             "New Session...": True,
+            "Rename Campaign...": True,
             "Delete Campaign...": True,
             "Open in File Explorer": True,
         },
         session_node_id: {
             "New Acquisition...": True,
+            "Rename Session...": True,
             "Delete Session...": True,
             "Open in File Explorer": True,
         },
         acquisition_node_id: {
             "New Acquisition...": True,
+            "Rename / Relabel...": True,
             "Delete Acquisition...": True,
             "Open in File Explorer": True,
         },
@@ -656,21 +660,25 @@ def test_workflow_explorer_context_menu_covers_every_trials_level(
         },
         trial_node_id: {
             "New Camera...": True,
+            "Rename Trial...": True,
             "Delete Trial...": True,
             "Open in File Explorer": True,
         },
         camera_node_id: {
             "New Session...": True,
+            "Rename Camera...": True,
             "Delete Camera...": True,
             "Open in File Explorer": True,
         },
         session_node_id: {
             "New Acquisition...": True,
+            "Rename Session...": True,
             "Delete Session...": True,
             "Open in File Explorer": True,
         },
         acquisition_node_id: {
             "New Acquisition...": True,
+            "Rename / Relabel...": True,
             "Delete Acquisition...": True,
             "Open in File Explorer": True,
         },

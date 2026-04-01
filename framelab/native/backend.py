@@ -8,6 +8,7 @@ existing Python implementations while recording lightweight diagnostics.
 
 from __future__ import annotations
 
+from pathlib import Path
 from threading import Lock
 from typing import Any
 
@@ -662,7 +663,7 @@ def compute_histogram(
 
 
 def decode_raw_file(
-    path: str,
+    path: str | Path,
     *,
     pixel_format: str | None = None,
     width: int | None = None,
@@ -691,8 +692,9 @@ def decode_raw_file(
             ),
         )
 
+    normalized_path = str(path)
     return require_native().decode_raw_file(
-        path,
+        normalized_path,
         validated.pixel_format,
         validated.width,
         validated.height,

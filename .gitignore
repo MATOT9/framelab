@@ -9,6 +9,7 @@ archived
 json_templates
 test.py
 */.tmp
+.codex
 
 # Software cache
 .framelab

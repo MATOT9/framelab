@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import Counter
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -32,6 +33,7 @@ from ..metrics_cache import (
     static_metric_signature_hash,
 )
 from ..processing_failures import (
+    ProcessingFailure,
     failure_reason_from_exception,
     make_processing_failure,
 )
@@ -851,6 +853,78 @@ class DatasetLoadingMixin:
             message=progress.message,
         )
 
+    @staticmethod
+    def _dataset_load_failure_hint(reason: str) -> str | None:
+        """Return a next-step hint for one common dataset load failure reason."""
+
+        normalized = " ".join(str(reason or "").split()).lower()
+        if "missing raw decode spec fields" in normalized:
+            # RAW decode metadata comes from acquisition/session/campaign
+            # datacards plus inherited node metadata. eBUS `.pvcfg` snapshots
+            # only contribute optional baseline values and are not required for
+            # RAW decode.
+            return (
+                "Add acquisition/session/campaign datacard metadata or "
+                "session-local RAW fallback values, then re-scan."
+            )
+        if "unsupported raw pixel format" in normalized:
+            return (
+                "Use one of the supported RAW pixel formats in datacard "
+                "metadata or session-local RAW fallback values, then re-scan."
+            )
+        if "expected 2d image" in normalized:
+            return (
+                "Verify the selected files contain single-frame 2D image data, "
+                "then re-scan."
+            )
+        return None
+
+    def _dataset_load_failure_message(
+        self,
+        *,
+        total_candidates: int,
+        failures: tuple[ProcessingFailure, ...],
+    ) -> str:
+        """Build a troubleshooting-focused dataset load error message."""
+
+        total = max(int(total_candidates), len(failures))
+        noun = "file" if total == 1 else "files"
+        lines = [f"All {total} supported image {noun} failed to load."]
+        if not failures:
+            lines.append("Open Processing Issues for per-file details.")
+            return "\n".join(lines)
+
+        reason_counts = Counter(
+            failure.reason
+            for failure in failures
+            if str(failure.reason).strip()
+        )
+        if not reason_counts:
+            lines.append("Open Processing Issues for per-file details.")
+            return "\n".join(lines)
+
+        ordered = sorted(
+            reason_counts.items(),
+            key=lambda item: (-item[1], item[0]),
+        )
+        if len(ordered) == 1:
+            reason, _count = ordered[0]
+            lines.append(f"Most likely cause: {reason}")
+            hint = self._dataset_load_failure_hint(reason)
+            if hint:
+                lines.append(hint)
+        else:
+            summary_parts: list[str] = []
+            for reason, count in ordered[:2]:
+                label = f"{reason} ({count})" if count > 1 else reason
+                summary_parts.append(label)
+            if len(ordered) > 2:
+                summary_parts.append(f"+{len(ordered) - 2} more")
+            lines.append("Observed failure types: " + "; ".join(summary_parts))
+
+        lines.append("Open Processing Issues for per-file details.")
+        return "\n".join(lines)
+
     def _on_dataset_load_finished(self, summary: object) -> None:
         """Finalize dataset state after the async loader completes or cancels."""
 
@@ -868,6 +942,11 @@ class DatasetLoadingMixin:
             total=summary.total_candidates,
             message="",
         )
+        if hasattr(self, "_record_processing_failures"):
+            self._record_processing_failures(
+                list(getattr(summary, "failures", ()) or ()),
+                replace_stage="scan",
+            )
 
         if summary.no_files:
             self.dataset_state.clear_loaded_dataset()
@@ -903,7 +982,13 @@ class DatasetLoadingMixin:
             self._update_metadata_source_options(False)
             self.base_status = "Load failed"
             self._clear_image_cache()
-            self._show_error("Load failed", "No readable 2D image files.")
+            self._show_error(
+                "Load failed",
+                self._dataset_load_failure_message(
+                    total_candidates=int(summary.total_candidates),
+                    failures=tuple(getattr(summary, "failures", ()) or ()),
+                ),
+            )
             self._run_dataset_load_callbacks(summary)
             self.datasetLoadCompleted.emit(summary)
             return

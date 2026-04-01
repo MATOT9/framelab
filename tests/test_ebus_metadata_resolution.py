@@ -13,13 +13,16 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 try:
     from PySide6 import QtWidgets as qtw
+    from PySide6.QtCore import Qt
 except ModuleNotFoundError:
     qtw = None
+    Qt = None
 
 from framelab.acquisition_datacard import normalize_override_selectors
 from framelab.ebus import resolve_ebus_canonical_fields
 from framelab.metadata import clear_metadata_cache, extract_path_metadata
 from framelab.payload_utils import get_dot_path
+from framelab.raw_decode import SUPPORTED_MONO_RAW_PIXEL_FORMATS
 
 if qtw is not None:
     from framelab.plugins.data.acquisition_datacard_wizard import (
@@ -247,6 +250,32 @@ def dialog_factory(
         except Exception:
             pass
     qapp.processEvents()
+
+
+@pytest.mark.skipif(not _WIZARD_AVAILABLE, reason="Qt wizard not available")
+def test_pixel_format_defaults_editor_uses_completer_with_known_options(
+    dialog_factory,
+) -> None:
+    dialog = dialog_factory()
+
+    editor = dialog._defaults_editors["camera_settings.pixel_format"]
+    assert isinstance(editor, qtw.QLineEdit)
+
+    completer = editor.completer()
+    assert completer is not None
+    assert completer.caseSensitivity() == Qt.CaseInsensitive
+    assert completer.filterMode() == Qt.MatchContains
+
+    model = completer.model()
+    values = [
+        model.index(index, 0).data()
+        for index in range(model.rowCount())
+    ]
+    assert values == list(SUPPORTED_MONO_RAW_PIXEL_FORMATS)
+
+    editor.setText("custom-pixel-format")
+    spec = dialog._field_spec_by_key()["camera_settings.pixel_format"]
+    assert dialog._get_editor_value(editor, spec) == "custom-pixel-format"
 
 
 def test_defaults_only_without_snapshot(acquisition_root: Path) -> None:

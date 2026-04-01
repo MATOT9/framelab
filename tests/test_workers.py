@@ -291,7 +291,7 @@ def test_scan_single_static_image_marks_raw_source_kind_and_uses_shared_resolver
     tmp_path: Path,
     monkeypatch,
 ) -> None:
-    path = tmp_path / "img.raw"
+    path = tmp_path / "img.bin"
     path.write_bytes(b"\x00" * 16)
     read_calls: list[dict[str, object]] = []
 
@@ -375,7 +375,7 @@ def test_dynamic_worker_marks_raw_source_kind_and_uses_shared_resolver(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
-    path = tmp_path / "img.raw"
+    path = tmp_path / "img.bin"
     path.write_bytes(b"\x00" * 16)
     read_calls: list[dict[str, object]] = []
     compute_calls: list[dict[str, object]] = []
