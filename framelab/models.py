@@ -578,11 +578,12 @@ class MetricsTableModel(QAbstractTableModel):
         str
             One of ``"reset"`` or ``"updated"``.
         """
-        row_changed = len(paths) != len(self._paths)
-        path_changed = not row_changed and self._paths != paths
+        owned_paths = [str(path) for path in paths]
+        row_changed = len(owned_paths) != len(self._paths)
+        path_changed = not row_changed and self._paths != owned_paths
         if row_changed or path_changed:
             self.beginResetModel()
-            self._paths = paths
+            self._paths = owned_paths
             self._iris_positions = iris_positions
             self._exposure_ms = exposure_ms
             self._maxs = maxs
@@ -619,7 +620,7 @@ class MetricsTableModel(QAbstractTableModel):
         old_avg_roi_sem = self._avg_roi_sem
         old_dn_per_ms = self._dn_per_ms
 
-        self._paths = paths
+        self._paths = owned_paths
         self._iris_positions = iris_positions
         self._exposure_ms = exposure_ms
         self._maxs = maxs

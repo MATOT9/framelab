@@ -448,6 +448,13 @@ class InspectPageMixin:
             return
 
         active_model = self.table.model()
+        if (
+            active_model is self.table_model
+            and self.table_proxy.rowCount() == expected_rows
+        ):
+            self._rebind_measure_table_model(prefer_proxy=True)
+            self._apply_table_sort()
+            active_model = self.table.model()
         if active_model is None:
             self._rebind_measure_table_model(prefer_proxy=True)
             active_model = self.table.model()

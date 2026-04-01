@@ -397,6 +397,46 @@ def test_metrics_table_proxy_keeps_all_rows_when_dataset_grows(qapp) -> None:
     assert proxy.rowCount() == 65
 
 
+def test_metrics_table_proxy_keeps_all_rows_when_shared_paths_grow_in_place(qapp) -> None:
+    model = MetricsTableModel()
+    proxy = MetricsSortProxyModel()
+    proxy.setSourceModel(model)
+    proxy.setDynamicSortFilter(True)
+
+    paths = [f"/tmp/frame_{index:03d}.tif" for index in range(32)]
+
+    def _update() -> str:
+        count = len(paths)
+        return model.update_metrics(
+            paths=paths,
+            iris_positions=np.full(count, np.nan, dtype=np.float64),
+            exposure_ms=np.full(count, np.nan, dtype=np.float64),
+            maxs=np.zeros(count, dtype=np.int64),
+            roi_maxs=np.full(count, np.nan, dtype=np.float64),
+            min_non_zero=np.zeros(count, dtype=np.int64),
+            sat_counts=np.zeros(count, dtype=np.int64),
+            low_signal_flags=np.zeros(count, dtype=bool),
+            avg_mode="none",
+            avg_topk=None,
+            avg_topk_std=None,
+            avg_topk_sem=None,
+            avg_roi=None,
+            avg_roi_std=None,
+            avg_roi_sem=None,
+            dn_per_ms=None,
+        )
+
+    assert _update() == "reset"
+    assert model.rowCount() == 32
+    assert proxy.rowCount() == 32
+
+    paths.extend(f"/tmp/frame_{index:03d}.tif" for index in range(32, 65))
+
+    assert _update() == "reset"
+    assert model.rowCount() == 65
+    assert proxy.rowCount() == 65
+
+
 def test_analysis_context_normalizes_active_metric_and_dn_per_ms_but_keeps_raw_metadata() -> None:
     host = _AnalysisHarness()
     host.paths = ["/tmp/a.tif"]
