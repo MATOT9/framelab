@@ -5,6 +5,57 @@
 #include "python_bridge.h"
 #include "framelab_native/api.h"
 #include "framelab_native/common/pixel_formats.h"
+#include "framelab_native/common/simd.h"
+
+typedef struct FramelabPyRawRuntimeState {
+    int use_mmap;
+    int simd_enabled;
+    FramelabRawExecutionInfo last_execution;
+} FramelabPyRawRuntimeState;
+
+static FramelabPyRawRuntimeState g_raw_runtime_state = {1, 1, {0, FRAMELAB_SIMD_SCALAR}};
+
+static void record_raw_execution(const FramelabRawExecutionInfo *execution_info) {
+    if (execution_info == NULL) {
+        g_raw_runtime_state.last_execution.used_mmap = 0;
+        g_raw_runtime_state.last_execution.simd_isa = FRAMELAB_SIMD_SCALAR;
+        return;
+    }
+    g_raw_runtime_state.last_execution = *execution_info;
+}
+
+static void init_raw_load_params(FramelabRawLoadParams *params,
+                                 const char *path,
+                                 FramelabPixelFormat pixel_format,
+                                 uint32_t width,
+                                 uint32_t height,
+                                 uint32_t stride_bytes,
+                                 size_t offset_bytes) {
+    memset(params, 0, sizeof(*params));
+    params->path = path;
+    params->width = width;
+    params->height = height;
+    params->src_stride_bytes = stride_bytes;
+    params->offset_bytes = offset_bytes;
+    params->pixel_format = pixel_format;
+    params->io_mode = g_raw_runtime_state.use_mmap
+        ? FRAMELAB_RAW_IO_AUTO
+        : FRAMELAB_RAW_IO_BUFFERED_ONLY;
+    params->simd_enabled = g_raw_runtime_state.simd_enabled;
+}
+
+static PyObject *build_raw_acceleration_status(void) {
+    return Py_BuildValue(
+        "{s:O,s:s,s:O,s:s}",
+        "mmap_supported",
+        Py_True,
+        "simd_capability",
+        framelab_simd_isa_name(framelab_best_simd_isa()),
+        "last_raw_used_mmap",
+        g_raw_runtime_state.last_execution.used_mmap ? Py_True : Py_False,
+        "last_raw_simd_isa",
+        framelab_simd_isa_name(g_raw_runtime_state.last_execution.simd_isa));
+}
 
 static PyObject *build_static_metrics_result(const FramelabStaticScanResult *result) {
     PyObject *tuple_obj = PyTuple_New(2);
@@ -582,6 +633,33 @@ static PyObject *py_compute_histogram(PyObject *self, PyObject *args, PyObject *
     return (PyObject *)bins_array;
 }
 
+static PyObject *py_set_raw_runtime_config(PyObject *self, PyObject *args, PyObject *kwargs) {
+    static char *kwlist[] = {"use_mmap", "simd_enabled", NULL};
+    int use_mmap = g_raw_runtime_state.use_mmap;
+    int simd_enabled = g_raw_runtime_state.simd_enabled;
+    (void)self;
+
+    if (!PyArg_ParseTupleAndKeywords(
+            args,
+            kwargs,
+            "|pp:set_raw_runtime_config",
+            kwlist,
+            &use_mmap,
+            &simd_enabled)) {
+        return NULL;
+    }
+
+    g_raw_runtime_state.use_mmap = use_mmap ? 1 : 0;
+    g_raw_runtime_state.simd_enabled = simd_enabled ? 1 : 0;
+    Py_RETURN_NONE;
+}
+
+static PyObject *py_raw_acceleration_status(PyObject *self, PyObject *args) {
+    (void)self;
+    (void)args;
+    return build_raw_acceleration_status();
+}
+
 static PyObject *py_decode_raw_file(PyObject *self, PyObject *args, PyObject *kwargs) {
     static char *kwlist[] = {
         "path",
@@ -602,6 +680,7 @@ static PyObject *py_decode_raw_file(PyObject *self, PyObject *args, PyObject *kw
     npy_intp dims[2];
     PyArrayObject *out_array = NULL;
     FramelabRawLoadParams params;
+    FramelabRawExecutionInfo execution_info;
     FramelabStatus status;
     (void)self;
 
@@ -634,19 +713,21 @@ static PyObject *py_decode_raw_file(PyObject *self, PyObject *args, PyObject *kw
         return NULL;
     }
 
-    memset(&params, 0, sizeof(params));
-    params.path = path;
-    params.width = (uint32_t)width;
-    params.height = (uint32_t)height;
-    params.src_stride_bytes = (uint32_t)stride_bytes;
-    params.offset_bytes = (size_t)offset_bytes;
-    params.pixel_format = pixel_format;
+    init_raw_load_params(
+        &params,
+        path,
+        pixel_format,
+        (uint32_t)width,
+        (uint32_t)height,
+        (uint32_t)stride_bytes,
+        (size_t)offset_bytes);
 
     Py_BEGIN_ALLOW_THREADS
-    status = framelab_load_raw_and_decode(
+    status = framelab_load_raw_and_decode_with_info(
         &params,
         (uint16_t *)PyArray_DATA(out_array),
-        (uint32_t)width
+        (uint32_t)width,
+        &execution_info
     );
     Py_END_ALLOW_THREADS
 
@@ -654,8 +735,197 @@ static PyObject *py_decode_raw_file(PyObject *self, PyObject *args, PyObject *kw
         Py_DECREF(out_array);
         return framelab_py_status_error(status, "decode_raw_file failed");
     }
+    record_raw_execution(&execution_info);
 
     return (PyObject *)out_array;
+}
+
+static PyObject *py_compute_raw_static_metrics(PyObject *self, PyObject *args, PyObject *kwargs) {
+    static char *kwlist[] = {
+        "path",
+        "pixel_format",
+        "width",
+        "height",
+        "stride_bytes",
+        "offset_bytes",
+        NULL
+    };
+    const char *path = NULL;
+    const char *pixel_format_name = NULL;
+    unsigned long width = 0UL;
+    unsigned long height = 0UL;
+    unsigned long stride_bytes = 0UL;
+    unsigned long long offset_bytes = 0ULL;
+    FramelabPixelFormat pixel_format;
+    FramelabRawLoadParams raw_params;
+    FramelabRawExecutionInfo execution_info;
+    FramelabRawStaticScanParams params;
+    FramelabStaticScanResult result;
+    FramelabStatus status;
+    (void)self;
+
+    if (!PyArg_ParseTupleAndKeywords(
+            args,
+            kwargs,
+            "sskk|kK:compute_raw_static_metrics",
+            kwlist,
+            &path,
+            &pixel_format_name,
+            &width,
+            &height,
+            &stride_bytes,
+            &offset_bytes)) {
+        return NULL;
+    }
+    pixel_format = framelab_pixel_format_from_string(pixel_format_name);
+    if (pixel_format == FRAMELAB_PIXFMT_UNKNOWN) {
+        PyErr_Format(PyExc_ValueError, "unsupported pixel_format string: %s", pixel_format_name);
+        return NULL;
+    }
+    if (width == 0UL || height == 0UL || width > (unsigned long)INT32_MAX || height > (unsigned long)INT32_MAX) {
+        PyErr_SetString(PyExc_ValueError, "width and height must be positive and reasonable");
+        return NULL;
+    }
+    init_raw_load_params(
+        &raw_params,
+        path,
+        pixel_format,
+        (uint32_t)width,
+        (uint32_t)height,
+        (uint32_t)stride_bytes,
+        (size_t)offset_bytes);
+    memset(&params, 0, sizeof(params));
+    params.raw = raw_params;
+    params.execution_info = &execution_info;
+
+    Py_BEGIN_ALLOW_THREADS
+    status = framelab_compute_raw_static_scan(&params, &result);
+    Py_END_ALLOW_THREADS
+
+    if (status != FRAMELAB_STATUS_OK) {
+        return framelab_py_status_error(status, "compute_raw_static_metrics failed");
+    }
+    record_raw_execution(&execution_info);
+    return build_static_metrics_result(&result);
+}
+
+static PyObject *py_compute_raw_dynamic_metrics(PyObject *self, PyObject *args, PyObject *kwargs) {
+    static char *kwlist[] = {
+        "path",
+        "pixel_format",
+        "width",
+        "height",
+        "threshold_value",
+        "mode",
+        "avg_count_value",
+        "background",
+        "clip_negative",
+        "stride_bytes",
+        "offset_bytes",
+        NULL
+    };
+    const char *path = NULL;
+    const char *pixel_format_name = NULL;
+    const char *mode = "none";
+    unsigned long width = 0UL;
+    unsigned long height = 0UL;
+    unsigned long avg_count_value = 1UL;
+    unsigned long stride_bytes = 0UL;
+    unsigned long long offset_bytes = 0ULL;
+    double threshold_value = 0.0;
+    PyObject *background_obj = Py_None;
+    int clip_negative = 1;
+    PyArrayObject *background_array = NULL;
+    FramelabImageView background_view;
+    int background_present = 0;
+    FramelabPixelFormat pixel_format;
+    FramelabRawLoadParams raw_params;
+    FramelabRawExecutionInfo execution_info;
+    FramelabRawDynamicMetricsParams params;
+    FramelabDynamicMetricsResult result;
+    FramelabStatus status;
+    PyObject *ret = NULL;
+    (void)self;
+
+    if (!PyArg_ParseTupleAndKeywords(
+            args,
+            kwargs,
+            "sskkdsk|OpkK:compute_raw_dynamic_metrics",
+            kwlist,
+            &path,
+            &pixel_format_name,
+            &width,
+            &height,
+            &threshold_value,
+            &mode,
+            &avg_count_value,
+            &background_obj,
+            &clip_negative,
+            &stride_bytes,
+            &offset_bytes)) {
+        return NULL;
+    }
+    pixel_format = framelab_pixel_format_from_string(pixel_format_name);
+    if (pixel_format == FRAMELAB_PIXFMT_UNKNOWN) {
+        PyErr_Format(PyExc_ValueError, "unsupported pixel_format string: %s", pixel_format_name);
+        return NULL;
+    }
+    if (width == 0UL || height == 0UL || width > (unsigned long)INT32_MAX || height > (unsigned long)INT32_MAX) {
+        PyErr_SetString(PyExc_ValueError, "width and height must be positive and reasonable");
+        return NULL;
+    }
+    if (!framelab_py_optional_image_view_from_object(
+            background_obj,
+            "background",
+            &background_view,
+            &background_array,
+            &background_present)) {
+        return NULL;
+    }
+
+    init_raw_load_params(
+        &raw_params,
+        path,
+        pixel_format,
+        (uint32_t)width,
+        (uint32_t)height,
+        (uint32_t)stride_bytes,
+        (size_t)offset_bytes);
+    memset(&params, 0, sizeof(params));
+    params.raw = raw_params;
+    params.execution_info = &execution_info;
+    params.background = background_present ? &background_view : NULL;
+    params.background_mode = background_present
+        ? (clip_negative ? FRAMELAB_BG_SUBTRACT_CLAMP_ZERO : FRAMELAB_BG_SUBTRACT)
+        : FRAMELAB_BG_NONE;
+    params.use_threshold = 1;
+    params.threshold = threshold_value;
+    if (strcmp(mode, "none") == 0) {
+        params.use_topk = 0;
+        params.topk_count = 0U;
+    } else if (strcmp(mode, "topk") == 0) {
+        params.use_topk = 1;
+        params.topk_count = avg_count_value > (unsigned long)UINT32_MAX
+            ? UINT32_MAX
+            : (uint32_t)avg_count_value;
+    } else {
+        Py_XDECREF(background_array);
+        PyErr_SetString(PyExc_ValueError, "mode must be 'none' or 'topk'");
+        return NULL;
+    }
+
+    Py_BEGIN_ALLOW_THREADS
+    status = framelab_compute_raw_dynamic_metrics(&params, &result);
+    Py_END_ALLOW_THREADS
+
+    if (status != FRAMELAB_STATUS_OK) {
+        Py_XDECREF(background_array);
+        return framelab_py_status_error(status, "compute_raw_dynamic_metrics failed");
+    }
+    record_raw_execution(&execution_info);
+    ret = build_dynamic_metrics_result(&result, params.use_topk);
+    Py_XDECREF(background_array);
+    return ret;
 }
 
 static PyMethodDef framelab_methods[] = {
@@ -708,11 +978,44 @@ static PyMethodDef framelab_methods[] = {
         )
     },
     {
+        "set_raw_runtime_config",
+        FRAMELAB_PY_CFUNCTION_CAST(py_set_raw_runtime_config),
+        METH_VARARGS | METH_KEYWORDS,
+        PyDoc_STR(
+            "set_raw_runtime_config(use_mmap=True, simd_enabled=True) -> None"
+        )
+    },
+    {
+        "raw_acceleration_status",
+        (PyCFunction)py_raw_acceleration_status,
+        METH_NOARGS,
+        PyDoc_STR(
+            "raw_acceleration_status() -> {'mmap_supported', 'simd_capability', 'last_raw_used_mmap', 'last_raw_simd_isa'}"
+        )
+    },
+    {
         "decode_raw_file",
         FRAMELAB_PY_CFUNCTION_CAST(py_decode_raw_file),
         METH_VARARGS | METH_KEYWORDS,
         PyDoc_STR(
             "decode_raw_file(path, pixel_format, width, height, stride_bytes=0, offset_bytes=0) -> uint16 ndarray"
+        )
+    },
+    {
+        "compute_raw_static_metrics",
+        FRAMELAB_PY_CFUNCTION_CAST(py_compute_raw_static_metrics),
+        METH_VARARGS | METH_KEYWORDS,
+        PyDoc_STR(
+            "compute_raw_static_metrics(path, pixel_format, width, height, stride_bytes=0, offset_bytes=0) -> (min_non_zero, max_pixel)"
+        )
+    },
+    {
+        "compute_raw_dynamic_metrics",
+        FRAMELAB_PY_CFUNCTION_CAST(py_compute_raw_dynamic_metrics),
+        METH_VARARGS | METH_KEYWORDS,
+        PyDoc_STR(
+            "compute_raw_dynamic_metrics(path, pixel_format, width, height, threshold_value, mode, avg_count_value, background=None, clip_negative=True, stride_bytes=0, offset_bytes=0)\n"
+            "-> {'sat_count', 'min_non_zero', 'max_pixel', 'avg_topk', 'avg_topk_std', 'avg_topk_sem'}"
         )
     },
     {NULL, NULL, 0, NULL}

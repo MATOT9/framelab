@@ -58,11 +58,35 @@ typedef struct FramelabRoiMetricsResult {
     double roi_sem;
 } FramelabRoiMetricsResult;
 
+typedef struct FramelabRawStaticScanParams {
+    FramelabRawLoadParams raw;
+    FramelabRawExecutionInfo *execution_info;
+} FramelabRawStaticScanParams;
+
+typedef struct FramelabRawDynamicMetricsParams {
+    FramelabRawLoadParams raw;
+    FramelabRawExecutionInfo *execution_info;
+    const FramelabImageView *background;
+    FramelabBackgroundMode background_mode;
+    int use_threshold;
+    double threshold;
+    int use_topk;
+    uint32_t topk_count;
+} FramelabRawDynamicMetricsParams;
+
 FramelabStatus framelab_compute_static_scan(const FramelabStaticScanParams *params,
                                             FramelabStaticScanResult *result);
 
+FramelabStatus framelab_compute_raw_static_scan(
+    const FramelabRawStaticScanParams *params,
+    FramelabStaticScanResult *result);
+
 FramelabStatus framelab_compute_dynamic_metrics(
     const FramelabDynamicMetricsParams *params,
+    FramelabDynamicMetricsResult *result);
+
+FramelabStatus framelab_compute_raw_dynamic_metrics(
+    const FramelabRawDynamicMetricsParams *params,
     FramelabDynamicMetricsResult *result);
 
 FramelabStatus framelab_compute_roi_metrics(const FramelabRoiMetricsParams *params,

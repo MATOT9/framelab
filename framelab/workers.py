@@ -247,12 +247,27 @@ def scan_single_static_image(
     """Read one image and compute quick static metrics."""
 
     source_path = Path(path)
+    source_kind = source_kind_for_path(source_path)
     try:
-        image = read_2d_image(
-            source_path,
-            raw_spec_resolver=resolve_raw_decode_spec,
-            raw_resolver_context=raw_resolver_context,
-        )
+        if source_kind == "raw":
+            spec = resolve_raw_decode_spec(
+                source_path,
+                context=raw_resolver_context,
+            )
+            min_non_zero, max_pixel = native_backend.compute_raw_static_metrics(
+                source_path,
+                spec=spec,
+            )
+        else:
+            image = read_2d_image(
+                source_path,
+                raw_spec_resolver=resolve_raw_decode_spec,
+                raw_resolver_context=raw_resolver_context,
+            )
+            min_non_zero, max_pixel = native_backend.compute_static_metrics(
+                image,
+                source_kind=source_kind,
+            )
     except Exception as exc:
         return (
             None,
@@ -265,10 +280,6 @@ def scan_single_static_image(
             ),
         )
 
-    min_non_zero, max_pixel = native_backend.compute_static_metrics(
-        image,
-        source_kind=source_kind_for_path(source_path),
-    )
     return ((str(source_path), min_non_zero, max_pixel), ())
 
 
@@ -353,6 +364,18 @@ class DynamicStatsWorker(QObject):
         if reference is None:
             return (None, False)
         if not validate_reference_shape(image.shape, reference.shape):
+            return (None, False)
+        return (reference, True)
+
+    def _metric_background_for_shape(
+        self,
+        path: str,
+        shape: tuple[int, int],
+    ) -> tuple[np.ndarray | None, bool]:
+        reference = self._reference_for_path(path)
+        if reference is None:
+            return (None, False)
+        if not validate_reference_shape(shape, reference.shape):
             return (None, False)
         return (reference, True)
 
@@ -467,39 +490,48 @@ class DynamicStatsWorker(QObject):
             for source_index, path in zip(self._source_indices, self._paths):
                 if thread.isInterruptionRequested():
                     return
+                source_kind = source_kind_for_path(path)
                 try:
-                    img = read_2d_image(
-                        path,
-                        raw_spec_resolver=resolve_raw_decode_spec,
-                        raw_resolver_context=self._raw_resolver_context,
-                    )
-                except Exception as exc:
-                    failures.append(
-                        make_processing_failure(
-                            stage="metrics",
-                            path=path,
-                            reason=failure_reason_from_exception(exc),
-                        ),
-                    )
-                    continue
-
-                try:
-                    background_img, bg_applied = self._metric_background(path, img)
                     clip_negative = (
                         True
                         if self._background_config is None
                         else self._background_config.clip_negative
                     )
-                    metric_result = native_backend.compute_dynamic_metrics(
-                        img,
-                        threshold_value=self._threshold_value,
-                        mode=self._mode,
-                        avg_count_value=self._avg_count_value,
-                        background=background_img,
-                        clip_negative=clip_negative,
-                        threshold_only=threshold_only,
-                        source_kind=source_kind_for_path(path),
-                    )
+                    if source_kind == "raw":
+                        spec = resolve_raw_decode_spec(
+                            path,
+                            context=self._raw_resolver_context,
+                        )
+                        background_img, bg_applied = self._metric_background_for_shape(
+                            path,
+                            (spec.height, spec.width),
+                        )
+                        metric_result = native_backend.compute_raw_dynamic_metrics(
+                            path,
+                            spec=spec,
+                            threshold_value=self._threshold_value,
+                            mode="none" if threshold_only else self._mode,
+                            avg_count_value=self._avg_count_value,
+                            background=background_img,
+                            clip_negative=clip_negative,
+                        )
+                    else:
+                        img = read_2d_image(
+                            path,
+                            raw_spec_resolver=resolve_raw_decode_spec,
+                            raw_resolver_context=self._raw_resolver_context,
+                        )
+                        background_img, bg_applied = self._metric_background(path, img)
+                        metric_result = native_backend.compute_dynamic_metrics(
+                            img,
+                            threshold_value=self._threshold_value,
+                            mode=self._mode,
+                            avg_count_value=self._avg_count_value,
+                            background=background_img,
+                            clip_negative=clip_negative,
+                            threshold_only=threshold_only,
+                            source_kind=source_kind,
+                        )
                 except Exception as exc:
                     failures.append(
                         make_processing_failure(

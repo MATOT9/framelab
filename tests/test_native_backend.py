@@ -44,6 +44,12 @@ def _set_backend_state(monkeypatch, native_obj) -> None:
         False,
         raising=False,
     )
+    monkeypatch.setattr(
+        backend,
+        "_raw_runtime_config",
+        backend.RawRuntimeConfig(),
+        raising=False,
+    )
 
 
 def test_static_metrics_fall_back_cleanly_when_native_unavailable(monkeypatch) -> None:
@@ -172,6 +178,46 @@ def test_backend_status_snapshot_reports_native_and_latched_failure(monkeypatch)
         backend.consume_backend_status_notice()
         == "Native metrics failed; using Python fallback"
     )
+    assert snapshot["raw_mmap_enabled"] is True
+    assert snapshot["raw_simd_enabled"] is True
+    assert snapshot["raw_last_used_mmap"] is False
+    assert snapshot["raw_last_simd_isa"] == "scalar"
+
+
+def test_configure_raw_runtime_updates_snapshot_and_syncs_native(monkeypatch) -> None:
+    calls: list[dict[str, object]] = []
+
+    class _FakeNative:
+        @staticmethod
+        def set_raw_runtime_config(*, use_mmap, simd_enabled):
+            calls.append(
+                {
+                    "use_mmap": use_mmap,
+                    "simd_enabled": simd_enabled,
+                },
+            )
+
+        @staticmethod
+        def raw_acceleration_status():
+            return {
+                "mmap_supported": True,
+                "simd_capability": "sse2",
+                "last_raw_used_mmap": True,
+                "last_raw_simd_isa": "sse2",
+            }
+
+    _set_backend_state(monkeypatch, _FakeNative())
+
+    backend.configure_raw_runtime(use_mmap_for_raw=False, enable_raw_simd=False)
+    snapshot = backend.backend_status_snapshot()
+
+    assert calls == [{"use_mmap": False, "simd_enabled": False}]
+    assert snapshot["raw_mmap_enabled"] is False
+    assert snapshot["raw_simd_enabled"] is False
+    assert snapshot["raw_mmap_supported"] is True
+    assert snapshot["raw_simd_capability"] == "sse2"
+    assert snapshot["raw_last_used_mmap"] is True
+    assert snapshot["raw_last_simd_isa"] == "sse2"
 
 
 def test_dynamic_metrics_treat_roi_mode_as_none(monkeypatch) -> None:
@@ -511,6 +557,124 @@ def test_decode_raw_file_accepts_path_objects_and_normalizes_for_native(
     np.testing.assert_array_equal(result, np.zeros((2, 2), dtype=np.uint16))
 
 
+def test_compute_raw_static_metrics_validates_spec_and_calls_native(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    path = tmp_path / "frame.bin"
+    path.write_bytes(b"\x00" * 4)
+    calls: list[dict[str, object]] = []
+
+    class _FakeNative:
+        @staticmethod
+        def compute_raw_static_metrics(candidate, pixel_format, width, height, *, stride_bytes, offset_bytes):
+            calls.append(
+                {
+                    "path": candidate,
+                    "pixel_format": pixel_format,
+                    "width": width,
+                    "height": height,
+                    "stride_bytes": stride_bytes,
+                    "offset_bytes": offset_bytes,
+                },
+            )
+            return (4, 9)
+
+    monkeypatch.setattr(backend, "_native", _FakeNative(), raising=False)
+
+    result = backend.compute_raw_static_metrics(
+        path,
+        spec=RawDecodeSpec(
+            source_kind="raw",
+            pixel_format="Mono12Packed",
+            width=2,
+            height=1,
+            stride_bytes=None,
+            offset_bytes=3,
+        ),
+    )
+
+    assert result == (4, 9)
+    assert calls == [
+        {
+            "path": str(path),
+            "pixel_format": "mono12packed",
+            "width": 2,
+            "height": 1,
+            "stride_bytes": 0,
+            "offset_bytes": 3,
+        },
+    ]
+
+
+def test_compute_raw_dynamic_metrics_validates_spec_and_calls_native(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    path = tmp_path / "frame.bin"
+    path.write_bytes(b"\x00" * 4)
+    calls: list[dict[str, object]] = []
+    background = np.ones((1, 2), dtype=np.uint16)
+
+    class _FakeNative:
+        @staticmethod
+        def compute_raw_dynamic_metrics(candidate, pixel_format, width, height, threshold_value, mode, avg_count_value, **kwargs):
+            calls.append(
+                {
+                    "path": candidate,
+                    "pixel_format": pixel_format,
+                    "width": width,
+                    "height": height,
+                    "threshold_value": threshold_value,
+                    "mode": mode,
+                    "avg_count_value": avg_count_value,
+                    **dict(kwargs),
+                },
+            )
+            return {
+                "sat_count": 2,
+                "min_non_zero": 1,
+                "max_pixel": 12,
+                "avg_topk": None,
+                "avg_topk_std": None,
+                "avg_topk_sem": None,
+            }
+
+    monkeypatch.setattr(backend, "_native", _FakeNative(), raising=False)
+
+    result = backend.compute_raw_dynamic_metrics(
+        path,
+        spec=RawDecodeSpec(
+            source_kind="raw",
+            pixel_format="mono8",
+            width=2,
+            height=1,
+        ),
+        threshold_value=5.0,
+        mode="none",
+        avg_count_value=3,
+        background=background,
+        clip_negative=False,
+    )
+
+    assert result["max_pixel"] == 12
+    assert calls == [
+        {
+            "path": str(path),
+            "pixel_format": "mono8",
+            "width": 2,
+            "height": 1,
+            "threshold_value": 5.0,
+            "mode": "none",
+            "avg_count_value": 3,
+            "background": background,
+            "clip_negative": False,
+            "stride_bytes": 0,
+            "offset_bytes": 0,
+        },
+    ]
+
+
 def test_decode_raw_file_rejects_mixed_spec_and_explicit_fields(
     tmp_path,
 ) -> None:
@@ -815,3 +979,67 @@ def test_native_decode_raw_file_supports_mono10p_and_mono10packed(tmp_path) -> N
         mono10packed,
         np.array([[685, 956]], dtype=np.uint16),
     )
+
+
+@pytest.mark.skipif(
+    not backend.native_available(),
+    reason="native extension not built in this environment",
+)
+def test_native_raw_decode_matches_buffered_and_mapped_modes(tmp_path) -> None:
+    path = tmp_path / "mono8.bin"
+    path.write_bytes(bytes((1, 2, 3, 4)))
+    original = backend.raw_runtime_config()
+    try:
+        backend.configure_raw_runtime(use_mmap_for_raw=False, enable_raw_simd=False)
+        buffered = backend.decode_raw_file(
+            path,
+            pixel_format="mono8",
+            width=2,
+            height=2,
+        )
+        backend.configure_raw_runtime(use_mmap_for_raw=True, enable_raw_simd=False)
+        mapped = backend.decode_raw_file(
+            path,
+            pixel_format="mono8",
+            width=2,
+            height=2,
+        )
+    finally:
+        backend.configure_raw_runtime(
+            use_mmap_for_raw=original.use_mmap_for_raw,
+            enable_raw_simd=original.enable_raw_simd,
+        )
+
+    np.testing.assert_array_equal(buffered, mapped)
+
+
+@pytest.mark.skipif(
+    not backend.native_available(),
+    reason="native extension not built in this environment",
+)
+def test_native_raw_decode_matches_scalar_and_simd_modes(tmp_path) -> None:
+    path = tmp_path / "mono12lsb.bin"
+    path.write_bytes(bytes((0x34, 0x12, 0x78, 0x05)))
+    original = backend.raw_runtime_config()
+    try:
+        backend.configure_raw_runtime(use_mmap_for_raw=False, enable_raw_simd=False)
+        scalar = backend.decode_raw_file(
+            path,
+            pixel_format="mono12_lsb",
+            width=2,
+            height=1,
+        )
+        backend.configure_raw_runtime(use_mmap_for_raw=False, enable_raw_simd=True)
+        simd = backend.decode_raw_file(
+            path,
+            pixel_format="mono12_lsb",
+            width=2,
+            height=1,
+        )
+    finally:
+        backend.configure_raw_runtime(
+            use_mmap_for_raw=original.use_mmap_for_raw,
+            enable_raw_simd=original.enable_raw_simd,
+        )
+
+    np.testing.assert_array_equal(scalar, simd)

@@ -1100,7 +1100,7 @@ class MetricsRuntimeMixin:
         if not self.show_histogram_preview:
             return False
         preview_pages = getattr(self, "preview_pages", None)
-        if preview_pages is None or not preview_pages.isVisible():
+        if preview_pages is None:
             return bool(self.show_histogram_preview)
         if hasattr(preview_pages, "isTabVisible") and not preview_pages.isTabVisible(1):
             return False

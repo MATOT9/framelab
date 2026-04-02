@@ -46,6 +46,8 @@ class UiPreferences:
     collapse_data_advanced_row_by_default: bool = True
     collapse_summary_strips_by_default: bool = False
     scan_worker_count_override: int | None = None
+    use_mmap_for_raw: bool = True
+    enable_raw_simd: bool = True
 
 
 @dataclass(slots=True)
@@ -303,6 +305,26 @@ class UiStateStore:
                 ),
                 defaults.scan_worker_count_override,
             ),
+            use_mmap_for_raw=bool(
+                _parse_bool(
+                    config.get(
+                        _SECTION_DATA_PAGE,
+                        "use_mmap_for_raw",
+                        fallback=defaults.use_mmap_for_raw,
+                    ),
+                    defaults.use_mmap_for_raw,
+                ),
+            ),
+            enable_raw_simd=bool(
+                _parse_bool(
+                    config.get(
+                        _SECTION_DATA_PAGE,
+                        "enable_raw_simd",
+                        fallback=defaults.enable_raw_simd,
+                    ),
+                    defaults.enable_raw_simd,
+                ),
+            ),
         )
 
         panel_states: dict[str, bool] = {}
@@ -452,6 +474,18 @@ class UiStateStore:
             None
             if snapshot.preferences.scan_worker_count_override is None
             else str(max(1, int(snapshot.preferences.scan_worker_count_override))),
+        )
+        self._set_option(
+            config,
+            _SECTION_DATA_PAGE,
+            "use_mmap_for_raw",
+            _serialize_bool(snapshot.preferences.use_mmap_for_raw),
+        )
+        self._set_option(
+            config,
+            _SECTION_DATA_PAGE,
+            "enable_raw_simd",
+            _serialize_bool(snapshot.preferences.enable_raw_simd),
         )
         self._set_option(
             config,

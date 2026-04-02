@@ -10,6 +10,7 @@ import tifffile
 import framelab.workers as workers_module
 from framelab.background import BackgroundConfig, BackgroundLibrary
 from framelab.metrics_state import DynamicStatsResult, RoiApplyResult
+from framelab.raw_decode import RawDecodeSpec
 from framelab.workers import (
     DynamicStatsWorker,
     RoiApplyWorker,
@@ -293,27 +294,31 @@ def test_scan_single_static_image_marks_raw_source_kind_and_uses_shared_resolver
 ) -> None:
     path = tmp_path / "img.bin"
     path.write_bytes(b"\x00" * 16)
-    read_calls: list[dict[str, object]] = []
+    resolver_calls: list[dict[str, object]] = []
+    compute_calls: list[dict[str, object]] = []
 
-    def _fake_read(path_arg, **kwargs):
-        read_calls.append(
+    def _fake_resolve(path_arg, *, context=None):
+        resolver_calls.append(
             {
                 "path": str(path_arg),
-                "raw_spec_resolver": kwargs.get("raw_spec_resolver"),
-                "raw_resolver_context": kwargs.get("raw_resolver_context"),
+                "context": context,
             },
         )
-        return np.array([[1, 2], [3, 4]], dtype=np.uint16)
+        return RawDecodeSpec(
+            source_kind="raw",
+            pixel_format="mono8",
+            width=2,
+            height=2,
+        )
 
-    def _fake_static_metrics(image, **kwargs):
-        _ = image
-        assert kwargs["source_kind"] == "raw"
+    def _fake_static_metrics(path_arg, *, spec):
+        compute_calls.append({"path": str(path_arg), "spec": spec})
         return (5, 123)
 
-    monkeypatch.setattr(workers_module, "read_2d_image", _fake_read)
+    monkeypatch.setattr(workers_module, "resolve_raw_decode_spec", _fake_resolve)
     monkeypatch.setattr(
         workers_module.native_backend,
-        "compute_static_metrics",
+        "compute_raw_static_metrics",
         _fake_static_metrics,
     )
 
@@ -321,8 +326,10 @@ def test_scan_single_static_image_marks_raw_source_kind_and_uses_shared_resolver
 
     assert failures == ()
     assert result == (str(path), 5, 123)
-    assert len(read_calls) == 1
-    assert read_calls[0]["raw_spec_resolver"] is workers_module.resolve_raw_decode_spec
+    assert resolver_calls == [{"path": str(path), "context": None}]
+    assert len(compute_calls) == 1
+    assert compute_calls[0]["path"] == str(path)
+    assert compute_calls[0]["spec"].pixel_format == "mono8"
 
 
 def test_dynamic_worker_uses_backend_wrapper(
@@ -377,22 +384,26 @@ def test_dynamic_worker_marks_raw_source_kind_and_uses_shared_resolver(
 ) -> None:
     path = tmp_path / "img.bin"
     path.write_bytes(b"\x00" * 16)
-    read_calls: list[dict[str, object]] = []
+    resolver_calls: list[dict[str, object]] = []
     compute_calls: list[dict[str, object]] = []
 
-    def _fake_read(path_arg, **kwargs):
-        read_calls.append(
+    def _fake_resolve(path_arg, *, context=None):
+        resolver_calls.append({"path": str(path_arg), "context": context})
+        return RawDecodeSpec(
+            source_kind="raw",
+            pixel_format="mono8",
+            width=2,
+            height=2,
+        )
+
+    def _fake_compute(path_arg, *, spec, **kwargs):
+        compute_calls.append(
             {
                 "path": str(path_arg),
-                "raw_spec_resolver": kwargs.get("raw_spec_resolver"),
-                "raw_resolver_context": kwargs.get("raw_resolver_context"),
+                "spec": spec,
+                **dict(kwargs),
             },
         )
-        return np.array([[10, 20], [30, 40]], dtype=np.uint16)
-
-    def _fake_compute(image, **kwargs):
-        _ = image
-        compute_calls.append(dict(kwargs))
         return {
             "sat_count": 2,
             "min_non_zero": 10,
@@ -402,10 +413,10 @@ def test_dynamic_worker_marks_raw_source_kind_and_uses_shared_resolver(
             "avg_topk_sem": 5.0,
         }
 
-    monkeypatch.setattr(workers_module, "read_2d_image", _fake_read)
+    monkeypatch.setattr(workers_module, "resolve_raw_decode_spec", _fake_resolve)
     monkeypatch.setattr(
         workers_module.native_backend,
-        "compute_dynamic_metrics",
+        "compute_raw_dynamic_metrics",
         _fake_compute,
     )
 
@@ -418,10 +429,11 @@ def test_dynamic_worker_marks_raw_source_kind_and_uses_shared_resolver(
     )
     result = _run_dynamic_worker(worker)
 
-    assert len(read_calls) == 1
-    assert read_calls[0]["raw_spec_resolver"] is workers_module.resolve_raw_decode_spec
+    assert resolver_calls == [{"path": str(path), "context": None}]
     assert len(compute_calls) == 1
-    assert compute_calls[0]["source_kind"] == "raw"
+    assert compute_calls[0]["path"] == str(path)
+    assert compute_calls[0]["spec"].pixel_format == "mono8"
+    assert compute_calls[0]["mode"] == "topk"
     np.testing.assert_array_equal(result.max_pixels, np.array([40], dtype=np.int64))
 
 

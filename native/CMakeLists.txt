@@ -30,6 +30,7 @@ option(
 )
 option(FRAMELAB_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
 option(FRAMELAB_BUILD_PYTHON_MODULE "Build the Python extension module (_native)" ON)
+option(FRAMELAB_ENABLE_SIMD "Enable SIMD acceleration for raw decode paths" ON)
 set(FRAMELAB_PYTHON_OUTPUT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../framelab/native" CACHE PATH "Directory for the built Python extension")
 set(FRAMELAB_TARGET_SYSTEM "native" CACHE STRING "Requested helper target system label")
 set(FRAMELAB_PYTHON_INCLUDE_DIR "" CACHE PATH "Explicit Python include directory for native/cross builds")
@@ -41,6 +42,7 @@ set(FRAMELAB_CORE_HEADERS
     include/framelab_native/common/types.h
     include/framelab_native/common/status.h
     include/framelab_native/common/pixel_formats.h
+    include/framelab_native/common/simd.h
     include/framelab_native/common/stride.h
     include/framelab_native/common/roi.h
     include/framelab_native/common/dispatch.h
@@ -57,6 +59,7 @@ set(FRAMELAB_CORE_HEADERS
     include/framelab_native/metrics/background.h
     include/framelab_native/metrics/roi_stats.h
     include/framelab_native/loaders/raw_loader.h
+    include/framelab_native/loaders/raw_source.h
     include/framelab_native/loaders/tiff_hook.h
 )
 
@@ -68,6 +71,7 @@ set(FRAMELAB_API_SOURCES
 set(FRAMELAB_CORE_SOURCES
     src/common/status.c
     src/common/pixel_formats.c
+    src/common/simd.c
     src/common/stride.c
     src/common/dispatch.c
     src/common/roi.c
@@ -77,7 +81,9 @@ set(FRAMELAB_CORE_SOURCES
     src/decode/bayer_unpacked.c
     src/decode/bayer_packed.c
     src/decode/packed_bits.c
+    src/loaders/file_map.c
     src/loaders/raw_loader.c
+    src/loaders/raw_source.c
     src/loaders/tiff_hook.c
     src/metrics/stats.c
     src/metrics/app_metrics.c
@@ -85,6 +91,7 @@ set(FRAMELAB_CORE_SOURCES
     src/metrics/background.c
     src/metrics/roi_stats.c
     src/metrics/histogram.c
+    src/metrics/raw_metrics.c
 )
 
 add_library(framelab_native STATIC
@@ -95,9 +102,14 @@ add_library(framelab_native STATIC
 target_include_directories(framelab_native
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
 target_compile_features(framelab_native PUBLIC c_std_11)
+target_compile_definitions(framelab_native PUBLIC
+    FRAMELAB_ENABLE_SIMD=$<BOOL:${FRAMELAB_ENABLE_SIMD}>
+)
 
 # Helpful IDE grouping.
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES

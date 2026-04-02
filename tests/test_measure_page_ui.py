@@ -379,6 +379,10 @@ def test_measure_histogram_waits_until_histogram_tab_is_active(
     measure_window.folder_edit.setText(str(dataset_root))
     measure_window.load_folder()
     wait_for_dataset_load(measure_window)
+    measure_window.show_histogram_preview = True
+    measure_window._on_preview_visibility_changed()
+    measure_window.preview_pages.setCurrentIndex(0)
+    QtTest.QTest.qWait(180)
 
     histogram_calls: list[bool] = []
     monkeypatch.setattr(

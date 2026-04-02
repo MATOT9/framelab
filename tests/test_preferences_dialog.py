@@ -44,6 +44,8 @@ def test_current_preferences_reflect_initial_snapshot(dialog_factory) -> None:
         collapse_data_advanced_row_by_default=False,
         collapse_summary_strips_by_default=True,
         scan_worker_count_override=6,
+        use_mmap_for_raw=False,
+        enable_raw_simd=False,
     )
     dialog = dialog_factory(UiStateSnapshot(preferences=prefs))
 

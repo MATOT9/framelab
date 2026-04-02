@@ -49,7 +49,25 @@ typedef struct FramelabDecodeParams {
     FramelabPixelFormat pixel_format;
     uint16_t *dst;
     uint32_t dst_stride_pixels;
+    int simd_enabled;
 } FramelabDecodeParams;
+
+typedef enum FramelabRawIoMode {
+    FRAMELAB_RAW_IO_AUTO = 0,
+    FRAMELAB_RAW_IO_BUFFERED_ONLY,
+    FRAMELAB_RAW_IO_MMAP_ONLY
+} FramelabRawIoMode;
+
+typedef enum FramelabSimdIsa {
+    FRAMELAB_SIMD_SCALAR = 0,
+    FRAMELAB_SIMD_SSE2,
+    FRAMELAB_SIMD_NEON
+} FramelabSimdIsa;
+
+typedef struct FramelabRawExecutionInfo {
+    int used_mmap;
+    FramelabSimdIsa simd_isa;
+} FramelabRawExecutionInfo;
 
 typedef struct FramelabRawLoadParams {
     const char *path;
@@ -58,6 +76,8 @@ typedef struct FramelabRawLoadParams {
     uint32_t src_stride_bytes;
     size_t offset_bytes;
     FramelabPixelFormat pixel_format;
+    FramelabRawIoMode io_mode;
+    int simd_enabled;
 } FramelabRawLoadParams;
 
 typedef enum FramelabBackgroundMode {

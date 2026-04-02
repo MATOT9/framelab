@@ -40,6 +40,8 @@ def test_load_returns_defaults_when_config_missing(store: UiStateStore) -> None:
     assert snapshot.preferences.restore_panel_states
     assert snapshot.preferences.restore_last_tab
     assert snapshot.preferences.scan_worker_count_override is None
+    assert snapshot.preferences.use_mmap_for_raw
+    assert snapshot.preferences.enable_raw_simd
     assert snapshot.panel_states == {}
     assert snapshot.splitter_sizes == {}
     assert snapshot.last_tab_index is None
@@ -67,6 +69,8 @@ def test_save_and_reload_round_trips_preferences_and_state(
             collapse_data_advanced_row_by_default=False,
             collapse_summary_strips_by_default=True,
             scan_worker_count_override=5,
+            use_mmap_for_raw=False,
+            enable_raw_simd=False,
         ),
         panel_states={
             "analysis.plugin_controls": False,
@@ -109,6 +113,8 @@ def test_save_and_reload_round_trips_preferences_and_state(
     assert not reloaded.preferences.collapse_data_advanced_row_by_default
     assert reloaded.preferences.collapse_summary_strips_by_default
     assert reloaded.preferences.scan_worker_count_override == 5
+    assert not reloaded.preferences.use_mmap_for_raw
+    assert not reloaded.preferences.enable_raw_simd
     assert reloaded.panel_states == {
         "analysis.plugin_controls": False,
         "data.advanced_row": True,
@@ -204,6 +210,8 @@ def test_invalid_values_fall_back_to_defaults(
     assert not snapshot.preferences.collapse_data_advanced_row_by_default
     assert snapshot.preferences.collapse_analysis_plugin_controls_by_default
     assert snapshot.preferences.scan_worker_count_override is None
+    assert snapshot.preferences.use_mmap_for_raw
+    assert snapshot.preferences.enable_raw_simd
     assert snapshot.panel_states == {}
     assert snapshot.splitter_sizes == {}
     assert snapshot.last_tab_index is None
@@ -258,7 +266,7 @@ def test_skip_patterns_persist_in_ui_state_without_creating_legacy_config(
 
     scan_settings_module.save_skip_patterns(["*.bak", "notes"])
 
-    ui_state_path = repo_root / "config" / "ui_state.ini"
+    ui_state_path = scan_settings_module.skip_config_path()
     legacy_config_path = repo_root / "config" / "config.ini"
     assert ui_state_path.is_file()
     assert not legacy_config_path.exists()

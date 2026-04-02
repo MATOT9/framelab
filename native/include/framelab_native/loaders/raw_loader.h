@@ -12,6 +12,12 @@ FramelabStatus framelab_load_raw_and_decode(const FramelabRawLoadParams *params,
                                             uint16_t *dst,
                                             uint32_t dst_stride_pixels);
 
+FramelabStatus framelab_load_raw_and_decode_with_info(
+    const FramelabRawLoadParams *params,
+    uint16_t *dst,
+    uint32_t dst_stride_pixels,
+    FramelabRawExecutionInfo *execution_info);
+
 #ifdef __cplusplus
 }
 #endif

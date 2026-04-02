@@ -1368,6 +1368,12 @@ class InspectPageMixin:
                     level="info" if metrics.normalize_intensity_values else "neutral",
                 ),
                 SummaryItem(
+                    "Backend",
+                    backend_label,
+                    level=backend_level,
+                    tooltip=backend_tooltip,
+                ),
+                SummaryItem(
                     "DN/ms",
                     "Ready" if dn_per_ms_ready else "Unavailable",
                     level="success" if dn_per_ms_ready else "neutral",

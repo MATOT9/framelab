@@ -13,12 +13,23 @@ FramelabStatus framelab_decode(const FramelabDecodeParams *params);
 FramelabStatus framelab_load_raw_and_decode(const FramelabRawLoadParams *params,
                                             uint16_t *dst,
                                             uint32_t dst_stride_pixels);
+FramelabStatus framelab_load_raw_and_decode_with_info(
+    const FramelabRawLoadParams *params,
+    uint16_t *dst,
+    uint32_t dst_stride_pixels,
+    FramelabRawExecutionInfo *execution_info);
 FramelabStatus framelab_compute_metrics(const FramelabMetricsParams *params,
                                         FramelabMetricsResult *result);
 FramelabStatus framelab_compute_static_scan(const FramelabStaticScanParams *params,
                                             FramelabStaticScanResult *result);
+FramelabStatus framelab_compute_raw_static_scan(
+    const FramelabRawStaticScanParams *params,
+    FramelabStaticScanResult *result);
 FramelabStatus framelab_compute_dynamic_metrics(
     const FramelabDynamicMetricsParams *params,
+    FramelabDynamicMetricsResult *result);
+FramelabStatus framelab_compute_raw_dynamic_metrics(
+    const FramelabRawDynamicMetricsParams *params,
     FramelabDynamicMetricsResult *result);
 FramelabStatus framelab_compute_roi_metrics(const FramelabRoiMetricsParams *params,
                                             FramelabRoiMetricsResult *result);

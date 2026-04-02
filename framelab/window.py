@@ -72,6 +72,7 @@ from .workspace_document import (
 from .window_drag import apply_secondary_window_geometry
 from .workflow import WorkflowStateController, workflow_profile_by_id
 from .workers import DynamicStatsWorker, RoiApplyWorker, DatasetLoadWorker
+from .native import backend as native_backend
 
 
 def _controller_property(controller_name: str, state_name: str, doc: str) -> property:
@@ -246,6 +247,10 @@ class FrameLabWindow(
         self._workspace_document_tracking_enabled = False
         self._workspace_document_restore_depth = 0
         self._load_ui_state()
+        native_backend.configure_raw_runtime(
+            use_mmap_for_raw=self.ui_preferences.use_mmap_for_raw,
+            enable_raw_simd=self.ui_preferences.enable_raw_simd,
+        )
         self.workflow_state_controller = WorkflowStateController()
         self.metadata_state_controller = MetadataStateController(
             self.workflow_state_controller,

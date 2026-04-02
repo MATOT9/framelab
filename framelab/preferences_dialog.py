@@ -87,6 +87,12 @@ class PreferencesDialog(qtw.QDialog):
             "Maximum worker count used for dataset scanning. Set to Auto-detect "
             "to let FrameLab choose based on CPU cores.",
         )
+        self._raw_mmap_checkbox = qtw.QCheckBox(
+            "Use memory-mapped RAW I/O when available"
+        )
+        self._raw_simd_checkbox = qtw.QCheckBox(
+            "Enable RAW SIMD acceleration when supported"
+        )
 
         self._add_page(
             "Appearance",
@@ -123,6 +129,8 @@ class PreferencesDialog(qtw.QDialog):
             [
                 self._collapse_data_advanced_checkbox,
                 self._form_row("Scan Workers", self._scan_worker_count_spin),
+                self._raw_mmap_checkbox,
+                self._raw_simd_checkbox,
             ],
         )
 
@@ -172,6 +180,8 @@ class PreferencesDialog(qtw.QDialog):
                 if int(self._scan_worker_count_spin.value()) <= 0
                 else int(self._scan_worker_count_spin.value())
             ),
+            use_mmap_for_raw=self._raw_mmap_checkbox.isChecked(),
+            enable_raw_simd=self._raw_simd_checkbox.isChecked(),
         )
 
     def reject(self) -> None:
@@ -225,6 +235,8 @@ class PreferencesDialog(qtw.QDialog):
             self._collapse_analysis_controls_checkbox,
             self._collapse_data_advanced_checkbox,
             self._scan_worker_count_spin,
+            self._raw_mmap_checkbox,
+            self._raw_simd_checkbox,
         ]
         for control in controls:
             if isinstance(control, qtw.QComboBox):
@@ -269,6 +281,8 @@ class PreferencesDialog(qtw.QDialog):
             if prefs.scan_worker_count_override is None
             else max(1, int(prefs.scan_worker_count_override))
         )
+        self._raw_mmap_checkbox.setChecked(prefs.use_mmap_for_raw)
+        self._raw_simd_checkbox.setChecked(prefs.enable_raw_simd)
 
     @staticmethod
     def _form_row(label_text: str, field: qtw.QWidget) -> qtw.QWidget:

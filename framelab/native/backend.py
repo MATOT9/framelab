@@ -8,6 +8,7 @@ existing Python implementations while recording lightweight diagnostics.
 
 from __future__ import annotations
 
+from dataclasses import dataclass, replace
 from pathlib import Path
 from threading import Lock
 from typing import Any
@@ -37,6 +38,14 @@ class NativeBackendUnavailable(RuntimeError):
     """Raised when the optional native extension is not available."""
 
 
+@dataclass(slots=True)
+class RawRuntimeConfig:
+    """Process-wide runtime controls for RAW-only native acceleration."""
+
+    use_mmap_for_raw: bool = True
+    enable_raw_simd: bool = True
+
+
 _VALID_SOURCE_KINDS = {"tiff", "raw", "unknown"}
 _VALID_BACKEND_OVERRIDES = {None, "python", "native"}
 _VALID_ROUTE_OPERATIONS = {
@@ -62,15 +71,64 @@ _last_native_fallback_reason = (
 )
 _pending_backend_status_notice: str | None = None
 _native_backend_notice_emitted = False
+_raw_runtime_config = RawRuntimeConfig()
+
+
+def _native_raw_acceleration_status_locked() -> dict[str, object]:
+    native_module = _native
+    defaults: dict[str, object] = {
+        "raw_mmap_supported": False,
+        "raw_simd_capability": "scalar",
+        "raw_last_used_mmap": False,
+        "raw_last_simd_isa": "scalar",
+    }
+    if native_module is None:
+        return defaults
+    status_fn = getattr(native_module, "raw_acceleration_status", None)
+    if status_fn is None:
+        return defaults
+    try:
+        payload = status_fn()
+    except Exception:
+        return defaults
+    if not isinstance(payload, dict):
+        return defaults
+    merged = dict(defaults)
+    if "mmap_supported" in payload:
+        merged["raw_mmap_supported"] = bool(payload["mmap_supported"])
+    if "simd_capability" in payload:
+        merged["raw_simd_capability"] = str(payload["simd_capability"] or "scalar")
+    if "last_raw_used_mmap" in payload:
+        merged["raw_last_used_mmap"] = bool(payload["last_raw_used_mmap"])
+    if "last_raw_simd_isa" in payload:
+        merged["raw_last_simd_isa"] = str(payload["last_raw_simd_isa"] or "scalar")
+    return merged
+
+
+def _sync_raw_runtime_config_locked() -> None:
+    native_module = _native
+    if native_module is None:
+        return
+    configure_fn = getattr(native_module, "set_raw_runtime_config", None)
+    if configure_fn is None:
+        return
+    configure_fn(
+        use_mmap=bool(_raw_runtime_config.use_mmap_for_raw),
+        simd_enabled=bool(_raw_runtime_config.enable_raw_simd),
+    )
 
 
 def _backend_status_snapshot_locked() -> dict[str, object]:
     native_is_available = _native is not None
+    raw_status = _native_raw_acceleration_status_locked()
     return {
         "native_available": native_is_available,
         "active_backend": _active_metrics_backend,
         "native_latched_off": bool(native_is_available and not _metrics_native_enabled),
         "last_fallback_reason": _last_native_fallback_reason,
+        "raw_mmap_enabled": bool(_raw_runtime_config.use_mmap_for_raw),
+        "raw_simd_enabled": bool(_raw_runtime_config.enable_raw_simd),
+        **raw_status,
     }
 
 
@@ -119,6 +177,39 @@ def require_native() -> Any:
             "extension module before using native metric entry points.",
         )
     return _native
+
+
+def raw_runtime_config() -> RawRuntimeConfig:
+    """Return a copy of the active process-wide RAW runtime configuration."""
+
+    with _metrics_backend_lock:
+        return replace(_raw_runtime_config)
+
+
+def configure_raw_runtime(
+    *,
+    use_mmap_for_raw: bool | None = None,
+    enable_raw_simd: bool | None = None,
+) -> RawRuntimeConfig:
+    """Update process-wide RAW runtime configuration and sync it to native."""
+
+    global _raw_runtime_config
+
+    with _metrics_backend_lock:
+        _raw_runtime_config = RawRuntimeConfig(
+            use_mmap_for_raw=(
+                _raw_runtime_config.use_mmap_for_raw
+                if use_mmap_for_raw is None
+                else bool(use_mmap_for_raw)
+            ),
+            enable_raw_simd=(
+                _raw_runtime_config.enable_raw_simd
+                if enable_raw_simd is None
+                else bool(enable_raw_simd)
+            ),
+        )
+        _sync_raw_runtime_config_locked()
+        return replace(_raw_runtime_config)
 
 
 def _record_native_success() -> None:
@@ -693,11 +784,69 @@ def decode_raw_file(
         )
 
     normalized_path = str(path)
+    with _metrics_backend_lock:
+        _sync_raw_runtime_config_locked()
     return require_native().decode_raw_file(
         normalized_path,
         validated.pixel_format,
         validated.width,
         validated.height,
+        stride_bytes=0 if validated.stride_bytes is None else validated.stride_bytes,
+        offset_bytes=validated.offset_bytes,
+    )
+
+
+def compute_raw_static_metrics(
+    path: str | Path,
+    *,
+    spec: RawDecodeSpec,
+) -> tuple[int, int]:
+    """Compute RAW static scan metrics without materializing a full decoded image."""
+
+    validated = validate_raw_decode_spec(spec)
+    normalized_path = str(path)
+    with _metrics_backend_lock:
+        _sync_raw_runtime_config_locked()
+    result = require_native().compute_raw_static_metrics(
+        normalized_path,
+        validated.pixel_format,
+        validated.width,
+        validated.height,
+        stride_bytes=0 if validated.stride_bytes is None else validated.stride_bytes,
+        offset_bytes=validated.offset_bytes,
+    )
+    return (int(result[0]), int(result[1]))
+
+
+def compute_raw_dynamic_metrics(
+    path: str | Path,
+    *,
+    spec: RawDecodeSpec,
+    threshold_value: float,
+    mode: str,
+    avg_count_value: int,
+    background=None,
+    clip_negative: bool = True,
+) -> dict[str, object]:
+    """Compute RAW dynamic metrics through the raw-direct native path."""
+
+    validated = validate_raw_decode_spec(spec)
+    normalized_path = str(path)
+    resolved_mode = str(mode or "").strip().lower()
+    if resolved_mode not in {"none", "topk"}:
+        raise ValueError("mode must be 'none' or 'topk'")
+    with _metrics_backend_lock:
+        _sync_raw_runtime_config_locked()
+    return require_native().compute_raw_dynamic_metrics(
+        normalized_path,
+        validated.pixel_format,
+        validated.width,
+        validated.height,
+        float(threshold_value),
+        resolved_mode,
+        int(avg_count_value),
+        background=background,
+        clip_negative=bool(clip_negative),
         stride_bytes=0 if validated.stride_bytes is None else validated.stride_bytes,
         offset_bytes=validated.offset_bytes,
     )

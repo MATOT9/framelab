@@ -2,10 +2,14 @@
 
 from .backend import (
     NativeBackendUnavailable,
+    RawRuntimeConfig,
     active_metrics_backend,
     apply_background_f32,
     backend_status_snapshot,
+    compute_raw_dynamic_metrics,
+    compute_raw_static_metrics,
     consume_backend_status_notice,
+    configure_raw_runtime,
     describe_metric_route,
     compute_histogram,
     compute_dynamic_metrics,
@@ -14,15 +18,20 @@ from .backend import (
     decode_raw_file,
     last_native_fallback_reason,
     native_available,
+    raw_runtime_config,
     require_native,
 )
 
 __all__ = [
     "NativeBackendUnavailable",
+    "RawRuntimeConfig",
     "active_metrics_backend",
     "apply_background_f32",
     "backend_status_snapshot",
+    "compute_raw_dynamic_metrics",
+    "compute_raw_static_metrics",
     "consume_backend_status_notice",
+    "configure_raw_runtime",
     "describe_metric_route",
     "compute_histogram",
     "compute_dynamic_metrics",
@@ -31,5 +40,6 @@ __all__ = [
     "decode_raw_file",
     "last_native_fallback_reason",
     "native_available",
+    "raw_runtime_config",
     "require_native",
 ]

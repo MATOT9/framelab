@@ -19,6 +19,7 @@ from ..stylesheets import (
 from ..help_docs import open_help_page
 from ..metadata_manager_dialog import MetadataManagerDialog
 from ..metadata_inspector_dock import MetadataInspectorDock
+from ..native import backend as native_backend
 from ..preferences_dialog import PreferencesDialog
 from ..plugins import PAGE_IDS, enabled_plugin_manifests, load_enabled_plugins
 from ..ui_settings import UiPreferences
@@ -1104,6 +1105,10 @@ class WindowChromeMixin:
 
         previous = self._current_ui_preferences()
         self.ui_preferences = replace(prefs)
+        native_backend.configure_raw_runtime(
+            use_mmap_for_raw=self.ui_preferences.use_mmap_for_raw,
+            enable_raw_simd=self.ui_preferences.enable_raw_simd,
+        )
 
         theme_changed = previous.theme_mode != prefs.theme_mode
         preview_changed = (
