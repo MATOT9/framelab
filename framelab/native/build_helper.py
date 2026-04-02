@@ -290,15 +290,27 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         default=DEFAULT_ENABLE_IPO,
         help=(
-            "Enable IPO/LTO for the native build. Disabled by default on "
+            "Enable LTO/IPO for the native build. Disabled by default on "
             "Windows for conservative extension builds."
         ),
+    )
+    parser.add_argument(
+        "--enable-lto",
+        action="store_true",
+        dest="enable_ipo",
+        help="Alias for --enable-ipo.",
     )
     parser.add_argument(
         "--disable-ipo",
         action="store_false",
         dest="enable_ipo",
-        help="Disable IPO/LTO for the native build.",
+        help="Disable LTO/IPO for the native build.",
+    )
+    parser.add_argument(
+        "--disable-lto",
+        action="store_false",
+        dest="enable_ipo",
+        help="Alias for --disable-ipo.",
     )
     parser.add_argument(
         "--python",

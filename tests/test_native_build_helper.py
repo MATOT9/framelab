@@ -39,6 +39,10 @@ def test_build_plan_forwards_active_python_and_output_dir(tmp_path: Path) -> Non
     assert "-DPython3_EXECUTABLE=C:\\Python\\python.exe" in configure_cmd
     assert f"-DFRAMELAB_PYTHON_OUTPUT_DIR={tmp_path / 'out'}" in configure_cmd
     assert "-DCMAKE_BUILD_TYPE=Release" in configure_cmd
+    assert (
+        f"-DFRAMELAB_ENABLE_IPO={'ON' if build_helper.DEFAULT_ENABLE_IPO else 'OFF'}"
+        in configure_cmd
+    )
 
 
 def test_build_commands_match_expected_cross_platform_shape(tmp_path: Path) -> None:
@@ -178,3 +182,15 @@ def test_main_reports_missing_cmake_and_returns_nonzero(
     captured = capsys.readouterr()
     assert result == 1
     assert "CMake was not found on PATH" in captured.err
+
+
+def test_parser_accepts_enable_lto_alias() -> None:
+    args = build_helper._parser().parse_args(["--enable-lto"])
+
+    assert args.enable_ipo is True
+
+
+def test_parser_accepts_disable_lto_alias() -> None:
+    args = build_helper._parser().parse_args(["--disable-lto"])
+
+    assert args.enable_ipo is False
