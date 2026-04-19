@@ -48,9 +48,11 @@ uint32_t framelab_raw_bytes_per_row(FramelabPixelFormat format, uint32_t width) 
     }
 }
 
-static FramelabStatus validate_open_params(const FramelabRawLoadParams *params,
-                                           uint32_t *src_stride_bytes,
-                                           size_t *needed_size) {
+static FramelabStatus validate_open_params(
+    const FramelabRawLoadParams *params,
+    uint32_t *src_stride_bytes,
+    size_t *needed_size
+) {
     size_t payload_size;
     uint32_t stride;
 
@@ -86,9 +88,11 @@ static void raw_source_reset(FramelabRawSource *source) {
     memset(source, 0, sizeof(*source));
 }
 
-static FramelabStatus open_buffered(const FramelabRawLoadParams *params,
-                                    size_t needed_size,
-                                    FramelabRawSource *source) {
+static FramelabStatus open_buffered(
+    const FramelabRawLoadParams *params,
+    size_t needed_size,
+    FramelabRawSource *source
+) {
     FILE *fp = NULL;
     uint8_t *buffer = NULL;
     long file_size = 0L;
@@ -137,8 +141,10 @@ static FramelabStatus open_buffered(const FramelabRawLoadParams *params,
     return FRAMELAB_STATUS_OK;
 }
 
-static FramelabStatus open_mapped(const FramelabRawLoadParams *params,
-                                  FramelabRawSource *source) {
+static FramelabStatus open_mapped(
+    const FramelabRawLoadParams *params,
+    FramelabRawSource *source
+) {
     FramelabMappedFile mapped;
     FramelabRawSourceImpl *impl = NULL;
     FramelabStatus status;
@@ -162,8 +168,10 @@ static FramelabStatus open_mapped(const FramelabRawLoadParams *params,
     return FRAMELAB_STATUS_OK;
 }
 
-FramelabStatus framelab_raw_source_open(const FramelabRawLoadParams *params,
-                                        FramelabRawSource *source) {
+FramelabStatus framelab_raw_source_open(
+    const FramelabRawLoadParams *params,
+    FramelabRawSource *source
+) {
     uint32_t src_stride_bytes = 0U;
     size_t needed_size = 0U;
     FramelabStatus status;

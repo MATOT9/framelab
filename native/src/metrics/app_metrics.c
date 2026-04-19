@@ -68,8 +68,10 @@ static int heap_push_topk(FramelabMinHeap *heap, double value) {
     return 1;
 }
 
-static FramelabStatus validate_background_pair(const FramelabImageView *image,
-                                              const FramelabImageView *background) {
+static FramelabStatus validate_background_pair(
+    const FramelabImageView *image,
+    const FramelabImageView *background
+) {
     FramelabStatus status = framelab_validate_image_view(image);
     if (status != FRAMELAB_STATUS_OK) {
         return status;
@@ -98,8 +100,10 @@ static void update_integer_semantics(FramelabRunningStats *stats, double value, 
     framelab_running_stats_update(stats, value);
 }
 
-FramelabStatus framelab_compute_static_scan(const FramelabStaticScanParams *params,
-                                            FramelabStaticScanResult *result) {
+FramelabStatus framelab_compute_static_scan(
+    const FramelabStaticScanParams *params,
+    FramelabStaticScanResult *result
+) {
     FramelabRunningStats stats;
     int floatish = 0;
 
@@ -223,8 +227,10 @@ FramelabStatus framelab_compute_dynamic_metrics(
     return FRAMELAB_STATUS_OK;
 }
 
-FramelabStatus framelab_compute_roi_metrics(const FramelabRoiMetricsParams *params,
-                                            FramelabRoiMetricsResult *result) {
+FramelabStatus framelab_compute_roi_metrics(
+    const FramelabRoiMetricsParams *params,
+    FramelabRoiMetricsResult *result
+) {
     FramelabRunningStats stats;
     FramelabMinHeap heap;
     FramelabStatus status;

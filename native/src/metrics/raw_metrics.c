@@ -70,9 +70,11 @@ static int heap_push_topk(FramelabMinHeap *heap, double value) {
     return 1;
 }
 
-static FramelabStatus validate_background_for_raw(uint32_t width,
-                                                  uint32_t height,
-                                                  const FramelabImageView *background) {
+static FramelabStatus validate_background_for_raw(
+    uint32_t width,
+    uint32_t height,
+    const FramelabImageView *background
+) {
     if (background == NULL) {
         return FRAMELAB_STATUS_OK;
     }
@@ -85,10 +87,12 @@ static FramelabStatus validate_background_for_raw(uint32_t width,
     return FRAMELAB_STATUS_OK;
 }
 
-static FramelabStatus decode_raw_row(const FramelabRawSource *source,
-                                     const FramelabRawLoadParams *raw,
-                                     uint32_t row_index,
-                                     uint16_t *scratch_row) {
+static FramelabStatus decode_raw_row(
+    const FramelabRawSource *source,
+    const FramelabRawLoadParams *raw,
+    uint32_t row_index,
+    uint16_t *scratch_row
+) {
     FramelabDecodeParams params;
     const uint8_t *src_row = source->data + raw->offset_bytes + (size_t)row_index * source->src_stride_bytes;
 

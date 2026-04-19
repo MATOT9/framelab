@@ -5,9 +5,11 @@
 #include "framelab_native/loaders/raw_source.h"
 #include "framelab_native/decode/decode.h"
 
-FramelabStatus framelab_load_raw_and_decode(const FramelabRawLoadParams *params,
-                                            uint16_t *dst,
-                                            uint32_t dst_stride_pixels) {
+FramelabStatus framelab_load_raw_and_decode(
+    const FramelabRawLoadParams *params,
+    uint16_t *dst,
+    uint32_t dst_stride_pixels
+) {
     return framelab_load_raw_and_decode_with_info(params, dst, dst_stride_pixels, NULL);
 }
 

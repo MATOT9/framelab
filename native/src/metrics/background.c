@@ -18,11 +18,13 @@ static double sample_at(const FramelabImageView *view, uint32_t x, uint32_t y) {
     }
 }
 
-FramelabStatus framelab_apply_background_to_f32(const FramelabImageView *image,
-                                                const FramelabImageView *background,
-                                                FramelabBackgroundMode mode,
-                                                float *dst,
-                                                uint32_t dst_stride_floats) {
+FramelabStatus framelab_apply_background_to_f32(
+    const FramelabImageView *image,
+    const FramelabImageView *background,
+    FramelabBackgroundMode mode,
+    float *dst,
+    uint32_t dst_stride_floats
+) {
     if (image == NULL || background == NULL || dst == NULL) {
         return FRAMELAB_STATUS_INVALID_ARGUMENT;
     }

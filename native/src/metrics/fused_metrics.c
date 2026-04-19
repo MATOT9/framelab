@@ -55,8 +55,10 @@ static double apply_background_mode(double value, double bg, FramelabBackgroundM
     return value;
 }
 
-FramelabStatus framelab_compute_metrics(const FramelabMetricsParams *params,
-                                        FramelabMetricsResult *result) {
+FramelabStatus framelab_compute_metrics(
+    const FramelabMetricsParams *params,
+    FramelabMetricsResult *result
+) {
     FramelabRunningStats global_stats;
     FramelabRunningStats roi_stats;
 

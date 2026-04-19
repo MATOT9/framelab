@@ -51,9 +51,11 @@ static inline FramelabStatus framelab_validate_image_view(const FramelabImageVie
     }
 }
 
-static inline int framelab_view_is_floatish(const FramelabImageView *view,
-                                            const FramelabImageView *background,
-                                            FramelabBackgroundMode background_mode) {
+static inline int framelab_view_is_floatish(
+    const FramelabImageView *view,
+    const FramelabImageView *background,
+    FramelabBackgroundMode background_mode
+) {
     if (view->sample_type == FRAMELAB_SAMPLE_F32 || view->sample_type == FRAMELAB_SAMPLE_F64) {
         return 1;
     }
@@ -63,11 +65,13 @@ static inline int framelab_view_is_floatish(const FramelabImageView *view,
     return 0;
 }
 
-static inline double framelab_apply_background_value(double value,
-                                                     const FramelabImageView *background,
-                                                     uint32_t x,
-                                                     uint32_t y,
-                                                     FramelabBackgroundMode mode) {
+static inline double framelab_apply_background_value(
+    double value,
+    const FramelabImageView *background,
+    uint32_t x,
+    uint32_t y,
+    FramelabBackgroundMode mode
+) {
     if (background == NULL || mode == FRAMELAB_BG_NONE) {
         return value;
     }

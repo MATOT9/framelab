@@ -25,21 +25,27 @@
 extern "C" {
 #endif
 
-int framelab_py_image_view_from_object(PyObject *obj,
-                                       const char *arg_name,
-                                       FramelabImageView *view,
-                                       PyArrayObject **array_out);
+int framelab_py_image_view_from_object(
+    PyObject *obj,
+    const char *arg_name,
+    FramelabImageView *view,
+    PyArrayObject **array_out
+);
 
-int framelab_py_optional_image_view_from_object(PyObject *obj,
-                                                const char *arg_name,
-                                                FramelabImageView *view,
-                                                PyArrayObject **array_out,
-                                                int *present_out);
+int framelab_py_optional_image_view_from_object(
+    PyObject *obj,
+    const char *arg_name,
+    FramelabImageView *view,
+    PyArrayObject **array_out,
+    int *present_out
+);
 
-int framelab_py_parse_roi_rect(PyObject *obj,
-                               npy_intp width,
-                               npy_intp height,
-                               FramelabRoi *roi_out);
+int framelab_py_parse_roi_rect(
+    PyObject *obj,
+    npy_intp width,
+    npy_intp height,
+    FramelabRoi *roi_out
+);
 
 PyObject *framelab_py_status_error(FramelabStatus status, const char *context);
 

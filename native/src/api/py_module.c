@@ -79,8 +79,10 @@ static PyObject *build_static_metrics_result(const FramelabStaticScanResult *res
     return tuple_obj;
 }
 
-static PyObject *build_dynamic_metrics_result(const FramelabDynamicMetricsResult *result,
-                                              int include_topk) {
+static PyObject *build_dynamic_metrics_result(
+    const FramelabDynamicMetricsResult *result,
+    int include_topk
+) {
     PyObject *dict_obj = PyDict_New();
     PyObject *value = NULL;
     if (dict_obj == NULL) {
@@ -192,8 +194,10 @@ static int dict_set_optional_topk_float(PyObject *dict_obj,
     return dict_set_float(dict_obj, key, value);
 }
 
-static PyObject *build_roi_metrics_full_result(const FramelabRoiMetricsResult *result,
-                                               int include_topk) {
+static PyObject *build_roi_metrics_full_result(
+    const FramelabRoiMetricsResult *result,
+    int include_topk
+) {
     PyObject *dict_obj = PyDict_New();
     if (dict_obj == NULL) {
         return NULL;

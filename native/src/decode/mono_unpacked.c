@@ -59,11 +59,13 @@ static void decode_mono8_sse2_row(const uint8_t *src_row, uint16_t *dst_row, uin
     }
 }
 
-static void decode_u16_sse2_row(const uint8_t *src_row,
-                                uint16_t *dst_row,
-                                uint32_t width,
-                                uint16_t mask,
-                                int shift_right_bits) {
+static void decode_u16_sse2_row(
+    const uint8_t *src_row,
+    uint16_t *dst_row,
+    uint32_t width,
+    uint16_t mask,
+    int shift_right_bits
+) {
     uint32_t x = 0U;
     const __m128i mask_vec = _mm_set1_epi16((short)mask);
 
@@ -102,11 +104,13 @@ static void decode_mono8_neon_row(const uint8_t *src_row, uint16_t *dst_row, uin
     }
 }
 
-static void decode_u16_neon_row(const uint8_t *src_row,
-                                uint16_t *dst_row,
-                                uint32_t width,
-                                uint16_t mask,
-                                int shift_right_bits) {
+static void decode_u16_neon_row(
+    const uint8_t *src_row,
+    uint16_t *dst_row,
+    uint32_t width,
+    uint16_t mask,
+    int shift_right_bits
+) {
     uint32_t x = 0U;
     const uint16x8_t mask_vec = vdupq_n_u16(mask);
 

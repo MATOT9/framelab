@@ -20,11 +20,13 @@ static double sample_at(const FramelabImageView *view, uint32_t x, uint32_t y) {
     }
 }
 
-FramelabStatus framelab_compute_roi_stats(const FramelabImageView *image,
-                                          const FramelabRoi *roi,
-                                          double *out_mean,
-                                          double *out_stddev,
-                                          uint64_t *out_count) {
+FramelabStatus framelab_compute_roi_stats(
+    const FramelabImageView *image,
+    const FramelabRoi *roi,
+    double *out_mean,
+    double *out_stddev,
+    uint64_t *out_count
+) {
     FramelabRunningStats stats;
     if (image == NULL || roi == NULL || out_mean == NULL || out_stddev == NULL || out_count == NULL) {
         return FRAMELAB_STATUS_INVALID_ARGUMENT;

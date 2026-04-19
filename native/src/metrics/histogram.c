@@ -19,11 +19,13 @@ static double sample_at(const FramelabImageView *view, uint32_t x, uint32_t y) {
     }
 }
 
-FramelabStatus framelab_compute_histogram(const FramelabImageView *image,
-                                          double value_min,
-                                          double value_max,
-                                          uint32_t bin_count,
-                                          uint64_t *bins) {
+FramelabStatus framelab_compute_histogram(
+    const FramelabImageView *image,
+    double value_min,
+    double value_max,
+    uint32_t bin_count,
+    uint64_t *bins
+) {
     if (image == NULL || bins == NULL || bin_count == 0U) {
         return FRAMELAB_STATUS_INVALID_ARGUMENT;
     }

@@ -22,10 +22,12 @@ static int framelab_sample_type_from_numpy(int typenum, FramelabSampleType *samp
     }
 }
 
-int framelab_py_image_view_from_object(PyObject *obj,
-                                       const char *arg_name,
-                                       FramelabImageView *view,
-                                       PyArrayObject **array_out) {
+int framelab_py_image_view_from_object(
+    PyObject *obj,
+    const char *arg_name,
+    FramelabImageView *view,
+    PyArrayObject **array_out
+) {
     PyArrayObject *array = NULL;
     FramelabSampleType sample_type;
     int typenum;
@@ -119,11 +121,13 @@ int framelab_py_image_view_from_object(PyObject *obj,
     return 1;
 }
 
-int framelab_py_optional_image_view_from_object(PyObject *obj,
-                                                const char *arg_name,
-                                                FramelabImageView *view,
-                                                PyArrayObject **array_out,
-                                                int *present_out) {
+int framelab_py_optional_image_view_from_object(
+    PyObject *obj,
+    const char *arg_name,
+    FramelabImageView *view,
+    PyArrayObject **array_out,
+    int *present_out
+) {
     if (present_out == NULL) {
         PyErr_SetString(PyExc_RuntimeError, "internal optional argument error");
         return 0;
@@ -152,10 +156,12 @@ static npy_intp normalize_slice_index(npy_intp index, npy_intp limit) {
     return index;
 }
 
-int framelab_py_parse_roi_rect(PyObject *obj,
-                               npy_intp width,
-                               npy_intp height,
-                               FramelabRoi *roi_out) {
+int framelab_py_parse_roi_rect(
+    PyObject *obj,
+    npy_intp width,
+    npy_intp height,
+    FramelabRoi *roi_out
+) {
     PyObject *seq = NULL;
     PyObject *item = NULL;
     npy_intp values[4];
