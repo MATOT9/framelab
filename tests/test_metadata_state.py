@@ -94,14 +94,14 @@ def test_resolve_path_metadata_merges_ancestor_nodecards_in_order(
 
 
 def test_schema_marks_ad_hoc_keys_from_node_metadata(tmp_path: Path) -> None:
-    node_root = tmp_path / "workspace" / "trial-01"
+    node_root = tmp_path / "workspace" / "2026"
     node_root.mkdir(parents=True, exist_ok=True)
     controller = MetadataStateController()
     save_nodecard(
         node_root,
         {"custom": {"operator": "maxime"}},
         profile_id="trials",
-        node_type_id="trial",
+        node_type_id="year",
     )
 
     snapshot = controller.resolve_path_metadata(node_root)
@@ -342,7 +342,14 @@ def test_promote_field_to_profile_writes_override_and_updates_schema(
         "governance_config_path",
         lambda: config_path,
     )
-    session_root = tmp_path / "trials" / "trial-07" / "camera-a" / "session-01"
+    session_root = (
+        tmp_path
+        / "trials"
+        / "2026"
+        / "campaign-07"
+        / "camera-a"
+        / "session-01"
+    )
     session_root.mkdir(parents=True, exist_ok=True)
     controller = MetadataStateController()
     save_nodecard(
@@ -384,7 +391,14 @@ def test_demote_field_from_profile_removes_override_and_restores_ad_hoc_schema(
         "governance_config_path",
         lambda: config_path,
     )
-    session_root = tmp_path / "trials" / "trial-07" / "camera-a" / "session-01"
+    session_root = (
+        tmp_path
+        / "trials"
+        / "2026"
+        / "campaign-07"
+        / "camera-a"
+        / "session-01"
+    )
     session_root.mkdir(parents=True, exist_ok=True)
     controller = MetadataStateController()
     save_nodecard(

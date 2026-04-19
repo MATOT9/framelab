@@ -35,6 +35,13 @@ def _assert_measure_table_rows_in_sync(window, expected_rows: int) -> None:
     assert model.rowCount() == expected_rows
 
 
+def _thread_is_running(thread) -> bool:
+    try:
+        return bool(thread is not None and thread.isRunning())
+    except RuntimeError:
+        return False
+
+
 def test_load_folder_runs_async_and_streams_rows_progressively(
     tmp_path: Path,
     framelab_window_factory,
@@ -48,12 +55,12 @@ def test_load_folder_runs_async_and_streams_rows_progressively(
     release_remaining = threading.Event()
     call_count = 0
 
-    def _slow_scan(path):
+    def _slow_scan(path, *, raw_resolver_context=None):
         nonlocal call_count
         call_count += 1
         if call_count > 1:
             assert release_remaining.wait(timeout=5.0)
-        return original_scan(path)
+        return original_scan(path, raw_resolver_context=raw_resolver_context)
 
     monkeypatch.setattr(workers_module, "scan_single_static_image", _slow_scan)
 
@@ -89,12 +96,12 @@ def test_cancelling_dataset_load_keeps_loaded_subset(
     release_remaining = threading.Event()
     call_count = 0
 
-    def _slow_scan(path):
+    def _slow_scan(path, *, raw_resolver_context=None):
         nonlocal call_count
         call_count += 1
         if call_count > 1:
             assert release_remaining.wait(timeout=5.0)
-        return original_scan(path)
+        return original_scan(path, raw_resolver_context=raw_resolver_context)
 
     monkeypatch.setattr(workers_module, "scan_single_static_image", _slow_scan)
 
@@ -110,6 +117,119 @@ def test_cancelling_dataset_load_keeps_loaded_subset(
 
     assert 1 <= window.dataset_state.path_count() < 8
     assert "load cancelled" in window.base_status.lower()
+
+
+def test_rescan_waits_for_prior_loader_to_drain_without_stale_rows(
+    tmp_path: Path,
+    framelab_window_factory,
+    monkeypatch,
+    wait_until,
+) -> None:
+    first_root = _write_dataset(tmp_path / "scope-a", 8)
+    second_root = _write_dataset(tmp_path / "scope-b", 3)
+    original_scan = workers_module.scan_single_static_image
+    monkeypatch.setattr(
+        workers_module,
+        "dataset_scan_chunk_size",
+        lambda total: 4 if total >= 8 else 1,
+    )
+    monkeypatch.setattr(
+        workers_module,
+        "dataset_scan_worker_count",
+        lambda worker_count=None, *, cpu_count=None: 2,
+    )
+    release_first_tail = threading.Event()
+    second_chunk_started = threading.Event()
+
+    def _slow_scan(path, *, raw_resolver_context=None):
+        resolved = Path(path).resolve()
+        try:
+            is_first_scope = resolved.is_relative_to(first_root.resolve())
+        except AttributeError:
+            is_first_scope = str(resolved).startswith(str(first_root.resolve()))
+        if is_first_scope and resolved.stem.startswith("frame_"):
+            index = int(resolved.stem.split("_")[1])
+            if index >= 4:
+                second_chunk_started.set()
+                assert release_first_tail.wait(timeout=5.0)
+        return original_scan(path, raw_resolver_context=raw_resolver_context)
+
+    monkeypatch.setattr(workers_module, "scan_single_static_image", _slow_scan)
+
+    window = framelab_window_factory(enabled_plugin_ids=())
+    completed_summaries: list[object] = []
+    window.datasetLoadCompleted.connect(completed_summaries.append)
+
+    window.folder_edit.setText(str(first_root))
+    window.load_folder()
+
+    wait_until(lambda: window.dataset_state.path_count() == 4, timeout_ms=8000)
+    wait_until(second_chunk_started.is_set, timeout_ms=4000)
+
+    first_thread = window._dataset_load_thread
+    assert first_thread is not None
+    assert _thread_is_running(first_thread)
+
+    window.folder_edit.setText(str(second_root))
+    window.load_folder()
+
+    wait_until(
+        lambda: bool(getattr(window, "_dataset_load_start_pending", False)),
+        timeout_ms=4000,
+    )
+    second_thread = window._dataset_load_thread
+    assert second_thread is not None
+    assert second_thread is not first_thread
+    assert not second_thread.isRunning()
+    assert window.dataset_state.path_count() == 0
+
+    release_first_tail.set()
+
+    wait_until(
+        lambda: (
+            not window._is_dataset_load_running()
+            and not _thread_is_running(first_thread)
+            and window.dataset_state.dataset_root == second_root.resolve()
+            and window.dataset_state.path_count() == 3
+            and all(
+                Path(path).resolve().is_relative_to(second_root.resolve())
+                for path in window.dataset_state.paths
+            )
+        ),
+        timeout_ms=15000,
+    )
+
+    _assert_measure_table_rows_in_sync(window, 3)
+    assert window.table.model() is window.table_proxy
+    assert window._dataset_load_thread is None
+    assert any(
+        isinstance(summary, workers_module.DatasetLoadSummary)
+        and Path(summary.dataset_root).resolve() == second_root.resolve()
+        for summary in completed_summaries
+    )
+
+
+def test_closing_window_after_dataset_load_does_not_touch_deleted_worker(
+    tmp_path: Path,
+    framelab_window_factory,
+    wait_until,
+    process_events,
+) -> None:
+    dataset_root = _write_dataset(tmp_path / "close-after-load", 4)
+    window = framelab_window_factory(enabled_plugin_ids=())
+    window.folder_edit.setText(str(dataset_root))
+
+    window.load_folder()
+    wait_until(
+        lambda: (
+            not window._is_dataset_load_running()
+            and window.dataset_state.path_count() == 4
+        ),
+        timeout_ms=10000,
+    )
+
+    window.close()
+    process_events()
 
 
 @pytest.mark.parametrize("image_count", [130, 300])

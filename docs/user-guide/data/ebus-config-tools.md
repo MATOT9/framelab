@@ -1,6 +1,6 @@
 # eBUS Config Tools
 
-Use **eBUS Config Tools** when an acquisition carries a readable eBUS Player `.pvcfg` snapshot and you need to inspect the raw snapshot, compare sources, or decide whether an app-side canonical override is justified. This plugin does **not** replace the datacard wizard. It complements it. The current plugin provides three workflows:
+Use **eBUS Config Tools** when an acquisition carries a readable eBUS Player `.pvcfg` snapshot and you need to inspect the raw snapshot, compare sources, or decide whether an app-side canonical override is justified. This built-in tool lives under **Edit -> Advanced -> eBUS Config Tools**. It does **not** replace the datacard wizard. It complements it. The current tool provides three workflows:
 
 - inspect one standalone `.pvcfg` file
 - compare multiple sources in **raw** or **effective** mode
@@ -8,7 +8,7 @@ Use **eBUS Config Tools** when an acquisition carries a readable eBUS Player `.p
 
 ![Placeholder screenshot: eBUS Config Tools menu and dialogs](../../assets/images/placeholders/screenshot-placeholder-16x9.svg)
 
-*Placeholder — Add screenshot: eBUS Config Tools actions in the Plugins menu and the compare dialog open with several loaded sources. Target: `docs/assets/images/user-guide/data/ebus-tools-menu-and-compare.png`. Theme: dark. Type: screenshot. State: compare dialog visible with a multi-source list and changed rows in the table.*
+*Placeholder — Add screenshot: eBUS Config Tools actions in the Edit -> Advanced menu and the compare dialog open with several loaded sources. Target: `docs/assets/images/user-guide/data/ebus-tools-menu-and-compare.png`. Theme: dark. Type: screenshot. State: compare dialog visible with a multi-source list and changed rows in the table.*
 
 ## Mental model
 
@@ -105,11 +105,11 @@ When an acquisition has a readable root-level eBUS snapshot, some canonical data
 - the wizard indicates whether the shown value comes from the raw snapshot baseline or from an app-side override over that baseline
 - those fields are excluded from frame-targeted override generation in the wizard
 
-This keeps the eBUS plugin standalone for inspect and compare while leaving canonical acquisition authoring in one place: the datacard wizard.
+This keeps eBUS inspect and compare in one built-in tool while leaving canonical acquisition authoring in one place: the datacard wizard.
 
-## When to leave the eBUS plugin and use the wizard
+## When to leave eBUS Config Tools and use the wizard
 
-Leave the eBUS plugin and move into the datacard wizard when:
+Leave **eBUS Config Tools** and move into the datacard wizard when:
 
 - the raw eBUS value is not the acquisition truth you need to preserve
 - the scientific record must capture a canonical app-side value that eBUS did not represent well

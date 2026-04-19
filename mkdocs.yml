@@ -90,6 +90,19 @@ nav:
       - eBUS Config Integration: developer-guide/ebus-config-integration.md
       - UI Structure: developer-guide/ui-structure.md
       - Packaging: developer-guide/packaging.md
+  - Development:
+      - Repo Conventions: development/repo_conventions.md
+      - Change Workflow: development/change_workflow.md
+      - Context Strategy: development/context_strategy.md
+      - Development Troubleshooting: development/troubleshooting.md
+      - Docs Editing Rules: AGENTS.md
+  - Handoff Templates:
+      - Feature Handoff: handoffs/feature_handoff_template.md
+      - Bugfix Handoff: handoffs/bugfix_handoff_template.md
+      - Refactor Handoff: handoffs/refactor_handoff_template.md
+  - Maintenance:
+      - Tooling Map: maintenance/tooling_map.md
+      - Benchmark Workflow: maintenance/benchmark_workflow.md
   - Reference:
       - Overview: reference/index.md
       - Config Files: reference/config-files.md

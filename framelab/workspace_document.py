@@ -53,6 +53,20 @@ def _parse_int_list(value: object) -> list[int]:
     return parsed
 
 
+def _parse_string_list(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    parsed: list[str] = []
+    seen: set[str] = set()
+    for item in value:
+        text = str(item).strip()
+        if not text or text in seen:
+            continue
+        seen.add(text)
+        parsed.append(text)
+    return parsed
+
+
 def _parse_bool_map(value: object) -> dict[str, bool]:
     if not isinstance(value, dict):
         return {}
@@ -111,6 +125,7 @@ class WorkspaceDocumentDatasetState:
     scope_source: str | None = None
     scan_root: str | None = None
     selected_image_path: str | None = None
+    skip_patterns: list[str] = field(default_factory=list)
 
 
 @dataclass(slots=True)
@@ -184,6 +199,7 @@ class WorkspaceDocumentSnapshot:
                 "scope_source": self.dataset.scope_source,
                 "scan_root": self.dataset.scan_root,
                 "selected_image_path": self.dataset.selected_image_path,
+                "skip_patterns": list(self.dataset.skip_patterns),
             },
             "measure": {
                 "average_mode": self.measure.average_mode,
@@ -258,6 +274,7 @@ class WorkspaceDocumentSnapshot:
                 scope_source=_clean_text(dataset.get("scope_source")),
                 scan_root=_clean_text(dataset.get("scan_root")),
                 selected_image_path=_clean_text(dataset.get("selected_image_path")),
+                skip_patterns=_parse_string_list(dataset.get("skip_patterns")),
             ),
             measure=WorkspaceDocumentMeasureState(
                 average_mode=average_mode,

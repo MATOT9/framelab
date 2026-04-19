@@ -587,9 +587,12 @@ class AnalysisPageMixin:
         caps = self._active_plugin_capabilities()
         mode = self._current_average_mode()
         mode_has_average = mode in {"topk", "roi"}
+        roi_mode_active = mode == "roi"
         visible: set[str] = set(self.BASE_VISIBLE_MEASURE_COLUMNS)
         if mode_has_average:
             visible.update(self.MODE_MEASURE_COLUMNS)
+        if roi_mode_active:
+            visible.update(self.ROI_MODE_MEASURE_COLUMNS)
         visible.update(caps.reveal_measure_columns)
 
         for key, override in self._manual_measure_column_visibility.items():
@@ -600,6 +603,8 @@ class AnalysisPageMixin:
 
         if not mode_has_average:
             visible.difference_update(self.MODE_MEASURE_COLUMNS)
+        if not roi_mode_active:
+            visible.difference_update(self.ROI_MODE_MEASURE_COLUMNS)
 
         for key, column in self.MEASURE_COLUMN_INDEX.items():
             self.table.setColumnHidden(column, key not in visible)

@@ -211,6 +211,30 @@ def test_roi_selection_updates_roi_max_for_selected_image_immediately(
     ) == "4"
 
 
+def test_roi_max_column_only_shows_in_roi_average_mode(
+    tmp_path: Path,
+    measure_window: FrameLabWindow,
+    wait_for_dataset_load,
+) -> None:
+    dataset_root = _write_measure_dataset(tmp_path)
+    roi_max_column = measure_window.MEASURE_COLUMN_INDEX["roi_max"]
+    measure_window.folder_edit.setText(str(dataset_root))
+    measure_window.load_folder()
+    wait_for_dataset_load(measure_window)
+
+    assert measure_window.table.isColumnHidden(roi_max_column)
+
+    measure_window.avg_mode_combo.setCurrentIndex(
+        measure_window.avg_mode_combo.findData("topk"),
+    )
+    assert measure_window.table.isColumnHidden(roi_max_column)
+
+    measure_window.avg_mode_combo.setCurrentIndex(
+        measure_window.avg_mode_combo.findData("roi"),
+    )
+    assert not measure_window.table.isColumnHidden(roi_max_column)
+
+
 def test_compact_measure_header_mirrors_low_signal_and_saturation_status(
     tmp_path: Path,
     measure_window: FrameLabWindow,

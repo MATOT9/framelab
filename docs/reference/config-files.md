@@ -2,13 +2,13 @@
 
 The app keeps its shareable runtime configuration in the project/app folder under `config/`. This page documents the file locations, ownership model, and runtime role of each configuration file.
 
-FrameLab also supports user-created workspace documents with the `.framelab` extension. Those files are not part of the automatic `config/` directory, but they matter here because they complement `ui_state.ini`: `ui_state.ini` keeps app-level defaults and recents, while `.framelab` files capture one reopenable working session.
+FrameLab also supports user-created workspace documents with the `.framelab` extension. Those files are not part of the automatic `config/` directory, but they matter here because they now own the reopenable session state: workflow scope, page selection, panel state, splitter positions, and skip rules all come back only from the workspace file you explicitly open.
 
 ## Main configuration files
 
 | File | Created automatically | Intended editor | Purpose |
 | --- | --- | --- | --- |
-| `config/ui_state.ini` | Yes | app | Persisted UI state such as workflow selection, dock visibility, panel state, splitter positions, and skip-pattern scan rules |
+| `config/preferences.ini` | Yes | app | Persistent application preferences such as theme, density, preview defaults, and runtime toggles |
 | `config/plugin_selection.json` | Yes | app, optionally user | Persisted startup plugin-selection state |
 | `config/acquisition_field_mapping.json` | Yes, if missing | user or app | Editable field-definition mapping used by the Acquisition Datacard Wizard |
 | `config/ebus_parameter_catalog.json` | Yes, if missing | user or app | Editable eBUS parameter catalog used by inspect, compare, and eBUS-override eligibility rules |
@@ -33,23 +33,21 @@ Important notes:
 - if the file is missing or invalid, the app falls back to enabling all discovered plugins
 - dependency closure is resolved at load time, so the effective enabled set may be larger than the explicitly stored list
 
-### `config/ui_state.ini`
+### `config/preferences.ini`
 
-This file stores host-window UI state in INI format. Current use:
+This file stores persistent application preferences in INI format. Current use:
 
-- selected workflow workspace root and profile
-- active workflow node id
-- recent workflow entries
-- dock visibility and panel disclosure state
-- splitter positions for workflow, analysis, and metadata surfaces
-- skip-pattern persistence for dataset scanning
+- theme and density preferences
+- preview defaults
+- panel/tab restore preferences that affect workspace restore behavior
+- collapse defaults for summary strips and advanced controls
+- scan-worker and RAW runtime preferences
 
 Important notes:
 
-- the file is created when UI state is first saved
-- this file stores app-level defaults and last-session convenience state, not the full reopenable session document
-- workflow, scan root, ROI, background source, selection, and page state can instead be saved explicitly into a user-managed `.framelab` workspace file from the File menu
-- limited legacy config migration may still pull older skip-rule settings into this file when the current file is missing
+- the file is created when preferences are first saved
+- this file does not restore the last workflow session on app launch
+- limited legacy migration may seed preferences from an older `ui_state.ini` when `preferences.ini` is missing
 - deleting it is safe; the app will recreate it from defaults
 
 ### `*.framelab`
@@ -58,6 +56,7 @@ Workspace document created explicitly by the user from the File menu. Current ru
 
 - restores workflow context and active node
 - restores the scanned dataset root and selected image
+- restores current skip rules for dataset intake
 - restores Measure-page state such as threshold, average mode, ROI, and background source
 - restores page/plugin selection, preview visibility, dock disclosure, and splitter positions relevant to the current session
 
@@ -66,7 +65,7 @@ Important notes:
 - this is a local reopen file, not a portable dataset bundle
 - paths are stored as filesystem paths and are expected to be valid on the same machine
 - the file is JSON-backed even though it uses the custom `.framelab` extension
-- global preferences such as theme and density still live in `config/ui_state.ini`
+- global preferences such as theme and density still live in `config/preferences.ini`
 
 ### `config/acquisition_field_mapping.json`
 
@@ -211,7 +210,7 @@ The app uses local `config/` paths as the primary runtime location. When a curre
 
 General guidance:
 
-- safe to edit while the app is closed: `ui_state.ini`, `plugin_selection.json`, `acquisition_field_mapping.json`, `ebus_parameter_catalog.json`, `workflow_metadata_governance.json`
+- safe to edit while the app is closed: `preferences.ini`, `plugin_selection.json`, `acquisition_field_mapping.json`, `ebus_parameter_catalog.json`, `workflow_metadata_governance.json`
 - safe to edit while the app is closed when you intentionally manage dataset metadata: `.framelab/nodecard.json`, `campaign_datacard.json`, `session_datacard.json`, `acquisition_datacard.json`
 - not intended for routine runtime editing: bundled asset files under `framelab/assets/`
 - if a file becomes invalid, the app will usually fall back to defaults rather than partially trusting malformed content

@@ -516,6 +516,196 @@ class MetricsTableModel(QAbstractTableModel):
                 roles,
             )
 
+    @staticmethod
+    def _prefix_array(
+        values: Optional[np.ndarray],
+        count: int,
+    ) -> Optional[np.ndarray]:
+        """Return one prefix view for diffing existing rows during append."""
+
+        if values is None:
+            return None
+        return values[:max(0, int(count))]
+
+    def _assign_metrics(
+        self,
+        *,
+        paths: list[str],
+        iris_positions: np.ndarray,
+        exposure_ms: np.ndarray,
+        maxs: np.ndarray,
+        roi_maxs: Optional[np.ndarray],
+        min_non_zero: np.ndarray,
+        sat_counts: np.ndarray,
+        low_signal_flags: Optional[np.ndarray],
+        avg_mode: str,
+        avg_topk: Optional[np.ndarray],
+        avg_topk_std: Optional[np.ndarray],
+        avg_topk_sem: Optional[np.ndarray],
+        avg_roi: Optional[np.ndarray],
+        avg_roi_std: Optional[np.ndarray],
+        avg_roi_sem: Optional[np.ndarray],
+        dn_per_ms: Optional[np.ndarray],
+    ) -> None:
+        """Store the latest table payload references."""
+
+        self._paths = paths
+        self._iris_positions = iris_positions
+        self._exposure_ms = exposure_ms
+        self._maxs = maxs
+        self._roi_maxs = roi_maxs
+        self._min_non_zero = min_non_zero
+        self._sat_counts = sat_counts
+        self._low_signal_flags = low_signal_flags
+        self._avg_mode = avg_mode
+        self._avg_topk = avg_topk
+        self._avg_topk_std = avg_topk_std
+        self._avg_topk_sem = avg_topk_sem
+        self._avg_roi = avg_roi
+        self._avg_roi_std = avg_roi_std
+        self._avg_roi_sem = avg_roi_sem
+        self._dn_per_ms = dn_per_ms
+
+    def _emit_metric_diffs(
+        self,
+        *,
+        previous_iris_positions: Optional[np.ndarray],
+        previous_exposure_ms: Optional[np.ndarray],
+        previous_maxs: Optional[np.ndarray],
+        previous_roi_maxs: Optional[np.ndarray],
+        previous_min_non_zero: Optional[np.ndarray],
+        previous_sat_counts: Optional[np.ndarray],
+        previous_low_signal_flags: Optional[np.ndarray],
+        previous_avg_mode: str,
+        previous_avg_topk: Optional[np.ndarray],
+        previous_avg_topk_std: Optional[np.ndarray],
+        previous_avg_topk_sem: Optional[np.ndarray],
+        previous_avg_roi: Optional[np.ndarray],
+        previous_avg_roi_std: Optional[np.ndarray],
+        previous_avg_roi_sem: Optional[np.ndarray],
+        previous_dn_per_ms: Optional[np.ndarray],
+        n_rows: int,
+        current_iris_positions: Optional[np.ndarray],
+        current_exposure_ms: Optional[np.ndarray],
+        current_maxs: Optional[np.ndarray],
+        current_roi_maxs: Optional[np.ndarray],
+        current_min_non_zero: Optional[np.ndarray],
+        current_sat_counts: Optional[np.ndarray],
+        current_low_signal_flags: Optional[np.ndarray],
+        current_avg_mode: str,
+        current_avg_topk: Optional[np.ndarray],
+        current_avg_topk_std: Optional[np.ndarray],
+        current_avg_topk_sem: Optional[np.ndarray],
+        current_avg_roi: Optional[np.ndarray],
+        current_avg_roi_std: Optional[np.ndarray],
+        current_avg_roi_sem: Optional[np.ndarray],
+        current_dn_per_ms: Optional[np.ndarray],
+    ) -> None:
+        """Emit minimal dataChanged regions for an in-place table update."""
+
+        if n_rows <= 0:
+            return
+
+        self._emit_changes_for_mask(
+            2,
+            self._diff_mask_float(
+                previous_iris_positions,
+                current_iris_positions,
+                n_rows,
+            ),
+        )
+        self._emit_changes_for_mask(
+            3,
+            self._diff_mask_float(
+                previous_exposure_ms,
+                current_exposure_ms,
+                n_rows,
+            ),
+        )
+        self._emit_changes_for_mask(
+            4,
+            self._diff_mask_int(previous_maxs, current_maxs, n_rows),
+        )
+        self._emit_changes_for_mask(
+            5,
+            self._diff_mask_float(previous_roi_maxs, current_roi_maxs, n_rows),
+        )
+        self._emit_changes_for_mask(
+            6,
+            self._diff_mask_int(
+                previous_min_non_zero,
+                current_min_non_zero,
+                n_rows,
+            ),
+        )
+        sat_mask = self._diff_mask_int(
+            previous_sat_counts,
+            current_sat_counts,
+            n_rows,
+        )
+        if previous_low_signal_flags is None and current_low_signal_flags is None:
+            low_signal_mask = np.zeros(n_rows, dtype=bool)
+        else:
+            low_signal_mask = self._diff_mask_int(
+                previous_low_signal_flags,
+                current_low_signal_flags,
+                n_rows,
+            )
+        self._emit_changes_for_mask(7, sat_mask, roles=[Qt.DisplayRole])
+        self._emit_row_role_changes_for_mask(
+            sat_mask | low_signal_mask,
+            [Qt.BackgroundRole],
+        )
+
+        if previous_avg_mode != current_avg_mode:
+            mean_mask = np.ones(n_rows, dtype=bool)
+            std_mask = np.ones(n_rows, dtype=bool)
+            sem_mask = np.ones(n_rows, dtype=bool)
+        elif current_avg_mode == "topk":
+            mean_mask = self._diff_mask_float(
+                previous_avg_topk,
+                current_avg_topk,
+                n_rows,
+            )
+            std_mask = self._diff_mask_float(
+                previous_avg_topk_std,
+                current_avg_topk_std,
+                n_rows,
+            )
+            sem_mask = self._diff_mask_float(
+                previous_avg_topk_sem,
+                current_avg_topk_sem,
+                n_rows,
+            )
+        elif current_avg_mode == "roi":
+            mean_mask = self._diff_mask_float(
+                previous_avg_roi,
+                current_avg_roi,
+                n_rows,
+            )
+            std_mask = self._diff_mask_float(
+                previous_avg_roi_std,
+                current_avg_roi_std,
+                n_rows,
+            )
+            sem_mask = self._diff_mask_float(
+                previous_avg_roi_sem,
+                current_avg_roi_sem,
+                n_rows,
+            )
+        else:
+            mean_mask = np.zeros(n_rows, dtype=bool)
+            std_mask = np.zeros(n_rows, dtype=bool)
+            sem_mask = np.zeros(n_rows, dtype=bool)
+
+        self._emit_changes_for_mask(8, mean_mask)
+        self._emit_changes_for_mask(9, std_mask)
+        self._emit_changes_for_mask(10, sem_mask)
+        self._emit_changes_for_mask(
+            11,
+            self._diff_mask_float(previous_dn_per_ms, current_dn_per_ms, n_rows),
+        )
+
     def update_metrics(
         self,
         *,
@@ -576,33 +766,116 @@ class MetricsTableModel(QAbstractTableModel):
         Returns
         -------
         str
-            One of ``"reset"`` or ``"updated"``.
+            One of ``"append"``, ``"reset"``, or ``"updated"``.
         """
         owned_paths = [str(path) for path in paths]
-        row_changed = len(owned_paths) != len(self._paths)
+        old_count = len(self._paths)
+        row_changed = len(owned_paths) != old_count
         path_changed = not row_changed and self._paths != owned_paths
+        append_only = (
+            len(owned_paths) > old_count
+            and self._paths == owned_paths[:old_count]
+        )
+        if append_only:
+            old_iris_positions = self._iris_positions
+            old_exposure_ms = self._exposure_ms
+            old_maxs = self._maxs
+            old_roi_maxs = self._roi_maxs
+            old_min_non_zero = self._min_non_zero
+            old_sat_counts = self._sat_counts
+            old_low_signal_flags = self._low_signal_flags
+            old_avg_mode = self._avg_mode
+            old_avg_topk = self._avg_topk
+            old_avg_topk_std = self._avg_topk_std
+            old_avg_topk_sem = self._avg_topk_sem
+            old_avg_roi = self._avg_roi
+            old_avg_roi_std = self._avg_roi_std
+            old_avg_roi_sem = self._avg_roi_sem
+            old_dn_per_ms = self._dn_per_ms
+
+            self.beginInsertRows(
+                QModelIndex(),
+                old_count,
+                len(owned_paths) - 1,
+            )
+            self._assign_metrics(
+                paths=owned_paths,
+                iris_positions=iris_positions,
+                exposure_ms=exposure_ms,
+                maxs=maxs,
+                roi_maxs=roi_maxs,
+                min_non_zero=min_non_zero,
+                sat_counts=sat_counts,
+                low_signal_flags=low_signal_flags,
+                avg_mode=avg_mode,
+                avg_topk=avg_topk,
+                avg_topk_std=avg_topk_std,
+                avg_topk_sem=avg_topk_sem,
+                avg_roi=avg_roi,
+                avg_roi_std=avg_roi_std,
+                avg_roi_sem=avg_roi_sem,
+                dn_per_ms=dn_per_ms,
+            )
+            self.endInsertRows()
+            self._emit_metric_diffs(
+                previous_iris_positions=old_iris_positions,
+                previous_exposure_ms=old_exposure_ms,
+                previous_maxs=old_maxs,
+                previous_roi_maxs=old_roi_maxs,
+                previous_min_non_zero=old_min_non_zero,
+                previous_sat_counts=old_sat_counts,
+                previous_low_signal_flags=old_low_signal_flags,
+                previous_avg_mode=old_avg_mode,
+                previous_avg_topk=old_avg_topk,
+                previous_avg_topk_std=old_avg_topk_std,
+                previous_avg_topk_sem=old_avg_topk_sem,
+                previous_avg_roi=old_avg_roi,
+                previous_avg_roi_std=old_avg_roi_std,
+                previous_avg_roi_sem=old_avg_roi_sem,
+                previous_dn_per_ms=old_dn_per_ms,
+                n_rows=old_count,
+                current_iris_positions=self._prefix_array(iris_positions, old_count),
+                current_exposure_ms=self._prefix_array(exposure_ms, old_count),
+                current_maxs=self._prefix_array(maxs, old_count),
+                current_roi_maxs=self._prefix_array(roi_maxs, old_count),
+                current_min_non_zero=self._prefix_array(min_non_zero, old_count),
+                current_sat_counts=self._prefix_array(sat_counts, old_count),
+                current_low_signal_flags=self._prefix_array(
+                    low_signal_flags,
+                    old_count,
+                ),
+                current_avg_mode=avg_mode,
+                current_avg_topk=self._prefix_array(avg_topk, old_count),
+                current_avg_topk_std=self._prefix_array(avg_topk_std, old_count),
+                current_avg_topk_sem=self._prefix_array(avg_topk_sem, old_count),
+                current_avg_roi=self._prefix_array(avg_roi, old_count),
+                current_avg_roi_std=self._prefix_array(avg_roi_std, old_count),
+                current_avg_roi_sem=self._prefix_array(avg_roi_sem, old_count),
+                current_dn_per_ms=self._prefix_array(dn_per_ms, old_count),
+            )
+            return "append"
         if row_changed or path_changed:
             self.beginResetModel()
-            self._paths = owned_paths
-            self._iris_positions = iris_positions
-            self._exposure_ms = exposure_ms
-            self._maxs = maxs
-            self._roi_maxs = roi_maxs
-            self._min_non_zero = min_non_zero
-            self._sat_counts = sat_counts
-            self._low_signal_flags = low_signal_flags
-            self._avg_mode = avg_mode
-            self._avg_topk = avg_topk
-            self._avg_topk_std = avg_topk_std
-            self._avg_topk_sem = avg_topk_sem
-            self._avg_roi = avg_roi
-            self._avg_roi_std = avg_roi_std
-            self._avg_roi_sem = avg_roi_sem
-            self._dn_per_ms = dn_per_ms
+            self._assign_metrics(
+                paths=owned_paths,
+                iris_positions=iris_positions,
+                exposure_ms=exposure_ms,
+                maxs=maxs,
+                roi_maxs=roi_maxs,
+                min_non_zero=min_non_zero,
+                sat_counts=sat_counts,
+                low_signal_flags=low_signal_flags,
+                avg_mode=avg_mode,
+                avg_topk=avg_topk,
+                avg_topk_std=avg_topk_std,
+                avg_topk_sem=avg_topk_sem,
+                avg_roi=avg_roi,
+                avg_roi_std=avg_roi_std,
+                avg_roi_sem=avg_roi_sem,
+                dn_per_ms=dn_per_ms,
+            )
             self.endResetModel()
             return "reset"
-
-        old_count = len(self._paths)
 
         old_iris_positions = self._iris_positions
         old_exposure_ms = self._exposure_ms
@@ -620,121 +893,58 @@ class MetricsTableModel(QAbstractTableModel):
         old_avg_roi_sem = self._avg_roi_sem
         old_dn_per_ms = self._dn_per_ms
 
-        self._paths = owned_paths
-        self._iris_positions = iris_positions
-        self._exposure_ms = exposure_ms
-        self._maxs = maxs
-        self._roi_maxs = roi_maxs
-        self._min_non_zero = min_non_zero
-        self._sat_counts = sat_counts
-        self._low_signal_flags = low_signal_flags
-        self._avg_mode = avg_mode
-        self._avg_topk = avg_topk
-        self._avg_topk_std = avg_topk_std
-        self._avg_topk_sem = avg_topk_sem
-        self._avg_roi = avg_roi
-        self._avg_roi_std = avg_roi_std
-        self._avg_roi_sem = avg_roi_sem
-        self._dn_per_ms = dn_per_ms
+        self._assign_metrics(
+            paths=owned_paths,
+            iris_positions=iris_positions,
+            exposure_ms=exposure_ms,
+            maxs=maxs,
+            roi_maxs=roi_maxs,
+            min_non_zero=min_non_zero,
+            sat_counts=sat_counts,
+            low_signal_flags=low_signal_flags,
+            avg_mode=avg_mode,
+            avg_topk=avg_topk,
+            avg_topk_std=avg_topk_std,
+            avg_topk_sem=avg_topk_sem,
+            avg_roi=avg_roi,
+            avg_roi_std=avg_roi_std,
+            avg_roi_sem=avg_roi_sem,
+            dn_per_ms=dn_per_ms,
+        )
 
         n_rows = len(self._paths)
-        if n_rows == 0:
-            return "updated"
-
-        self._emit_changes_for_mask(
-            2,
-            self._diff_mask_float(
-                old_iris_positions,
-                self._iris_positions,
-                n_rows,
-            ),
-        )
-        self._emit_changes_for_mask(
-            3,
-            self._diff_mask_float(
-                old_exposure_ms,
-                self._exposure_ms,
-                n_rows,
-            ),
-        )
-        self._emit_changes_for_mask(
-            4,
-            self._diff_mask_int(old_maxs, self._maxs, n_rows),
-        )
-        self._emit_changes_for_mask(
-            5,
-            self._diff_mask_float(old_roi_maxs, self._roi_maxs, n_rows),
-        )
-        self._emit_changes_for_mask(
-            6,
-            self._diff_mask_int(old_min_non_zero, self._min_non_zero, n_rows),
-        )
-        sat_mask = self._diff_mask_int(
-            old_sat_counts,
-            self._sat_counts,
-            n_rows,
-        )
-        if old_low_signal_flags is None and self._low_signal_flags is None:
-            low_signal_mask = np.zeros(n_rows, dtype=bool)
-        else:
-            low_signal_mask = self._diff_mask_int(
-                old_low_signal_flags,
-                self._low_signal_flags,
-                n_rows,
-            )
-        self._emit_changes_for_mask(7, sat_mask, roles=[Qt.DisplayRole])
-        self._emit_row_role_changes_for_mask(
-            sat_mask | low_signal_mask,
-            [Qt.BackgroundRole],
-        )
-
-        if old_avg_mode != self._avg_mode:
-            mean_mask = np.ones(n_rows, dtype=bool)
-            std_mask = np.ones(n_rows, dtype=bool)
-            sem_mask = np.ones(n_rows, dtype=bool)
-        elif self._avg_mode == "topk":
-            mean_mask = self._diff_mask_float(
-                old_avg_topk,
-                self._avg_topk,
-                n_rows,
-            )
-            std_mask = self._diff_mask_float(
-                old_avg_topk_std,
-                self._avg_topk_std,
-                n_rows,
-            )
-            sem_mask = self._diff_mask_float(
-                old_avg_topk_sem,
-                self._avg_topk_sem,
-                n_rows,
-            )
-        elif self._avg_mode == "roi":
-            mean_mask = self._diff_mask_float(
-                old_avg_roi,
-                self._avg_roi,
-                n_rows,
-            )
-            std_mask = self._diff_mask_float(
-                old_avg_roi_std,
-                self._avg_roi_std,
-                n_rows,
-            )
-            sem_mask = self._diff_mask_float(
-                old_avg_roi_sem,
-                self._avg_roi_sem,
-                n_rows,
-            )
-        else:
-            mean_mask = np.zeros(n_rows, dtype=bool)
-            std_mask = np.zeros(n_rows, dtype=bool)
-            sem_mask = np.zeros(n_rows, dtype=bool)
-
-        self._emit_changes_for_mask(8, mean_mask)
-        self._emit_changes_for_mask(9, std_mask)
-        self._emit_changes_for_mask(10, sem_mask)
-        self._emit_changes_for_mask(
-            11,
-            self._diff_mask_float(old_dn_per_ms, self._dn_per_ms, n_rows),
+        self._emit_metric_diffs(
+            previous_iris_positions=old_iris_positions,
+            previous_exposure_ms=old_exposure_ms,
+            previous_maxs=old_maxs,
+            previous_roi_maxs=old_roi_maxs,
+            previous_min_non_zero=old_min_non_zero,
+            previous_sat_counts=old_sat_counts,
+            previous_low_signal_flags=old_low_signal_flags,
+            previous_avg_mode=old_avg_mode,
+            previous_avg_topk=old_avg_topk,
+            previous_avg_topk_std=old_avg_topk_std,
+            previous_avg_topk_sem=old_avg_topk_sem,
+            previous_avg_roi=old_avg_roi,
+            previous_avg_roi_std=old_avg_roi_std,
+            previous_avg_roi_sem=old_avg_roi_sem,
+            previous_dn_per_ms=old_dn_per_ms,
+            n_rows=n_rows,
+            current_iris_positions=self._iris_positions,
+            current_exposure_ms=self._exposure_ms,
+            current_maxs=self._maxs,
+            current_roi_maxs=self._roi_maxs,
+            current_min_non_zero=self._min_non_zero,
+            current_sat_counts=self._sat_counts,
+            current_low_signal_flags=self._low_signal_flags,
+            current_avg_mode=self._avg_mode,
+            current_avg_topk=self._avg_topk,
+            current_avg_topk_std=self._avg_topk_std,
+            current_avg_topk_sem=self._avg_topk_sem,
+            current_avg_roi=self._avg_roi,
+            current_avg_roi_std=self._avg_roi_std,
+            current_avg_roi_sem=self._avg_roi_sem,
+            current_dn_per_ms=self._dn_per_ms,
         )
         return "updated"
 

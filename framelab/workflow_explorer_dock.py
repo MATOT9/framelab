@@ -74,6 +74,18 @@ class WorkflowExplorerTree(qtw.QTreeWidget):
             return
         event.ignore()
 
+    def keyPressEvent(self, event: QtGui.QKeyEvent) -> None:
+        """Handle tree-level shortcuts for structure actions."""
+
+        if (
+            event.key() == Qt.Key_Delete
+            and event.modifiers() == Qt.NoModifier
+        ):
+            self._dock._delete_context_node()
+            event.accept()
+            return
+        super().keyPressEvent(event)
+
 
 class WorkflowExplorerDock(qtw.QDockWidget):
     """Docked workflow explorer that drives the active app scope."""
@@ -819,10 +831,13 @@ class WorkflowExplorerDock(qtw.QDockWidget):
             handler(node.node_id, batch=True)
 
     def _new_session(self) -> None:
-        """Create a new session inline under the selected campaign node."""
+        """Create a new session inline under the selected workflow parent."""
 
+        state = self._structure_action_state()
+        if str(state.get("create_child_type_id", "") or "").strip().lower() != "session":
+            return
         node = self._selected_node()
-        if node is None or node.type_id != "campaign":
+        if node is None:
             return
         self._begin_inline_session_creation(node.node_id)
 
@@ -1015,6 +1030,7 @@ class WorkflowExplorerDock(qtw.QDockWidget):
 
         editor = qtw.QLineEdit(self._tree)
         editor.setPlaceholderText(f"New {child_label.lower()} folder")
+        editor.returnPressed.connect(self._finalize_pending_session_creation)
         editor.editingFinished.connect(self._finalize_pending_session_creation)
         self._tree.setItemWidget(pending_item, 0, editor)
         self._tree.scrollToItem(pending_item, qtw.QAbstractItemView.PositionAtBottom)
@@ -1027,10 +1043,10 @@ class WorkflowExplorerDock(qtw.QDockWidget):
         editor.setFocus(Qt.OtherFocusReason)
         editor.selectAll()
 
-    def _begin_inline_session_creation(self, campaign_node_id: str) -> None:
+    def _begin_inline_session_creation(self, parent_node_id: str) -> None:
         """Add a temporary inline editor row for creating one session child."""
 
-        self._begin_inline_child_creation(campaign_node_id, "session")
+        self._begin_inline_child_creation(parent_node_id, "session")
 
     def _clear_pending_session_creation(self, *, remove_item: bool) -> None:
         """Tear down any active inline session-creation editor."""
@@ -1043,6 +1059,10 @@ class WorkflowExplorerDock(qtw.QDockWidget):
         self._pending_child_type_id = None
 
         if editor is not None:
+            try:
+                editor.returnPressed.disconnect(self._finalize_pending_session_creation)
+            except (RuntimeError, TypeError):
+                pass
             try:
                 editor.editingFinished.disconnect(self._finalize_pending_session_creation)
             except (RuntimeError, TypeError):
@@ -1136,7 +1156,7 @@ class WorkflowExplorerDock(qtw.QDockWidget):
         style = self.style()
         icon_map = {
             "root": qtw.QStyle.SP_DirHomeIcon,
-            "trial": qtw.QStyle.SP_FileDialogDetailedView,
+            "year": qtw.QStyle.SP_FileDialogContentsView,
             "camera": qtw.QStyle.SP_ComputerIcon,
             "campaign": qtw.QStyle.SP_FileDialogListView,
             "session": qtw.QStyle.SP_DirOpenIcon,

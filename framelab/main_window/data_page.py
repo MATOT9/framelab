@@ -22,7 +22,6 @@ from ..metadata import (
     path_has_json_metadata,
 )
 from ..node_metadata import NODECARD_DIR_NAME, NODECARD_FILE_NAME
-from ..scan_settings import save_skip_patterns
 from ..raw_decode import SUPPORTED_MONO_RAW_PIXEL_FORMATS, is_raw_image_path
 from ..ui_primitives import (
     ChipSpec,
@@ -160,6 +159,16 @@ class _SkipRulesEditorDialog(qtw.QDialog):
 class DataPageMixin:
     """Dataset input, skip rules, and metadata table helpers."""
 
+    def _trigger_browse_folder_button(self, _checked: bool = False) -> None:
+        """Open the dataset-folder chooser from the Data-page button."""
+
+        self.browse_folder()
+
+    def _trigger_scan_folder_button(self, _checked: bool = False) -> None:
+        """Start a dataset scan from the Data-page button."""
+
+        self.load_folder()
+
     def _apply_data_page_density(self, tokens) -> None:
         """Apply density tokens to shared Data-page layouts."""
 
@@ -250,9 +259,7 @@ class DataPageMixin:
         browse_button = qtw.QPushButton("Browse Folder...")
         self._data_browse_button = browse_button
         browse_button.setToolTip("Open dataset folder chooser.")
-        browse_button.clicked.connect(
-            lambda _checked=False: self.browse_folder(),
-        )
+        browse_button.clicked.connect(self._trigger_browse_folder_button)
         command_layout.addWidget(browse_button)
 
         load_button = qtw.QPushButton("Scan Folder")
@@ -261,9 +268,7 @@ class DataPageMixin:
         load_button.setToolTip(
             "Scan folder, load metadata, and initialize image metrics.",
         )
-        load_button.clicked.connect(
-            lambda _checked=False: self.load_folder(),
-        )
+        load_button.clicked.connect(self._trigger_scan_folder_button)
         command_layout.addWidget(load_button)
 
         self.data_load_progress = qtw.QProgressBar()
@@ -600,7 +605,7 @@ class DataPageMixin:
         *,
         persist: bool = True,
     ) -> None:
-        """Set in-memory skip patterns and optionally persist them."""
+        """Set in-memory skip patterns for the current session/workspace."""
         normalized = [
             self._normalize_skip_pattern(item)
             for item in patterns
@@ -613,9 +618,9 @@ class DataPageMixin:
             seen.add(item)
             unique.append(item)
         self.skip_patterns = unique
-        if persist:
-            save_skip_patterns(self.skip_patterns)
         self._refresh_skip_pattern_ui()
+        if hasattr(self, "_refresh_workspace_document_dirty_state"):
+            self._refresh_workspace_document_dirty_state()
 
     def _refresh_skip_pattern_ui(self) -> None:
         """Refresh visual list + hint of active skip patterns."""

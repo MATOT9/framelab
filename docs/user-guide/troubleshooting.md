@@ -22,7 +22,8 @@ Cause:
 
 - the plugin was not enabled before launch
 - or the current plugin does not expose a runtime action for the task you expected
-- or a plugin such as Session Manager, Background Correction, or eBUS Config Tools was not enabled at startup
+- or a plugin such as Session Manager or Background Correction was not enabled at startup
+- or you were looking for **eBUS Config Tools**, which lives under **Edit -> Advanced** rather than **Plugins**
 
 Action:
 
@@ -185,13 +186,12 @@ Action:
 
 Cause:
 
-- the **eBUS Config Tools** plugin was not enabled at startup
-- or no acquisition row is currently selected
+- no acquisition row is currently selected
 
 Action:
 
-- relaunch with the eBUS plugin enabled if needed
-- then reopen Session Manager and select the intended acquisition
+- select the intended acquisition row
+- then retry the toggle
 
 ## 5. eBUS inspection and compare issues
 

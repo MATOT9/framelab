@@ -5,14 +5,14 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from PySide6 import QtWidgets as qtw
+from PySide6 import QtTest, QtWidgets as qtw
 from PySide6.QtCore import Qt
 from tifffile import imwrite
 
 import framelab.acquisition_authoring_dialog as acquisition_authoring_dialog_module
 import framelab.window as window_module
 from framelab.dock_title_bar import should_use_custom_dock_title_bar
-from framelab.ui_settings import UiStateSnapshot, UiStateStore
+from framelab.ui_settings import UiStateStore
 from framelab.workflow_explorer_dock import WorkflowExplorerDock
 
 
@@ -159,9 +159,15 @@ def _make_workspace_with_session_container(tmp_path: Path) -> tuple[Path, Path, 
     return workspace_root, campaign_root, campaign_node_id
 
 
-def _make_trials_workspace(tmp_path: Path) -> tuple[Path, str, str, str, str]:
+def _make_trials_workspace(tmp_path: Path) -> tuple[Path, str, str, str, str, str]:
     workspace_root = tmp_path / "trials"
-    session_root = workspace_root / "trial-07" / "camera-a" / "2026-03-05__sess01"
+    session_root = (
+        workspace_root
+        / "2026"
+        / "campaign-07"
+        / "camera-a"
+        / "2026-03-05__sess01"
+    )
     acquisitions_root = session_root / "acquisitions"
     acquisitions_root.mkdir(parents=True, exist_ok=True)
     _write_session_datacard(session_root)
@@ -173,10 +179,11 @@ def _make_trials_workspace(tmp_path: Path) -> tuple[Path, str, str, str, str]:
 
     return (
         workspace_root,
-        "trials:trial:trial-07",
-        "trials:camera:trial-07/camera-a",
-        "trials:session:trial-07/camera-a/2026-03-05__sess01",
-        "trials:acquisition:trial-07/camera-a/2026-03-05__sess01/acquisitions/acq-0011__dark",
+        "trials:year:2026",
+        "trials:campaign:2026/campaign-07",
+        "trials:camera:2026/campaign-07/camera-a",
+        "trials:session:2026/campaign-07/camera-a/2026-03-05__sess01",
+        "trials:acquisition:2026/campaign-07/camera-a/2026-03-05__sess01/acquisitions/acq-0011__dark",
     )
 
 
@@ -366,17 +373,21 @@ def test_workflow_explorer_active_path_expands_with_top_pane_resize(
     assert dock._tree.minimumHeight() >= 240
 
 
-def test_workflow_explorer_dock_visibility_restores_from_ui_state(
+def test_workflow_explorer_dock_visibility_is_not_restored_from_preferences_cache(
     tmp_path: Path,
     monkeypatch,
     qapp,
 ) -> None:
-    config_path = tmp_path / "ui_state.ini"
-    store = UiStateStore(config_path)
-    store.save(
-        UiStateSnapshot(
-            panel_states={WorkflowExplorerDock.PANEL_STATE_KEY: False},
-        ),
+    config_path = tmp_path / "preferences.ini"
+    config_path.write_text(
+        "\n".join(
+            [
+                "[panels]",
+                f"{WorkflowExplorerDock.PANEL_STATE_KEY} = false",
+            ],
+        )
+        + "\n",
+        encoding="utf-8",
     )
     monkeypatch.setattr(
         window_module,
@@ -386,7 +397,7 @@ def test_workflow_explorer_dock_visibility_restores_from_ui_state(
 
     window = window_module.FrameLabWindow(enabled_plugin_ids=())
     try:
-        assert not window._workflow_explorer_dock.isVisible()
+        assert not window._workflow_explorer_dock.isHidden()
     finally:
         window.close()
         window.deleteLater()
@@ -588,6 +599,64 @@ def test_workflow_explorer_dock_cancels_empty_inline_session_creation(
     assert dock._pending_session_editor is None
 
 
+def test_workflow_explorer_inline_creation_confirms_with_enter(
+    tmp_path: Path,
+    framelab_window_factory,
+    process_events,
+) -> None:
+    workspace_root, _session_root, _acquisition_root, _session_node_id, _acquisition_node_id = (
+        _make_workspace(tmp_path)
+    )
+    campaign_node_id = "calibration:campaign:camera-a/campaign-2026"
+    window = framelab_window_factory(enabled_plugin_ids=(), show=True)
+    window.set_workflow_context(str(workspace_root), "calibration", active_node_id=campaign_node_id)
+    dock = window._workflow_explorer_dock
+
+    dock._begin_inline_session_creation(campaign_node_id)
+    assert dock._pending_session_editor is not None
+    dock._pending_session_editor.setText("2026-03-06__sess02")
+    dock._pending_session_editor.setFocus(Qt.OtherFocusReason)
+    process_events()
+    QtTest.QTest.keyClick(dock._pending_session_editor, Qt.Key_Return)
+    process_events()
+
+    created_root = workspace_root / "camera-a" / "campaign-2026" / "2026-03-06__sess02"
+    assert created_root.is_dir()
+    assert dock._pending_session_editor is None
+
+
+def test_workflow_explorer_delete_key_triggers_selected_scope_delete(
+    tmp_path: Path,
+    framelab_window_factory,
+    monkeypatch,
+    process_events,
+) -> None:
+    workspace_root, _session_root, _acquisition_root, session_node_id, _acquisition_node_id = (
+        _make_workspace(tmp_path)
+    )
+    window = framelab_window_factory(enabled_plugin_ids=(), show=True)
+    window.set_workflow_context(
+        str(workspace_root),
+        "calibration",
+        active_node_id=session_node_id,
+    )
+    dock = window._workflow_explorer_dock
+    deleted_node_ids: list[str | None] = []
+
+    monkeypatch.setattr(
+        window,
+        "_delete_workflow_node",
+        lambda node_id=None: deleted_node_ids.append(node_id),
+    )
+
+    dock._tree.setCurrentItem(dock._item_by_node_id[session_node_id])
+    dock._tree.setFocus(Qt.OtherFocusReason)
+    process_events()
+    QtTest.QTest.keyClick(dock._tree, Qt.Key_Delete)
+
+    assert deleted_node_ids == [session_node_id]
+
+
 def test_workflow_explorer_context_menu_covers_every_calibration_level(
     tmp_path: Path,
     framelab_window_factory,
@@ -645,7 +714,14 @@ def test_workflow_explorer_context_menu_covers_every_trials_level(
     framelab_window_factory,
     process_events,
 ) -> None:
-    workspace_root, trial_node_id, camera_node_id, session_node_id, acquisition_node_id = (
+    (
+        workspace_root,
+        year_node_id,
+        campaign_node_id,
+        camera_node_id,
+        session_node_id,
+        acquisition_node_id,
+    ) = (
         _make_trials_workspace(tmp_path)
     )
     window = framelab_window_factory(enabled_plugin_ids=())
@@ -654,14 +730,20 @@ def test_workflow_explorer_context_menu_covers_every_trials_level(
 
     action_state_by_node_id = {
         "trials:root": {
-            "New Trial...": True,
+            "New Year...": True,
             "Delete Workspace...": False,
             "Open in File Explorer": True,
         },
-        trial_node_id: {
+        year_node_id: {
+            "New Campaign...": True,
+            "Rename Year...": True,
+            "Delete Year...": True,
+            "Open in File Explorer": True,
+        },
+        campaign_node_id: {
             "New Camera...": True,
-            "Rename Trial...": True,
-            "Delete Trial...": True,
+            "Rename Campaign...": True,
+            "Delete Campaign...": True,
             "Open in File Explorer": True,
         },
         camera_node_id: {

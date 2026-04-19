@@ -77,9 +77,101 @@ class MetricsPipelineController:
         self.is_roi_applying = False
         self.roi_apply_done = 0
         self.roi_apply_total = 0
+        self._clear_loaded_dataset_buffer_state()
+
+    def _clear_loaded_dataset_buffer_state(self) -> None:
+        """Drop any reserved streaming buffers used during dataset loading."""
+
+        self._loaded_dataset_capacity = 0
+        self._loaded_dataset_count = 0
+        self._loaded_min_non_zero_buffer: np.ndarray | None = None
+        self._loaded_maxs_buffer: np.ndarray | None = None
+        self._loaded_sat_counts_buffer: np.ndarray | None = None
+        self._loaded_roi_maxs_buffer: np.ndarray | None = None
+        self._loaded_roi_means_buffer: np.ndarray | None = None
+        self._loaded_roi_stds_buffer: np.ndarray | None = None
+        self._loaded_roi_sems_buffer: np.ndarray | None = None
+        self._loaded_bg_applied_mask_buffer: np.ndarray | None = None
+
+    def _current_loaded_dataset_count(self) -> int:
+        """Return the current public row count tracked by dataset-sized arrays."""
+
+        if self._loaded_min_non_zero_buffer is not None:
+            return int(self._loaded_dataset_count)
+        for values in (
+            self.maxs,
+            self.min_non_zero,
+            self.sat_counts,
+            self.roi_maxs,
+        ):
+            if values is not None:
+                return int(len(values))
+        return 0
+
+    @staticmethod
+    def _copy_prefix(
+        target: np.ndarray,
+        source: np.ndarray | None,
+        count: int,
+        *,
+        dtype: np.dtype,
+    ) -> None:
+        """Copy one shared prefix into a resized streaming buffer."""
+
+        if count <= 0 or source is None:
+            return
+        target[:count] = np.asarray(source, dtype=dtype)[:count]
+
+    def _sync_loaded_dataset_views(self) -> None:
+        """Expose the loaded prefix of reserved buffers through public arrays."""
+
+        count = max(0, int(self._loaded_dataset_count))
+        self.min_non_zero = (
+            self._loaded_min_non_zero_buffer[:count]
+            if self._loaded_min_non_zero_buffer is not None
+            else None
+        )
+        self.maxs = (
+            self._loaded_maxs_buffer[:count]
+            if self._loaded_maxs_buffer is not None
+            else None
+        )
+        self.sat_counts = (
+            self._loaded_sat_counts_buffer[:count]
+            if self._loaded_sat_counts_buffer is not None
+            else None
+        )
+        self.roi_maxs = (
+            self._loaded_roi_maxs_buffer[:count]
+            if self._loaded_roi_maxs_buffer is not None
+            else None
+        )
+        self.roi_means = (
+            self._loaded_roi_means_buffer[:count]
+            if self._loaded_roi_means_buffer is not None
+            else None
+        )
+        self.roi_stds = (
+            self._loaded_roi_stds_buffer[:count]
+            if self._loaded_roi_stds_buffer is not None
+            else None
+        )
+        self.roi_sems = (
+            self._loaded_roi_sems_buffer[:count]
+            if self._loaded_roi_sems_buffer is not None
+            else None
+        )
+        self.bg_applied_mask = (
+            self._loaded_bg_applied_mask_buffer[:count]
+            if self._loaded_bg_applied_mask_buffer is not None
+            else None
+        )
+        self.bg_total_count = count
+        self.bg_unmatched_count = count if self.background_config.enabled else 0
 
     def clear_metric_results(self) -> None:
         """Clear dataset-dependent metric results while preserving settings."""
+        self._clear_loaded_dataset_buffer_state()
         self.min_non_zero = None
         self.maxs = None
         self.sat_counts = None
@@ -111,7 +203,18 @@ class MetricsPipelineController:
     def initialize_loaded_dataset(self, path_count: int) -> None:
         """Initialize dataset-dependent state after a new dataset load."""
         count = max(0, int(path_count))
+        self._clear_loaded_dataset_buffer_state()
         self.roi_rect = None
+        self.min_non_zero = (
+            np.zeros(count, dtype=np.int64)
+            if count > 0
+            else None
+        )
+        self.maxs = (
+            np.zeros(count, dtype=np.int64)
+            if count > 0
+            else None
+        )
         self.reset_roi_metrics(count)
         self.sat_counts = np.zeros(count, dtype=np.int64)
         self.avg_maxs = None
@@ -126,6 +229,89 @@ class MetricsPipelineController:
             count if self.background_config.enabled else 0
         )
 
+    def reserve_loaded_dataset(self, total_candidates: int) -> None:
+        """Reserve capacity for one incremental dataset load."""
+
+        capacity = max(0, int(total_candidates))
+        if capacity <= 0:
+            return
+        if (
+            capacity <= self._loaded_dataset_capacity
+            and self._loaded_min_non_zero_buffer is not None
+        ):
+            return
+
+        loaded_count = min(self._current_loaded_dataset_count(), capacity)
+        min_non_zero = np.zeros(capacity, dtype=np.int64)
+        maxs = np.zeros(capacity, dtype=np.int64)
+        sat_counts = np.zeros(capacity, dtype=np.int64)
+        roi_maxs = np.full(capacity, np.nan, dtype=np.float64)
+        roi_means = np.full(capacity, np.nan, dtype=np.float64)
+        roi_stds = np.full(capacity, np.nan, dtype=np.float64)
+        roi_sems = np.full(capacity, np.nan, dtype=np.float64)
+        bg_applied_mask = np.zeros(capacity, dtype=bool)
+
+        self._copy_prefix(
+            min_non_zero,
+            self.min_non_zero,
+            loaded_count,
+            dtype=np.int64,
+        )
+        self._copy_prefix(
+            maxs,
+            self.maxs,
+            loaded_count,
+            dtype=np.int64,
+        )
+        self._copy_prefix(
+            sat_counts,
+            self.sat_counts,
+            loaded_count,
+            dtype=np.int64,
+        )
+        self._copy_prefix(
+            roi_maxs,
+            self.roi_maxs,
+            loaded_count,
+            dtype=np.float64,
+        )
+        self._copy_prefix(
+            roi_means,
+            self.roi_means,
+            loaded_count,
+            dtype=np.float64,
+        )
+        self._copy_prefix(
+            roi_stds,
+            self.roi_stds,
+            loaded_count,
+            dtype=np.float64,
+        )
+        self._copy_prefix(
+            roi_sems,
+            self.roi_sems,
+            loaded_count,
+            dtype=np.float64,
+        )
+        self._copy_prefix(
+            bg_applied_mask,
+            self.bg_applied_mask,
+            loaded_count,
+            dtype=bool,
+        )
+
+        self._loaded_dataset_capacity = capacity
+        self._loaded_dataset_count = loaded_count
+        self._loaded_min_non_zero_buffer = min_non_zero
+        self._loaded_maxs_buffer = maxs
+        self._loaded_sat_counts_buffer = sat_counts
+        self._loaded_roi_maxs_buffer = roi_maxs
+        self._loaded_roi_means_buffer = roi_means
+        self._loaded_roi_stds_buffer = roi_stds
+        self._loaded_roi_sems_buffer = roi_sems
+        self._loaded_bg_applied_mask_buffer = bg_applied_mask
+        self._sync_loaded_dataset_views()
+
     def append_loaded_batch(
         self,
         min_non_zero: np.ndarray,
@@ -135,58 +321,39 @@ class MetricsPipelineController:
 
         mins_arr = np.asarray(min_non_zero, dtype=np.int64)
         maxs_arr = np.asarray(maxs, dtype=np.int64)
-        if mins_arr.size == 0 and maxs_arr.size == 0:
-            return
-        if self.min_non_zero is None or self.maxs is None:
-            self.min_non_zero = mins_arr.copy()
-            self.maxs = maxs_arr.copy()
-        else:
-            self.min_non_zero = np.concatenate((self.min_non_zero, mins_arr))
-            self.maxs = np.concatenate((self.maxs, maxs_arr))
-
+        if mins_arr.size != maxs_arr.size:
+            raise ValueError("Loaded metric batches must have matching lengths")
         batch_count = int(maxs_arr.size)
-        if self.sat_counts is None:
-            self.sat_counts = np.zeros(batch_count, dtype=np.int64)
-        else:
-            self.sat_counts = np.concatenate(
-                (self.sat_counts, np.zeros(batch_count, dtype=np.int64)),
-            )
+        if batch_count <= 0:
+            return
+        required = self._current_loaded_dataset_count() + batch_count
+        if (
+            self._loaded_min_non_zero_buffer is None
+            or required > self._loaded_dataset_capacity
+        ):
+            self.reserve_loaded_dataset(required)
 
-        def _append_nan(values: np.ndarray | None) -> np.ndarray:
-            if values is None:
-                return np.full(batch_count, np.nan, dtype=np.float64)
-            return np.concatenate(
-                (values, np.full(batch_count, np.nan, dtype=np.float64)),
-            )
+        assert self._loaded_min_non_zero_buffer is not None
+        assert self._loaded_maxs_buffer is not None
+        assert self._loaded_sat_counts_buffer is not None
+        assert self._loaded_roi_maxs_buffer is not None
+        assert self._loaded_roi_means_buffer is not None
+        assert self._loaded_roi_stds_buffer is not None
+        assert self._loaded_roi_sems_buffer is not None
+        assert self._loaded_bg_applied_mask_buffer is not None
 
-        self.roi_maxs = _append_nan(self.roi_maxs)
-        self.roi_means = _append_nan(self.roi_means)
-        self.roi_stds = _append_nan(self.roi_stds)
-        self.roi_sems = _append_nan(self.roi_sems)
-
-        if self.avg_maxs is not None:
-            self.avg_maxs = _append_nan(self.avg_maxs)
-        if self.avg_maxs_std is not None:
-            self.avg_maxs_std = _append_nan(self.avg_maxs_std)
-        if self.avg_maxs_sem is not None:
-            self.avg_maxs_sem = _append_nan(self.avg_maxs_sem)
-        if self.dn_per_ms_values is not None:
-            self.dn_per_ms_values = _append_nan(self.dn_per_ms_values)
-        if self.dn_per_ms_stds is not None:
-            self.dn_per_ms_stds = _append_nan(self.dn_per_ms_stds)
-        if self.dn_per_ms_sems is not None:
-            self.dn_per_ms_sems = _append_nan(self.dn_per_ms_sems)
-
-        if self.bg_applied_mask is None:
-            self.bg_applied_mask = np.zeros(batch_count, dtype=bool)
-        else:
-            self.bg_applied_mask = np.concatenate(
-                (self.bg_applied_mask, np.zeros(batch_count, dtype=bool)),
-            )
-        self.bg_total_count = len(self.maxs)
-        self.bg_unmatched_count = (
-            self.bg_total_count if self.background_config.enabled else 0
-        )
+        start = int(self._loaded_dataset_count)
+        end = start + batch_count
+        self._loaded_min_non_zero_buffer[start:end] = mins_arr
+        self._loaded_maxs_buffer[start:end] = maxs_arr
+        self._loaded_sat_counts_buffer[start:end] = 0
+        self._loaded_roi_maxs_buffer[start:end].fill(np.nan)
+        self._loaded_roi_means_buffer[start:end].fill(np.nan)
+        self._loaded_roi_stds_buffer[start:end].fill(np.nan)
+        self._loaded_roi_sems_buffer[start:end].fill(np.nan)
+        self._loaded_bg_applied_mask_buffer[start:end] = False
+        self._loaded_dataset_count = end
+        self._sync_loaded_dataset_views()
 
     def prepare_for_live_update(self, *, path_count: int, mode: str) -> None:
         """Ensure dataset-sized metric arrays exist for one recompute request."""
@@ -230,6 +397,7 @@ class MetricsPipelineController:
         path_count: int,
     ) -> None:
         """Store one structured dynamic-stats worker result."""
+        self._clear_loaded_dataset_buffer_state()
         self.sat_counts = np.asarray(result.sat_counts, dtype=np.int64)
         self.avg_maxs = (
             np.asarray(result.avg_topk, dtype=np.float64)
@@ -256,6 +424,7 @@ class MetricsPipelineController:
 
     def apply_roi_result(self, result: RoiApplyResult) -> None:
         """Store one structured ROI-apply worker result."""
+        self._clear_loaded_dataset_buffer_state()
         self.roi_applied_to_all = True
         self.roi_maxs = np.asarray(result.maxs, dtype=np.float64)
         self.roi_means = np.asarray(result.means, dtype=np.float64)

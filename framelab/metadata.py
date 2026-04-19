@@ -24,6 +24,9 @@ from .ebus import (
     EbusCanonicalFieldResolution,
     EbusCanonicalResolutionSet,
     apply_ebus_canonical_baseline,
+    discover_effective_ebus_snapshot_path,
+    discover_ebus_snapshot_path,
+    parse_ebus_config,
     resolve_ebus_canonical_fields,
 )
 from .frame_indexing import parse_frame_name, resolve_frame_index_map
@@ -39,6 +42,10 @@ from .payload_utils import (
     read_json_dict,
     unflatten_payload_dict,
 )
+from .raw_decode import (
+    SUPPORTED_MONO_RAW_PIXEL_FORMATS,
+    normalize_raw_pixel_format,
+)
 
 EXPOSURE_PATTERN = re.compile(
     r"(?:exp(?:osure)?)[_\-\s]*([0-9]+(?:\.[0-9]+)?)\s*(us|µs|ms|s)?",
@@ -50,6 +57,11 @@ TIME_PATTERN = re.compile(
 )
 IRIS_PATTERN = re.compile(
     r"(?:iris|pos(?:ition)?)[_\-\s]*([0-9]+(?:\.[0-9]+)?)",
+    re.IGNORECASE,
+)
+_RAW_IMAGE_SUFFIXES = {".bin", ".raw"}
+_RAW_FILENAME_METADATA_PATTERN = re.compile(
+    r"(?:^|[_-])w(?P<width>\d+)[_-]h(?P<height>\d+)[_-]p(?P<pixel_format>[A-Za-z0-9_]+)(?:$|[._-])",
     re.IGNORECASE,
 )
 
@@ -193,6 +205,115 @@ def _find_iris_position(text: str) -> Optional[float]:
     if match is None:
         return None
     return float(match.group(1))
+
+
+def _is_raw_image_path(path: Path) -> bool:
+    """Return whether one path should use RAW metadata fallbacks."""
+
+    return path.suffix.lower() in _RAW_IMAGE_SUFFIXES
+
+
+def _raw_metadata_fallback_root(path: Path) -> Path | None:
+    """Find the nearest acquisition-like root that carries RAW fallback context."""
+
+    acquisition_root = find_acquisition_root(path, allow_name_only=True)
+    if acquisition_root is not None:
+        return acquisition_root.resolve()
+    search_root = path if path.is_dir() else path.parent
+    for parent in (search_root, *search_root.parents):
+        try:
+            if discover_ebus_snapshot_path(parent) is not None:
+                return parent.resolve()
+        except Exception:
+            continue
+    return None
+
+
+def _raw_metadata_from_ebus_snapshot(path: Path) -> dict[str, object]:
+    """Resolve RAW-required metadata from a nearby acquisition snapshot."""
+
+    acquisition_root = _raw_metadata_fallback_root(path)
+    if acquisition_root is None:
+        return {}
+    payload = read_json_dict(resolve_acquisition_datacard_path(acquisition_root))
+    snapshot_path = discover_effective_ebus_snapshot_path(acquisition_root, payload or {})
+    if snapshot_path is None or not snapshot_path.is_file():
+        return {}
+    try:
+        snapshot = parse_ebus_config(snapshot_path)
+    except Exception:
+        return {}
+    snapshot_by_key = snapshot.by_key()
+    metadata: dict[str, object] = {
+        "acquisition_root": str(acquisition_root),
+    }
+    raw_width = snapshot_by_key.get("device.Width")
+    raw_height = snapshot_by_key.get("device.Height")
+    raw_pixel_format = snapshot_by_key.get("device.PixelFormat")
+    if raw_width is not None and isinstance(raw_width.normalized_value, int):
+        metadata["camera_settings.resolution_x"] = int(raw_width.normalized_value)
+        metadata["camera_settings.resolution_x_source"] = "ebus_snapshot"
+    if raw_height is not None and isinstance(raw_height.normalized_value, int):
+        metadata["camera_settings.resolution_y"] = int(raw_height.normalized_value)
+        metadata["camera_settings.resolution_y_source"] = "ebus_snapshot"
+    if raw_pixel_format is not None and str(raw_pixel_format.normalized_value or "").strip():
+        metadata["camera_settings.pixel_format"] = str(raw_pixel_format.normalized_value)
+        metadata["camera_settings.pixel_format_source"] = "ebus_snapshot"
+    return metadata
+
+
+def _raw_metadata_from_filename(path: Path) -> dict[str, object]:
+    """Extract RAW-required metadata from filename tokens when present."""
+
+    match = _RAW_FILENAME_METADATA_PATTERN.search(path.name)
+    if match is None:
+        return {}
+    pixel_format = normalize_raw_pixel_format(match.group("pixel_format"))
+    if pixel_format not in SUPPORTED_MONO_RAW_PIXEL_FORMATS:
+        return {}
+    try:
+        width = int(match.group("width"))
+        height = int(match.group("height"))
+    except Exception:
+        return {}
+    if width <= 0 or height <= 0:
+        return {}
+    return {
+        "camera_settings.pixel_format": pixel_format,
+        "camera_settings.pixel_format_source": "filename_fallback",
+        "camera_settings.resolution_x": width,
+        "camera_settings.resolution_x_source": "filename_fallback",
+        "camera_settings.resolution_y": height,
+        "camera_settings.resolution_y_source": "filename_fallback",
+    }
+
+
+def _apply_raw_metadata_fallbacks(values: dict[str, object], path: Path) -> None:
+    """Fill missing RAW decode fields from acquisition snapshots or filenames."""
+
+    if not _is_raw_image_path(path):
+        return
+    for fallback in (
+        _raw_metadata_from_ebus_snapshot(path),
+        _raw_metadata_from_filename(path),
+    ):
+        if not fallback:
+            continue
+        acquisition_root = fallback.get("acquisition_root")
+        if acquisition_root and "acquisition_root" not in values:
+            values["acquisition_root"] = acquisition_root
+        for key in (
+            "camera_settings.pixel_format",
+            "camera_settings.resolution_x",
+            "camera_settings.resolution_y",
+        ):
+            if key in values or key not in fallback:
+                continue
+            values[key] = fallback[key]
+            values[f"{key}_label"] = label_for_camera_setting_key(key)
+            source = fallback.get(f"{key}_source")
+            if source not in {None, ""}:
+                values[f"{key}_source"] = source
 
 
 def path_has_json_metadata(
@@ -686,6 +807,8 @@ def extract_path_metadata(
             if iris_datacard is not None:
                 datacard_iris_position = float(iris_datacard)
                 values["iris_position_datacard"] = datacard_iris_position
+
+    _apply_raw_metadata_fallbacks(values, p)
 
     final_iris: Optional[float]
     final_exposure_ms: Optional[float]

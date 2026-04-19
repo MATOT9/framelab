@@ -1,4 +1,4 @@
-"""Persistent UI preferences and workspace state for FrameLab."""
+"""Persistent UI preferences and in-memory UI state helpers for FrameLab."""
 
 from __future__ import annotations
 
@@ -10,8 +10,8 @@ from pathlib import Path
 
 from .scan_settings import app_config_path
 
-_CONFIG_FILE_NAME = "ui_state.ini"
-_LEGACY_CONFIG_NAMES: tuple[str, ...] = ()
+_CONFIG_FILE_NAME = "preferences.ini"
+_LEGACY_CONFIG_NAMES: tuple[str, ...] = ("ui_state.ini",)
 _SECTION_APPEARANCE = "appearance"
 _SECTION_WORKSPACE = "workspace"
 _SECTION_DATA_PAGE = "data_page"
@@ -83,13 +83,19 @@ class UiStateSnapshot:
     recent_workflows: list[RecentWorkflowEntry] = field(default_factory=list)
 
 
-def ui_state_config_path() -> Path:
-    """Return the shared config path used for UI persistence."""
+def preferences_config_path() -> Path:
+    """Return the shared config path used for persistent UI preferences."""
 
     return app_config_path(
         _CONFIG_FILE_NAME,
         legacy_names=_LEGACY_CONFIG_NAMES,
     )
+
+
+def ui_state_config_path() -> Path:
+    """Return the config path used by the legacy-named UI settings store."""
+
+    return preferences_config_path()
 
 
 def _normalize_theme_mode(value: object) -> str:
@@ -192,7 +198,11 @@ def _serialize_recent_workflow_entry(entry: RecentWorkflowEntry) -> str:
 
 
 class UiStateStore:
-    """Config-backed persistence for UI preferences and workspace state."""
+    """Config-backed persistence for UI preferences only.
+
+    The returned ``UiStateSnapshot`` still carries the in-memory session fields used
+    by the window at runtime, but those fields are no longer restored from disk.
+    """
 
     def __init__(self, path: Path | None = None) -> None:
         self.path = path or ui_state_config_path()
@@ -327,92 +337,19 @@ class UiStateStore:
             ),
         )
 
-        panel_states: dict[str, bool] = {}
-        if config.has_section(_SECTION_PANELS):
-            for key, raw_value in config.items(_SECTION_PANELS):
-                parsed = _parse_bool(raw_value)
-                if parsed is not None:
-                    panel_states[key] = parsed
-
-        splitter_sizes: dict[str, list[int]] = {}
-        if config.has_section(_SECTION_SPLITTERS):
-            for key, raw_value in config.items(_SECTION_SPLITTERS):
-                parsed = _parse_splitter_sizes(raw_value)
-                if parsed is not None:
-                    splitter_sizes[key] = parsed
-
-        last_tab_index = _parse_int(
-            config.get(
-                _SECTION_WORKSPACE,
-                "last_workflow_tab",
-                fallback=None,
-            ),
-        )
-        if last_tab_index is not None and last_tab_index < 0:
-            last_tab_index = None
-
-        raw_plugin_id = config.get(
-            _SECTION_ANALYSIS_PAGE,
-            "last_plugin_id",
-            fallback="",
-        )
-        last_analysis_plugin_id = str(raw_plugin_id).strip() or None
-        workflow_workspace_root = (
-            config.get(
-                _SECTION_WORKSPACE,
-                "workflow_root",
-                fallback="",
-            ).strip()
-            or None
-        )
-        workflow_profile_id = (
-            config.get(
-                _SECTION_WORKSPACE,
-                "workflow_profile_id",
-                fallback="",
-            ).strip()
-            or None
-        )
-        workflow_anchor_type_id = (
-            config.get(
-                _SECTION_WORKSPACE,
-                "workflow_anchor_type_id",
-                fallback="",
-            ).strip()
-            or None
-        )
-        workflow_active_node_id = (
-            config.get(
-                _SECTION_WORKSPACE,
-                "workflow_active_node_id",
-                fallback="",
-            ).strip()
-            or None
-        )
-        recent_workflows: list[RecentWorkflowEntry] = []
-        if config.has_section(_SECTION_RECENT_WORKFLOWS):
-            for _key, raw_value in sorted(config.items(_SECTION_RECENT_WORKFLOWS)):
-                entry = _parse_recent_workflow_entry(raw_value)
-                if entry is not None:
-                    recent_workflows.append(entry)
-
         return UiStateSnapshot(
             preferences=preferences,
-            panel_states=panel_states,
-            splitter_sizes=splitter_sizes,
-            last_tab_index=last_tab_index,
-            last_analysis_plugin_id=last_analysis_plugin_id,
-            workflow_workspace_root=workflow_workspace_root,
-            workflow_profile_id=workflow_profile_id,
-            workflow_anchor_type_id=workflow_anchor_type_id,
-            workflow_active_node_id=workflow_active_node_id,
-            recent_workflows=recent_workflows,
         )
 
     def save(self, snapshot: UiStateSnapshot) -> None:
-        """Persist a complete UI state snapshot while preserving other config."""
+        """Persist application preferences only.
 
-        config = self._read_config()
+        Session-style state such as workflow selection, recent entries, splitter
+        sizes, panel states, and last-tab memory now lives only in ``.framelab``
+        workspace documents or the current process.
+        """
+
+        config = ConfigParser()
         self._set_option(
             config,
             _SECTION_APPEARANCE,
@@ -495,119 +432,23 @@ class UiStateStore:
                 snapshot.preferences.collapse_analysis_plugin_controls_by_default
             ),
         )
-        self._set_option(
-            config,
-            _SECTION_WORKSPACE,
-            "last_workflow_tab",
-            None
-            if snapshot.last_tab_index is None
-            else str(int(snapshot.last_tab_index)),
-        )
-        self._set_option(
-            config,
-            _SECTION_ANALYSIS_PAGE,
-            "last_plugin_id",
-            snapshot.last_analysis_plugin_id or None,
-        )
-        self._set_option(
-            config,
-            _SECTION_WORKSPACE,
-            "workflow_root",
-            snapshot.workflow_workspace_root or None,
-        )
-        self._set_option(
-            config,
-            _SECTION_WORKSPACE,
-            "workflow_profile_id",
-            snapshot.workflow_profile_id or None,
-        )
-        self._set_option(
-            config,
-            _SECTION_WORKSPACE,
-            "workflow_anchor_type_id",
-            snapshot.workflow_anchor_type_id or None,
-        )
-        self._set_option(
-            config,
-            _SECTION_WORKSPACE,
-            "workflow_active_node_id",
-            snapshot.workflow_active_node_id or None,
-        )
-        self._replace_section(
-            config,
-            _SECTION_PANELS,
-            {
-                key: _serialize_bool(value)
-                for key, value in sorted(snapshot.panel_states.items())
-            },
-        )
-        self._replace_section(
-            config,
-            _SECTION_SPLITTERS,
-            {
-                key: _serialize_splitter_sizes(value)
-                for key, value in sorted(snapshot.splitter_sizes.items())
-                if value
-            },
-        )
-        self._replace_section(
-            config,
-            _SECTION_RECENT_WORKFLOWS,
-            {
-                f"entry_{index:02d}": _serialize_recent_workflow_entry(entry)
-                for index, entry in enumerate(snapshot.recent_workflows[:8], start=1)
-                if entry.workspace_root and entry.profile_id
-            },
-        )
         self._write_config(config)
 
     def set_panel_state(self, key: str, expanded: bool) -> None:
-        """Persist one panel disclosure state."""
-
-        clean_key = str(key).strip()
-        if not clean_key:
-            return
-        config = self._read_config()
-        self._set_option(
-            config,
-            _SECTION_PANELS,
-            clean_key,
-            _serialize_bool(bool(expanded)),
-        )
-        self._write_config(config)
+        """Compatibility no-op for retired UI-state persistence."""
 
     def panel_state(self, key: str) -> bool | None:
-        """Return the persisted state for one panel if available."""
+        """Return no persisted panel state because it is workspace-scoped now."""
 
-        clean_key = str(key).strip()
-        if not clean_key:
-            return None
-        return self.load().panel_states.get(clean_key)
+        return None
 
     def set_splitter_sizes(self, key: str, sizes: list[int]) -> None:
-        """Persist the latest splitter sizes for one splitter."""
-
-        clean_key = str(key).strip()
-        if not clean_key:
-            return
-        normalized = [int(size) for size in sizes]
-        config = self._read_config()
-        self._set_option(
-            config,
-            _SECTION_SPLITTERS,
-            clean_key,
-            _serialize_splitter_sizes(normalized) if normalized else None,
-        )
-        self._write_config(config)
+        """Compatibility no-op for retired UI-state persistence."""
 
     def splitter_sizes(self, key: str) -> list[int] | None:
-        """Return persisted splitter sizes for one splitter if available."""
+        """Return no persisted splitter sizes because they are workspace-scoped now."""
 
-        clean_key = str(key).strip()
-        if not clean_key:
-            return None
-        sizes = self.load().splitter_sizes.get(clean_key)
-        return list(sizes) if sizes is not None else None
+        return None
 
     def _read_config(self) -> ConfigParser:
         config = ConfigParser()
@@ -662,5 +503,6 @@ __all__ = [
     "UiPreferences",
     "UiStateSnapshot",
     "UiStateStore",
+    "preferences_config_path",
     "ui_state_config_path",
 ]

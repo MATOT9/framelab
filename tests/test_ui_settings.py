@@ -1,4 +1,4 @@
-"""Tests for persistent UI preferences and workspace state."""
+"""Tests for persistent UI preferences without last-session UI cache restore."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from configparser import ConfigParser
 from pathlib import Path
 
 import pytest
-import framelab.scan_settings as scan_settings_module
+
 from framelab.ui_settings import (
     DensityMode,
     RecentWorkflowEntry,
@@ -21,7 +21,7 @@ pytestmark = [pytest.mark.fast, pytest.mark.core]
 
 @pytest.fixture
 def config_path(tmp_path: Path) -> Path:
-    return tmp_path / "ui_state.ini"
+    return tmp_path / "preferences.ini"
 
 
 @pytest.fixture
@@ -29,7 +29,9 @@ def store(config_path: Path) -> UiStateStore:
     return UiStateStore(config_path)
 
 
-def test_load_returns_defaults_when_config_missing(store: UiStateStore) -> None:
+def test_load_returns_default_preferences_and_no_cached_ui_state(
+    store: UiStateStore,
+) -> None:
     snapshot = store.load()
 
     assert snapshot.preferences.theme_mode == "dark"
@@ -53,8 +55,9 @@ def test_load_returns_defaults_when_config_missing(store: UiStateStore) -> None:
     assert snapshot.recent_workflows == []
 
 
-def test_save_and_reload_round_trips_preferences_and_state(
+def test_save_and_reload_round_trips_preferences_only(
     store: UiStateStore,
+    config_path: Path,
 ) -> None:
     snapshot = UiStateSnapshot(
         preferences=UiPreferences(
@@ -90,12 +93,6 @@ def test_save_and_reload_round_trips_preferences_and_state(
                 anchor_type_id="root",
                 active_node_id="calibration:root",
             ),
-            RecentWorkflowEntry(
-                workspace_root="/tmp/workspaces/trials/trial-0004",
-                profile_id="trials",
-                anchor_type_id="trial",
-                active_node_id="trials:trial",
-            ),
         ],
     )
 
@@ -115,58 +112,28 @@ def test_save_and_reload_round_trips_preferences_and_state(
     assert reloaded.preferences.scan_worker_count_override == 5
     assert not reloaded.preferences.use_mmap_for_raw
     assert not reloaded.preferences.enable_raw_simd
-    assert reloaded.panel_states == {
-        "analysis.plugin_controls": False,
-        "data.advanced_row": True,
-    }
-    assert reloaded.splitter_sizes == {"measure.main_splitter": [640, 360]}
-    assert reloaded.last_tab_index == 2
-    assert reloaded.last_analysis_plugin_id == "iris_gain"
-    assert reloaded.workflow_workspace_root == "/tmp/workspaces/calibration"
-    assert reloaded.workflow_profile_id == "calibration"
-    assert reloaded.workflow_anchor_type_id == "session"
-    assert (
-        reloaded.workflow_active_node_id
-        == "calibration:session:cam-a/campaign-1/session-01"
-    )
-    assert reloaded.recent_workflows == [
-        RecentWorkflowEntry(
-            workspace_root="/tmp/workspaces/calibration",
-            profile_id="calibration",
-            anchor_type_id="root",
-            active_node_id="calibration:root",
-        ),
-        RecentWorkflowEntry(
-            workspace_root="/tmp/workspaces/trials/trial-0004",
-            profile_id="trials",
-            anchor_type_id="trial",
-            active_node_id="trials:trial",
-        ),
-    ]
+    assert reloaded.panel_states == {}
+    assert reloaded.splitter_sizes == {}
+    assert reloaded.last_tab_index is None
+    assert reloaded.last_analysis_plugin_id is None
+    assert reloaded.workflow_workspace_root is None
+    assert reloaded.workflow_profile_id is None
+    assert reloaded.workflow_anchor_type_id is None
+    assert reloaded.workflow_active_node_id is None
+    assert reloaded.recent_workflows == []
 
-
-def test_incremental_panel_and_splitter_updates_preserve_other_sections(
-    store: UiStateStore,
-    config_path: Path,
-) -> None:
     config = ConfigParser()
-    config.add_section("scan")
-    config.set("scan", "skip_patterns", "*.bak")
-    with config_path.open("w", encoding="utf-8") as handle:
-        config.write(handle)
-
-    store.set_panel_state("analysis.plugin_controls", False)
-    store.set_splitter_sizes("measure.main_splitter", [400, 300])
-
-    reloaded_config = ConfigParser()
-    reloaded_config.read(config_path, encoding="utf-8")
-
-    assert reloaded_config.get("scan", "skip_patterns") == "*.bak"
-    assert not store.panel_state("analysis.plugin_controls")
-    assert store.splitter_sizes("measure.main_splitter") == [400, 300]
+    config.read(config_path, encoding="utf-8")
+    assert config.get("appearance", "theme") == "light"
+    assert not config.has_section("panels")
+    assert not config.has_section("splitters")
+    assert not config.has_section("recent_workflows")
+    assert not config.has_option("workspace", "last_workflow_tab")
+    assert not config.has_option("workspace", "workflow_root")
+    assert not config.has_option("analysis_page", "last_plugin_id")
 
 
-def test_invalid_values_fall_back_to_defaults(
+def test_invalid_values_fall_back_to_defaults_and_ignore_cached_state(
     store: UiStateStore,
     config_path: Path,
 ) -> None:
@@ -182,16 +149,18 @@ def test_invalid_values_fall_back_to_defaults(
                 "show_histogram_preview = yes",
                 "restore_panel_states = perhaps",
                 "restore_last_tab = no",
-                "last_workflow_tab = not-a-number",
+                "last_workflow_tab = 2",
+                "workflow_root = /tmp/workspace",
+                "workflow_profile_id = calibration",
                 "[data_page]",
                 "collapse_advanced_row_by_default = no",
                 "[analysis_page]",
                 "collapse_plugin_controls_by_default = invalid",
                 "last_plugin_id = iris_gain",
                 "[panels]",
-                "analysis.plugin_controls = invalid",
+                "analysis.plugin_controls = false",
                 "[splitters]",
-                "measure.main_splitter = 300, nope",
+                "measure.main_splitter = 300, 700",
             ],
         )
         + "\n",
@@ -215,7 +184,7 @@ def test_invalid_values_fall_back_to_defaults(
     assert snapshot.panel_states == {}
     assert snapshot.splitter_sizes == {}
     assert snapshot.last_tab_index is None
-    assert snapshot.last_analysis_plugin_id == "iris_gain"
+    assert snapshot.last_analysis_plugin_id is None
     assert snapshot.workflow_workspace_root is None
     assert snapshot.workflow_profile_id is None
     assert snapshot.workflow_anchor_type_id is None
@@ -223,21 +192,30 @@ def test_invalid_values_fall_back_to_defaults(
     assert snapshot.recent_workflows == []
 
 
-def test_invalid_recent_workflow_entries_are_ignored(
+def test_legacy_cached_ui_state_sections_are_ignored(
     store: UiStateStore,
     config_path: Path,
 ) -> None:
     config_path.write_text(
         "\n".join(
             [
+                "[workspace]",
+                "workflow_root = /tmp/legacy-workspace",
+                "workflow_profile_id = calibration",
+                "workflow_anchor_type_id = root",
+                "workflow_active_node_id = calibration:root",
+                "last_workflow_tab = 2",
+                "[analysis_page]",
+                "last_plugin_id = iris_gain",
+                "[panels]",
+                "workflow.explorer_dock = false",
+                "[splitters]",
+                "measure.main_splitter = 200,400",
                 "[recent_workflows]",
-                "entry_01 = not-json",
-                "entry_02 = {\"workspace_root\": \"/tmp/work\", \"profile_id\": \"\"}",
                 (
-                    "entry_03 = "
-                    "{\"workspace_root\": \"/tmp/work\", \"profile_id\": \"calibration\", "
-                    "\"anchor_type_id\": \"session\", "
-                    "\"active_node_id\": \"calibration:session\"}"
+                    "entry_01 = "
+                    "{\"workspace_root\": \"/tmp/legacy-workspace\", "
+                    "\"profile_id\": \"calibration\"}"
                 ),
             ],
         )
@@ -247,27 +225,22 @@ def test_invalid_recent_workflow_entries_are_ignored(
 
     snapshot = store.load()
 
-    assert snapshot.recent_workflows == [
-        RecentWorkflowEntry(
-            workspace_root="/tmp/work",
-            profile_id="calibration",
-            anchor_type_id="session",
-            active_node_id="calibration:session",
-        ),
-    ]
+    assert snapshot.panel_states == {}
+    assert snapshot.splitter_sizes == {}
+    assert snapshot.last_tab_index is None
+    assert snapshot.last_analysis_plugin_id is None
+    assert snapshot.workflow_workspace_root is None
+    assert snapshot.workflow_profile_id is None
+    assert snapshot.workflow_anchor_type_id is None
+    assert snapshot.workflow_active_node_id is None
+    assert snapshot.recent_workflows == []
 
 
-def test_skip_patterns_persist_in_ui_state_without_creating_legacy_config(
-    tmp_path: Path,
-    monkeypatch,
+def test_compatibility_helpers_no_longer_persist_ui_state(
+    store: UiStateStore,
 ) -> None:
-    repo_root = tmp_path / "repo"
-    monkeypatch.setattr(scan_settings_module, "_repo_root", lambda: repo_root)
+    store.set_panel_state("workflow.explorer_dock", False)
+    store.set_splitter_sizes("measure.main_splitter", [300, 500])
 
-    scan_settings_module.save_skip_patterns(["*.bak", "notes"])
-
-    ui_state_path = scan_settings_module.skip_config_path()
-    legacy_config_path = repo_root / "config" / "config.ini"
-    assert ui_state_path.is_file()
-    assert not legacy_config_path.exists()
-    assert scan_settings_module.load_skip_patterns() == ["*.bak", "notes"]
+    assert store.panel_state("workflow.explorer_dock") is None
+    assert store.splitter_sizes("measure.main_splitter") is None

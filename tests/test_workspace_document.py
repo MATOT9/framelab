@@ -118,6 +118,7 @@ def test_workspace_document_store_round_trip(tmp_path: Path) -> None:
             scope_source="workflow",
             scan_root="/tmp/workspace/session",
             selected_image_path="/tmp/workspace/session/frame.tiff",
+            skip_patterns=["*.bak", "notes"],
         ),
         measure=WorkspaceDocumentMeasureState(
             average_mode="roi",
@@ -156,6 +157,7 @@ def test_workspace_document_store_round_trip(tmp_path: Path) -> None:
     assert loaded.measure.roi_applied_to_all is True
     assert loaded.measure.low_signal_threshold_value == pytest.approx(111.0)
     assert loaded.background.source_path == "/tmp/background.tiff"
+    assert loaded.dataset.skip_patterns == ["*.bak", "notes"]
     assert loaded.ui.splitter_sizes["measure.main_splitter"] == [300, 700]
 
 
@@ -164,7 +166,7 @@ def test_workspace_document_dirty_state_tracks_saved_session(
     monkeypatch,
     framelab_window_factory,
 ) -> None:
-    config_path = tmp_path / "ui_state.ini"
+    config_path = tmp_path / "preferences.ini"
     monkeypatch.setattr(
         window_module,
         "UiStateStore",
@@ -193,7 +195,7 @@ def test_window_actions_restore_workspace_document_session(
     framelab_window_factory,
     wait_for_dataset_load,
 ) -> None:
-    config_path = tmp_path / "ui_state.ini"
+    config_path = tmp_path / "preferences.ini"
     monkeypatch.setattr(
         window_module,
         "UiStateStore",
@@ -230,6 +232,7 @@ def test_window_actions_restore_workspace_document_session(
         source_text=str(background_path),
         mode="single_file",
     )
+    window._set_skip_patterns(["*.bak", "notes"], persist=False)
     assert window._apply_roi_rect_to_current_dataset((0, 0, 2, 2), status_message=None)
     window.metrics_state.roi_applied_to_all = True
     second_index = window.dataset_state.paths.index(str(frame_paths[1]))
@@ -282,6 +285,7 @@ def test_window_actions_restore_workspace_document_session(
     assert restored.metrics_state.background_config.enabled is True
     assert restored.metrics_state.background_source_text == str(background_path)
     assert restored.metrics_state.background_library.global_ref is not None
+    assert restored.skip_patterns == ["*.bak", "notes"]
     assert restored.show_histogram_preview is True
     assert restored.dataset_state.selected_index == second_index
     assert restored.dataset_state.paths[second_index] == str(frame_paths[1])
@@ -296,7 +300,7 @@ def test_open_workspace_document_reports_missing_paths_once(
     monkeypatch,
     framelab_window_factory,
 ) -> None:
-    config_path = tmp_path / "ui_state.ini"
+    config_path = tmp_path / "preferences.ini"
     monkeypatch.setattr(
         window_module,
         "UiStateStore",

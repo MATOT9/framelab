@@ -75,8 +75,8 @@ Skip rules exclude files or folders from dataset intake. Use them to keep tempor
 ### Main-page behavior
 
 - **Edit Skip Rules...** opens the dedicated editor.
-- The muted status line summarizes how many patterns are active and where the rules are stored.
-- Rule edits persist under local config; after changing them, rescan the dataset.
+- The muted status line summarizes how many patterns are active for the current session.
+- Rule edits stay with the current window and are restored only when they are part of a saved `.framelab` workspace file. After changing them, rescan the dataset.
 
 ### Pattern types
 
@@ -123,7 +123,7 @@ When the selected dataset folder contains exactly one readable root-level `.pvcf
 
 - the acquisition carries an immutable raw eBUS baseline snapshot
 - some canonical acquisition-wide metadata may now be driven by effective eBUS values if the datacard and field mapping declare them as eBUS-managed
-- detailed inspection and compare workflows belong in **eBUS Config Tools**, not in the main Data page layout
+- detailed inspection and compare workflows belong in the built-in **eBUS Config Tools**, not in the main Data page layout
 
 The status line does **not** mean the app will compare or modify the snapshot automatically. It only indicates that a discoverable acquisition-local snapshot exists.
 

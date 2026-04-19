@@ -1,0 +1,39 @@
+[build]
+main_script = "launcher.py"
+output_root = "build/nuitka"
+product_name = "FrameLab"
+company_name = "FrameLab"
+enable_plugins = ["pyside6"]
+include_qt_plugins = []
+noinclude_qt_plugins = []
+noinclude_qt_translations = false
+nofollow_import_to = ["*.tests", "matplotlib.tests", "numpy.tests"]
+include_distribution_metadata = []
+extra_args = []
+smoke_source = """
+print("FrameLab Nuitka smoke")
+"""
+
+[include]
+data_files = [
+  "framelab/assets/LabReport.mplstyle",
+  "framelab/assets/framelab_splash.png",
+  "framelab/assets/acquisition_field_mapping.default.json",
+  "framelab/assets/ebus_parameter_catalog.default.json",
+]
+data_dirs = ["framelab/assets/help"]
+icon_globs = ["framelab/assets/app_icon.*"]
+module_includes = ["framelab.native._native"]
+
+[targets.linux]
+output_filename = "FrameLab.bin"
+folder_name = "FrameLab"
+icon_path = "framelab/assets/app_icon.png"
+extra_args = []
+
+[targets.windows]
+output_filename = "FrameLab.exe"
+folder_name = "FrameLab"
+icon_path = "framelab/assets/app_icon.ico"
+windows_console_mode = "disable"
+extra_args = []

@@ -25,6 +25,17 @@ from ..window_drag import apply_secondary_window_geometry, configure_secondary_w
 class WindowActionsMixin:
     """Window-level actions that do not belong to a single page builder."""
 
+    @staticmethod
+    def _qthread_is_running(thread) -> bool:
+        """Return whether one Qt thread object still exists and is running."""
+
+        if thread is None:
+            return False
+        try:
+            return bool(thread.isRunning())
+        except RuntimeError:
+            return False
+
     def _apply_roi_rect_to_current_dataset(
         self,
         rect: tuple[int, int, int, int] | object,
@@ -601,15 +612,15 @@ class WindowActionsMixin:
             self._cancel_dataset_load_job()
         self._cancel_roi_apply_job()
         self._cancel_stats_job()
-        if ebus_thread is not None and ebus_thread.isRunning():
+        if self._qthread_is_running(ebus_thread):
             ebus_thread.requestInterruption()
             ebus_thread.quit()
             ebus_thread.wait(1500)
-        if load_thread is not None and load_thread.isRunning():
+        if self._qthread_is_running(load_thread):
             load_thread.wait(1500)
-        if roi_thread is not None and roi_thread.isRunning():
+        if self._qthread_is_running(roi_thread):
             roi_thread.wait(1500)
-        if thread is not None and thread.isRunning():
+        if self._qthread_is_running(thread):
             thread.wait(1500)
         super().closeEvent(event)
 

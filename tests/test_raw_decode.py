@@ -20,6 +20,25 @@ from framelab.raw_decode import (
 pytestmark = [pytest.mark.fast, pytest.mark.core]
 
 
+def _write_snapshot(path: Path, parameters: dict[str, object]) -> None:
+    lines = [
+        '<?xml version="1.0"?>',
+        '<puregevpersistencefile version="1.0">',
+        '  <device name="" version="1.0">',
+        "    <device>",
+    ]
+    for name, value in parameters.items():
+        lines.append(f'      <parameter name="{name}">{value}</parameter>')
+    lines.extend(
+        [
+            "    </device>",
+            "  </device>",
+            "</puregevpersistencefile>",
+        ],
+    )
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
 def test_validate_raw_decode_spec_normalizes_supported_values() -> None:
     spec = validate_raw_decode_spec(
         RawDecodeSpec(
@@ -158,6 +177,43 @@ def test_resolve_raw_decode_spec_reuses_cached_json_metadata_without_reresolving
     assert spec.width == 64
     assert spec.height == 32
     assert spec.offset_bytes == 8
+
+
+def test_resolve_raw_decode_spec_falls_back_to_acquisition_snapshot_without_datacard(
+    tmp_path: Path,
+) -> None:
+    acquisition_root = tmp_path / "scene-raw"
+    frames_root = acquisition_root / "frames"
+    frames_root.mkdir(parents=True, exist_ok=True)
+    path = frames_root / "capture.bin"
+    path.write_bytes(b"\x00" * 16)
+    _write_snapshot(
+        acquisition_root / "camera_config.pvcfg",
+        {
+            "Width": 320,
+            "Height": 240,
+            "PixelFormat": "Mono12Packed",
+        },
+    )
+
+    spec = resolve_raw_decode_spec(path)
+
+    assert spec.pixel_format == "mono12packed"
+    assert spec.width == 320
+    assert spec.height == 240
+
+
+def test_resolve_raw_decode_spec_falls_back_to_filename_tokens(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "00000000_00000000000DA20D_w2848_h2848_pMono12Packed.bin"
+    path.write_bytes(b"\x00" * 16)
+
+    spec = resolve_raw_decode_spec(path)
+
+    assert spec.pixel_format == "mono12packed"
+    assert spec.width == 2848
+    assert spec.height == 2848
 
 
 def test_build_image_metric_identity_changes_when_raw_spec_changes(

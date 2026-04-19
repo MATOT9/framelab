@@ -77,7 +77,9 @@ def test_built_in_profiles_cover_calibration_and_trials() -> None:
     assert custom is not None
     assert calibration.node_type("root").child_type_ids == ("camera",)
     assert calibration.node_type("session").child_type_ids == ("acquisition",)
-    assert trials.node_type("root").child_type_ids == ("trial",)
+    assert trials.node_type("root").child_type_ids == ("year",)
+    assert trials.node_type("year").child_type_ids == ("campaign",)
+    assert trials.node_type("camera").child_type_ids == ("session",)
     assert trials.node_type("session").discovery_mode == "session_acquisitions"
     assert custom.node_type("root").child_type_ids == ()
 
@@ -170,11 +172,14 @@ def test_controller_loads_calibration_workspace_with_session_acquisitions(
     assert controller.resolve_node_id_for_path(acquisition_one) is not None
 
 
-def test_controller_loads_trials_workspace_with_trial_level(tmp_path: Path) -> None:
+def test_controller_loads_trials_workspace_with_year_and_campaign_levels(
+    tmp_path: Path,
+) -> None:
     workspace_root = tmp_path / "trials"
     session_root = (
         workspace_root
-        / "trial-007"
+        / "2026"
+        / "campaign-07"
         / "camera-b"
         / "2026-03-05__sess02"
     )
@@ -186,7 +191,7 @@ def test_controller_loads_trials_workspace_with_trial_level(tmp_path: Path) -> N
     controller = WorkflowStateController()
     acquisition_node_id = (
         "trials:acquisition:"
-        "trial-007/camera-b/2026-03-05__sess02/acquisitions/acq-0001"
+        "2026/campaign-07/camera-b/2026-03-05__sess02/acquisitions/acq-0001"
     )
     controller.load_workspace(
         workspace_root,
@@ -198,7 +203,8 @@ def test_controller_loads_trials_workspace_with_trial_level(tmp_path: Path) -> N
     ancestry = controller.ancestry_for(controller.active_node_id)
     assert [node.type_id for node in ancestry] == [
         "root",
-        "trial",
+        "year",
+        "campaign",
         "camera",
         "session",
         "acquisition",
@@ -402,7 +408,7 @@ def test_detect_supported_workspace_walks_up_from_frames_dir(
     tmp_path: Path,
 ) -> None:
     workspace_root = tmp_path / "trials"
-    session_root = workspace_root / "trial-alpha" / "camera-a" / "session-1"
+    session_root = workspace_root / "2026" / "campaign-alpha" / "camera-a" / "session-1"
     acquisitions_root = session_root / "acquisitions"
     acquisition_root = acquisitions_root / "acq-0011__scene"
     frames_root = acquisition_root / "frames"

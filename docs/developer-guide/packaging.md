@@ -46,6 +46,8 @@ Required assets currently include at least:
 
 ```text
 framelab/assets/app_icon.*
+framelab/assets/framelab_splash.png
+framelab/assets/LabReport.mplstyle
 framelab/assets/acquisition_field_mapping.default.json
 framelab/assets/ebus_parameter_catalog.default.json
 framelab/assets/help/**
@@ -54,9 +56,15 @@ framelab/assets/help/**
 These support:
 
 - window/app identity
+- startup splash and packaged plotting style
 - default mapping fallback for datacard authoring
 - default eBUS catalog fallback
 - offline documentation access from the Help menu
+
+Large artwork-only folders such as `framelab/assets/logo_ideas/`,
+`framelab/assets/main_logos/`, and `framelab/assets/plugin_logos/` are not
+runtime requirements and should stay out of standalone builds unless code
+starts referencing them directly.
 
 ### 4. Local config directory
 
@@ -68,7 +76,7 @@ config/
 
 Typical runtime files include:
 
-- `config/ui_state.ini`
+- `config/preferences.ini`
 - `config/plugin_selection.json`
 - `config/acquisition_field_mapping.json` when a user saves a local mapping override
 - `config/ebus_parameter_catalog.json` when a user edits the local catalog
@@ -97,6 +105,47 @@ These are created or updated on the target machine:
 - user-edited mapping override file
 - user-edited eBUS catalog file
 - any rebuilt offline-help output if docs are rebuilt locally
+
+## Nuitka build helper
+
+The repo-owned standalone packaging entrypoint is:
+
+```bash
+python tools/build_nuitka_app.py
+```
+
+Its wrapper config lives in:
+
+```text
+tools/nuitka_build.toml
+```
+
+Current behavior:
+
+- builds a folder-based standalone app from `launcher.py`
+- writes output under `build/nuitka/<target>/FrameLab.dist/`
+- supports host-native Linux and Windows builds only
+- auto-builds the native backend first when `_native.so` or `_native.pyd` is missing
+- includes plugin entrypoint modules explicitly so manifest-driven imports still work at startup
+- includes only the required runtime assets instead of copying the whole `framelab/assets/` tree
+
+Useful commands:
+
+```bash
+python tools/build_nuitka_app.py --check
+python tools/build_nuitka_app.py --smoke
+python tools/build_nuitka_app.py --clean
+```
+
+Notes:
+
+- `--check` validates config, manifests, asset mappings, native-backend preflight, and prints the resolved Nuitka command without freezing FrameLab.
+- `--smoke` runs a tiny temporary standalone compile to verify the Nuitka toolchain quickly.
+- The wrapper rejects the known-bad `Python 3.14 + Nuitka 4.0.x` PySide6 standalone combo because frozen builds from that toolchain crash during Qt signal connection inside `PySide6-postLoad`. Use Python 3.13 for release builds until a newer Nuitka/Python combination is validated.
+- The wrapper forces `PYTHON_BASIC_REPL=1` for its own Python subprocesses so Python 3.13 builds do not fail in `_pyrepl._minimal_curses` on environments where `libncursesw.so` resolves to a linker script.
+- Windows builds are produced on Windows in v1; Linux-to-Windows freezing is intentionally rejected.
+- Keep the build config in `tools/`, not under `nuitka/config/`, because runtime config migration still treats `nuitka/config/` as a legacy user-config source.
+- When a packaged app fails during startup or plugin loading, FrameLab now writes the full traceback to `config/startup_error.log` before showing the error dialog.
 
 ## Offline documentation packaging
 
@@ -180,11 +229,12 @@ Before producing a release or handoff build, verify all of the following.
 - manifests are present in packaged layout
 - enabled plugins load correctly
 - disabled plugins do not need to import for startup selection
-- runtime dialog tools such as Session Manager, eBUS compare, and Background Correction still open
+- runtime dialog tools such as Session Manager, built-in eBUS compare, and Background Correction still open
 
 ### Runtime assets
 
 - app icon resolves correctly
+- startup splash and Matplotlib style asset are present
 - default acquisition mapping asset is present
 - default eBUS catalog asset is present
 - bundled help directory contains `index.html`
@@ -208,6 +258,8 @@ Before producing a release or handoff build, verify all of the following.
 
 - app startup and window bootstrapping -> `framelab/app.py`
 - offline help resolution and browser launch -> `framelab/help_docs.py`
+- packaged asset-path helpers -> `framelab/runtime_assets.py`
+- standalone build wrapper and config -> `tools/build_nuitka_app.py`, `tools/nuitka_build.toml`
 - config-path behavior and legacy migration -> `framelab/scan_settings.py`
 - docs build pipeline -> `scripts/docs/build.py`
 - docs validation -> `scripts/docs/check.py`
@@ -218,6 +270,7 @@ Avoid these mistakes:
 
 - shipping plugin source without manifest files
 - shipping manifests without the corresponding plugin modules
+- copying the whole `framelab/assets/` tree into the build when only a smaller runtime subset is required
 - forgetting to refresh `framelab/assets/help/` after docs changes
 - assuming config files are bundled defaults rather than mutable local state
 - treating a successful Python package build as proof that Help integration works
@@ -230,8 +283,11 @@ A practical release sequence is:
 1. validate docs source layout and navigation
 2. rebuild bundled help
 3. run docs validation
-4. run the app from the packaged layout
-5. verify plugin startup, scan, session-manager actions, measurement, analysis, and Help paths
-6. only then freeze or distribute the build
+4. run `python tools/build_nuitka_app.py --check`
+5. optionally run `python tools/build_nuitka_app.py --smoke`
+6. build the standalone app with `python tools/build_nuitka_app.py --clean`
+7. run the app from the packaged layout
+8. verify plugin startup, scan, session-manager actions, measurement, analysis, and Help paths
+9. only then freeze or distribute the build
 
 The packaging process should validate the real runtime layout, not just the importability of modules.

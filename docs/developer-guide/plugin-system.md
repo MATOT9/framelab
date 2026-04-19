@@ -241,7 +241,6 @@ The shipped plugin set is a useful guide to intended plugin patterns.
 
 - **acquisition_datacard_wizard** — modal authoring workflow around the datacard service layer
 - **session_manager** — non-modal dialog for session-level acquisition management; depends on the wizard plugin
-- **ebus_config_tools** — inspect/compare dialogs and hand-off back into canonical metadata authoring
 
 ### Measure-page plugins
 

@@ -26,6 +26,15 @@ def data_window(framelab_window_factory) -> FrameLabWindow:
     return window
 
 
+def _submenu_by_title(menu: qtw.QMenu, title: str) -> qtw.QMenu | None:
+    """Return one submenu by visible action title."""
+
+    for action in menu.actions():
+        if action.text() == title:
+            return action.menu()
+    return None
+
+
 def test_data_advanced_row_toggle_updates_session_override(
     data_window: FrameLabWindow,
 ) -> None:
@@ -97,6 +106,37 @@ def test_metadata_controls_row_is_no_longer_collapsible(
     assert not hasattr(data_window, "metadata_controls_toggle")
     assert not data_window.metadata_controls_body.isHidden()
     assert not data_window.metadata_source_combo.isHidden()
+
+
+def test_edit_advanced_menu_always_exposes_core_ebus_tools(
+    data_window: FrameLabWindow,
+) -> None:
+    ebus_menu = _submenu_by_title(data_window.edit_advanced_menu, "eBUS Config Tools")
+
+    assert ebus_menu is not None
+    action_texts = [action.text() for action in ebus_menu.actions() if not action.isSeparator()]
+    assert action_texts == [
+        "Inspect eBUS Config File...",
+        "Compare eBUS Configs...",
+    ]
+
+
+def test_edit_advanced_menu_shows_wizard_bridge_when_plugin_is_enabled(
+    framelab_window_factory,
+) -> None:
+    window = framelab_window_factory(
+        enabled_plugin_ids=("acquisition_datacard_wizard",),
+    )
+
+    ebus_menu = _submenu_by_title(window.edit_advanced_menu, "eBUS Config Tools")
+
+    assert ebus_menu is not None
+    action_texts = [action.text() for action in ebus_menu.actions() if not action.isSeparator()]
+    assert action_texts == [
+        "Inspect eBUS Config File...",
+        "Compare eBUS Configs...",
+        "Open Datacard Wizard",
+    ]
 
 
 def test_ebus_status_scans_selected_root_recursively(

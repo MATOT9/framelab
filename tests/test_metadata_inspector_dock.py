@@ -11,7 +11,7 @@ from PySide6.QtCore import Qt
 from framelab.dock_title_bar import should_use_custom_dock_title_bar
 from framelab.metadata_inspector_dock import MetadataInspectorDock
 from framelab.node_metadata import load_nodecard, save_nodecard
-from framelab.ui_settings import UiStateSnapshot, UiStateStore
+from framelab.ui_settings import UiStateStore
 
 
 pytestmark = [pytest.mark.ui, pytest.mark.core]
@@ -77,7 +77,13 @@ def _make_trials_workspace_with_metadata(
     tmp_path: Path,
 ) -> tuple[Path, Path, str]:
     workspace_root = tmp_path / "trials"
-    session_root = workspace_root / "trial-07" / "camera-a" / "2026-03-05__sess01"
+    session_root = (
+        workspace_root
+        / "2026"
+        / "campaign-07"
+        / "camera-a"
+        / "2026-03-05__sess01"
+    )
     acquisitions_root = session_root / "acquisitions"
     acquisitions_root.mkdir(parents=True, exist_ok=True)
     _write_session_datacard(session_root)
@@ -89,7 +95,7 @@ def _make_trials_workspace_with_metadata(
         node_type_id="session",
     )
 
-    session_node_id = "trials:session:trial-07/camera-a/2026-03-05__sess01"
+    session_node_id = "trials:session:2026/campaign-07/camera-a/2026-03-05__sess01"
     return workspace_root, session_root, session_node_id
 
 
@@ -151,6 +157,11 @@ def _row_for_key(table, key: str) -> int:
     raise AssertionError(f"could not find row for metadata key {key!r}")
 
 
+def _show_and_sync_dock(dock: MetadataInspectorDock) -> None:
+    dock.setVisible(True)
+    dock.sync_from_host()
+
+
 def test_metadata_inspector_dock_displays_effective_and_local_metadata(
     tmp_path: Path,
     framelab_window_factory,
@@ -166,6 +177,7 @@ def test_metadata_inspector_dock_displays_effective_and_local_metadata(
     )
 
     dock = window._metadata_inspector_dock
+    _show_and_sync_dock(dock)
     assert isinstance(dock, MetadataInspectorDock)
     assert dock.features() & qtw.QDockWidget.DockWidgetFloatable
     assert dock.allowedAreas() == Qt.AllDockWidgetAreas
@@ -205,6 +217,7 @@ def test_metadata_inspector_dock_hides_advanced_actions_behind_menu(
     )
 
     dock = window._metadata_inspector_dock
+    _show_and_sync_dock(dock)
 
     assert not dock._advanced_button.isHidden()
     assert dock._add_field_button.isHidden()
@@ -232,6 +245,7 @@ def test_metadata_inspector_dock_saves_local_metadata_and_refreshes_host_scope(
     )
 
     dock = window._metadata_inspector_dock
+    _show_and_sync_dock(dock)
     dock._add_local_row()
     new_row = dock._local_table.rowCount() - 1
     dock._local_table.item(new_row, 0).setText("custom.operator")
@@ -259,6 +273,7 @@ def test_metadata_inspector_dock_respects_governance_and_applies_template(
     )
 
     dock = window._metadata_inspector_dock
+    _show_and_sync_dock(dock)
     dock._apply_template()
     saved = load_nodecard(session_root)
 
@@ -288,6 +303,7 @@ def test_metadata_inspector_effective_table_widens_source_column_for_chip_text(
     )
 
     dock = window._metadata_inspector_dock
+    _show_and_sync_dock(dock)
     exposure_row = _row_for_key(dock._effective_table, "camera_settings.exposure_us")
     source_chip = dock._effective_table.cellWidget(exposure_row, 2)
 
@@ -311,6 +327,7 @@ def test_metadata_inspector_dock_lists_acquisition_datacard_fields_and_override_
     window.set_active_workflow_node(acquisition_node_id)
 
     dock = window._metadata_inspector_dock
+    _show_and_sync_dock(dock)
     exposure_row = _row_for_key(dock._effective_table, "camera_settings.exposure_us")
     iris_row = _row_for_key(dock._effective_table, "instrument.optics.iris.position")
 
@@ -336,6 +353,7 @@ def test_metadata_inspector_remove_selected_deletes_override_backed_field_from_a
     window.set_active_workflow_node(acquisition_node_id)
 
     dock = window._metadata_inspector_dock
+    _show_and_sync_dock(dock)
     exposure_row = _row_for_key(dock._effective_table, "camera_settings.exposure_us")
     dock._effective_table.setCurrentCell(exposure_row, 0)
 
@@ -376,6 +394,7 @@ def test_metadata_field_move_transfers_datacard_default_to_session_node(
     window.set_active_workflow_node(acquisition_node_id)
 
     dock = window._metadata_inspector_dock
+    _show_and_sync_dock(dock)
     iris_row = _row_for_key(dock._effective_table, "instrument.optics.iris.position")
     dock._effective_table.setCurrentCell(iris_row, 0)
     payload = dock._panel._drag_payload_for_selected_field()
@@ -419,6 +438,7 @@ def test_metadata_field_move_transfers_session_field_to_acquisition_node_storage
     assert acquisition_node_id is not None
 
     dock = window._metadata_inspector_dock
+    _show_and_sync_dock(dock)
     operator_row = _row_for_key(dock._effective_table, "workflow.operator")
     dock._effective_table.setCurrentCell(operator_row, 0)
     payload = dock._panel._drag_payload_for_selected_field()
@@ -452,6 +472,7 @@ def test_metadata_inspector_dock_allows_trials_ad_hoc_group_creation(
         active_node_id=session_node_id,
     )
     dock = window._metadata_inspector_dock
+    _show_and_sync_dock(dock)
     responses = iter(
         [
             ("Field Ops", True),
@@ -473,17 +494,21 @@ def test_metadata_inspector_dock_allows_trials_ad_hoc_group_creation(
     )
 
 
-def test_metadata_inspector_dock_visibility_restores_from_ui_state(
+def test_metadata_inspector_dock_visibility_is_not_restored_from_preferences_cache(
     tmp_path: Path,
     monkeypatch,
     qapp,
 ) -> None:
-    config_path = tmp_path / "ui_state.ini"
-    store = UiStateStore(config_path)
-    store.save(
-        UiStateSnapshot(
-            panel_states={MetadataInspectorDock.PANEL_STATE_KEY: False},
-        ),
+    config_path = tmp_path / "preferences.ini"
+    config_path.write_text(
+        "\n".join(
+            [
+                "[panels]",
+                f"{MetadataInspectorDock.PANEL_STATE_KEY} = true",
+            ],
+        )
+        + "\n",
+        encoding="utf-8",
     )
     monkeypatch.setattr(
         window_module,
@@ -500,23 +525,27 @@ def test_metadata_inspector_dock_visibility_restores_from_ui_state(
         qapp.processEvents()
 
 
-def test_metadata_inspector_stays_hidden_on_start_when_workflow_restores_without_panel_state(
+def test_metadata_inspector_stays_hidden_on_start_when_stale_workflow_cache_exists(
     tmp_path: Path,
     monkeypatch,
     qapp,
 ) -> None:
-    config_path = tmp_path / "ui_state.ini"
+    config_path = tmp_path / "preferences.ini"
     workspace_root, _camera_root, _session_root, session_node_id = (
         _make_workspace_with_metadata(tmp_path)
     )
-    store = UiStateStore(config_path)
-    store.save(
-        UiStateSnapshot(
-            workflow_workspace_root=str(workspace_root),
-            workflow_profile_id="calibration",
-            workflow_anchor_type_id="root",
-            workflow_active_node_id=session_node_id,
-        ),
+    config_path.write_text(
+        "\n".join(
+            [
+                "[workspace]",
+                f"workflow_root = {workspace_root}",
+                "workflow_profile_id = calibration",
+                "workflow_anchor_type_id = root",
+                f"workflow_active_node_id = {session_node_id}",
+            ],
+        )
+        + "\n",
+        encoding="utf-8",
     )
     monkeypatch.setattr(
         window_module,
@@ -526,7 +555,7 @@ def test_metadata_inspector_stays_hidden_on_start_when_workflow_restores_without
 
     window = window_module.FrameLabWindow(enabled_plugin_ids=())
     try:
-        assert window.workflow_state_controller.profile_id == "calibration"
+        assert window.workflow_state_controller.profile_id is None
         assert not window._metadata_inspector_dock.isVisible()
     finally:
         window.close()

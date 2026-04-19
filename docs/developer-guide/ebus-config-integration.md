@@ -41,8 +41,8 @@ The eBUS subsystem is intentionally split by responsibility:
   - describes standalone-file versus acquisition-root sources for the inspect/compare UI
 - `framelab/ebus/sidecar.py`
   - discovery helpers for acquisition-local snapshot files
-- `framelab/plugins/data/ebus_config_tools/`
-  - runtime UI plugin for inspect, compare, and optional wizard hand-off
+- `framelab/ebus/dialogs.py`
+  - host-owned inspect/compare dialogs and optional wizard hand-off
 
 The datacard wizard does not own eBUS parsing or comparison logic. It only reflects eBUS-managed canonical fields when a readable acquisition-local snapshot exists.
 
@@ -164,15 +164,15 @@ Important nuance:
 
 ## Optional wizard integration
 
-The eBUS data plugin does **not** hard-depend on the datacard wizard plugin. Reason:
+The built-in eBUS tool does **not** hard-depend on the datacard wizard plugin. Reason:
 
 - inspect and compare workflows are useful even when the datacard wizard is disabled
 - forcing a dependency would make eBUS tooling unavailable unless the wizard were also enabled
 
 Current behavior:
 
-- the eBUS plugin stands alone
-- when the datacard wizard plugin is enabled, the eBUS plugin may offer an `Open Datacard Wizard` bridge action
+- the eBUS tool is always available from `Edit -> Advanced -> eBUS Config Tools`
+- when the datacard wizard plugin is enabled, the eBUS tool may offer an `Open Datacard Wizard` bridge action
 
 ## Maintenance rules
 

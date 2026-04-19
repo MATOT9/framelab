@@ -1,25 +1,28 @@
-"""Dialogs used by the eBUS config tools plugin."""
+"""Core dialogs and host actions for eBUS config tools."""
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, Optional
 
 from PySide6 import QtWidgets as qtw
 from PySide6.QtCore import Qt
 
-from ....ebus import describe_ebus_source, ebus_catalog_index, effective_ebus_parameters, mapped_datacard_key_for_ebus
-from ....file_dialogs import choose_existing_directory, choose_open_file
-from ....ui_primitives import (
+from ..file_dialogs import choose_existing_directory, choose_open_file
+from ..ui_primitives import (
     ChipSpec,
     SummaryItem,
     build_page_header,
     build_summary_strip,
 )
-from ....window_drag import configure_secondary_window
+from ..window_drag import configure_secondary_window
+from .catalog import ebus_catalog_index, mapped_datacard_key_for_ebus
+from .effective import describe_ebus_source, effective_ebus_parameters
 
 
 def _display_value(value: Any) -> str:
     """Return a compact display string for UI tables."""
+
     if value is None:
         return ""
     if isinstance(value, bool):
@@ -29,6 +32,7 @@ def _display_value(value: Any) -> str:
 
 def _apply_tooltip(target: Any, text: str) -> None:
     """Apply matching tooltip and status-tip text."""
+
     if hasattr(target, "setToolTip"):
         target.setToolTip(text)
     if hasattr(target, "setStatusTip"):
@@ -37,6 +41,7 @@ def _apply_tooltip(target: Any, text: str) -> None:
 
 def _choose_ebus_file(parent: qtw.QWidget, start: str = "") -> str:
     """Open a themed file picker for ``.pvcfg`` files."""
+
     return choose_open_file(
         parent,
         "Select eBUS Config File",
@@ -48,7 +53,27 @@ def _choose_ebus_file(parent: qtw.QWidget, start: str = "") -> str:
 
 def _choose_folder(parent: qtw.QWidget, title: str, start: str = "") -> str:
     """Open a themed directory picker for a generic folder selection."""
+
     return choose_existing_directory(parent, title, start)
+
+
+def _selected_acquisition_root(host_window: qtw.QWidget) -> Path | None:
+    """Return the currently selected acquisition folder from the host window."""
+
+    folder_edit = getattr(host_window, "folder_edit", None)
+    if not isinstance(folder_edit, qtw.QLineEdit):
+        return None
+    folder = Path(folder_edit.text().strip()).expanduser()
+    return folder if folder.is_dir() else None
+
+
+def _ebus_browse_start(host_window: qtw.QWidget) -> str:
+    """Prefer the selected acquisition root when browsing for eBUS files."""
+
+    acquisition_root = _selected_acquisition_root(host_window)
+    if acquisition_root is not None:
+        return str(acquisition_root)
+    return str(Path.home())
 
 
 class EbusInspectDialog(qtw.QDialog):
@@ -79,10 +104,7 @@ class EbusInspectDialog(qtw.QDialog):
             "Inspect eBUS Config",
             f"Browse raw and normalized parameters for {descriptor.display_name}.",
             chips=[
-                ChipSpec(
-                    descriptor.source_kind,
-                    level="info",
-                ),
+                ChipSpec(descriptor.source_kind, level="info"),
                 ChipSpec(
                     f"{len(descriptor.snapshot.parameters)} parameters",
                     level="success",
@@ -94,7 +116,11 @@ class EbusInspectDialog(qtw.QDialog):
             [
                 SummaryItem("Source", descriptor.display_name, level="info"),
                 SummaryItem("Catalogued", str(catalogued_count), level="success"),
-                SummaryItem("Mapped Fields", str(mapped_count), level="success" if mapped_count else "neutral"),
+                SummaryItem(
+                    "Mapped Fields",
+                    str(mapped_count),
+                    level="success" if mapped_count else "neutral",
+                ),
                 SummaryItem("Kind", descriptor.source_kind, level="neutral"),
             ],
         )
@@ -118,7 +144,7 @@ class EbusInspectDialog(qtw.QDialog):
                 "Relevance",
                 "Overridable",
                 "Canonical Mapping",
-            ]
+            ],
         )
         self.tree.setAlternatingRowColors(True)
         self.tree.setRootIsDecorated(True)
@@ -137,15 +163,7 @@ class EbusInspectDialog(qtw.QDialog):
             grouped.setdefault(parameter.section, []).append(parameter)
         for section_name in sorted(grouped):
             section_item = qtw.QTreeWidgetItem(
-                [
-                    section_name,
-                    "",
-                    "",
-                    "",
-                    "",
-                    "",
-                    "",
-                ]
+                [section_name, "", "", "", "", "", ""],
             )
             self.tree.addTopLevelItem(section_item)
             for parameter in grouped[section_name]:
@@ -160,8 +178,8 @@ class EbusInspectDialog(qtw.QDialog):
                             entry.relevance if entry is not None else "uncatalogued",
                             "yes" if entry is not None and entry.overridable else "no",
                             mapped_datacard_key_for_ebus(parameter.qualified_key),
-                        ]
-                    )
+                        ],
+                    ),
                 )
             section_item.setExpanded(True)
 
@@ -209,7 +227,10 @@ class EbusCompareDialog(qtw.QDialog):
 
         source_buttons = qtw.QHBoxLayout()
         add_file_button = qtw.QPushButton("Add File...")
-        _apply_tooltip(add_file_button, "Add one standalone .pvcfg file to the compare set.")
+        _apply_tooltip(
+            add_file_button,
+            "Add one standalone .pvcfg file to the compare set.",
+        )
         add_file_button.clicked.connect(
             lambda _checked=False: self._add_file_source(),
         )
@@ -224,7 +245,10 @@ class EbusCompareDialog(qtw.QDialog):
         )
         source_buttons.addWidget(add_folder_button)
         remove_button = qtw.QPushButton("Remove Selected")
-        _apply_tooltip(remove_button, "Remove selected sources from this compare session.")
+        _apply_tooltip(
+            remove_button,
+            "Remove selected sources from this compare session.",
+        )
         remove_button.clicked.connect(self._remove_selected_sources)
         source_buttons.addWidget(remove_button)
         clear_button = qtw.QPushButton("Clear All")
@@ -256,10 +280,16 @@ class EbusCompareDialog(qtw.QDialog):
         controls.addWidget(self._mode_combo)
         self._changed_only = qtw.QCheckBox("Changed only")
         self._changed_only.setChecked(True)
-        _apply_tooltip(self._changed_only, "Show only parameters whose values differ across the loaded sources.")
+        _apply_tooltip(
+            self._changed_only,
+            "Show only parameters whose values differ across the loaded sources.",
+        )
         controls.addWidget(self._changed_only)
         self._mapped_only = qtw.QCheckBox("Mapped fields only")
-        _apply_tooltip(self._mapped_only, "Restrict the view to eBUS parameters that map to canonical app metadata fields.")
+        _apply_tooltip(
+            self._mapped_only,
+            "Restrict the view to eBUS parameters that map to canonical app metadata fields.",
+        )
         controls.addWidget(self._mapped_only)
         controls.addWidget(qtw.QLabel("Relevance"))
         self._relevance_combo = qtw.QComboBox()
@@ -298,7 +328,7 @@ class EbusCompareDialog(qtw.QDialog):
                 "Status",
                 "Overridable",
                 "Canonical Mapping",
-            ]
+            ],
         )
         self.table.setAlternatingRowColors(True)
         self.table.verticalHeader().setVisible(False)
@@ -325,6 +355,7 @@ class EbusCompareDialog(qtw.QDialog):
 
     def add_source(self, path: str | Path) -> None:
         """Add one source path to the transient compare list."""
+
         self._add_source(path)
 
     def _add_source(
@@ -335,6 +366,7 @@ class EbusCompareDialog(qtw.QDialog):
         header_label: str | None = None,
     ) -> bool:
         """Add one source path to the transient compare list."""
+
         source = describe_ebus_source(path)
         if source is None or source.snapshot is None:
             return False
@@ -377,8 +409,7 @@ class EbusCompareDialog(qtw.QDialog):
         if not root.is_dir():
             return
         discovered = sorted(
-            path for path in root.rglob("*.pvcfg")
-            if path.is_file()
+            path for path in root.rglob("*.pvcfg") if path.is_file()
         )
         if not discovered:
             qtw.QMessageBox.warning(
@@ -408,7 +439,7 @@ class EbusCompareDialog(qtw.QDialog):
             )
             return
         self._summary_label.setText(
-            f"Added {added} .pvcfg file(s) from {root}. Click Compare to refresh parameter changes."
+            f"Added {added} .pvcfg file(s) from {root}. Click Compare to refresh parameter changes.",
         )
         self._refresh_compare_header_state()
 
@@ -424,6 +455,7 @@ class EbusCompareDialog(qtw.QDialog):
 
     def _reset_compare_results(self) -> None:
         """Clear stale compare results after the source list changes."""
+
         fixed_headers = [
             "Section",
             "Parameter",
@@ -438,7 +470,7 @@ class EbusCompareDialog(qtw.QDialog):
         source_count = self._source_list.count()
         if source_count >= 2:
             self._summary_label.setText(
-                f"Sources loaded: {source_count}. Click Compare to refresh parameter changes."
+                f"Sources loaded: {source_count}. Click Compare to refresh parameter changes.",
             )
         else:
             self._summary_label.setText(self._empty_summary_text)
@@ -452,6 +484,7 @@ class EbusCompareDialog(qtw.QDialog):
         identical: int = 0,
     ) -> None:
         """Refresh compare dialog header chips and summary strip."""
+
         source_count = self._source_list.count()
         mode = str(self._mode_combo.currentData()) if hasattr(self, "_mode_combo") else "raw"
         self._header.set_chips(
@@ -555,7 +588,7 @@ class EbusCompareDialog(qtw.QDialog):
                 key
                 for _name, parameter_map in source_maps
                 for key in parameter_map
-            }
+            },
         )
         rows: list[tuple[tuple[str, str, str, bool, str], list[str]]] = []
         changed = 0
@@ -568,8 +601,9 @@ class EbusCompareDialog(qtw.QDialog):
             seen_headers[base_name] = count
             header_name = base_name if count == 1 else f"{base_name} ({count})"
             source_headers.append(header_name)
+        catalog_index = ebus_catalog_index()
         for qualified_key in all_keys:
-            catalog_entry = ebus_catalog_index().get(qualified_key)
+            catalog_entry = catalog_index.get(qualified_key)
             label = (
                 catalog_entry.label
                 if catalog_entry is not None and catalog_entry.label
@@ -582,14 +616,10 @@ class EbusCompareDialog(qtw.QDialog):
             )
             overridable = bool(catalog_entry is not None and catalog_entry.overridable)
             relevance = (
-                catalog_entry.relevance
-                if catalog_entry is not None
-                else "operational"
+                catalog_entry.relevance if catalog_entry is not None else "operational"
             )
             show_in_compare = (
-                catalog_entry.show_in_compare
-                if catalog_entry is not None
-                else True
+                catalog_entry.show_in_compare if catalog_entry is not None else True
             )
             mapped_key = mapped_datacard_key_for_ebus(qualified_key)
             value_cells: list[str] = []
@@ -637,10 +667,7 @@ class EbusCompareDialog(qtw.QDialog):
             ):
                 continue
             rows.append(
-                (
-                    (section, label, status, overridable, mapped_key),
-                    value_cells,
-                )
+                ((section, label, status, overridable, mapped_key), value_cells),
             )
 
         self.table.clear()
@@ -681,10 +708,47 @@ class EbusCompareDialog(qtw.QDialog):
                 header.setSectionResizeMode(column, qtw.QHeaderView.ResizeToContents)
         self._summary_label.setText(
             f"Mode: {mode} | Sources: {len(sources)} | Visible rows: {len(rows)} | "
-            f"Changed: {changed} | Identical: {identical}"
+            f"Changed: {changed} | Identical: {identical}",
         )
         self._refresh_compare_header_state(
             visible_rows=len(rows),
             changed=changed,
             identical=identical,
         )
+
+
+def open_ebus_inspect_dialog(host_window: qtw.QWidget) -> None:
+    """Open a standalone ``.pvcfg`` file in the inspect dialog."""
+
+    path = _choose_ebus_file(host_window, _ebus_browse_start(host_window))
+    if not path:
+        return
+    try:
+        dialog = EbusInspectDialog(path, parent=None)
+    except Exception as exc:
+        qtw.QMessageBox.warning(host_window, "Inspect eBUS Config", str(exc))
+        return
+    dialog.exec()
+
+
+def open_ebus_compare_dialog(host_window: qtw.QWidget) -> None:
+    """Open raw/effective eBUS compare dialog."""
+
+    acquisition_root = _selected_acquisition_root(host_window)
+    dialog = EbusCompareDialog(
+        parent=None,
+        initial_path=_ebus_browse_start(host_window),
+    )
+    if acquisition_root is not None and describe_ebus_source(acquisition_root) is not None:
+        dialog.add_source(acquisition_root)
+    dialog.exec()
+
+
+def open_ebus_datacard_wizard(host_window: qtw.QWidget) -> None:
+    """Open the datacard wizard from the core eBUS tools menu."""
+
+    from ..plugins.data.acquisition_datacard_wizard import (
+        AcquisitionDatacardWizardPlugin,
+    )
+
+    AcquisitionDatacardWizardPlugin.open_wizard(host_window)

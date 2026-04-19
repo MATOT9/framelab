@@ -58,7 +58,6 @@ from .plugins import (
 )
 from .plugins.analysis import AnalysisPlugin
 from .ui_density import AdaptiveUiContext, UiDensityResolver
-from .scan_settings import load_skip_patterns, skip_config_path
 from .ui_settings import RecentWorkflowEntry, UiStateSnapshot, UiStateStore
 from .workspace_document import (
     WorkspaceDocumentBackgroundState,
@@ -151,11 +150,11 @@ class FrameLabWindow(
         "row",
         "path",
         "max_pixel",
-        "roi_max",
         "min_non_zero",
         "sat_count",
     }
     MODE_MEASURE_COLUMNS = {"avg", "std", "sem", "dn_per_ms"}
+    ROI_MODE_MEASURE_COLUMNS = {"roi_max"}
     DATA_OPTIONAL_COLUMNS = (
         ("iris_pos", label_for_metadata_field("iris_position")),
         ("exposure_ms", label_for_metadata_field("exposure_ms")),
@@ -295,7 +294,14 @@ class FrameLabWindow(
         self._dataset_load_callbacks: dict[int, list[object]] = {}
         self._dataset_load_auto_metrics: dict[int, bool] = {}
         self._dataset_load_workflow_notices: dict[int, str] = {}
+        self._dataset_load_start_pending = False
         self._dataset_load_batch_applying = False
+        self._dataset_load_refresh_timer = QTimer(self)
+        self._dataset_load_refresh_timer.setSingleShot(True)
+        self._dataset_load_refresh_timer.setInterval(60)
+        self._dataset_load_refresh_timer.timeout.connect(
+            self._flush_dataset_load_table_refresh,
+        )
         self._threshold_summary_anim_phase = 0
         self._threshold_summary_timer = QTimer(self)
         self._threshold_summary_timer.setInterval(320)
@@ -344,8 +350,8 @@ class FrameLabWindow(
 
         self.base_status = "Select a folder."
         self.context_hint = "Step 1: choose a dataset folder, then scan."
-        self.skip_patterns = load_skip_patterns()
-        self.skip_pattern_config_path = skip_config_path()
+        self.skip_patterns: list[str] = []
+        self.skip_pattern_config_path = None
         self._last_scan_pruned_dirs = 0
         self._last_scan_skipped_files = 0
 
@@ -379,7 +385,7 @@ class FrameLabWindow(
         )
 
     def _load_ui_state(self) -> None:
-        """Load persisted UI preferences and last-session workspace state."""
+        """Load persisted UI preferences and initialize empty launch state."""
 
         self.ui_state_store = UiStateStore()
         try:
@@ -389,7 +395,7 @@ class FrameLabWindow(
         self.ui_preferences = self.ui_state_snapshot.preferences
 
     def _restore_persisted_ui_state(self) -> None:
-        """Restore last tab/plugin selection once widgets exist."""
+        """Apply any launch-time UI snapshot state once widgets exist."""
 
         if (
             self.ui_preferences.restore_last_tab
@@ -410,7 +416,7 @@ class FrameLabWindow(
             self._apply_dynamic_visibility_policy()
 
     def _restore_persisted_workflow_state(self) -> None:
-        """Restore persisted workflow workspace selection when available."""
+        """Apply any launch-time workflow snapshot state when available."""
 
         root = self.ui_state_snapshot.workflow_workspace_root
         profile_id = self.ui_state_snapshot.workflow_profile_id
@@ -1230,7 +1236,7 @@ class FrameLabWindow(
             "session_node": session_node,
             "session_index": session_index,
             "selected_entry": selected_entry,
-            "can_create_session": node is not None and node.type_id == "campaign",
+            "can_create_session": create_child_type_id == "session",
             "can_delete_session": node is not None and node.type_id == "session",
             "can_create": session_node is not None and numbering_valid,
             "can_batch_create": session_node is not None and numbering_valid,
@@ -1683,16 +1689,15 @@ class FrameLabWindow(
         node_id: str | None,
         folder_label: str,
     ) -> Path | None:
-        """Create a session under the selected workflow campaign."""
+        """Create a session under the selected workflow parent node."""
 
-        controller = self.workflow_state_controller
-        node = controller.node(node_id) if node_id else controller.active_node()
-        if node is None or node.type_id != "campaign":
+        parent_node, child_type_id = self._workflow_create_target(node_id)
+        if parent_node is None or child_type_id != "session":
             return None
         from .session_manager import create_session
 
-        result = create_session(node.folder_path, folder_label)
-        preferred_path = result.created_path or node.folder_path
+        result = create_session(parent_node.folder_path, folder_label)
+        preferred_path = result.created_path or parent_node.folder_path
         self._refresh_workflow_after_structure_mutation(
             result,
             preferred_active_path=preferred_path,
@@ -1731,9 +1736,9 @@ class FrameLabWindow(
             raise FileExistsError(f"{child_label} folder already exists: {created_path.name}")
 
         created_path.mkdir(parents=True, exist_ok=False)
-        if child_type_id == "campaign":
-            created_path.joinpath("01_sessions").mkdir(parents=True, exist_ok=True)
         profile_id = str(getattr(controller.profile, "profile_id", "") or "").strip().lower()
+        if profile_id == "calibration" and child_type_id == "campaign":
+            created_path.joinpath("01_sessions").mkdir(parents=True, exist_ok=True)
         if profile_id and child_type_id not in {"session", "acquisition"}:
             save_nodecard(
                 created_path,
@@ -1787,12 +1792,22 @@ class FrameLabWindow(
 
         preferred_path = None
         ancestry = controller.ancestry_for(node.node_id)
-        campaign_node = next(
-            (entry for entry in reversed(ancestry) if entry.type_id == "campaign"),
+        profile = controller.profile
+        session_parent_node = next(
+            (
+                entry
+                for entry in reversed(ancestry[:-1])
+                if profile is not None
+                and "session" in getattr(
+                    profile.node_type(entry.type_id),
+                    "child_type_ids",
+                    (),
+                )
+            ),
             None,
         )
-        if campaign_node is not None:
-            preferred_path = campaign_node.folder_path
+        if session_parent_node is not None:
+            preferred_path = session_parent_node.folder_path
         elif node.folder_path.parent.name.lower() in {"01_sessions", "sessions"}:
             preferred_path = node.folder_path.parent.parent
         else:
@@ -2146,6 +2161,7 @@ class FrameLabWindow(
                 scope_source=scope_source,
                 scan_root=scan_root,
                 selected_image_path=selected_image_path,
+                skip_patterns=[str(pattern) for pattern in self.skip_patterns],
             ),
             measure=WorkspaceDocumentMeasureState(
                 average_mode=self._current_average_mode(),
@@ -2196,6 +2212,9 @@ class FrameLabWindow(
         panel_states: dict[str, bool],
     ) -> None:
         """Apply saved dock and disclosure states from a workspace document."""
+
+        if not self.ui_preferences.restore_panel_states:
+            return
 
         workflow_dock = getattr(self, "_workflow_explorer_dock", None)
         if workflow_dock is not None and "workflow.explorer_dock" in panel_states:
@@ -2429,7 +2448,7 @@ class FrameLabWindow(
                     )
 
             page_id = snapshot.ui.active_page
-            if hasattr(self, "workflow_tabs"):
+            if self.ui_preferences.restore_last_tab and hasattr(self, "workflow_tabs"):
                 target_index = 0
                 if page_id == "measure":
                     target_index = 1 if self.workflow_tabs.count() > 1 else 0
@@ -2489,6 +2508,7 @@ class FrameLabWindow(
                 for key, value in snapshot.ui.splitter_sizes.items()
                 if str(key).strip() and value
             }
+            self._set_skip_patterns(snapshot.dataset.skip_patterns, persist=False)
 
             workflow_state = snapshot.workflow
             workflow_loaded = False
@@ -2710,7 +2730,7 @@ class FrameLabWindow(
         self._open_workspace_document(selected_path)
 
     def _save_ui_state(self) -> None:
-        """Persist current UI preferences and workspace selection state."""
+        """Persist current UI preferences and keep the runtime snapshot in sync."""
 
         preferences = replace(
             self.ui_preferences,

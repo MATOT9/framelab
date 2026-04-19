@@ -12,7 +12,7 @@ Use this page when you want the shortest reliable path from launch to interpreta
 6. On **Data**, confirm the dataset folder implied by the active node scope and click **Scan Selected Scope** if needed.
 7. If unwanted files were included, open **Edit Skip Rules...**, update the patterns, and rescan.
 8. Review the metadata table and choose the correct metadata source.
-9. If the dataset carries hierarchical JSON metadata or an eBUS snapshot, decide whether you need **Workflow Explorer -> Structure**, the **Acquisition Datacard Wizard**, **eBUS Config Tools**, or the **Session Manager (Legacy)** fallback before continuing.
+9. If the dataset carries hierarchical JSON metadata or an eBUS snapshot, decide whether you need **Workflow Explorer -> Structure**, the **Acquisition Datacard Wizard**, the built-in **eBUS Config Tools**, or the **Session Manager (Legacy)** fallback before continuing.
 10. On **Measure**, choose the measurement mode that matches the comparison you want to make.
 11. Verify the preview, histogram, and measurement table before moving on.
 12. On **Analyze**, select the analysis plugin and configure the plot for the intended sweep or comparison.
@@ -68,7 +68,7 @@ Use:
 
 - **Metadata Inspector** when you need to edit generic workflow-node metadata or understand inherited values
 - **Acquisition Datacard Wizard** when defaults, frame-targeted overrides, or canonical acquisition metadata must be authored or corrected
-- **eBUS Config Tools** when you need to inspect or compare `.pvcfg` snapshots before deciding whether a canonical app-side override is justified
+- the built-in **eBUS Config Tools** when you need to inspect or compare `.pvcfg` snapshots before deciding whether a canonical app-side override is justified
 
 Do not open the wizard simply because an eBUS snapshot exists. Use it when a canonical acquisition record or approved app-side override is actually required.
 

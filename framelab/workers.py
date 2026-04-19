@@ -877,6 +877,7 @@ class DatasetLoadWorker(QObject):
         all_loaded_mins: list[int] = []
         all_loaded_maxs: list[int] = []
         all_loaded_metadata: dict[str, dict[str, object]] = {}
+        raw_resolver_context = self._raw_resolver_context()
 
         try:
             self._emit_progress(
@@ -926,32 +927,11 @@ class DatasetLoadWorker(QObject):
             if max_workers > 1:
                 executor = ThreadPoolExecutor(max_workers=max_workers)
             try:
+                was_cancelled = False
                 for start in range(0, total_files, chunk_size):
                     if thread.isInterruptionRequested():
-                        self.finished.emit(
-                            DatasetLoadSummary(
-                                job_id=self._job_id,
-                                dataset_root=str(folder),
-                                loaded_count=loaded_count,
-                                total_candidates=total_files,
-                                loaded_paths=tuple(all_loaded_paths),
-                                min_non_zero=np.asarray(
-                                    all_loaded_mins,
-                                    dtype=np.int64,
-                                ),
-                                max_pixels=np.asarray(
-                                    all_loaded_maxs,
-                                    dtype=np.int64,
-                                ),
-                                metadata_by_path=dict(all_loaded_metadata),
-                                failures=tuple(failures),
-                                skipped_unreadable=skipped_unreadable,
-                                pruned_dirs=pruned_dirs,
-                                skipped_files=skipped_files,
-                                was_cancelled=True,
-                            ),
-                        )
-                        return
+                        was_cancelled = True
+                        break
 
                     chunk = files[start:start + chunk_size]
                     identities = self._build_identity_map(chunk)
@@ -972,23 +952,33 @@ class DatasetLoadWorker(QObject):
                         for path in chunk
                         if str(path.resolve()) not in cached_payloads
                     ]
+                    chunk_was_cancelled = False
                     if uncached_paths:
                         if executor is None:
                             for path in uncached_paths:
+                                if thread.isInterruptionRequested():
+                                    chunk_was_cancelled = True
+                                    break
                                 computed_results[str(path.resolve())] = scan_single_static_image(
                                     path,
-                                    raw_resolver_context=self._raw_resolver_context(),
+                                    raw_resolver_context=raw_resolver_context,
                                 )
                         else:
                             future_to_path = {
                                 executor.submit(
                                     scan_single_static_image,
                                     path,
-                                    raw_resolver_context=self._raw_resolver_context(),
+                                    raw_resolver_context=raw_resolver_context,
                                 ): path
                                 for path in uncached_paths
                             }
                             for future in as_completed(future_to_path):
+                                if thread.isInterruptionRequested():
+                                    chunk_was_cancelled = True
+                                    for pending_future in future_to_path:
+                                        if pending_future is not future:
+                                            pending_future.cancel()
+                                    break
                                 path = future_to_path[future]
                                 try:
                                     computed_results[str(path.resolve())] = future.result()
@@ -1003,6 +993,9 @@ class DatasetLoadWorker(QObject):
                                             ),
                                         ),
                                     )
+                    if chunk_was_cancelled or thread.isInterruptionRequested():
+                        was_cancelled = True
+                        break
 
                     batch_paths: list[str] = []
                     batch_mins: list[int] = []
@@ -1085,9 +1078,34 @@ class DatasetLoadWorker(QObject):
                             f"{min(start + len(chunk), total_files)}/{total_files}"
                         ),
                     )
+                if was_cancelled:
+                    self.finished.emit(
+                        DatasetLoadSummary(
+                            job_id=self._job_id,
+                            dataset_root=str(folder),
+                            loaded_count=loaded_count,
+                            total_candidates=total_files,
+                            loaded_paths=tuple(all_loaded_paths),
+                            min_non_zero=np.asarray(
+                                all_loaded_mins,
+                                dtype=np.int64,
+                            ),
+                            max_pixels=np.asarray(
+                                all_loaded_maxs,
+                                dtype=np.int64,
+                            ),
+                            metadata_by_path=dict(all_loaded_metadata),
+                            failures=tuple(failures),
+                            skipped_unreadable=skipped_unreadable,
+                            pruned_dirs=pruned_dirs,
+                            skipped_files=skipped_files,
+                            was_cancelled=True,
+                        ),
+                    )
+                    return
             finally:
                 if executor is not None:
-                    executor.shutdown(wait=False, cancel_futures=False)
+                    executor.shutdown(wait=False, cancel_futures=True)
 
             self.finished.emit(
                 DatasetLoadSummary(

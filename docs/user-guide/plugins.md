@@ -10,6 +10,9 @@ Data plugins extend dataset-side workflows. In the current app, the built-in dat
 
 - **Acquisition Datacard Wizard** — create, edit, validate, and save acquisition datacards for the selected dataset
 - **Session Manager (Legacy)** — legacy dialog for acquisition datacard copy/paste, acquisition-local eBUS enable state, and session-level repair tasks that are still outside the workflow shell
+
+The app also includes one built-in data-side tool outside the plugin system:
+
 - **eBUS Config Tools** — inspect raw `.pvcfg` snapshots, compare sources in raw or effective mode, and hand off to the datacard wizard when canonical app-side metadata changes are required
 
 ### Measure plugins
@@ -67,7 +70,7 @@ After startup, loaded plugins expose whatever UI they own:
 - Use [Workflow Structure and Required Folder Layout](workflow-structure.md) before enabling plugins merely to compensate for weak dataset organization.
 - Use **Workflow Explorer -> Structure** first when the session and acquisition folders themselves still need to be prepared.
 - Keep **Session Manager (Legacy)** for datacard copy/paste and acquisition-local eBUS enable state until those flows are fully workflow-native.
-- Use the **eBUS Config Tools** plugin for snapshot inspection and cross-source compare, not as a replacement for canonical datacard authoring.
+- Use the built-in **eBUS Config Tools** for snapshot inspection and cross-source compare, not as a replacement for canonical datacard authoring.
 - Use the **Acquisition Datacard Wizard** when you need a stable acquisition record, frame-targeted metadata, or approved app-side overrides of eBUS-managed canonical fields.
 - Use **Background Correction** when you want a focused dialog around the same host-owned background-subtraction state used by the Measure page.
 
@@ -77,8 +80,11 @@ This page is the generic overview. Detailed usage belongs to the pages that matc
 
 - [Session Manager (Legacy)](data/session-manager.md)
 - [Datacard Wizard](data/datacard-wizard.md)
-- [eBUS Config Tools](data/ebus-config-tools.md)
 - [Intensity Trend Explorer](analysis/intensity-trend-explorer.md)
+
+Related built-in workflow page:
+
+- [eBUS Config Tools](data/ebus-config-tools.md)
 
 ## When to use the Plugins menu
 
@@ -86,9 +92,10 @@ Open the **Plugins** menu when you need:
 
 - the **Session Manager (Legacy)** for one session root
 - the **Acquisition Datacard Wizard** for the current dataset
-- the **eBUS Config Tools** for snapshot inspect or compare work
 - the **Background Correction** dialog for a focused background-reference workflow
 - analysis-plugin actions such as table export or plot-copy helpers
+
+Use **Edit -> Advanced -> eBUS Config Tools** for snapshot inspect or compare work.
 
 ## Related pages
 

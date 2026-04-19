@@ -9,6 +9,11 @@ from typing import Any, Optional
 from PySide6 import QtGui, QtWidgets as qtw
 from PySide6.QtCore import Qt, QSignalBlocker, QSize
 
+from ..ebus.dialogs import (
+    open_ebus_compare_dialog,
+    open_ebus_datacard_wizard,
+    open_ebus_inspect_dialog,
+)
 from ..stylesheets import (
     DARK_THEME,
     LIGHT_THEME,
@@ -96,6 +101,16 @@ class WindowChromeMixin:
                 action.setStatusTip(tooltip)
             elif status and not tooltip:
                 action.setToolTip(status)
+
+    def _trigger_browse_folder_action(self, _checked: bool = False) -> None:
+        """Open the dataset-folder chooser from one QAction signal."""
+
+        self.browse_folder()
+
+    def _trigger_scan_folder_action(self, _checked: bool = False) -> None:
+        """Start a dataset scan from one QAction signal."""
+
+        self.load_folder()
 
     def _build_ui(self) -> None:
         dock_options = self.dockOptions() | qtw.QMainWindow.AllowNestedDocks | qtw.QMainWindow.AllowTabbedDocks
@@ -227,9 +242,7 @@ class WindowChromeMixin:
             "Open a dataset folder from disk.",
             status="Choose the root folder that contains the TIFF dataset.",
         )
-        open_folder_action.triggered.connect(
-            lambda _checked=False: self.browse_folder(),
-        )
+        open_folder_action.triggered.connect(self._trigger_browse_folder_action)
         file_menu.addAction(open_folder_action)
         self.file_open_folder_action = open_folder_action
 
@@ -240,7 +253,7 @@ class WindowChromeMixin:
             "Scan the current dataset folder.",
             status="Rescan the current folder and refresh metadata and metrics.",
         )
-        scan_action.triggered.connect(lambda _checked=False: self.load_folder())
+        scan_action.triggered.connect(self._trigger_scan_folder_action)
         file_menu.addAction(scan_action)
         self.file_scan_scope_action = scan_action
 
@@ -329,6 +342,48 @@ class WindowChromeMixin:
         metadata_manager_action.triggered.connect(self._open_metadata_manager_dialog)
         advanced_menu.addAction(metadata_manager_action)
         self.edit_metadata_manager_action = metadata_manager_action
+
+        ebus_tools_menu = advanced_menu.addMenu("eBUS Config Tools")
+        self.edit_ebus_tools_menu = ebus_tools_menu
+
+        inspect_ebus_action = QtGui.QAction("Inspect eBUS Config File...", self)
+        self._apply_help_text(
+            inspect_ebus_action,
+            "Open a standalone eBUS config file for read-only inspection.",
+        )
+        inspect_ebus_action.triggered.connect(
+            lambda _checked=False: open_ebus_inspect_dialog(self),
+        )
+        ebus_tools_menu.addAction(inspect_ebus_action)
+        self.edit_ebus_inspect_action = inspect_ebus_action
+
+        compare_ebus_action = QtGui.QAction("Compare eBUS Configs...", self)
+        self._apply_help_text(
+            compare_ebus_action,
+            "Compare two or more raw or effective eBUS sources.",
+        )
+        compare_ebus_action.triggered.connect(
+            lambda _checked=False: open_ebus_compare_dialog(self),
+        )
+        ebus_tools_menu.addAction(compare_ebus_action)
+        self.edit_ebus_compare_action = compare_ebus_action
+
+        if "acquisition_datacard_wizard" in getattr(
+            self,
+            "_enabled_plugin_ids",
+            frozenset(),
+        ):
+            ebus_tools_menu.addSeparator()
+            ebus_wizard_action = QtGui.QAction("Open Datacard Wizard", self)
+            self._apply_help_text(
+                ebus_wizard_action,
+                "Open the datacard wizard to author acquisition metadata and any eBUS-backed fields that the catalog marks as overridable.",
+            )
+            ebus_wizard_action.triggered.connect(
+                lambda _checked=False: open_ebus_datacard_wizard(self),
+            )
+            ebus_tools_menu.addAction(ebus_wizard_action)
+            self.edit_ebus_open_wizard_action = ebus_wizard_action
 
         view_menu = menu_bar.addMenu("&View")
         preview_menu = view_menu.addMenu("Preview")
@@ -531,9 +586,7 @@ class WindowChromeMixin:
         self.toolbar_open_action.setStatusTip(
             "Open a dataset folder, then run Scan to populate tables.",
         )
-        self.toolbar_open_action.triggered.connect(
-            lambda _checked=False: self.browse_folder(),
-        )
+        self.toolbar_open_action.triggered.connect(self._trigger_browse_folder_action)
         toolbar.addAction(self.toolbar_open_action)
 
         self.toolbar_scan_action = QtGui.QAction(
@@ -547,9 +600,7 @@ class WindowChromeMixin:
         self.toolbar_scan_action.setStatusTip(
             "Reload current dataset folder and recompute displayed metrics.",
         )
-        self.toolbar_scan_action.triggered.connect(
-            lambda _checked=False: self.load_folder(),
-        )
+        self.toolbar_scan_action.triggered.connect(self._trigger_scan_folder_action)
         toolbar.addAction(self.toolbar_scan_action)
 
         self.toolbar_export_action = QtGui.QAction(
@@ -821,6 +872,7 @@ class WindowChromeMixin:
         """Sync View->Columns checkboxes with current table visibility."""
         mode = self._current_average_mode()
         mode_has_average = mode in {"topk", "roi"}
+        roi_mode_active = mode == "roi"
 
         for key, action in self._data_column_actions.items():
             if hasattr(self, "metadata_table"):
@@ -839,7 +891,10 @@ class WindowChromeMixin:
                 checked = not self.table.isColumnHidden(col)
             else:
                 checked = self._manual_measure_column_visibility.get(key, False)
-            enabled = key not in self.MODE_MEASURE_COLUMNS or mode_has_average
+            enabled = (
+                (key not in self.MODE_MEASURE_COLUMNS or mode_has_average)
+                and (key not in self.ROI_MODE_MEASURE_COLUMNS or roi_mode_active)
+            )
             blocker = QSignalBlocker(action)
             action.setChecked(checked)
             action.setEnabled(enabled)

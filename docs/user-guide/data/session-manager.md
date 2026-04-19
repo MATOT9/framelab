@@ -24,7 +24,7 @@ Use **Session Manager (Legacy)** to:
 - open the selected acquisition directly in the main window
 - open the datacard wizard for the selected acquisition
 - copy one acquisition datacard and paste a normalized copy onto another acquisition
-- toggle the acquisition-local eBUS enabled state when the eBUS tools plugin is also enabled
+- toggle the acquisition-local eBUS enabled state
 
 ## Where this fits in the current workflow
 
@@ -146,7 +146,7 @@ Treat paste as a controlled reuse tool, not as a blind file copy.
 
 ### Toggle eBUS
 
-Toggles `external_sources.ebus.enabled` for the selected acquisition. This action is available only when the **eBUS Config Tools** plugin is also enabled. Use it when the acquisition should explicitly opt in or out of using the discoverable root-level eBUS snapshot as part of effective metadata resolution.
+Toggles `external_sources.ebus.enabled` for the selected acquisition. Use it when the acquisition should explicitly opt in or out of using the discoverable root-level eBUS snapshot as part of effective metadata resolution.
 
 ## Relationship to the rest of the app
 
@@ -203,7 +203,7 @@ The datacard clipboard is empty. Copy a source acquisition datacard first.
 
 ### Toggle eBUS is disabled
 
-The selected acquisition may be missing, or the **eBUS Config Tools** plugin was not enabled at startup.
+The most common reason is that no acquisition row is currently selected.
 
 ### Load Selected did not change the dataset
 

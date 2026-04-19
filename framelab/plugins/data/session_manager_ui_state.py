@@ -28,9 +28,9 @@ def build_session_manager_action_state(
     selected_entry: AcquisitionEntry | None,
     *,
     clipboard_ready: bool,
-    has_ebus_tools: bool,
 ) -> SessionManagerActionState:
     """Return the current Session Manager action state from pure inputs."""
+
     has_session = session_index is not None
     numbering_valid = session_index.numbering_valid if session_index is not None else False
     has_entries = bool(session_index.entries) if session_index is not None else False
@@ -55,7 +55,7 @@ def build_session_manager_action_state(
         edit_datacard_enabled=has_entry,
         copy_datacard_enabled=has_entry and datacard_present,
         paste_datacard_enabled=has_entry and bool(clipboard_ready),
-        toggle_ebus_enabled=has_entry and has_ebus_tools,
+        toggle_ebus_enabled=has_entry,
         reindex_enabled=has_session and has_entries,
         toggle_ebus_text=toggle_ebus_text,
     )

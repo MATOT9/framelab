@@ -14,7 +14,7 @@ import framelab.main_window.chrome as chrome_module
 import framelab.main_window.data_page as data_page_module
 import framelab.window as window_module
 from framelab.ui_primitives import StatusChip
-from framelab.ui_settings import UiStateSnapshot, UiStateStore
+from framelab.ui_settings import DensityMode, UiPreferences, UiStateSnapshot, UiStateStore
 
 
 pytestmark = [pytest.mark.ui, pytest.mark.core]
@@ -141,7 +141,7 @@ def _make_trials_workspace_with_frames(
     tmp_path: Path,
 ) -> tuple[Path, Path, Path, str]:
     workspace_root = tmp_path / "trials"
-    session_root = workspace_root / "trial-alpha" / "camera-a" / "session-1"
+    session_root = workspace_root / "2026" / "campaign-alpha" / "camera-a" / "session-1"
     acquisitions_root = session_root / "acquisitions"
     acquisitions_root.mkdir(parents=True, exist_ok=True)
     _write_session_datacard(session_root)
@@ -153,7 +153,7 @@ def _make_trials_workspace_with_frames(
 
     acquisition_node_id = (
         "trials:acquisition:"
-        "trial-alpha/camera-a/session-1/acquisitions/acq-0011__scene"
+        "2026/campaign-alpha/camera-a/session-1/acquisitions/acq-0011__scene"
     )
     return (
         workspace_root,
@@ -163,21 +163,25 @@ def _make_trials_workspace_with_frames(
     )
 
 
-def test_window_restores_and_saves_workflow_context(
+def test_window_does_not_restore_workflow_context_from_preferences_cache(
     tmp_path: Path,
     monkeypatch,
     qapp,
 ) -> None:
-    config_path = tmp_path / "ui_state.ini"
+    config_path = tmp_path / "preferences.ini"
     workspace_root, active_node_id = _make_calibration_workspace(tmp_path)
-    store = UiStateStore(config_path)
-    store.save(
-        UiStateSnapshot(
-            workflow_workspace_root=str(workspace_root),
-            workflow_profile_id="calibration",
-            workflow_anchor_type_id="root",
-            workflow_active_node_id=active_node_id,
-        ),
+    config_path.write_text(
+        "\n".join(
+            [
+                "[workspace]",
+                f"workflow_root = {workspace_root}",
+                "workflow_profile_id = calibration",
+                "workflow_anchor_type_id = root",
+                f"workflow_active_node_id = {active_node_id}",
+            ],
+        )
+        + "\n",
+        encoding="utf-8",
     )
 
     monkeypatch.setattr(
@@ -188,50 +192,32 @@ def test_window_restores_and_saves_workflow_context(
 
     window = window_module.FrameLabWindow(enabled_plugin_ids=())
     try:
-        assert window.workflow_state_controller.profile_id == "calibration"
-        assert window.workflow_state_controller.active_node_id == active_node_id
-        assert window.metadata_state_controller.resolve_active_node_metadata() is not None
-        assert (
-            window.metadata_state_controller.resolve_active_node_metadata().schema.profile_id
-            == "calibration"
-        )
-
-        window.set_active_workflow_node(window.workflow_state_controller.root_node_id)
-        window._save_ui_state()
-        reloaded = store.load()
-
-        assert reloaded.workflow_workspace_root == str(workspace_root)
-        assert reloaded.workflow_profile_id == "calibration"
-        assert reloaded.workflow_anchor_type_id == "root"
-        assert reloaded.workflow_active_node_id == "calibration:root"
+        assert window.workflow_state_controller.profile_id is None
+        assert window.workflow_state_controller.active_node_id is None
+        assert window.metadata_state_controller.resolve_active_node_metadata() is None
+        assert window.folder_edit.text() == ""
     finally:
         window.close()
         window.deleteLater()
         qapp.processEvents()
 
 
-def test_window_restores_partial_workflow_anchor_from_saved_state(
+def test_window_persists_preferences_without_restoring_cached_workflow_state(
     tmp_path: Path,
     monkeypatch,
     qapp,
 ) -> None:
-    config_path = tmp_path / "ui_state.ini"
-    (
-        _workspace_root,
-        session_root,
-        first,
-        _second,
-        _session_node_id,
-        _acquisition_node_id,
-    ) = _make_calibration_workspace_with_frames(tmp_path)
-    partial_acquisition_node_id = "calibration:acquisition:acquisitions/acq-0011__dark"
+    config_path = tmp_path / "preferences.ini"
     store = UiStateStore(config_path)
     store.save(
         UiStateSnapshot(
-            workflow_workspace_root=str(session_root),
-            workflow_profile_id="calibration",
-            workflow_anchor_type_id="session",
-            workflow_active_node_id=partial_acquisition_node_id,
+            preferences=UiPreferences(
+                theme_mode="light",
+                density_mode=DensityMode.COMPACT,
+                show_image_preview=False,
+                show_histogram_preview=True,
+                restore_last_tab=False,
+            ),
         ),
     )
 
@@ -243,19 +229,56 @@ def test_window_restores_partial_workflow_anchor_from_saved_state(
 
     window = window_module.FrameLabWindow(enabled_plugin_ids=())
     try:
-        assert window.workflow_state_controller.profile_id == "calibration"
-        assert window.workflow_state_controller.anchor_type_id == "session"
-        assert window.workflow_state_controller.root_node_id == "calibration:session"
-        assert window.workflow_state_controller.active_node_id == partial_acquisition_node_id
-        assert window.folder_edit.text() == str(first.resolve())
+        assert window.workflow_state_controller.profile_id is None
+        assert window.workflow_state_controller.active_node_id is None
+        assert window.ui_preferences.theme_mode == "light"
+        assert window.ui_preferences.density_mode == DensityMode.COMPACT
+        assert window.show_image_preview is False
+        assert window.show_histogram_preview is True
 
         window._save_ui_state()
         reloaded = store.load()
 
-        assert reloaded.workflow_workspace_root == str(session_root)
-        assert reloaded.workflow_profile_id == "calibration"
-        assert reloaded.workflow_anchor_type_id == "session"
-        assert reloaded.workflow_active_node_id == partial_acquisition_node_id
+        assert reloaded.preferences.theme_mode == "light"
+        assert reloaded.preferences.density_mode == DensityMode.COMPACT
+        assert reloaded.preferences.show_image_preview is False
+        assert reloaded.preferences.show_histogram_preview is True
+        assert reloaded.workflow_workspace_root is None
+        assert reloaded.workflow_profile_id is None
+        assert reloaded.workflow_anchor_type_id is None
+        assert reloaded.workflow_active_node_id is None
+    finally:
+        window.close()
+        window.deleteLater()
+        qapp.processEvents()
+
+
+def test_window_starts_with_no_skip_rules_even_if_legacy_cache_exists(
+    tmp_path: Path,
+    monkeypatch,
+    qapp,
+) -> None:
+    config_path = tmp_path / "preferences.ini"
+    config_path.write_text(
+        "\n".join(
+            [
+                "[scan]",
+                "skip_patterns = *.bak",
+                "  notes",
+            ],
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        window_module,
+        "UiStateStore",
+        lambda: UiStateStore(config_path),
+    )
+
+    window = window_module.FrameLabWindow(enabled_plugin_ids=())
+    try:
+        assert window.skip_patterns == []
     finally:
         window.close()
         window.deleteLater()
@@ -304,7 +327,7 @@ def test_workflow_shell_breadcrumb_reflects_active_context(
     workspace_root, session_root, _first, _second, session_node_id, _acq_node_id = (
         _make_calibration_workspace_with_frames(tmp_path)
     )
-    config_path = tmp_path / "ui_state.ini"
+    config_path = tmp_path / "preferences.ini"
     monkeypatch.setattr(
         window_module,
         "UiStateStore",
@@ -754,6 +777,38 @@ def test_workflow_context_reframes_folder_actions_as_scope_actions(
     assert window._data_browse_button.text() == "Browse Scope..."
     assert window._data_load_button.text() == "Scan Selected Scope"
     assert window.folder_edit.text() == str(session_root.resolve())
+
+
+def test_scope_scan_controls_invoke_load_folder_without_lambda_slots(
+    tmp_path: Path,
+    framelab_window_factory,
+    monkeypatch,
+) -> None:
+    workspace_root, _session_root, _first, _second, session_node_id, _acq_node_id = (
+        _make_calibration_workspace_with_frames(tmp_path)
+    )
+    load_calls: list[str] = []
+
+    def _fake_load_folder(self, *args, **kwargs) -> None:
+        load_calls.append(type(self).__name__)
+
+    monkeypatch.setattr(window_module.FrameLabWindow, "load_folder", _fake_load_folder)
+    window = framelab_window_factory(enabled_plugin_ids=(), show=True)
+    window.set_workflow_context(
+        str(workspace_root),
+        "calibration",
+        active_node_id=session_node_id,
+    )
+
+    window.file_scan_scope_action.trigger()
+    window.toolbar_scan_action.trigger()
+    window._data_load_button.click()
+
+    assert load_calls == [
+        "FrameLabWindow",
+        "FrameLabWindow",
+        "FrameLabWindow",
+    ]
 
 
 def test_workflow_tab_changes_coalesce_visibility_refresh_until_settled(

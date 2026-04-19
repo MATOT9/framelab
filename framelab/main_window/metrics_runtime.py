@@ -965,12 +965,20 @@ class MetricsRuntimeMixin:
             return
 
         mode = self._current_average_mode()
+        streaming_update = bool(
+            getattr(self, "_dataset_load_batch_applying", False),
+        )
         iris_positions, exposure_ms = self._metadata_numeric_arrays()
-        (
-            self.metrics_state.dn_per_ms_values,
-            self.metrics_state.dn_per_ms_stds,
-            self.metrics_state.dn_per_ms_sems,
-        ) = self._compute_dn_per_ms_metrics(mode, exposure_ms)
+        if streaming_update and mode == "roi" and not self.metrics_state.roi_applied_to_all:
+            self.metrics_state.dn_per_ms_values = None
+            self.metrics_state.dn_per_ms_stds = None
+            self.metrics_state.dn_per_ms_sems = None
+        else:
+            (
+                self.metrics_state.dn_per_ms_values,
+                self.metrics_state.dn_per_ms_stds,
+                self.metrics_state.dn_per_ms_sems,
+            ) = self._compute_dn_per_ms_metrics(mode, exposure_ms)
         self.table_model.set_intensity_normalization(
             self.metrics_state.normalize_intensity_values,
             self._normalization_scale(),

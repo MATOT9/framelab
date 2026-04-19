@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+import re
 
 from ..acquisition_datacard import (
     parse_acquisition_folder_name,
@@ -370,7 +371,9 @@ class WorkflowStateController:
                     if "campaign" in current_name or anchor_type == "campaign":
                         folder_name_bonus = max(folder_name_bonus, 2)
                 elif clean_profile_id == "trials":
-                    if "trial" in current_name or anchor_type == "trial":
+                    if anchor_type == "year" and re.fullmatch(r"\d{4}", current_name):
+                        folder_name_bonus = max(folder_name_bonus, 3)
+                    elif "campaign" in current_name or anchor_type == "campaign":
                         folder_name_bonus = max(folder_name_bonus, 2)
             score = (
                 farthest_distance,

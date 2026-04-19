@@ -93,10 +93,6 @@ class SessionManagerDialog(qtw.QDialog):
         self._host_window = host_window
         self._session_index: SessionIndex | None = None
         self._selected_path: Path | None = None
-        self._has_ebus_tools = (
-            "ebus_config_tools"
-            in getattr(host_window, "_enabled_plugin_ids", frozenset())
-        )
 
         self.setWindowTitle("Session Manager")
         configure_secondary_window(self, draggable=True)
@@ -371,7 +367,6 @@ class SessionManagerDialog(qtw.QDialog):
             self._session_index,
             self._selected_entry(),
             clipboard_ready=_current_clipboard(self._host_window) is not None,
-            has_ebus_tools=self._has_ebus_tools,
         )
 
     def _refresh_header_state(self) -> None:
@@ -397,8 +392,6 @@ class SessionManagerDialog(qtw.QDialog):
                 level="info" if clipboard_ready else "neutral",
             ),
         ]
-        if self._has_ebus_tools:
-            chips.append(ChipSpec("eBUS toggle available", level="info"))
         self._header.set_chips(chips)
 
         selected_entry = self._selected_entry()
@@ -562,11 +555,10 @@ class SessionManagerDialog(qtw.QDialog):
         paste_action.setEnabled(action_state.paste_datacard_enabled)
         paste_action.triggered.connect(self._paste_datacard)
 
-        if self._has_ebus_tools:
-            menu.addSeparator()
-            toggle_action = menu.addAction(action_state.toggle_ebus_text)
-            toggle_action.setEnabled(action_state.toggle_ebus_enabled)
-            toggle_action.triggered.connect(self._toggle_ebus)
+        menu.addSeparator()
+        toggle_action = menu.addAction(action_state.toggle_ebus_text)
+        toggle_action.setEnabled(action_state.toggle_ebus_enabled)
+        toggle_action.triggered.connect(self._toggle_ebus)
 
         menu.exec(self._table.viewport().mapToGlobal(position))
 

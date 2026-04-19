@@ -61,7 +61,7 @@ _TRIALS_GOVERNANCE = MetadataGovernanceProfile(
             label="Field Conditions",
             group="Workflow",
             value_type="string",
-            template_node_types=("trial", "session"),
+            template_node_types=("campaign", "session"),
             template_value="",
         ),
     ),
@@ -117,20 +117,26 @@ TRIALS_WORKFLOW_PROFILE = WorkflowProfile(
     display_name="Trials",
     root_display_name="Trials Workspace",
     description=(
-        "Field and trial hierarchy with trials, cameras, sessions, and "
-        "acquisitions."
+        "Field and trial hierarchy with years, campaigns, cameras, sessions, "
+        "and acquisitions."
     ),
     metadata_governance=_TRIALS_GOVERNANCE,
     node_types=(
         NodeTypeDefinition(
             type_id="root",
             display_name="Workspace",
-            child_type_ids=("trial",),
+            child_type_ids=("year",),
             discovery_mode="directories",
         ),
         NodeTypeDefinition(
-            type_id="trial",
-            display_name="Trial",
+            type_id="year",
+            display_name="Year",
+            child_type_ids=("campaign",),
+            discovery_mode="directories",
+        ),
+        NodeTypeDefinition(
+            type_id="campaign",
+            display_name="Campaign",
             child_type_ids=("camera",),
             discovery_mode="directories",
         ),

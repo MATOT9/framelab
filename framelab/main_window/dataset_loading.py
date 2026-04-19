@@ -7,6 +7,7 @@ import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Optional
+import warnings
 
 import numpy as np
 from PySide6 import QtWidgets as qtw
@@ -57,6 +58,17 @@ from ..workers import (
 
 class DatasetLoadingMixin:
     """Dataset lifecycle helpers for dataset discovery and image access."""
+
+    @staticmethod
+    def _qthread_is_running(thread: QThread | None) -> bool:
+        """Return whether one Qt thread object still exists and is running."""
+
+        if thread is None:
+            return False
+        try:
+            return bool(thread.isRunning())
+        except RuntimeError:
+            return False
 
     def _manual_raw_decode_overrides(self) -> dict[str, object]:
         """Return session-local fallback RAW decode inputs from the Data page."""
@@ -145,6 +157,7 @@ class DatasetLoadingMixin:
         """Clear the currently loaded dataset and reset dependent UI state."""
         dataset = self.dataset_state
         metrics = self.metrics_state
+        self._cancel_pending_dataset_load_refresh()
         self._cancel_dataset_load_job()
         self._cancel_stats_job()
         self._cancel_roi_apply_job()
@@ -590,7 +603,45 @@ class DatasetLoadingMixin:
         """Return whether one dataset load worker is currently active."""
 
         thread = getattr(self, "_dataset_load_thread", None)
-        return bool(thread is not None and thread.isRunning())
+        return bool(
+            thread is not None
+            and (
+                self._qthread_is_running(thread)
+                or bool(getattr(self, "_dataset_load_start_pending", False))
+            )
+        )
+
+    def _dispose_dataset_load_thread_objects(
+        self,
+        thread: QThread,
+        worker: DatasetLoadWorker | None,
+    ) -> None:
+        """Dispose one dataset-load thread/worker pair without blocking."""
+
+        if getattr(self, "_dataset_load_worker", None) is worker:
+            self._dataset_load_worker = None
+        if getattr(self, "_dataset_load_thread", None) is thread:
+            self._dataset_load_thread = None
+            self._dataset_load_start_pending = False
+        if worker is not None:
+            try:
+                thread.started.disconnect(worker.run)
+            except Exception:
+                pass
+            try:
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", RuntimeWarning)
+                    worker.batch_ready.disconnect(self._on_dataset_load_batch)
+            except Exception:
+                pass
+            try:
+                worker.deleteLater()
+            except RuntimeError:
+                pass
+        try:
+            thread.deleteLater()
+        except RuntimeError:
+            pass
 
     def _cancel_dataset_load_job(self) -> None:
         """Cancel any in-flight dataset load worker and drop queued callbacks."""
@@ -609,11 +660,20 @@ class DatasetLoadingMixin:
         notices = getattr(self, "_dataset_load_workflow_notices", None)
         if isinstance(notices, dict):
             notices.pop(job_id, None)
+        thread_running = self._qthread_is_running(thread)
         if worker is not None:
+            try:
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", RuntimeWarning)
+                    worker.batch_ready.disconnect(self._on_dataset_load_batch)
+            except Exception:
+                pass
             try:
                 thread.requestInterruption()
             except Exception:
                 pass
+        if not thread_running:
+            self._dispose_dataset_load_thread_objects(thread, worker)
         self._update_dataset_load_ui(
             active=False,
             processed=0,
@@ -632,8 +692,31 @@ class DatasetLoadingMixin:
             self._dataset_load_worker = None
         if getattr(self, "_dataset_load_thread", None) is thread:
             self._dataset_load_thread = None
-        worker.deleteLater()
-        thread.deleteLater()
+            self._dataset_load_start_pending = False
+        try:
+            thread.deleteLater()
+        except RuntimeError:
+            pass
+
+    def _start_dataset_load_thread_if_current(
+        self,
+        *,
+        thread: QThread,
+        worker: DatasetLoadWorker,
+        job_id: int,
+    ) -> None:
+        """Start one prepared dataset-load thread when it is still current."""
+
+        if (
+            int(job_id) != int(getattr(self, "_dataset_load_job_id", -1))
+            or getattr(self, "_dataset_load_thread", None) is not thread
+        ):
+            return
+        self._dataset_load_start_pending = False
+        try:
+            thread.start()
+        except RuntimeError:
+            self._dispose_dataset_load_thread_objects(thread, worker)
 
     def _register_dataset_load_callback(
         self,
@@ -661,6 +744,35 @@ class DatasetLoadingMixin:
                 callback(summary)
             except Exception:
                 continue
+
+    def _cancel_pending_dataset_load_refresh(self) -> None:
+        """Stop any coalesced table refresh queued for streamed load batches."""
+
+        timer = getattr(self, "_dataset_load_refresh_timer", None)
+        if timer is not None:
+            timer.stop()
+
+    def _schedule_dataset_load_table_refresh(self) -> None:
+        """Coalesce streamed dataset rows into bounded-rate table refreshes."""
+
+        timer = getattr(self, "_dataset_load_refresh_timer", None)
+        if timer is None:
+            self._flush_dataset_load_table_refresh()
+            return
+        if not timer.isActive():
+            timer.start()
+
+    def _flush_dataset_load_table_refresh(self) -> None:
+        """Apply one coalesced table refresh for streamed dataset batches."""
+
+        self._cancel_pending_dataset_load_refresh()
+        if not self._has_loaded_data():
+            return
+        self._dataset_load_batch_applying = True
+        try:
+            self._refresh_table(update_analysis=False)
+        finally:
+            self._dataset_load_batch_applying = False
 
     def _update_dataset_load_ui(
         self,
@@ -722,7 +834,7 @@ class DatasetLoadingMixin:
     ) -> int:
         """Start one asynchronous dataset load job and return its job id."""
 
-        self._cancel_dataset_load_job()
+        previous_thread = getattr(self, "_dataset_load_thread", None)
         self.unload_folder(clear_folder_edit=False)
         self.dataset_state.begin_loaded_dataset(folder)
         self.metrics_state.initialize_loaded_dataset(0)
@@ -793,19 +905,43 @@ class DatasetLoadingMixin:
         worker.failed.connect(self._on_dataset_load_failed)
         worker.finished.connect(thread.quit)
         worker.failed.connect(thread.quit)
+        thread.finished.connect(worker.deleteLater)
         thread.finished.connect(
             lambda t=thread, w=worker: self._on_dataset_load_thread_finished(t, w),
         )
 
         self._dataset_load_thread = thread
         self._dataset_load_worker = worker
+        self._dataset_load_start_pending = False
+        start_message = "Discovering image files..."
+        if self._qthread_is_running(previous_thread):
+            self._dataset_load_start_pending = True
+            start_message = "Waiting for previous load to stop..."
+
+            def _start_when_previous_finishes(
+                target_thread: QThread = thread,
+                target_worker: DatasetLoadWorker = worker,
+                target_job_id: int = job_id,
+            ) -> None:
+                self._start_dataset_load_thread_if_current(
+                    thread=target_thread,
+                    worker=target_worker,
+                    job_id=target_job_id,
+                )
+
+            previous_thread.finished.connect(_start_when_previous_finishes)
+        else:
+            self._start_dataset_load_thread_if_current(
+                thread=thread,
+                worker=worker,
+                job_id=job_id,
+            )
         self._update_dataset_load_ui(
             active=True,
             processed=0,
             total=0,
-            message="Discovering image files...",
+            message=start_message,
         )
-        thread.start()
         return job_id
 
     def _on_dataset_load_batch(self, batch: object) -> None:
@@ -818,6 +954,7 @@ class DatasetLoadingMixin:
 
         self.dataset_state.append_loaded_paths(batch.paths)
         self.dataset_state.update_path_metadata(batch.metadata_by_path)
+        self.metrics_state.reserve_loaded_dataset(max(0, int(batch.total)))
         self.metrics_state.append_loaded_batch(
             batch.min_non_zero,
             batch.max_pixels,
@@ -827,11 +964,7 @@ class DatasetLoadingMixin:
                 list(batch.failures),
                 replace_stage=None,
             )
-        self._dataset_load_batch_applying = True
-        try:
-            self._refresh_table(update_analysis=False)
-        finally:
-            self._dataset_load_batch_applying = False
+        self._schedule_dataset_load_table_refresh()
         self._update_dataset_load_ui(
             active=True,
             processed=batch.processed,
@@ -859,18 +992,22 @@ class DatasetLoadingMixin:
 
         normalized = " ".join(str(reason or "").split()).lower()
         if "missing raw decode spec fields" in normalized:
-            # RAW decode metadata comes from acquisition/session/campaign
-            # datacards plus inherited node metadata. eBUS `.pvcfg` snapshots
-            # only contribute optional baseline values and are not required for
-            # RAW decode.
             return (
-                "Add acquisition/session/campaign datacard metadata or "
-                "session-local RAW fallback values, then re-scan."
+                "Add acquisition/session/campaign metadata, attach an eBUS "
+                "config in the acquisition, or provide session-local RAW "
+                "fallback values, then re-scan."
             )
         if "unsupported raw pixel format" in normalized:
             return (
-                "Use one of the supported RAW pixel formats in datacard "
-                "metadata or session-local RAW fallback values, then re-scan."
+                "Use a supported RAW pixel format in metadata, an eBUS "
+                "config, the filename token, or session-local RAW fallback "
+                "values, then re-scan."
+            )
+        if "width must be greater than 0" in normalized or "height must be greater than 0" in normalized:
+            return (
+                "Add acquisition/session/campaign metadata, an eBUS config, "
+                "a filename token like w2848_h2848_pMono12Packed, or "
+                "session-local RAW fallback values, then re-scan."
             )
         if "expected 2d image" in normalized:
             return (
@@ -933,6 +1070,7 @@ class DatasetLoadingMixin:
         if int(summary.job_id) != int(getattr(self, "_dataset_load_job_id", -1)):
             return
 
+        self._cancel_pending_dataset_load_refresh()
         folder = Path(summary.dataset_root).expanduser()
         self._last_scan_pruned_dirs = int(summary.pruned_dirs)
         self._last_scan_skipped_files = int(summary.skipped_files)
@@ -1052,6 +1190,7 @@ class DatasetLoadingMixin:
 
         if int(job_id) != int(getattr(self, "_dataset_load_job_id", -1)):
             return
+        self._cancel_pending_dataset_load_refresh()
         summary = DatasetLoadSummary(
             job_id=int(job_id),
             dataset_root=str(

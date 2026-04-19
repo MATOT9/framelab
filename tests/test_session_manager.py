@@ -456,7 +456,6 @@ def test_action_state_for_valid_session_with_selected_entry(
         index,
         entry,
         clipboard_ready=True,
-        has_ebus_tools=True,
     )
 
     assert state.load_selected_enabled
@@ -483,7 +482,6 @@ def test_action_state_blocks_structural_edits_for_invalid_numbering(
         index,
         entry,
         clipboard_ready=False,
-        has_ebus_tools=False,
     )
 
     assert state.load_selected_enabled
@@ -493,7 +491,7 @@ def test_action_state_blocks_structural_edits_for_invalid_numbering(
     assert state.edit_datacard_enabled
     assert not state.copy_datacard_enabled
     assert not state.paste_datacard_enabled
-    assert not state.toggle_ebus_enabled
+    assert state.toggle_ebus_enabled
     assert state.reindex_enabled
     assert state.toggle_ebus_text == "Disable eBUS Snapshot"
 
@@ -508,7 +506,6 @@ def test_action_state_for_no_selection_keeps_session_level_actions_only(
         index,
         None,
         clipboard_ready=True,
-        has_ebus_tools=True,
     )
 
     assert not state.load_selected_enabled

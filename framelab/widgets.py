@@ -12,8 +12,16 @@ from .mpl_canvas import FigureCanvasQTAgg
 from .mpl_config import ensure_matplotlib_config_dir
 from .mpl_layout import adjust_single_axes_layout
 from .native import backend as native_backend
+from .runtime_assets import labreport_style_path
 
 ensure_matplotlib_config_dir()
+
+
+def _labreport_style_path() -> str:
+    """Return the packaged Matplotlib style path without relying on cwd."""
+
+    return str(labreport_style_path())
+
 
 try:
     from matplotlib.figure import Figure
@@ -22,7 +30,7 @@ try:
 
     MATPLOTLIB_AVAILABLE = FigureCanvasQTAgg is not None
     try:
-        plt.style.use("framelab/assets/LabReport.mplstyle")
+        plt.style.use(_labreport_style_path())
     except Exception:
         pass
 except Exception:

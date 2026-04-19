@@ -77,15 +77,8 @@ Enable:
 
 - **Acquisition Datacard Wizard**
 - **Session Manager (Legacy)** only if you still need datacard copy/paste or acquisition-local eBUS toggles
-- optionally **eBUS Config Tools** if snapshot interpretation must be reviewed
 
-### eBUS inspection session
-
-Enable:
-
-- **eBUS Config Tools**
-- **Acquisition Datacard Wizard** if you may need to author approved canonical overrides
-- analysis plugins only if you also intend to continue through measurement and analysis in the same run
+Use the built-in **Edit -> Advanced -> eBUS Config Tools** menu when snapshot interpretation must be reviewed.
 
 ## Common misunderstanding
 

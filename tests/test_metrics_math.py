@@ -362,6 +362,33 @@ def test_metrics_table_uses_distinct_low_signal_row_highlight_with_saturation_pr
     assert model.data(model.index(1, 0), QtCore.Qt.BackgroundRole) == model.SATURATED_ROW_BRUSH
 
 
+def test_metrics_state_reserves_dataset_capacity_and_commits_loaded_batches() -> None:
+    state = MetricsPipelineController()
+    state.initialize_loaded_dataset(0)
+    state.reserve_loaded_dataset(8)
+
+    state.append_loaded_batch(
+        np.array([1, 2], dtype=np.int64),
+        np.array([10, 20], dtype=np.int64),
+    )
+    state.append_loaded_batch(
+        np.array([3], dtype=np.int64),
+        np.array([30], dtype=np.int64),
+    )
+
+    assert state.min_non_zero is not None
+    assert state.maxs is not None
+    assert state.sat_counts is not None
+    assert state.roi_maxs is not None
+    assert state.bg_applied_mask is not None
+    assert state.min_non_zero.tolist() == [1, 2, 3]
+    assert state.maxs.tolist() == [10, 20, 30]
+    assert state.sat_counts.tolist() == [0, 0, 0]
+    assert len(state.roi_maxs) == 3
+    assert len(state.bg_applied_mask) == 3
+    assert state.bg_total_count == 3
+
+
 def test_metrics_table_proxy_keeps_all_rows_when_dataset_grows(qapp) -> None:
     model = MetricsTableModel()
     proxy = MetricsSortProxyModel()
@@ -388,11 +415,11 @@ def test_metrics_table_proxy_keeps_all_rows_when_dataset_grows(qapp) -> None:
             dn_per_ms=None,
         )
 
-    assert _update(32) == "reset"
+    assert _update(32) == "append"
     assert model.rowCount() == 32
     assert proxy.rowCount() == 32
 
-    assert _update(65) == "reset"
+    assert _update(65) == "append"
     assert model.rowCount() == 65
     assert proxy.rowCount() == 65
 
@@ -426,13 +453,13 @@ def test_metrics_table_proxy_keeps_all_rows_when_shared_paths_grow_in_place(qapp
             dn_per_ms=None,
         )
 
-    assert _update() == "reset"
+    assert _update() == "append"
     assert model.rowCount() == 32
     assert proxy.rowCount() == 32
 
     paths.extend(f"/tmp/frame_{index:03d}.tif" for index in range(32, 65))
 
-    assert _update() == "reset"
+    assert _update() == "append"
     assert model.rowCount() == 65
     assert proxy.rowCount() == 65
 

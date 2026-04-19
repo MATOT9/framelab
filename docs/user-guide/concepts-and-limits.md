@@ -90,7 +90,7 @@ Grouping is primarily for operator organization and pre-analysis sanity checking
 
 A **plugin** is an extension point loaded at startup. In the current shipped app, plugins appear in three roles:
 
-- **data plugins**, such as **Session Manager (Legacy)**, **Acquisition Datacard Wizard**, and **eBUS Config Tools**
+- **data plugins**, such as **Session Manager (Legacy)** and **Acquisition Datacard Wizard**
 - **measure plugins**, such as **Background Correction**
 - **analysis plugins**, such as **Intensity Trend Explorer**
 

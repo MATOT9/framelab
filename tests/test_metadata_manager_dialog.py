@@ -72,7 +72,13 @@ def _make_trials_workspace_with_metadata(
     tmp_path: Path,
 ) -> tuple[Path, Path, str]:
     workspace_root = tmp_path / "trials"
-    session_root = workspace_root / "trial-07" / "camera-a" / "2026-03-05__sess01"
+    session_root = (
+        workspace_root
+        / "2026"
+        / "campaign-07"
+        / "camera-a"
+        / "2026-03-05__sess01"
+    )
     acquisitions_root = session_root / "acquisitions"
     acquisitions_root.mkdir(parents=True, exist_ok=True)
     _write_session_datacard(session_root)
@@ -84,7 +90,7 @@ def _make_trials_workspace_with_metadata(
         node_type_id="session",
     )
 
-    session_node_id = "trials:session:trial-07/camera-a/2026-03-05__sess01"
+    session_node_id = "trials:session:2026/campaign-07/camera-a/2026-03-05__sess01"
     return workspace_root, session_root, session_node_id
 
 

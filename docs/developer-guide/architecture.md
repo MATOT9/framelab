@@ -90,7 +90,7 @@ This means workflow behavior should be documented and maintained as a contract, 
 
 ### 5. Main window construction
 
-The enabled plugin set can include both page-embedded plugins and dialog-style tools such as Session Manager, eBUS compare/inspect helpers, or Background Correction. The host window must therefore support both permanent page contributions and transient runtime actions from the same plugin system. `FrameLabWindow` in `framelab/window.py` is then constructed with the enabled plugin ids. During initialization it:
+The enabled plugin set can include both page-embedded plugins and dialog-style tools such as Session Manager or Background Correction, while the host also owns built-in runtime tools such as eBUS inspect/compare. The host window must therefore support both permanent page contributions and transient runtime actions without forcing every tool through the plugin system. `FrameLabWindow` in `framelab/window.py` is then constructed with the enabled plugin ids. During initialization it:
 
 - resolves the enabled plugin set again for safety
 - groups enabled manifests by page

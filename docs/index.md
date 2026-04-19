@@ -1,7 +1,7 @@
 <div class="tv-hero">
   <h1>FrameLab Documentation</h1>
-  <p>Technical documentation for the FrameLab application, including workflow-scoped TIFF intake, hierarchical metadata, calibration-oriented folder structure, session and acquisition tooling, eBUS snapshot workflows, measurement pipelines, analysis plugins, and the bundled offline Help site.</p>
-  <p>Use this site by intent: operator workflow, exact reference contract, developer maintenance, or cross-cutting troubleshooting.</p>
+  <p>Technical documentation for the FrameLab application, including workflow-scoped TIFF intake, hierarchical metadata, calibration-oriented folder structure, session and acquisition tooling, eBUS snapshot workflows, measurement pipelines, analysis plugins, developer workflow, and the bundled offline Help site.</p>
+  <p>Use this site by intent: operator workflow, exact reference contract, developer maintenance, handoff context, or cross-cutting troubleshooting.</p>
 </div>
 
 <div class="tv-link-grid">
@@ -16,6 +16,18 @@
   <a class="tv-link-card" href="developer-guide/">
     <strong>Developer Guide</strong>
     Architecture, state ownership, workflow hierarchy contracts, plugin boundaries, datacard and eBUS integration, UI structure, and packaging rules.
+  </a>
+  <a class="tv-link-card" href="development/repo_conventions.html">
+    <strong>Development</strong>
+    Repo conventions, change workflow, context strategy, and maintainer troubleshooting for future implementation sessions.
+  </a>
+  <a class="tv-link-card" href="maintenance/tooling_map.html">
+    <strong>Maintenance</strong>
+    Tooling map and benchmark workflow for docs, tests, native builds, profiling, and standalone packaging.
+  </a>
+  <a class="tv-link-card" href="handoffs/feature_handoff_template.html">
+    <strong>Handoffs</strong>
+    Compact templates for feature, bugfix, and refactor handoffs.
   </a>
   <a class="tv-link-card" href="troubleshooting/">
     <strong>Troubleshooting</strong>
@@ -85,6 +97,40 @@ Recommended entry points:
 - [eBUS Config Integration](developer-guide/ebus-config-integration.md)
 - [UI Structure](developer-guide/ui-structure.md)
 - [Packaging](developer-guide/packaging.md)
+
+### Development
+
+Use **Development** when the question is:
+
+- Which repo conventions should guide this change?
+- What docs should be updated with a code change?
+- How should future sessions use root context docs and local `AGENTS.md` files?
+- How should maintainer-facing issues be triaged?
+
+Recommended entry points:
+
+- [Repo Conventions](development/repo_conventions.md)
+- [Change Workflow](development/change_workflow.md)
+- [Context Strategy](development/context_strategy.md)
+- [Development Troubleshooting](development/troubleshooting.md)
+
+For development-session routing, start from the repository-root `START_HERE.md`.
+
+### Maintenance And Handoffs
+
+Use **Maintenance** and **Handoff Templates** when the question is:
+
+- Which repo-owned helper should run a validation or build?
+- How should benchmark/performance evidence be recorded?
+- What information should be preserved when handing work to another session?
+
+Recommended entry points:
+
+- [Tooling Map](maintenance/tooling_map.md)
+- [Benchmark Workflow](maintenance/benchmark_workflow.md)
+- [Feature Handoff Template](handoffs/feature_handoff_template.md)
+- [Bugfix Handoff Template](handoffs/bugfix_handoff_template.md)
+- [Refactor Handoff Template](handoffs/refactor_handoff_template.md)
 
 ### Troubleshooting
 
