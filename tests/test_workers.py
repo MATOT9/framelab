@@ -451,6 +451,7 @@ def test_roi_worker_computes_mean_std_and_sem(qapp, write_tiff) -> None:
     assert finished.valid_count == 1
     assert tuple(finished.failures) == ()
     np.testing.assert_allclose(finished.maxs, np.array([4.0]))
+    np.testing.assert_allclose(finished.sums, np.array([10.0]))
     np.testing.assert_allclose(finished.means, np.array([2.5]))
     np.testing.assert_allclose(
         finished.stds,
@@ -460,6 +461,32 @@ def test_roi_worker_computes_mean_std_and_sem(qapp, write_tiff) -> None:
         finished.sems,
         np.array([np.std(np.array([1.0, 2.0, 3.0, 4.0])) / math.sqrt(4.0)]),
     )
+
+
+def test_roi_worker_computes_topk_only_inside_roi(qapp, write_tiff) -> None:
+    image = np.array(
+        [
+            [1000, 1, 2, 3],
+            [4, 10, 20, 5],
+            [6, 30, 40, 7],
+            [8, 9, 10, 11],
+        ],
+        dtype=np.uint16,
+    )
+    path = write_tiff("img.tif", image)
+    worker = RoiApplyWorker(
+        job_id=62,
+        paths=[path],
+        roi_rect=(1, 1, 3, 3),
+        topk_count=2,
+    )
+    _progress, finished, _failed = _run_roi_worker(worker)
+
+    np.testing.assert_allclose(finished.sums, np.array([100.0]))
+    np.testing.assert_allclose(finished.means, np.array([25.0]))
+    np.testing.assert_allclose(finished.topk_means, np.array([35.0]))
+    np.testing.assert_allclose(finished.topk_stds, np.array([5.0]))
+    np.testing.assert_allclose(finished.topk_sems, np.array([5.0 / math.sqrt(2.0)]))
 
 
 def test_roi_worker_empty_roi_returns_nan_and_zero_valid_count(
@@ -477,6 +504,7 @@ def test_roi_worker_empty_roi_returns_nan_and_zero_valid_count(
     assert finished.valid_count == 0
     assert tuple(finished.failures) == ()
     assert np.isnan(finished.maxs[0])
+    assert np.isnan(finished.sums[0])
     assert np.isnan(finished.means[0])
     assert np.isnan(finished.stds[0])
     assert np.isnan(finished.sems[0])
@@ -497,6 +525,7 @@ def test_roi_worker_uses_current_numpy_slicing_contract_for_out_of_bounds_roi(
     assert finished.valid_count == 1
     assert tuple(finished.failures) == ()
     np.testing.assert_allclose(finished.maxs, np.array([4.0]))
+    np.testing.assert_allclose(finished.sums, np.array([4.0]))
     np.testing.assert_allclose(finished.means, np.array([4.0]))
     np.testing.assert_allclose(finished.stds, np.array([0.0]))
     np.testing.assert_allclose(finished.sems, np.array([0.0]))
@@ -520,6 +549,8 @@ def test_roi_worker_reports_unreadable_images_and_continues(
     assert finished.valid_count == 1
     np.testing.assert_allclose(finished.maxs[:1], np.array([4.0]))
     assert np.isnan(finished.maxs[1])
+    np.testing.assert_allclose(finished.sums[:1], np.array([10.0]))
+    assert np.isnan(finished.sums[1])
     np.testing.assert_allclose(finished.means[:1], np.array([2.5]))
     assert np.isnan(finished.means[1])
     assert np.isnan(finished.stds[1])
@@ -542,6 +573,7 @@ def test_roi_worker_fills_only_missing_source_indices(
         result_length=3,
         roi_rect=(0, 0, 2, 2),
         existing_maxs=np.array([20.0, np.nan, 40.0]),
+        existing_sums=np.array([50.0, np.nan, 70.0]),
         existing_means=np.array([10.0, np.nan, 30.0]),
         existing_stds=np.array([1.0, np.nan, 3.0]),
         existing_sems=np.array([0.5, np.nan, 1.5]),
@@ -551,6 +583,7 @@ def test_roi_worker_fills_only_missing_source_indices(
     assert progress == [(1, 1)]
     assert finished.valid_count == 3
     np.testing.assert_allclose(finished.maxs, np.array([20.0, 4.0, 40.0]))
+    np.testing.assert_allclose(finished.sums, np.array([50.0, 10.0, 70.0]))
     np.testing.assert_allclose(finished.means, np.array([10.0, 2.5, 30.0]))
     np.testing.assert_allclose(
         finished.stds,
@@ -579,11 +612,20 @@ def test_roi_worker_uses_backend_wrapper(
 
     def _fake_compute(image, **kwargs):
         calls.append(dict(kwargs))
-        return (9.0, 8.0, 7.0, 6.0)
+        return {
+            "roi_max": 9.0,
+            "roi_sum": 30.0,
+            "roi_mean": 8.0,
+            "roi_std": 7.0,
+            "roi_sem": 6.0,
+            "roi_topk_mean": None,
+            "roi_topk_std": None,
+            "roi_topk_sem": None,
+        }
 
     monkeypatch.setattr(
         workers_module.native_backend,
-        "compute_roi_metrics",
+        "compute_roi_metrics_full",
         _fake_compute,
     )
 
@@ -597,7 +639,9 @@ def test_roi_worker_uses_backend_wrapper(
     assert progress == [(1, 1)]
     assert len(calls) == 1
     assert calls[0]["roi_rect"] == (0, 0, 2, 2)
+    assert calls[0]["topk_count"] is None
     np.testing.assert_allclose(finished.maxs, np.array([9.0]))
+    np.testing.assert_allclose(finished.sums, np.array([30.0]))
     np.testing.assert_allclose(finished.means, np.array([8.0]))
     np.testing.assert_allclose(finished.stds, np.array([7.0]))
     np.testing.assert_allclose(finished.sems, np.array([6.0]))

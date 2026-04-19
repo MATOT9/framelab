@@ -48,14 +48,21 @@ typedef struct FramelabRoiMetricsParams {
     const FramelabImageView *background;
     FramelabBackgroundMode background_mode;
     FramelabRoi roi;
+    int use_topk;
+    uint32_t topk_count;
 } FramelabRoiMetricsParams;
 
 typedef struct FramelabRoiMetricsResult {
     uint64_t roi_count;
     double roi_max;
+    double roi_sum;
     double roi_mean;
     double roi_stddev;
     double roi_sem;
+    uint32_t roi_topk_actual_count;
+    double roi_topk_mean;
+    double roi_topk_stddev;
+    double roi_topk_sem;
 } FramelabRoiMetricsResult;
 
 typedef struct FramelabRawStaticScanParams {

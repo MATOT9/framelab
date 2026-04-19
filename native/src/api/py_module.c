@@ -24,13 +24,15 @@ static void record_raw_execution(const FramelabRawExecutionInfo *execution_info)
     g_raw_runtime_state.last_execution = *execution_info;
 }
 
-static void init_raw_load_params(FramelabRawLoadParams *params,
-                                 const char *path,
-                                 FramelabPixelFormat pixel_format,
-                                 uint32_t width,
-                                 uint32_t height,
-                                 uint32_t stride_bytes,
-                                 size_t offset_bytes) {
+static void init_raw_load_params(
+    FramelabRawLoadParams *params,
+    const char *path,
+    FramelabPixelFormat pixel_format,
+    uint32_t width,
+    uint32_t height,
+    uint32_t stride_bytes,
+    size_t offset_bytes
+) {
     memset(params, 0, sizeof(*params));
     params->path = path;
     params->width = width;
@@ -153,6 +155,83 @@ static PyObject *build_roi_metrics_result(const FramelabRoiMetricsResult *result
     PyTuple_SET_ITEM(tuple_obj, 2, item2);
     PyTuple_SET_ITEM(tuple_obj, 3, item3);
     return tuple_obj;
+}
+
+static int dict_set_float(PyObject *dict_obj, const char *key, double value) {
+    PyObject *item = PyFloat_FromDouble(value);
+    int status;
+    if (item == NULL) {
+        return -1;
+    }
+    status = PyDict_SetItemString(dict_obj, key, item);
+    Py_DECREF(item);
+    return status;
+}
+
+static int dict_set_uint64(PyObject *dict_obj, const char *key, uint64_t value) {
+    PyObject *item = PyLong_FromUnsignedLongLong((unsigned long long)value);
+    int status;
+    if (item == NULL) {
+        return -1;
+    }
+    status = PyDict_SetItemString(dict_obj, key, item);
+    Py_DECREF(item);
+    return status;
+}
+
+static int dict_set_optional_topk_float(PyObject *dict_obj,
+                                        const char *key,
+                                        double value,
+                                        int include_topk) {
+    if (!include_topk) {
+        if (PyDict_SetItemString(dict_obj, key, Py_None) < 0) {
+            return -1;
+        }
+        return 0;
+    }
+    return dict_set_float(dict_obj, key, value);
+}
+
+static PyObject *build_roi_metrics_full_result(const FramelabRoiMetricsResult *result,
+                                               int include_topk) {
+    PyObject *dict_obj = PyDict_New();
+    if (dict_obj == NULL) {
+        return NULL;
+    }
+    if (dict_set_uint64(dict_obj, "roi_count", result->roi_count) < 0) goto error;
+    if (dict_set_float(dict_obj, "roi_max", result->roi_max) < 0) goto error;
+    if (dict_set_float(dict_obj, "roi_sum", result->roi_sum) < 0) goto error;
+    if (dict_set_float(dict_obj, "roi_mean", result->roi_mean) < 0) goto error;
+    if (dict_set_float(dict_obj, "roi_std", result->roi_stddev) < 0) goto error;
+    if (dict_set_float(dict_obj, "roi_sem", result->roi_sem) < 0) goto error;
+    if (include_topk) {
+        if (dict_set_uint64(
+                dict_obj,
+                "roi_topk_count",
+                (uint64_t)result->roi_topk_actual_count) < 0) goto error;
+    } else {
+        if (PyDict_SetItemString(dict_obj, "roi_topk_count", Py_None) < 0) goto error;
+    }
+    if (dict_set_optional_topk_float(
+            dict_obj,
+            "roi_topk_mean",
+            result->roi_topk_mean,
+            include_topk) < 0) goto error;
+    if (dict_set_optional_topk_float(
+            dict_obj,
+            "roi_topk_std",
+            result->roi_topk_stddev,
+            include_topk) < 0) goto error;
+    if (dict_set_optional_topk_float(
+            dict_obj,
+            "roi_topk_sem",
+            result->roi_topk_sem,
+            include_topk) < 0) goto error;
+    return dict_obj;
+
+error:
+    Py_DECREF(dict_obj);
+    return NULL;
 }
 
 static int parse_value_range(PyObject *obj, double *range_min, double *range_max) {
@@ -389,6 +468,98 @@ static PyObject *py_compute_roi_metrics(PyObject *self, PyObject *args, PyObject
     }
 
     ret = build_roi_metrics_result(&result);
+    Py_DECREF(image_array);
+    Py_XDECREF(background_array);
+    return ret;
+}
+
+static PyObject *py_compute_roi_metrics_full(PyObject *self, PyObject *args, PyObject *kwargs) {
+    static char *kwlist[] = {
+        "image",
+        "roi_rect",
+        "topk_count",
+        "background",
+        "clip_negative",
+        NULL
+    };
+    PyObject *image_obj = NULL;
+    PyObject *roi_obj = NULL;
+    PyObject *topk_count_obj = Py_None;
+    PyObject *background_obj = Py_None;
+    int clip_negative = 1;
+    PyArrayObject *image_array = NULL;
+    PyArrayObject *background_array = NULL;
+    FramelabImageView image_view;
+    FramelabImageView background_view;
+    FramelabRoi roi;
+    int background_present = 0;
+    FramelabRoiMetricsParams params;
+    FramelabRoiMetricsResult result;
+    FramelabStatus status;
+    PyObject *ret = NULL;
+    (void)self;
+
+    if (!PyArg_ParseTupleAndKeywords(
+            args,
+            kwargs,
+            "OO|OOp:compute_roi_metrics_full",
+            kwlist,
+            &image_obj,
+            &roi_obj,
+            &topk_count_obj,
+            &background_obj,
+            &clip_negative)) {
+        return NULL;
+    }
+    if (!framelab_py_image_view_from_object(image_obj, "image", &image_view, &image_array)) {
+        return NULL;
+    }
+    if (!framelab_py_optional_image_view_from_object(
+            background_obj,
+            "background",
+            &background_view,
+            &background_array,
+            &background_present)) {
+        Py_DECREF(image_array);
+        return NULL;
+    }
+    if (!framelab_py_parse_roi_rect(roi_obj, (npy_intp)image_view.width, (npy_intp)image_view.height, &roi)) {
+        Py_DECREF(image_array);
+        Py_XDECREF(background_array);
+        return NULL;
+    }
+
+    memset(&params, 0, sizeof(params));
+    params.image = image_view;
+    params.background = background_present ? &background_view : NULL;
+    params.background_mode = background_present
+        ? (clip_negative ? FRAMELAB_BG_SUBTRACT_CLAMP_ZERO : FRAMELAB_BG_SUBTRACT)
+        : FRAMELAB_BG_NONE;
+    params.roi = roi;
+    if (topk_count_obj != Py_None) {
+        unsigned long topk_count = PyLong_AsUnsignedLong(topk_count_obj);
+        if (PyErr_Occurred()) {
+            Py_DECREF(image_array);
+            Py_XDECREF(background_array);
+            return NULL;
+        }
+        params.use_topk = 1;
+        params.topk_count = topk_count > (unsigned long)UINT32_MAX
+            ? UINT32_MAX
+            : (uint32_t)topk_count;
+    }
+
+    Py_BEGIN_ALLOW_THREADS
+    status = framelab_compute_roi_metrics(&params, &result);
+    Py_END_ALLOW_THREADS
+
+    if (status != FRAMELAB_STATUS_OK) {
+        Py_DECREF(image_array);
+        Py_XDECREF(background_array);
+        return framelab_py_status_error(status, "compute_roi_metrics_full failed");
+    }
+
+    ret = build_roi_metrics_full_result(&result, params.use_topk);
     Py_DECREF(image_array);
     Py_XDECREF(background_array);
     return ret;
@@ -951,6 +1122,15 @@ static PyMethodDef framelab_methods[] = {
         PyDoc_STR(
             "compute_roi_metrics(image, *, roi_rect, background=None, clip_negative=True)\n"
             "-> (roi_max, roi_mean, roi_std, roi_sem)"
+        )
+    },
+    {
+        "compute_roi_metrics_full",
+        FRAMELAB_PY_CFUNCTION_CAST(py_compute_roi_metrics_full),
+        METH_VARARGS | METH_KEYWORDS,
+        PyDoc_STR(
+            "compute_roi_metrics_full(image, *, roi_rect, topk_count=None, background=None, clip_negative=True)\n"
+            "-> {'roi_count', 'roi_max', 'roi_sum', 'roi_mean', 'roi_std', 'roi_sem', 'roi_topk_count', 'roi_topk_mean', 'roi_topk_std', 'roi_topk_sem'}"
         )
     },
     {

@@ -121,7 +121,7 @@ def test_workspace_document_store_round_trip(tmp_path: Path) -> None:
             skip_patterns=["*.bak", "notes"],
         ),
         measure=WorkspaceDocumentMeasureState(
-            average_mode="roi",
+            average_mode="roi_topk",
             threshold_value=1234.0,
             low_signal_threshold_value=111.0,
             avg_count_value=55,
@@ -153,6 +153,7 @@ def test_workspace_document_store_round_trip(tmp_path: Path) -> None:
 
     assert saved_path.suffix == ".framelab"
     assert loaded.workflow.workspace_root == "/tmp/workspace"
+    assert loaded.measure.average_mode == "roi_topk"
     assert loaded.measure.roi_rect == (1, 2, 3, 4)
     assert loaded.measure.roi_applied_to_all is True
     assert loaded.measure.low_signal_threshold_value == pytest.approx(111.0)

@@ -108,3 +108,63 @@ def compute_roi_stats(image: np.ndarray) -> tuple[float, float, float, float]:
         std_value,
         float(std_value / math.sqrt(roi.size)),
     )
+
+
+def compute_roi_stats_full(
+    image: np.ndarray,
+    *,
+    topk_count: int | None = None,
+) -> dict[str, float | int | None]:
+    """Return ROI stats plus optional Top-K stats constrained to the ROI view."""
+
+    roi = np.asarray(image)
+    result: dict[str, float | int | None] = {
+        "roi_count": int(roi.size),
+        "roi_max": float("nan"),
+        "roi_sum": float("nan"),
+        "roi_mean": float("nan"),
+        "roi_std": float("nan"),
+        "roi_sem": float("nan"),
+        "roi_topk_count": None,
+        "roi_topk_mean": None,
+        "roi_topk_std": None,
+        "roi_topk_sem": None,
+    }
+    if roi.size == 0:
+        if topk_count is not None:
+            result.update(
+                {
+                    "roi_topk_count": 0,
+                    "roi_topk_mean": float("nan"),
+                    "roi_topk_std": float("nan"),
+                    "roi_topk_sem": float("nan"),
+                },
+            )
+        return result
+
+    roi_sum = float(np.sum(roi, dtype=np.float64))
+    roi_std = float(np.std(roi, dtype=np.float64))
+    result.update(
+        {
+            "roi_max": float(np.max(roi)),
+            "roi_sum": roi_sum,
+            "roi_mean": float(np.mean(roi, dtype=np.float64)),
+            "roi_std": roi_std,
+            "roi_sem": float(roi_std / math.sqrt(roi.size)),
+        },
+    )
+    if topk_count is not None:
+        k = min(max(1, int(topk_count)), int(roi.size))
+        topk_mean, topk_std, topk_sem = compute_topk_stats_inplace(
+            np.array(roi, copy=True, order="C"),
+            k,
+        )
+        result.update(
+            {
+                "roi_topk_count": int(k),
+                "roi_topk_mean": topk_mean,
+                "roi_topk_std": topk_std,
+                "roi_topk_sem": topk_sem,
+            },
+        )
+    return result

@@ -226,7 +226,9 @@ FramelabStatus framelab_compute_dynamic_metrics(
 FramelabStatus framelab_compute_roi_metrics(const FramelabRoiMetricsParams *params,
                                             FramelabRoiMetricsResult *result) {
     FramelabRunningStats stats;
+    FramelabMinHeap heap;
     FramelabStatus status;
+    uint64_t roi_pixel_count;
 
     if (params == NULL || result == NULL) {
         return FRAMELAB_STATUS_INVALID_ARGUMENT;
@@ -238,15 +240,39 @@ FramelabStatus framelab_compute_roi_metrics(const FramelabRoiMetricsParams *para
 
     memset(result, 0, sizeof(*result));
     result->roi_max = NAN;
+    result->roi_sum = NAN;
     result->roi_mean = NAN;
     result->roi_stddev = NAN;
     result->roi_sem = NAN;
+    result->roi_topk_mean = NAN;
+    result->roi_topk_stddev = NAN;
+    result->roi_topk_sem = NAN;
 
     if (params->roi.x1 <= params->roi.x0 || params->roi.y1 <= params->roi.y0) {
         return FRAMELAB_STATUS_OK;
     }
     if (!framelab_roi_is_valid(&params->roi, params->image.width, params->image.height)) {
         return FRAMELAB_STATUS_INVALID_ARGUMENT;
+    }
+    roi_pixel_count = (uint64_t)(params->roi.x1 - params->roi.x0)
+        * (uint64_t)(params->roi.y1 - params->roi.y0);
+
+    heap.data = NULL;
+    heap.size = 0U;
+    heap.capacity = 0U;
+    if (params->use_topk) {
+        uint64_t requested = params->topk_count > 0U ? (uint64_t)params->topk_count : 1U;
+        uint64_t actual = requested < roi_pixel_count ? requested : roi_pixel_count;
+        if (actual > (uint64_t)UINT32_MAX) {
+            return FRAMELAB_STATUS_OUT_OF_RANGE;
+        }
+        if (actual > 0U) {
+            heap.capacity = (uint32_t)actual;
+            heap.data = (double *)malloc((size_t)heap.capacity * sizeof(double));
+            if (heap.data == NULL) {
+                return FRAMELAB_STATUS_ALLOC_FAILED;
+            }
+        }
     }
 
     framelab_running_stats_init(&stats);
@@ -261,16 +287,36 @@ FramelabStatus framelab_compute_roi_metrics(const FramelabRoiMetricsParams *para
                 params->background_mode
             );
             framelab_running_stats_update(&stats, value);
+            if (heap.capacity > 0U) {
+                heap_push_topk(&heap, value);
+            }
         }
     }
 
     result->roi_count = stats.count;
     if (stats.count == 0U) {
+        free(heap.data);
         return FRAMELAB_STATUS_OK;
     }
     result->roi_max = stats.max_value;
+    result->roi_sum = stats.sum;
     result->roi_mean = stats.mean;
     result->roi_stddev = framelab_running_stats_stddev(&stats);
     result->roi_sem = result->roi_stddev / sqrt((double)stats.count);
+    if (heap.capacity > 0U) {
+        double mean = 0.0;
+        double m2 = 0.0;
+        uint32_t count = heap.size;
+        for (uint32_t i = 0U; i < count; ++i) {
+            double delta = heap.data[i] - mean;
+            mean += delta / (double)(i + 1U);
+            m2 += delta * (heap.data[i] - mean);
+        }
+        result->roi_topk_actual_count = count;
+        result->roi_topk_mean = mean;
+        result->roi_topk_stddev = count > 0U ? sqrt(m2 / (double)count) : NAN;
+        result->roi_topk_sem = count > 0U ? result->roi_topk_stddev / sqrt((double)count) : NAN;
+    }
+    free(heap.data);
     return FRAMELAB_STATUS_OK;
 }

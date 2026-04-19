@@ -201,6 +201,7 @@ class InspectPageMixin:
         self.avg_mode_combo.addItem("Disabled", "none")
         self.avg_mode_combo.addItem("Top-K Mean", "topk")
         self.avg_mode_combo.addItem("ROI Mean", "roi")
+        self.avg_mode_combo.addItem("ROI + Top-K Mean", "roi_topk")
         self.avg_mode_combo.setToolTip(
             "Select how the average metric is computed for each image.",
         )
@@ -225,7 +226,7 @@ class InspectPageMixin:
         self.avg_spin.setEnabled(False)
         self.avg_spin.setMinimumWidth(90)
         self.avg_spin.setToolTip(
-            "Number of highest-intensity pixels used in Top-K mode.",
+            "Number of highest-intensity pixels used in Top-K modes.",
         )
         topk_layout.addWidget(self.avg_spin)
         self.apply_topk_button = qtw.QPushButton("Apply Top-K Count")
@@ -931,6 +932,22 @@ class InspectPageMixin:
             means = metrics.roi_means if metrics is not None else self.roi_means
             stds = metrics.roi_stds if metrics is not None else self.roi_stds
             sems = metrics.roi_sems if metrics is not None else self.roi_sems
+        elif mode == "roi_topk":
+            means = (
+                metrics.roi_topk_means
+                if metrics is not None
+                else self.roi_topk_means
+            )
+            stds = (
+                metrics.roi_topk_stds
+                if metrics is not None
+                else self.roi_topk_stds
+            )
+            sems = (
+                metrics.roi_topk_sems
+                if metrics is not None
+                else self.roi_topk_sems
+            )
         else:
             return (None, None, None)
         if means is None:
@@ -1133,6 +1150,7 @@ class InspectPageMixin:
             "none": "Disabled",
             "topk": "Top-K",
             "roi": "ROI",
+            "roi_topk": "ROI Top-K",
         }.get(mode, mode.title())
         selection = (
             f"{int(dataset.selected_index) + 1}/{dataset.path_count()}"
@@ -1144,10 +1162,10 @@ class InspectPageMixin:
         if metrics.is_roi_applying:
             roi_text = "Applying"
             roi_level = "warning"
-        elif metrics.roi_rect is not None and mode == "roi":
+        elif metrics.roi_rect is not None and mode in {"roi", "roi_topk"}:
             roi_text = "Drawn"
             roi_level = "success"
-        elif mode == "roi":
+        elif mode in {"roi", "roi_topk"}:
             roi_text = "Awaiting selection"
             roi_level = "warning"
         else:
@@ -1756,7 +1774,7 @@ class InspectPageMixin:
             getattr(self, "_is_dataset_load_running", None)
             and self._is_dataset_load_running()
         )
-        topk_enabled = mode == "topk"
+        topk_enabled = mode in {"topk", "roi_topk"}
         self.topk_controls_widget.setVisible(topk_enabled)
         self.avg_spin.setEnabled(topk_enabled and not load_running)
         self.apply_topk_button.setEnabled(topk_enabled and not load_running)
@@ -1764,7 +1782,7 @@ class InspectPageMixin:
             self.apply_threshold_button.setEnabled(not load_running)
         if hasattr(self, "apply_low_signal_button"):
             self.apply_low_signal_button.setEnabled(not load_running)
-        roi_enabled = mode == "roi"
+        roi_enabled = mode in {"roi", "roi_topk"}
         self.roi_controls_widget.setVisible(roi_enabled)
         self.image_preview.set_roi_mode(
             roi_enabled and self.show_image_preview,

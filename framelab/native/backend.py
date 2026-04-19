@@ -27,6 +27,7 @@ from ..background import apply_background, validate_reference_shape
 from ..metric_reducers import (
     compute_min_non_zero_and_max,
     compute_roi_stats,
+    compute_roi_stats_full,
     compute_topk_stats_inplace,
     count_at_or_above_threshold,
 )
@@ -289,7 +290,8 @@ def describe_metric_route(
     effective_mode: str | None = None
 
     if normalized_operation == "dynamic_metrics":
-        normalized_mode = "none" if mode == "roi" else str(mode or "").strip().lower()
+        raw_mode = str(mode or "").strip().lower()
+        normalized_mode = "none" if raw_mode in {"roi", "roi_topk"} else raw_mode
         if normalized_mode not in {"none", "topk"}:
             raise ValueError("mode must be 'none' or 'topk'")
         effective_mode = "none" if threshold_only else normalized_mode
@@ -423,6 +425,28 @@ def _python_compute_roi_metrics(
     )
     x0, y0, x1, y1 = normalize_roi_rect_like_numpy(roi_rect, metric_img.shape)
     return compute_roi_stats(metric_img[y0:y1, x0:x1])
+
+
+def _python_compute_roi_metrics_full(
+    image,
+    *,
+    roi_rect: tuple[int, int, int, int],
+    topk_count: int | None = None,
+    background=None,
+    clip_negative: bool = True,
+) -> dict[str, object]:
+    image_arr = _coerce_image(image)
+    background_arr = _compatible_background(image_arr, background)
+    metric_img = (
+        apply_background(image_arr, background_arr, clip_negative)
+        if background_arr is not None
+        else image_arr
+    )
+    x0, y0, x1, y1 = normalize_roi_rect_like_numpy(roi_rect, metric_img.shape)
+    return compute_roi_stats_full(
+        metric_img[y0:y1, x0:x1],
+        topk_count=topk_count,
+    )
 
 
 def _python_apply_background_f32(
@@ -595,11 +619,13 @@ def compute_roi_metrics(
     background=None,
     clip_negative: bool = True,
     allow_native: bool = True,
+    backend_override: str | None = None,
 ):
     """Compute one image's ROI statistics through the native backend."""
     decision = describe_metric_route(
         "roi_metrics",
         allow_native=allow_native,
+        backend_override=backend_override,
     )
     image_arr = _coerce_image(image)
     normalized_roi = normalize_roi_rect_like_numpy(roi_rect, image_arr.shape)
@@ -619,6 +645,46 @@ def compute_roi_metrics(
             clip_negative=clip_negative,
         ),
         failure_label="compute_roi_metrics",
+    )
+
+
+def compute_roi_metrics_full(
+    image,
+    *,
+    roi_rect: tuple[int, int, int, int],
+    topk_count: int | None = None,
+    background=None,
+    clip_negative: bool = True,
+    allow_native: bool = True,
+    backend_override: str | None = None,
+):
+    """Compute one image's full ROI statistics, including sum and ROI Top-K."""
+    decision = describe_metric_route(
+        "roi_metrics",
+        allow_native=allow_native,
+        backend_override=backend_override,
+    )
+    image_arr = _coerce_image(image)
+    normalized_roi = normalize_roi_rect_like_numpy(roi_rect, image_arr.shape)
+    background_arr = _compatible_background(image_arr, background)
+    resolved_topk_count = None if topk_count is None else max(1, int(topk_count))
+    return _execute_routed_metric(
+        decision=decision,
+        python_fn=lambda: _python_compute_roi_metrics_full(
+            image_arr,
+            roi_rect=normalized_roi,
+            topk_count=resolved_topk_count,
+            background=background_arr,
+            clip_negative=clip_negative,
+        ),
+        native_fn=lambda: require_native().compute_roi_metrics_full(
+            image_arr,
+            roi_rect=normalized_roi,
+            topk_count=resolved_topk_count,
+            background=background_arr,
+            clip_negative=clip_negative,
+        ),
+        failure_label="compute_roi_metrics_full",
     )
 
 

@@ -20,7 +20,6 @@ This roadmap is grounded in current repo docs, `TODO`, and inspected implementat
 
 ## Measurement And Analysis
 
-- Add ROI sum as a supported metric.
 - Add computer last boot time calculation where it belongs in metadata or runtime context.
 - Extend analysis and plugin coverage for dead pixel detection and spectral responsivity assessment.
 

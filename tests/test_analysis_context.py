@@ -92,6 +92,30 @@ def test_build_context_sets_background_flags_and_reference_labels() -> None:
     assert record_b.metadata["background_reference"] == "raw_fallback"
 
 
+def test_build_context_uses_roi_topk_metric_arrays() -> None:
+    dataset = DatasetStateController()
+    dataset.set_loaded_dataset(None, ["/tmp/a.tif"])
+    metrics = MetricsPipelineController()
+    metrics.roi_topk_means = np.array([35.0])
+    metrics.roi_topk_stds = np.array([5.0])
+    metrics.roi_topk_sems = np.array([2.5])
+
+    controller = AnalysisContextController(
+        dataset,
+        metrics,
+        background_reference_label_resolver=lambda path: f"ref:{path}",
+    )
+    context = controller.build_context(
+        mode="roi_topk",
+        normalization_scale=1.0,
+    )
+
+    record = context.records[0]
+    assert record.mean == pytest.approx(35.0)
+    assert record.std == pytest.approx(5.0)
+    assert record.sem == pytest.approx(2.5)
+
+
 def test_build_context_exposes_workflow_scope_and_effective_metadata() -> None:
     dataset = DatasetStateController()
     dataset.set_loaded_dataset("/tmp/workspace/session-01", ["/tmp/workspace/session-01/a.tif"])

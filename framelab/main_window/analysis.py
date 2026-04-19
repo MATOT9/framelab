@@ -586,8 +586,8 @@ class AnalysisPageMixin:
             return
         caps = self._active_plugin_capabilities()
         mode = self._current_average_mode()
-        mode_has_average = mode in {"topk", "roi"}
-        roi_mode_active = mode == "roi"
+        mode_has_average = mode in {"topk", "roi", "roi_topk"}
+        roi_mode_active = mode in {"roi", "roi_topk"}
         visible: set[str] = set(self.BASE_VISIBLE_MEASURE_COLUMNS)
         if mode_has_average:
             visible.update(self.MODE_MEASURE_COLUMNS)
@@ -635,6 +635,9 @@ class AnalysisPageMixin:
                 "roi_means",
                 "roi_stds",
                 "roi_sems",
+                "roi_topk_means",
+                "roi_topk_stds",
+                "roi_topk_sems",
                 "_bg_applied_mask",
             ):
                 target = "bg_applied_mask" if attr == "_bg_applied_mask" else attr

@@ -46,7 +46,7 @@ This is a compact snapshot of the current implementation. Prefer canonical docs 
 
 ## Measurement And Analysis
 
-- Measure workflows cover thresholding, Top-K mean/std/SEM, ROI mean/std/SEM, normalization, background correction, and exposure-normalized quantities such as `DN/ms`.
+- Measure workflows cover thresholding, Top-K mean/std/SEM, ROI max/sum/mean/std/SEM, ROI + Top-K mean/std/SEM, normalization, background correction, and exposure-normalized quantities such as `DN/ms`.
 - Dataset-wide metric work is coordinated through worker objects and applied back on the UI thread.
 - Analyze workflows consume an `AnalysisContext` built from dataset metadata, metric state, normalization state, and background state.
 - Analysis plugins should consume that context rather than reaching back into raw host state.

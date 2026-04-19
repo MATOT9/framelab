@@ -596,10 +596,15 @@ class RoiApplyWorker(QObject):
         background_library: Optional[BackgroundLibrary] = None,
         path_metadata: Optional[dict[str, dict[str, object]]] = None,
         raw_resolver_context: RawDecodeResolverContext | None = None,
+        topk_count: int | None = None,
         existing_maxs: Optional[np.ndarray] = None,
+        existing_sums: Optional[np.ndarray] = None,
         existing_means: Optional[np.ndarray] = None,
         existing_stds: Optional[np.ndarray] = None,
         existing_sems: Optional[np.ndarray] = None,
+        existing_topk_means: Optional[np.ndarray] = None,
+        existing_topk_stds: Optional[np.ndarray] = None,
+        existing_topk_sems: Optional[np.ndarray] = None,
     ) -> None:
         super().__init__()
         self._job_id = job_id
@@ -615,10 +620,15 @@ class RoiApplyWorker(QObject):
         self._background_library = background_library
         self._path_metadata = path_metadata or {}
         self._raw_resolver_context = raw_resolver_context
+        self._topk_count = None if topk_count is None else max(1, int(topk_count))
         self._existing_maxs = existing_maxs
+        self._existing_sums = existing_sums
         self._existing_means = existing_means
         self._existing_stds = existing_stds
         self._existing_sems = existing_sems
+        self._existing_topk_means = existing_topk_means
+        self._existing_topk_stds = existing_topk_stds
+        self._existing_topk_sems = existing_topk_sems
 
     def _reference_for_path(self, path: str) -> Optional[np.ndarray]:
         config = self._background_config
@@ -656,6 +666,11 @@ class RoiApplyWorker(QObject):
             if self._existing_maxs is not None and len(self._existing_maxs) == n
             else np.full(n, np.nan, dtype=np.float64)
         )
+        sums = (
+            np.asarray(self._existing_sums, dtype=np.float64).copy()
+            if self._existing_sums is not None and len(self._existing_sums) == n
+            else np.full(n, np.nan, dtype=np.float64)
+        )
         means = (
             np.asarray(self._existing_means, dtype=np.float64).copy()
             if self._existing_means is not None and len(self._existing_means) == n
@@ -671,6 +686,28 @@ class RoiApplyWorker(QObject):
             if self._existing_sems is not None and len(self._existing_sems) == n
             else np.full(n, np.nan, dtype=np.float64)
         )
+        topk_means = None
+        topk_stds = None
+        topk_sems = None
+        if self._topk_count is not None:
+            topk_means = (
+                np.asarray(self._existing_topk_means, dtype=np.float64).copy()
+                if self._existing_topk_means is not None
+                and len(self._existing_topk_means) == n
+                else np.full(n, np.nan, dtype=np.float64)
+            )
+            topk_stds = (
+                np.asarray(self._existing_topk_stds, dtype=np.float64).copy()
+                if self._existing_topk_stds is not None
+                and len(self._existing_topk_stds) == n
+                else np.full(n, np.nan, dtype=np.float64)
+            )
+            topk_sems = (
+                np.asarray(self._existing_topk_sems, dtype=np.float64).copy()
+                if self._existing_topk_sems is not None
+                and len(self._existing_topk_sems) == n
+                else np.full(n, np.nan, dtype=np.float64)
+            )
         valid_count = int(np.count_nonzero(np.isfinite(means)))
         failures = []
         thread = QThread.currentThread()
@@ -726,17 +763,30 @@ class RoiApplyWorker(QObject):
                     self.progress.emit(processed_index, total)
                     continue
                 try:
-                    (
-                        maxs[source_index],
-                        means[source_index],
-                        stds[source_index],
-                        sems[source_index],
-                    ) = native_backend.compute_roi_metrics(
+                    roi_result = native_backend.compute_roi_metrics_full(
                         img,
                         roi_rect=normalized_roi,
+                        topk_count=self._topk_count,
                         background=background_img,
                         clip_negative=clip_negative,
                     )
+                    maxs[source_index] = float(roi_result["roi_max"])
+                    sums[source_index] = float(roi_result["roi_sum"])
+                    means[source_index] = float(roi_result["roi_mean"])
+                    stds[source_index] = float(roi_result["roi_std"])
+                    sems[source_index] = float(roi_result["roi_sem"])
+                    if topk_means is not None:
+                        topk_means[source_index] = float(
+                            roi_result["roi_topk_mean"],
+                        )
+                    if topk_stds is not None:
+                        topk_stds[source_index] = float(
+                            roi_result["roi_topk_std"],
+                        )
+                    if topk_sems is not None:
+                        topk_sems[source_index] = float(
+                            roi_result["roi_topk_sem"],
+                        )
                 except Exception as exc:
                     failures.append(
                         make_processing_failure(
@@ -762,10 +812,14 @@ class RoiApplyWorker(QObject):
             RoiApplyResult(
                 job_id=self._job_id,
                 maxs=maxs,
+                sums=sums,
                 means=means,
                 stds=stds,
                 sems=sems,
                 valid_count=valid_count,
+                topk_means=topk_means,
+                topk_stds=topk_stds,
+                topk_sems=topk_sems,
                 failures=tuple(failures),
             ),
         )

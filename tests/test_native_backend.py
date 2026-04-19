@@ -251,6 +251,37 @@ def test_dynamic_metrics_treat_roi_mode_as_none(monkeypatch) -> None:
     assert calls[0]["mode"] == "none"
 
 
+def test_dynamic_metrics_treat_roi_topk_mode_as_none(monkeypatch) -> None:
+    calls: list[dict[str, object]] = []
+
+    class _FakeNative:
+        @staticmethod
+        def compute_dynamic_metrics(image, **kwargs):
+            calls.append(dict(kwargs))
+            return {
+                "sat_count": 4,
+                "min_non_zero": 1,
+                "max_pixel": 9,
+                "avg_topk": None,
+                "avg_topk_std": None,
+                "avg_topk_sem": None,
+            }
+
+    _set_backend_state(monkeypatch, _FakeNative())
+
+    result = backend.compute_dynamic_metrics(
+        np.array([[1, 2], [3, 4]], dtype=np.uint16),
+        threshold_value=2,
+        mode="roi_topk",
+        avg_count_value=8,
+        backend_override="native",
+    )
+
+    assert result["sat_count"] == 4
+    assert len(calls) == 1
+    assert calls[0]["mode"] == "none"
+
+
 def test_roi_metrics_disable_native_after_failure_and_fall_back(monkeypatch) -> None:
     class _FailingNative:
         @staticmethod
@@ -270,6 +301,38 @@ def test_roi_metrics_disable_native_after_failure_and_fall_back(monkeypatch) -> 
     assert result[3] == pytest.approx(result[2] / math.sqrt(4.0))
     assert backend.active_metrics_backend() == "python"
     assert "compute_roi_metrics failed" in str(backend.last_native_fallback_reason())
+
+
+def test_roi_metrics_full_falls_back_and_computes_roi_topk(monkeypatch) -> None:
+    class _FailingNative:
+        @staticmethod
+        def compute_roi_metrics_full(image, **kwargs):
+            raise RuntimeError("boom")
+
+    _set_backend_state(monkeypatch, _FailingNative())
+
+    image = np.array(
+        [
+            [1000, 1, 2],
+            [3, 10, 20],
+            [4, 30, 40],
+        ],
+        dtype=np.uint16,
+    )
+    result = backend.compute_roi_metrics_full(
+        image,
+        roi_rect=(1, 1, 3, 3),
+        topk_count=2,
+    )
+
+    assert result["roi_sum"] == pytest.approx(100.0)
+    assert result["roi_mean"] == pytest.approx(25.0)
+    assert result["roi_topk_mean"] == pytest.approx(35.0)
+    assert result["roi_topk_std"] == pytest.approx(5.0)
+    assert backend.active_metrics_backend() == "python"
+    assert "compute_roi_metrics_full failed" in str(
+        backend.last_native_fallback_reason(),
+    )
 
 
 def test_apply_background_f32_returns_float32_and_supports_force_python(
@@ -918,6 +981,56 @@ def test_native_and_python_roi_metrics_match_when_extension_is_present(monkeypat
     assert native_result[1] == pytest.approx(python_result[1])
     assert native_result[2] == pytest.approx(python_result[2])
     assert native_result[3] == pytest.approx(python_result[3])
+
+
+@pytest.mark.skipif(
+    not backend.native_available(),
+    reason="native extension not built in this environment",
+)
+def test_native_and_python_roi_metrics_full_match_when_extension_is_present(
+    monkeypatch,
+) -> None:
+    image = np.array(
+        [
+            [1000, 1, 2],
+            [3, 10, 20],
+            [4, 30, 40],
+        ],
+        dtype=np.uint16,
+    )
+
+    monkeypatch.setattr(backend, "_metrics_native_enabled", True, raising=False)
+    native_result = backend.compute_roi_metrics_full(
+        image,
+        roi_rect=(1, 1, 3, 3),
+        topk_count=2,
+        backend_override="native",
+    )
+
+    monkeypatch.setattr(backend, "_metrics_native_enabled", False, raising=False)
+    monkeypatch.setattr(backend, "_active_metrics_backend", "python", raising=False)
+    python_result = backend.compute_roi_metrics_full(
+        image,
+        roi_rect=(1, 1, 3, 3),
+        topk_count=2,
+        backend_override="python",
+    )
+
+    assert native_result["roi_max"] == pytest.approx(python_result["roi_max"])
+    assert native_result["roi_sum"] == pytest.approx(python_result["roi_sum"])
+    assert native_result["roi_mean"] == pytest.approx(python_result["roi_mean"])
+    assert native_result["roi_std"] == pytest.approx(python_result["roi_std"])
+    assert native_result["roi_sem"] == pytest.approx(python_result["roi_sem"])
+    assert native_result["roi_topk_count"] == python_result["roi_topk_count"]
+    assert native_result["roi_topk_mean"] == pytest.approx(
+        python_result["roi_topk_mean"],
+    )
+    assert native_result["roi_topk_std"] == pytest.approx(
+        python_result["roi_topk_std"],
+    )
+    assert native_result["roi_topk_sem"] == pytest.approx(
+        python_result["roi_topk_sem"],
+    )
 
 
 @pytest.mark.skipif(

@@ -25,8 +25,8 @@ A reliable operating sequence is:
 1. Confirm the dataset and metadata source in **Data**.
 2. Set the saturation threshold.
 3. Choose the average mode.
-4. If using **Top-K Mean**, choose `K` and apply it.
-5. If using **ROI Mean**, draw or load the ROI, then apply it to all images.
+4. If using **Top-K Mean** or **ROI + Top-K Mean**, choose `K` and apply it.
+5. If using **ROI Mean** or **ROI + Top-K Mean**, draw or load the ROI, then apply it to all images.
 6. Enable background subtraction only if the comparison requires it.
 7. Decide intentionally whether normalization should be on or off.
 8. Review the table, preview, and histogram together before moving to **Analyze**.
@@ -40,7 +40,7 @@ The **Metrics Setup** group determines how the app computes per-image values.
 | **Saturation Threshold (>=)** | Sets the pixel value counted as saturated. | Defines the clipping criterion used for `sat_count`. The count is evaluated on the current metric image. |
 | **Apply Threshold** | Recomputes threshold-dependent counts. | Use it after changing the threshold. This does not invent a new measurement mode; it updates the threshold-based view of the current metric image. |
 | **Average Mode** | Chooses how the representative intensity is computed. | This decision controls which mean/std/SEM values exist and therefore which downstream analysis quantities can be built. |
-| **Top-K Count** | Sets how many brightest pixels are used in Top-K mode. | Visible only in **Top-K Mean** mode. |
+| **Top-K Count** | Sets how many brightest pixels are used in Top-K modes. | Visible in **Top-K Mean** and **ROI + Top-K Mean** modes. |
 | **Apply Top-K Count** | Recomputes metrics using the current `K`. | Use it after changing `K`. |
 | **Display Rounding** | Changes only the displayed precision of mean/std/SEM values. | Formatting only; stored values are unchanged. |
 | **Normalize Intensity (0-1)** | Rescales intensity-like values relative to the current dataset maximum pixel value. | Useful for within-dataset comparison, but it changes the meaning of displayed and downstream intensity-derived values from raw counts to dataset-relative values. |
@@ -83,6 +83,18 @@ When **ROI Mean** is selected:
 - the preview supports drawing and moving the ROI
 - **Apply ROI to All Images** becomes the batch-computation path for ROI statistics
 
+### ROI + Top-K Mean
+
+The app first restricts the pixel population to the selected ROI rectangle, then selects the `K` brightest pixels inside that ROI. This is **Top-K within ROI**, not global Top-K followed by cropping.
+
+Use **ROI + Top-K Mean** when:
+
+- the same physical region must be compared across images
+- the brightest part of the signal can move within that region
+- bright artifacts outside the ROI must be excluded
+
+When **ROI + Top-K Mean** is selected, both Top-K controls and ROI tools are visible. The table also reports ROI-derived values such as **ROI Max** and **ROI Sum** from the full ROI population, not only from the Top-K subset.
+
 ## How to choose `K`
 
 `K` is not just a UI parameter. It defines the pixel population used to build the Top-K statistics. General guidance:
@@ -120,12 +132,25 @@ The current implementation uses NumPy's population standard deviation (`ddof = 0
 Let `r_1 ... r_N` be the pixels inside the selected ROI.
 
 ```text
+ROI sum        = sum(r_n)
 ROI mean       = (1 / N) * sum(r_n)
 ROI std        = std(r_1 ... r_N)
 ROI std err    = ROI std / sqrt(N)
 ```
 
 The current implementation also uses the population standard deviation (`ddof = 0`) for ROI statistics.
+
+### ROI + Top-K metrics
+
+Let `q_1 ... q_K` be the `K` highest pixel values inside the selected ROI. If the requested `K` is larger than the number of pixels inside the ROI, the app uses all ROI pixels.
+
+```text
+ROI Top-K mean     = (1 / K) * sum(q_n)
+ROI Top-K std      = std(q_1 ... q_K)
+ROI Top-K std err  = ROI Top-K std / sqrt(K)
+```
+
+**ROI Sum** remains the sum of all ROI pixels after background correction, not the sum of the Top-K subset.
 
 ### DN/ms intensity rate
 
@@ -137,7 +162,7 @@ DN/ms std      = std_intensity / exposure_ms
 DN/ms std err  = std_err_intensity / exposure_ms
 ```
 
-This is computed only when the active average mode is **Top-K Mean** or **ROI Mean**. Dividing the measured intensity by exposure time normalizes the result by integration duration, allowing first-order comparison across images acquired with different exposure settings. `DN/ms` is useful for analysis of relative trends, especially in exposure and iris sweeps. It is not a radiometric quantity and should not be interpreted, by itself, as evidence of constant scene radiance, detector linearity, or invariant optical throughput. Those conclusions require additional calibration and control of acquisition conditions. If exposure metadata is missing, non-finite, or non-positive, `DN/ms` remains unavailable for that image.
+This is computed only when the active average mode is **Top-K Mean**, **ROI Mean**, or **ROI + Top-K Mean**. Dividing the measured intensity by exposure time normalizes the result by integration duration, allowing first-order comparison across images acquired with different exposure settings. `DN/ms` is useful for analysis of relative trends, especially in exposure and iris sweeps. It is not a radiometric quantity and should not be interpreted, by itself, as evidence of constant scene radiance, detector linearity, or invariant optical throughput. Those conclusions require additional calibration and control of acquisition conditions. If exposure metadata is missing, non-finite, or non-positive, `DN/ms` remains unavailable for that image.
 
 ### Normalization
 
@@ -156,11 +181,11 @@ In the current implementation, the divisor is the maximum value in the current *
 
 ## ROI tools
 
-The **ROI Tools** row appears only in **ROI Mean** mode.
+The **ROI Tools** row appears in **ROI Mean** and **ROI + Top-K Mean** modes.
 
 | Control | What it does |
 | --- | --- |
-| **Apply ROI to All Images** | Computes ROI mean/std/SEM across the full loaded dataset using the current ROI rectangle. |
+| **Apply ROI to All Images** | Computes ROI-derived metrics across the full loaded dataset using the current ROI rectangle. |
 | **Load ROI...** | Loads an ROI rectangle from a JSON file. |
 | **Save ROI...** | Saves the current ROI rectangle to a JSON file. |
 | **Clear ROI** | Removes the ROI and clears ROI-based metrics. |
@@ -173,7 +198,7 @@ The preview interaction model is:
 - mouse wheel zooms
 - drag pans the image
 - double-click resets the view
-- in ROI mode, left-drag draws the ROI
+- in ROI modes, left-drag draws the ROI
 - dragging inside an existing ROI moves it
 
 ### Saved ROI format
@@ -274,6 +299,9 @@ Use them together. The table tells you what the app computed. The preview and hi
 
 - **Top-K**, **Top-K Std**, **Top-K Std Err** in Top-K mode
 - **ROI**, **ROI Std**, **ROI Std Err** in ROI mode
+- **ROI Top-K**, **ROI Top-K Std**, **ROI Top-K Std Err** in ROI + Top-K mode
+
+**ROI Max** and **ROI Sum** are shown in ROI modes.
 
 The table can also be exported through **File -> Export Image Metrics Table...** when you need the currently visible rows outside the app.
 
@@ -285,6 +313,7 @@ The table can also be exported through **File -> Export Image Metrics Table...**
 | ROI not defined | ROI-based metrics remain blank until an ROI is drawn or loaded. |
 | ROI file outside current image bounds | The ROI load is rejected. |
 | Requested `K` larger than image size | The app uses all available pixels. |
+| Requested `K` larger than ROI size | In ROI + Top-K mode, the app uses all pixels inside the ROI. |
 | No compatible background reference | The image is measured without background subtraction. |
 | Dataset mixes incompatible image shapes or incomplete metadata | Some derived values can remain blank (`NaN`). |
 

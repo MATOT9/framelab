@@ -33,6 +33,12 @@ class MetricsRuntimeMixin:
         return "topk" if mode == "topk" else "none"
 
     @staticmethod
+    def _average_mode_uses_roi(mode: str) -> bool:
+        """Return whether one average mode depends on the selected ROI."""
+
+        return mode in {"roi", "roi_topk"}
+
+    @staticmethod
     def _build_preview_rgb(
         image: np.ndarray,
         *,
@@ -144,6 +150,11 @@ class MetricsRuntimeMixin:
             return None
         return roi_metric_signature_hash(
             roi_rect=roi_rect,
+            topk_count=(
+                self.metrics_state.avg_count_value
+                if self._current_average_mode() == "roi_topk"
+                else None
+            ),
             background_payload=self._background_signature_payload(),
         )
 
@@ -355,15 +366,31 @@ class MetricsRuntimeMixin:
     def _prefill_roi_metric_arrays(
         self,
         cached_payloads: dict[str, dict[str, object]],
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, list[int]]:
+        *,
+        include_topk: bool,
+    ) -> tuple[
+        np.ndarray,
+        np.ndarray,
+        np.ndarray,
+        np.ndarray,
+        np.ndarray,
+        np.ndarray | None,
+        np.ndarray | None,
+        np.ndarray | None,
+        list[int],
+    ]:
         """Build partially cached ROI arrays and return miss indices."""
 
         dataset = self.dataset_state
         n = dataset.path_count()
         maxs = np.full(n, np.nan, dtype=np.float64)
+        sums = np.full(n, np.nan, dtype=np.float64)
         means = np.full(n, np.nan, dtype=np.float64)
         stds = np.full(n, np.nan, dtype=np.float64)
         sems = np.full(n, np.nan, dtype=np.float64)
+        topk_means = np.full(n, np.nan, dtype=np.float64) if include_topk else None
+        topk_stds = np.full(n, np.nan, dtype=np.float64) if include_topk else None
+        topk_sems = np.full(n, np.nan, dtype=np.float64) if include_topk else None
         hit_indices: set[int] = set()
         for index, path in enumerate(dataset.paths):
             payload = cached_payloads.get(path)
@@ -371,15 +398,32 @@ class MetricsRuntimeMixin:
                 continue
             hit_indices.add(index)
             maxs[index] = float(payload.get("max", np.nan))
+            sums[index] = float(payload.get("sum", np.nan))
             means[index] = float(payload.get("mean", np.nan))
             stds[index] = float(payload.get("std", np.nan))
             sems[index] = float(payload.get("sem", np.nan))
+            if topk_means is not None:
+                topk_means[index] = float(payload.get("topk_mean", np.nan))
+            if topk_stds is not None:
+                topk_stds[index] = float(payload.get("topk_std", np.nan))
+            if topk_sems is not None:
+                topk_sems[index] = float(payload.get("topk_sem", np.nan))
         missing_indices = [
             index
             for index in range(n)
             if index not in hit_indices
         ]
-        return (maxs, means, stds, sems, missing_indices)
+        return (
+            maxs,
+            sums,
+            means,
+            stds,
+            sems,
+            topk_means,
+            topk_stds,
+            topk_sems,
+            missing_indices,
+        )
 
     def _store_cached_roi_metrics(
         self,
@@ -407,9 +451,23 @@ class MetricsRuntimeMixin:
                     identity=identity,
                     payload={
                         "max": float(result.maxs[index]),
+                        "sum": float(result.sums[index]),
                         "mean": float(result.means[index]),
                         "std": float(result.stds[index]),
                         "sem": float(result.sems[index]),
+                        **(
+                            {
+                                "topk_mean": float(result.topk_means[index]),
+                                "topk_std": float(result.topk_stds[index]),
+                                "topk_sem": float(result.topk_sems[index]),
+                            }
+                            if (
+                                result.topk_means is not None
+                                and result.topk_stds is not None
+                                and result.topk_sems is not None
+                            )
+                            else {}
+                        ),
                     },
                 ),
             )
@@ -666,12 +724,15 @@ class MetricsRuntimeMixin:
     def _start_roi_apply_job(self) -> None:
         """Start asynchronous ROI application across the full dataset."""
         metrics = self.metrics_state
+        mode = self._current_average_mode()
         if (
             not self._has_loaded_data()
             or metrics.roi_rect is None
-            or self._current_average_mode() != "roi"
+            or not self._average_mode_uses_roi(mode)
         ):
             return
+        if mode == "roi_topk" and hasattr(self, "avg_spin"):
+            metrics.avg_count_value = self.avg_spin.value()
         if (
             self._roi_apply_thread is not None
             and self._roi_apply_thread.isRunning()
@@ -685,8 +746,22 @@ class MetricsRuntimeMixin:
         if signature_hash is None:
             return
         identities, cached_payloads = self._cached_roi_payloads(signature_hash)
-        existing_maxs, existing_means, existing_stds, existing_sems, missing_indices = (
-            self._prefill_roi_metric_arrays(cached_payloads)
+        include_topk = self._current_average_mode() == "roi_topk"
+        (
+            existing_maxs,
+            existing_sums,
+            existing_means,
+            existing_stds,
+            existing_sems,
+            existing_topk_means,
+            existing_topk_stds,
+            existing_topk_sems,
+            missing_indices,
+        ) = (
+            self._prefill_roi_metric_arrays(
+                cached_payloads,
+                include_topk=include_topk,
+            )
         )
         if not missing_indices:
             self._roi_cache_pending = None
@@ -694,10 +769,14 @@ class MetricsRuntimeMixin:
                 RoiApplyResult(
                     job_id=job_id,
                     maxs=existing_maxs,
+                    sums=existing_sums,
                     means=existing_means,
                     stds=existing_stds,
                     sems=existing_sems,
                     valid_count=int(np.count_nonzero(np.isfinite(existing_means))),
+                    topk_means=existing_topk_means,
+                    topk_stds=existing_topk_stds,
+                    topk_sems=existing_topk_sems,
                 ),
             )
             return
@@ -715,10 +794,15 @@ class MetricsRuntimeMixin:
             raw_resolver_context=self._raw_decode_resolver_context(
                 path_metadata_by_path=dict(dataset.path_metadata),
             ),
+            topk_count=metrics.avg_count_value if include_topk else None,
             existing_maxs=existing_maxs,
+            existing_sums=existing_sums,
             existing_means=existing_means,
             existing_stds=existing_stds,
             existing_sems=existing_sems,
+            existing_topk_means=existing_topk_means,
+            existing_topk_stds=existing_topk_stds,
+            existing_topk_sems=existing_topk_sems,
         )
         worker.moveToThread(thread)
 
@@ -832,6 +916,10 @@ class MetricsRuntimeMixin:
             mean_header = "ROI"
             std_header = "ROI Std"
             sem_header = "ROI Std Err"
+        elif mode == "roi_topk":
+            mean_header = "ROI Top-K"
+            std_header = "ROI Top-K Std"
+            sem_header = "ROI Top-K Std Err"
         else:
             mean_header = "Average Metric"
             std_header = "Std"
@@ -869,6 +957,14 @@ class MetricsRuntimeMixin:
             update_kind="full",
             refresh_analysis=True,
         )
+        if mode == "roi_topk" and metrics.roi_rect is not None:
+            if metrics.roi_applied_to_all:
+                self._start_roi_apply_job()
+            else:
+                self._apply_roi_rect_to_current_dataset(
+                    metrics.roi_rect,
+                    status_message=None,
+                )
         self._update_average_controls()
         self._refresh_workspace_document_dirty_state()
         self._set_status()
@@ -969,7 +1065,11 @@ class MetricsRuntimeMixin:
             getattr(self, "_dataset_load_batch_applying", False),
         )
         iris_positions, exposure_ms = self._metadata_numeric_arrays()
-        if streaming_update and mode == "roi" and not self.metrics_state.roi_applied_to_all:
+        if (
+            streaming_update
+            and self._average_mode_uses_roi(mode)
+            and not self.metrics_state.roi_applied_to_all
+        ):
             self.metrics_state.dn_per_ms_values = None
             self.metrics_state.dn_per_ms_stds = None
             self.metrics_state.dn_per_ms_sems = None
@@ -992,6 +1092,7 @@ class MetricsRuntimeMixin:
             exposure_ms=exposure_ms,
             maxs=metrics.maxs,
             roi_maxs=metrics.roi_maxs,
+            roi_sums=metrics.roi_sums,
             min_non_zero=metrics.min_non_zero,
             sat_counts=metrics.sat_counts,
             low_signal_flags=metrics.low_signal_mask(path_count=dataset.path_count()),
@@ -1002,6 +1103,9 @@ class MetricsRuntimeMixin:
             avg_roi=metrics.roi_means if mode == "roi" else None,
             avg_roi_std=metrics.roi_stds if mode == "roi" else None,
             avg_roi_sem=metrics.roi_sems if mode == "roi" else None,
+            avg_roi_topk=metrics.roi_topk_means if mode == "roi_topk" else None,
+            avg_roi_topk_std=metrics.roi_topk_stds if mode == "roi_topk" else None,
+            avg_roi_topk_sem=metrics.roi_topk_sems if mode == "roi_topk" else None,
             dn_per_ms=metrics.dn_per_ms_values,
         )
         self._apply_table_sort()
@@ -1326,25 +1430,45 @@ class MetricsRuntimeMixin:
                 f" | mean={mean_text} | std={std_text}"
                 f" | stderr={sem_text}"
             )
-        elif mode == "roi":
+        elif self._average_mode_uses_roi(mode):
             if metrics.roi_rect is not None:
                 x0, y0, x1, y1 = metrics.roi_rect
                 info += f" | roi=({x0},{y0})-({x1},{y1})"
-            roi_value = (
-                metrics.roi_means[idx]
-                if metrics.roi_means is not None
-                else np.nan
-            )
-            roi_std = (
-                metrics.roi_stds[idx]
-                if metrics.roi_stds is not None
-                else np.nan
-            )
-            roi_sem = (
-                metrics.roi_sems[idx]
-                if metrics.roi_sems is not None
-                else np.nan
-            )
+            if mode == "roi_topk":
+                roi_value = (
+                    metrics.roi_topk_means[idx]
+                    if metrics.roi_topk_means is not None
+                    and idx < len(metrics.roi_topk_means)
+                    else np.nan
+                )
+                roi_std = (
+                    metrics.roi_topk_stds[idx]
+                    if metrics.roi_topk_stds is not None
+                    and idx < len(metrics.roi_topk_stds)
+                    else np.nan
+                )
+                roi_sem = (
+                    metrics.roi_topk_sems[idx]
+                    if metrics.roi_topk_sems is not None
+                    and idx < len(metrics.roi_topk_sems)
+                    else np.nan
+                )
+            else:
+                roi_value = (
+                    metrics.roi_means[idx]
+                    if metrics.roi_means is not None
+                    else np.nan
+                )
+                roi_std = (
+                    metrics.roi_stds[idx]
+                    if metrics.roi_stds is not None
+                    else np.nan
+                )
+                roi_sem = (
+                    metrics.roi_sems[idx]
+                    if metrics.roi_sems is not None
+                    else np.nan
+                )
             mean_text, std_text, sem_text = self._format_mean_std_sem(
                 float(roi_value),
                 float(roi_std),
@@ -1363,14 +1487,14 @@ class MetricsRuntimeMixin:
     def _compute_roi_stats_for_index(
         self,
         index: int,
-    ) -> tuple[float, float, float, float]:
-        """Compute ROI max, mean, std, and sem for one image index."""
+    ) -> dict[str, object]:
+        """Compute ROI stats for one image index."""
         dataset = self.dataset_state
         roi_rect = self.metrics_state.roi_rect
         if not self._has_loaded_data() or roi_rect is None:
-            return (np.nan, np.nan, np.nan, np.nan)
+            return {}
         if not (0 <= index < dataset.path_count()):
-            return (np.nan, np.nan, np.nan, np.nan)
+            return {}
 
         signature_hash = self._roi_metric_signature_hash()
         path = dataset.paths[index]
@@ -1390,20 +1514,32 @@ class MetricsRuntimeMixin:
                 )
                 cached_payload = cached.get(str(Path(path).resolve()))
                 if cached_payload is not None:
-                    return (
-                        float(cached_payload.get("max", np.nan)),
-                        float(cached_payload.get("mean", np.nan)),
-                        float(cached_payload.get("std", np.nan)),
-                        float(cached_payload.get("sem", np.nan)),
-                    )
+                    return {
+                        "roi_max": float(cached_payload.get("max", np.nan)),
+                        "roi_sum": float(cached_payload.get("sum", np.nan)),
+                        "roi_mean": float(cached_payload.get("mean", np.nan)),
+                        "roi_std": float(cached_payload.get("std", np.nan)),
+                        "roi_sem": float(cached_payload.get("sem", np.nan)),
+                        "roi_topk_mean": float(
+                            cached_payload.get("topk_mean", np.nan),
+                        ),
+                        "roi_topk_std": float(
+                            cached_payload.get("topk_std", np.nan),
+                        ),
+                        "roi_topk_sem": float(
+                            cached_payload.get("topk_sem", np.nan),
+                        ),
+                    }
 
         image = self._get_image_by_index(index)
         if image is None:
-            return (np.nan, np.nan, np.nan, np.nan)
+            return {}
 
-        roi_max, roi_mean, roi_std, roi_sem = native_backend.compute_roi_metrics(
+        include_topk = self._current_average_mode() == "roi_topk"
+        roi_result = native_backend.compute_roi_metrics_full(
             image,
             roi_rect=roi_rect,
+            topk_count=self.metrics_state.avg_count_value if include_topk else None,
             background=self._get_reference_for_path(path),
             clip_negative=self.metrics_state.background_config.clip_negative,
         )
@@ -1417,17 +1553,27 @@ class MetricsRuntimeMixin:
                     MetricCacheWrite(
                         identity=identity,
                         payload={
-                            "max": roi_max,
-                            "mean": roi_mean,
-                            "std": roi_std,
-                            "sem": roi_sem,
+                            "max": float(roi_result["roi_max"]),
+                            "sum": float(roi_result["roi_sum"]),
+                            "mean": float(roi_result["roi_mean"]),
+                            "std": float(roi_result["roi_std"]),
+                            "sem": float(roi_result["roi_sem"]),
+                            **(
+                                {
+                                    "topk_mean": float(roi_result["roi_topk_mean"]),
+                                    "topk_std": float(roi_result["roi_topk_std"]),
+                                    "topk_sem": float(roi_result["roi_topk_sem"]),
+                                }
+                                if include_topk
+                                else {}
+                            ),
                         },
                     ),
                 ],
                 metric_kind=ROI_METRIC_KIND,
                 signature_hash=signature_hash,
             )
-        return (roi_max, roi_mean, roi_std, roi_sem)
+        return roi_result
 
     def _on_average_mode_changed(self) -> None:
         """Respond to average-mode UI changes."""
@@ -1439,7 +1585,7 @@ class MetricsRuntimeMixin:
         """Store current ROI selection and refresh ROI metrics."""
         if not self._has_loaded_data() or self.dataset_state.selected_index is None:
             return
-        if self._current_average_mode() != "roi":
+        if not self._average_mode_uses_roi(self._current_average_mode()):
             return
         self._apply_roi_rect_to_current_dataset(rect, status_message=None)
 
@@ -1447,6 +1593,6 @@ class MetricsRuntimeMixin:
         """Start ROI propagation across all loaded images."""
         if not self._has_loaded_data() or self.metrics_state.roi_rect is None:
             return
-        if self._current_average_mode() != "roi":
+        if not self._average_mode_uses_roi(self._current_average_mode()):
             return
         self._start_roi_apply_job()

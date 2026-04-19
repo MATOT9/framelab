@@ -21,7 +21,6 @@ This file is the compact registry of known bugs, fragile zones, and incomplete a
 
 ## Feature Gaps
 
-- ROI sum is not yet a first-class metric.
 - Computer last boot time calculation is planned but not implemented.
 - Setup builder work is planned, including preregistered cameras, lenses, filters, and a visual setup authoring UI.
 - Dead pixel detection is planned.

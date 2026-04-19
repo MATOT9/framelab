@@ -11,7 +11,7 @@ from framelab.main_window.analysis import AnalysisPageMixin
 from framelab.main_window.inspect_page import InspectPageMixin
 from framelab.main_window.metrics_runtime import MetricsRuntimeMixin
 from framelab.main_window.window_actions import WindowActionsMixin
-from framelab.metric_reducers import compute_roi_stats
+from framelab.metric_reducers import compute_roi_stats_full
 from framelab.metrics_state import MetricsPipelineController
 from framelab.models import MetricsSortProxyModel, MetricsTableModel
 
@@ -28,6 +28,9 @@ class _InspectMathHarness:
         self.roi_means = None
         self.roi_stds = None
         self.roi_sems = None
+        self.roi_topk_means = None
+        self.roi_topk_stds = None
+        self.roi_topk_sems = None
         self.maxs = None
         self.normalize_intensity_values = False
         self.rounding_mode = "off"
@@ -49,6 +52,9 @@ class _AnalysisHarness(AnalysisPageMixin):
         self.roi_means = None
         self.roi_stds = None
         self.roi_sems = None
+        self.roi_topk_means = None
+        self.roi_topk_stds = None
+        self.roi_topk_sems = None
         self.normalize_intensity_values = False
         self.background_config = BackgroundConfig()
         self._bg_applied_mask = None
@@ -83,6 +89,7 @@ class _RoiSelectionHarness(WindowActionsMixin, InspectPageMixin):
         self.image_preview = _PreviewStub()
         self._images: list[np.ndarray] = []
         self.last_status = None
+        self._mode = "roi"
 
     def load_images(
         self,
@@ -118,6 +125,9 @@ class _RoiSelectionHarness(WindowActionsMixin, InspectPageMixin):
     def _has_loaded_data(self) -> bool:
         return self.dataset_state.has_loaded_data()
 
+    def _current_average_mode(self) -> str:
+        return self._mode
+
     def _get_metric_image_by_index(self, index: int):
         if not (0 <= index < len(self._images)):
             return (None, False)
@@ -129,13 +139,20 @@ class _RoiSelectionHarness(WindowActionsMixin, InspectPageMixin):
     def _compute_roi_stats_for_index(
         self,
         index: int,
-    ) -> tuple[float, float, float, float]:
+    ) -> dict[str, object]:
         roi_rect = self.metrics_state.roi_rect
         if roi_rect is None:
-            return (np.nan, np.nan, np.nan, np.nan)
+            return {}
         image = self._images[index]
         x0, y0, x1, y1 = roi_rect
-        return compute_roi_stats(image[y0:y1, x0:x1])
+        return compute_roi_stats_full(
+            image[y0:y1, x0:x1],
+            topk_count=(
+                self.metrics_state.avg_count_value
+                if self._current_average_mode() == "roi_topk"
+                else None
+            ),
+        )
 
     def _update_average_controls(self) -> None:
         return
@@ -146,7 +163,7 @@ class _RoiSelectionHarness(WindowActionsMixin, InspectPageMixin):
             self.metrics_state.dn_per_ms_values,
             self.metrics_state.dn_per_ms_stds,
             self.metrics_state.dn_per_ms_sems,
-        ) = self._compute_dn_per_ms_metrics("roi", exposure_ms)
+        ) = self._compute_dn_per_ms_metrics(self._current_average_mode(), exposure_ms)
 
     def _refresh_workspace_document_dirty_state(self) -> None:
         return
@@ -162,6 +179,7 @@ class _SingleRoiStatsHarness(MetricsRuntimeMixin):
         self.dataset_state = DatasetStateController()
         self.metrics_state = MetricsPipelineController()
         self.metrics_cache = None
+        self._mode = "roi"
         self._image = np.asarray(image, dtype=np.float64)
         self._reference = (
             None if reference is None else np.asarray(reference, dtype=np.float64)
@@ -171,6 +189,9 @@ class _SingleRoiStatsHarness(MetricsRuntimeMixin):
 
     def _has_loaded_data(self) -> bool:
         return True
+
+    def _current_average_mode(self) -> str:
+        return self._mode
 
     def _roi_metric_signature_hash(self) -> str | None:
         return None
@@ -227,6 +248,22 @@ def test_compute_dn_per_ms_metrics_uses_roi_arrays_in_roi_mode() -> None:
     np.testing.assert_allclose(sems, np.array([0.375]))
 
 
+def test_compute_dn_per_ms_metrics_uses_roi_topk_arrays_in_roi_topk_mode() -> None:
+    host = _InspectMathHarness()
+    host.roi_topk_means = np.array([20.0])
+    host.roi_topk_stds = np.array([4.0])
+    host.roi_topk_sems = np.array([2.0])
+
+    values, stds, sems = host._compute_dn_per_ms_metrics(
+        "roi_topk",
+        np.array([5.0]),
+    )
+
+    np.testing.assert_allclose(values, np.array([4.0]))
+    np.testing.assert_allclose(stds, np.array([0.8]))
+    np.testing.assert_allclose(sems, np.array([0.4]))
+
+
 def test_apply_roi_rect_uses_fallback_selection_for_dn_per_ms() -> None:
     host = _RoiSelectionHarness()
     path_metadata = {
@@ -277,6 +314,35 @@ def test_apply_roi_rect_derives_dn_per_ms_from_raw_exposure_metadata() -> None:
     assert float(host.metrics_state.dn_per_ms_values[0]) == pytest.approx(0.8)
 
 
+def test_apply_roi_rect_populates_roi_topk_metric_inside_roi() -> None:
+    host = _RoiSelectionHarness()
+    host._mode = "roi_topk"
+    host.metrics_state.avg_count_value = 2
+    host.load_images(
+        [
+            np.array(
+                [
+                    [1000.0, 1.0, 2.0],
+                    [3.0, 10.0, 20.0],
+                    [4.0, 30.0, 40.0],
+                ],
+            ),
+        ],
+        {"/tmp/image-0.tiff": {"exposure_ms": 10.0}},
+    )
+    host.dataset_state.set_selected_index(0, path_count=1)
+
+    applied = host._apply_roi_rect_to_current_dataset(
+        (1, 1, 3, 3),
+        status_message=None,
+    )
+
+    assert applied
+    assert float(host.metrics_state.roi_sums[0]) == pytest.approx(100.0)
+    assert float(host.metrics_state.roi_topk_means[0]) == pytest.approx(35.0)
+    assert float(host.metrics_state.dn_per_ms_values[0]) == pytest.approx(3.5)
+
+
 def test_compute_roi_stats_for_index_uses_native_backend_wrapper(
     monkeypatch,
 ) -> None:
@@ -285,11 +351,26 @@ def test_compute_roi_stats_for_index_uses_native_backend_wrapper(
 
     monkeypatch.setattr(
         metrics_runtime_module.native_backend,
-        "compute_roi_metrics",
-        lambda image, **kwargs: (9.0, 8.0, 7.0, 6.0),
+        "compute_roi_metrics_full",
+        lambda image, **kwargs: {
+            "roi_max": 9.0,
+            "roi_sum": 30.0,
+            "roi_mean": 8.0,
+            "roi_std": 7.0,
+            "roi_sem": 6.0,
+            "roi_topk_mean": None,
+            "roi_topk_std": None,
+            "roi_topk_sem": None,
+        },
     )
 
-    assert host._compute_roi_stats_for_index(0) == (9.0, 8.0, 7.0, 6.0)
+    result = host._compute_roi_stats_for_index(0)
+
+    assert result["roi_max"] == pytest.approx(9.0)
+    assert result["roi_sum"] == pytest.approx(30.0)
+    assert result["roi_mean"] == pytest.approx(8.0)
+    assert result["roi_std"] == pytest.approx(7.0)
+    assert result["roi_sem"] == pytest.approx(6.0)
 
 
 def test_normalization_scale_falls_back_to_one_for_empty_or_zero_max() -> None:
@@ -309,6 +390,7 @@ def test_metrics_table_normalization_changes_intensity_fields_but_not_sat_count(
         exposure_ms=np.array([10.0]),
         maxs=np.array([100], dtype=np.int64),
         roi_maxs=np.array([80.0]),
+        roi_sums=np.array([160.0]),
         min_non_zero=np.array([4], dtype=np.int64),
         sat_counts=np.array([3], dtype=np.int64),
         low_signal_flags=np.array([False], dtype=bool),
@@ -324,17 +406,55 @@ def test_metrics_table_normalization_changes_intensity_fields_but_not_sat_count(
 
     assert model.data(model.index(0, 4)) == "100"
     assert model.data(model.index(0, 5)) == "80"
-    assert model.data(model.index(0, 7)) == "3"
-    assert model.data(model.index(0, 8)) == "50.00"
-    assert model.data(model.index(0, 11)) == "2"
+    assert model.data(model.index(0, 6)) == "160"
+    assert model.data(model.index(0, 8)) == "3"
+    assert model.data(model.index(0, 9)) == "50.00"
+    assert model.data(model.index(0, 12)) == "2"
 
     model.set_intensity_normalization(True, 100.0)
 
     assert model.data(model.index(0, 4)) == "1"
     assert model.data(model.index(0, 5)) == "0.8"
-    assert model.data(model.index(0, 7)) == "3"
-    assert model.data(model.index(0, 8)) == "0.50"
-    assert model.data(model.index(0, 11)) == "0.02"
+    assert model.data(model.index(0, 6)) == "1.6"
+    assert model.data(model.index(0, 8)) == "3"
+    assert model.data(model.index(0, 9)) == "0.50"
+    assert model.data(model.index(0, 12)) == "0.02"
+
+
+def test_metrics_table_displays_roi_sum_and_roi_topk_average() -> None:
+    model = MetricsTableModel()
+    model.update_metrics(
+        paths=["/tmp/a.tif"],
+        iris_positions=np.array([np.nan]),
+        exposure_ms=np.array([2.0]),
+        maxs=np.array([100], dtype=np.int64),
+        roi_maxs=np.array([40.0]),
+        roi_sums=np.array([100.0]),
+        min_non_zero=np.array([1], dtype=np.int64),
+        sat_counts=np.array([0], dtype=np.int64),
+        low_signal_flags=None,
+        avg_mode="roi_topk",
+        avg_topk=None,
+        avg_topk_std=None,
+        avg_topk_sem=None,
+        avg_roi=None,
+        avg_roi_std=None,
+        avg_roi_sem=None,
+        avg_roi_topk=np.array([35.0]),
+        avg_roi_topk_std=np.array([5.0]),
+        avg_roi_topk_sem=np.array([5.0 / np.sqrt(2.0)]),
+        dn_per_ms=np.array([17.5]),
+    )
+
+    model.set_average_header("ROI Top-K")
+    model.set_std_header("ROI Top-K Std")
+    model.set_sem_header("ROI Top-K Std Err")
+
+    assert model.headerData(9, QtCore.Qt.Horizontal, QtCore.Qt.UserRole) == "ROI Top-K"
+    assert model.data(model.index(0, 6)) == "100"
+    assert model.data(model.index(0, 9)) == "35.00"
+    assert model.data(model.index(0, 10)) == "5.00"
+    assert model.data(model.index(0, 12)) == "17.5"
 
 
 def test_metrics_table_uses_distinct_low_signal_row_highlight_with_saturation_precedence() -> None:
@@ -345,6 +465,7 @@ def test_metrics_table_uses_distinct_low_signal_row_highlight_with_saturation_pr
         exposure_ms=np.array([10.0, 10.0]),
         maxs=np.array([4, 6], dtype=np.int64),
         roi_maxs=np.array([4.0, 6.0]),
+        roi_sums=np.array([10.0, 12.0]),
         min_non_zero=np.array([1, 1], dtype=np.int64),
         sat_counts=np.array([0, 2], dtype=np.int64),
         low_signal_flags=np.array([True, True], dtype=bool),
@@ -380,11 +501,13 @@ def test_metrics_state_reserves_dataset_capacity_and_commits_loaded_batches() ->
     assert state.maxs is not None
     assert state.sat_counts is not None
     assert state.roi_maxs is not None
+    assert state.roi_sums is not None
     assert state.bg_applied_mask is not None
     assert state.min_non_zero.tolist() == [1, 2, 3]
     assert state.maxs.tolist() == [10, 20, 30]
     assert state.sat_counts.tolist() == [0, 0, 0]
     assert len(state.roi_maxs) == 3
+    assert len(state.roi_sums) == 3
     assert len(state.bg_applied_mask) == 3
     assert state.bg_total_count == 3
 
@@ -402,6 +525,7 @@ def test_metrics_table_proxy_keeps_all_rows_when_dataset_grows(qapp) -> None:
             exposure_ms=np.full(count, np.nan, dtype=np.float64),
             maxs=np.zeros(count, dtype=np.int64),
             roi_maxs=np.full(count, np.nan, dtype=np.float64),
+            roi_sums=np.full(count, np.nan, dtype=np.float64),
             min_non_zero=np.zeros(count, dtype=np.int64),
             sat_counts=np.zeros(count, dtype=np.int64),
             low_signal_flags=np.zeros(count, dtype=bool),
@@ -440,6 +564,7 @@ def test_metrics_table_proxy_keeps_all_rows_when_shared_paths_grow_in_place(qapp
             exposure_ms=np.full(count, np.nan, dtype=np.float64),
             maxs=np.zeros(count, dtype=np.int64),
             roi_maxs=np.full(count, np.nan, dtype=np.float64),
+            roi_sums=np.full(count, np.nan, dtype=np.float64),
             min_non_zero=np.zeros(count, dtype=np.int64),
             sat_counts=np.zeros(count, dtype=np.int64),
             low_signal_flags=np.zeros(count, dtype=bool),

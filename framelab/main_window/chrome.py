@@ -871,8 +871,8 @@ class WindowChromeMixin:
     def _sync_column_menu_actions(self) -> None:
         """Sync View->Columns checkboxes with current table visibility."""
         mode = self._current_average_mode()
-        mode_has_average = mode in {"topk", "roi"}
-        roi_mode_active = mode == "roi"
+        mode_has_average = mode in {"topk", "roi", "roi_topk"}
+        roi_mode_active = mode in {"roi", "roi_topk"}
 
         for key, action in self._data_column_actions.items():
             if hasattr(self, "metadata_table"):

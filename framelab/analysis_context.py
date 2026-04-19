@@ -48,6 +48,10 @@ class AnalysisContextController:
             means = metrics.roi_means
             stds = metrics.roi_stds
             sems = metrics.roi_sems
+        elif mode == "roi_topk":
+            means = metrics.roi_topk_means
+            stds = metrics.roi_topk_stds
+            sems = metrics.roi_topk_sems
 
         normalize_intensity = bool(metrics.normalize_intensity_values)
         scale = float(normalization_scale)

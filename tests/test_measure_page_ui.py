@@ -205,34 +205,51 @@ def test_roi_selection_updates_roi_max_for_selected_image_immediately(
     )
 
     roi_max_column = measure_window.MEASURE_COLUMN_INDEX["roi_max"]
+    roi_sum_column = measure_window.MEASURE_COLUMN_INDEX["roi_sum"]
     assert float(measure_window.metrics_state.roi_maxs[dark_index]) == pytest.approx(4.0)
+    assert float(measure_window.metrics_state.roi_sums[dark_index]) == pytest.approx(16.0)
     assert measure_window.table_model.data(
         measure_window.table_model.index(dark_index, roi_max_column),
     ) == "4"
+    assert measure_window.table_model.data(
+        measure_window.table_model.index(dark_index, roi_sum_column),
+    ) == "16"
 
 
-def test_roi_max_column_only_shows_in_roi_average_mode(
+def test_roi_columns_show_in_roi_average_modes(
     tmp_path: Path,
     measure_window: FrameLabWindow,
     wait_for_dataset_load,
 ) -> None:
     dataset_root = _write_measure_dataset(tmp_path)
     roi_max_column = measure_window.MEASURE_COLUMN_INDEX["roi_max"]
+    roi_sum_column = measure_window.MEASURE_COLUMN_INDEX["roi_sum"]
     measure_window.folder_edit.setText(str(dataset_root))
     measure_window.load_folder()
     wait_for_dataset_load(measure_window)
 
     assert measure_window.table.isColumnHidden(roi_max_column)
+    assert measure_window.table.isColumnHidden(roi_sum_column)
 
     measure_window.avg_mode_combo.setCurrentIndex(
         measure_window.avg_mode_combo.findData("topk"),
     )
     assert measure_window.table.isColumnHidden(roi_max_column)
+    assert measure_window.table.isColumnHidden(roi_sum_column)
 
     measure_window.avg_mode_combo.setCurrentIndex(
         measure_window.avg_mode_combo.findData("roi"),
     )
     assert not measure_window.table.isColumnHidden(roi_max_column)
+    assert not measure_window.table.isColumnHidden(roi_sum_column)
+
+    measure_window.avg_mode_combo.setCurrentIndex(
+        measure_window.avg_mode_combo.findData("roi_topk"),
+    )
+    assert not measure_window.table.isColumnHidden(roi_max_column)
+    assert not measure_window.table.isColumnHidden(roi_sum_column)
+    assert not measure_window.topk_controls_widget.isHidden()
+    assert not measure_window.roi_controls_widget.isHidden()
 
 
 def test_compact_measure_header_mirrors_low_signal_and_saturation_status(

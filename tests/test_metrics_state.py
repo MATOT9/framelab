@@ -33,8 +33,12 @@ def test_initialize_loaded_dataset_resets_dataset_dependent_arrays(
     assert state.bg_unmatched_count == 3
     assert state.roi_maxs.shape == (3,)
     assert np.isnan(state.roi_maxs).all()
+    assert state.roi_sums.shape == (3,)
+    assert np.isnan(state.roi_sums).all()
     assert state.roi_means.shape == (3,)
     assert np.isnan(state.roi_means).all()
+    assert state.roi_topk_means.shape == (3,)
+    assert np.isnan(state.roi_topk_means).all()
 
 
 def test_prepare_for_live_update_sizes_topk_roi_and_background_arrays(
@@ -51,7 +55,9 @@ def test_prepare_for_live_update_sizes_topk_roi_and_background_arrays(
     assert state.avg_maxs_std.shape == (2,)
     assert state.avg_maxs_sem.shape == (2,)
     assert state.roi_maxs.shape == (2,)
+    assert state.roi_sums.shape == (2,)
     assert state.roi_means.shape == (2,)
+    assert state.roi_topk_means.shape == (2,)
 
     state.prepare_for_live_update(path_count=2, mode="none")
 
@@ -88,20 +94,29 @@ def test_apply_roi_result_updates_roi_arrays(state: MetricsPipelineController) -
     result = RoiApplyResult(
         job_id=9,
         maxs=np.array([4.0, np.nan]),
+        sums=np.array([8.0, np.nan]),
         means=np.array([2.0, np.nan]),
         stds=np.array([1.0, np.nan]),
         sems=np.array([0.5, np.nan]),
         valid_count=1,
+        topk_means=np.array([3.5, np.nan]),
+        topk_stds=np.array([0.5, np.nan]),
+        topk_sems=np.array([0.25, np.nan]),
     )
 
     state.apply_roi_result(result)
 
     np.testing.assert_allclose(state.roi_maxs[:1], np.array([4.0]))
     assert np.isnan(state.roi_maxs[1])
+    np.testing.assert_allclose(state.roi_sums[:1], np.array([8.0]))
+    assert np.isnan(state.roi_sums[1])
     np.testing.assert_allclose(state.roi_means[:1], np.array([2.0]))
     assert np.isnan(state.roi_means[1])
     np.testing.assert_allclose(state.roi_stds[:1], np.array([1.0]))
     np.testing.assert_allclose(state.roi_sems[:1], np.array([0.5]))
+    np.testing.assert_allclose(state.roi_topk_means[:1], np.array([3.5]))
+    np.testing.assert_allclose(state.roi_topk_stds[:1], np.array([0.5]))
+    np.testing.assert_allclose(state.roi_topk_sems[:1], np.array([0.25]))
 
 
 def test_job_state_helpers_track_stats_and_roi_lifecycle(

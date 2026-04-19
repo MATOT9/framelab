@@ -17,7 +17,7 @@ from .background import BackgroundConfig, BackgroundLibrary
 CACHE_SCHEMA_VERSION = 1
 STATIC_METRIC_KIND = "static_v1"
 DYNAMIC_METRIC_KIND = "dynamic_v1"
-ROI_METRIC_KIND = "roi_v1"
+ROI_METRIC_KIND = "roi_v2"
 
 
 def _repo_root() -> Path:
@@ -256,6 +256,7 @@ def dynamic_metric_signature_hash(
 def roi_metric_signature_hash(
     *,
     roi_rect: tuple[int, int, int, int],
+    topk_count: int | None = None,
     background_payload: dict[str, Any],
 ) -> str:
     """Return the versioned signature for ROI row metrics."""
@@ -265,6 +266,7 @@ def roi_metric_signature_hash(
             "metric_kind": ROI_METRIC_KIND,
             "cache_schema_version": CACHE_SCHEMA_VERSION,
             "roi_rect": [int(value) for value in roi_rect],
+            "topk_count": None if topk_count is None else int(topk_count),
             "background": background_payload,
         },
     )

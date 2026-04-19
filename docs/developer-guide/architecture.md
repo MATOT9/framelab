@@ -188,11 +188,12 @@ The Measure workflow computes per-image metrics such as:
 - minimum non-zero pixel
 - saturated-pixel count
 - Top-K mean/std/SEM
-- ROI mean/std/SEM
+- ROI max/sum/mean/std/SEM
+- ROI + Top-K mean/std/SEM
 - `DN/ms`
 - background-match status
 
-These results are stored through `MetricsPipelineController`. Dynamic metric computation is delegated to worker classes in `framelab/workers.py` and orchestrated by `MetricsRuntimeMixin`, which applies worker results back into controller-owned state.
+These results are stored through `MetricsPipelineController`. Dynamic metric computation is delegated to worker classes in `framelab/workers.py` and orchestrated by `MetricsRuntimeMixin`, which applies worker results back into controller-owned state. Global Top-K uses the dynamic metrics path, while ROI-derived modes, including ROI + Top-K, use `RoiApplyWorker` so the Top-K population is selected inside the ROI.
 
 ### Stage 4: analysis context build
 
@@ -259,6 +260,7 @@ The metrics controller owns measurement settings and the latest measurement resu
 
 - static and dynamic metric arrays
 - ROI rectangle and ROI-derived arrays
+- ROI + Top-K arrays derived from the selected ROI and Top-K count
 - normalization and rounding settings
 - background configuration, loaded references, and match bookkeeping
 - threshold and Top-K settings
@@ -303,7 +305,7 @@ This repo already uses worker threads for expensive per-dataset operations.
 ### Current asynchronous jobs
 
 - dynamic metric computation via `DynamicStatsWorker`
-- dataset-wide ROI application via `RoiApplyWorker`
+- dataset-wide ROI and ROI + Top-K application via `RoiApplyWorker`
 
 ### Architectural rule
 

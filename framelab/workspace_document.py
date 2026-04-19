@@ -254,7 +254,7 @@ class WorkspaceDocumentSnapshot:
         ui = _section(payload, "ui")
 
         average_mode = _clean_text(measure.get("average_mode")) or "none"
-        if average_mode not in {"none", "topk", "roi"}:
+        if average_mode not in {"none", "topk", "roi", "roi_topk"}:
             average_mode = "none"
         rounding_mode = _clean_text(measure.get("rounding_mode")) or "off"
         if rounding_mode not in {"off", "std", "stderr"}:

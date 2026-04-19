@@ -23,6 +23,7 @@ class MetricsTableModel(QAbstractTableModel):
         label_for_metadata_field("exposure_ms"),
         "Max Pixel",
         "ROI Max",
+        "ROI Sum",
         "Min > 0",
         "# Saturated",
         "Average Metric",
@@ -40,6 +41,7 @@ class MetricsTableModel(QAbstractTableModel):
         self._exposure_ms: Optional[np.ndarray] = None
         self._maxs: Optional[np.ndarray] = None
         self._roi_maxs: Optional[np.ndarray] = None
+        self._roi_sums: Optional[np.ndarray] = None
         self._min_non_zero: Optional[np.ndarray] = None
         self._sat_counts: Optional[np.ndarray] = None
         self._low_signal_flags: Optional[np.ndarray] = None
@@ -49,6 +51,9 @@ class MetricsTableModel(QAbstractTableModel):
         self._avg_roi: Optional[np.ndarray] = None
         self._avg_roi_std: Optional[np.ndarray] = None
         self._avg_roi_sem: Optional[np.ndarray] = None
+        self._avg_roi_topk: Optional[np.ndarray] = None
+        self._avg_roi_topk_std: Optional[np.ndarray] = None
+        self._avg_roi_topk_sem: Optional[np.ndarray] = None
         self._dn_per_ms: Optional[np.ndarray] = None
         self._avg_mode = "none"
         self._avg_header = "Average Metric"
@@ -64,13 +69,13 @@ class MetricsTableModel(QAbstractTableModel):
 
     def _base_header_label(self, section: int) -> Optional[str]:
         """Return section label without sort-indicator decorations."""
-        if section == 8:
-            return self._avg_header
         if section == 9:
-            return self._std_header
+            return self._avg_header
         if section == 10:
-            return self._sem_header
+            return self._std_header
         if section == 11:
+            return self._sem_header
+        if section == 12:
             return self._dn_per_ms_header
         if 0 <= section < len(self.HEADERS):
             return self.HEADERS[section]
@@ -85,15 +90,16 @@ class MetricsTableModel(QAbstractTableModel):
             3: "Exposure extracted from selected metadata source (milliseconds).",
             4: "Maximum pixel intensity in the image. Normalized when enabled.",
             5: "Maximum intensity inside the applied ROI for this image.",
-            6: "Smallest strictly non-zero pixel intensity in the image.",
-            7: "Count of pixels above the saturation threshold.",
-            8: (
+            6: "Sum of intensities inside the applied ROI for this image.",
+            7: "Smallest strictly non-zero pixel intensity in the image.",
+            8: "Count of pixels above the saturation threshold.",
+            9: (
                 f"{self._avg_header}. Computed from Top-K pixels or ROI, "
                 "depending on average mode."
             ),
-            9: f"{self._std_header} associated with the selected average metric.",
-            10: f"{self._sem_header} associated with the selected average metric.",
-            11: (
+            10: f"{self._std_header} associated with the selected average metric.",
+            11: f"{self._sem_header} associated with the selected average metric.",
+            12: (
                 f"{self._dn_per_ms_header}: average intensity divided by "
                 "exposure time."
             ),
@@ -226,8 +232,17 @@ class MetricsTableModel(QAbstractTableModel):
                 roi_max_value /= self._normalization_scale
             return f"{roi_max_value:.6g}"
         if col == 6:
-            return str(int(self._min_non_zero[row]))
+            if self._roi_sums is None or row >= len(self._roi_sums):
+                return "-"
+            roi_sum_value = float(self._roi_sums[row])
+            if not np.isfinite(roi_sum_value):
+                return "-"
+            if self._normalize_intensity and self._normalization_scale > 0.0:
+                roi_sum_value /= self._normalization_scale
+            return f"{roi_sum_value:.6g}"
         if col == 7:
+            return str(int(self._min_non_zero[row]))
+        if col == 8:
             return str(int(self._sat_counts[row]))
 
         mean_value = float("nan")
@@ -253,25 +268,38 @@ class MetricsTableModel(QAbstractTableModel):
                 std_value = float(self._avg_roi_std[row])
             if self._avg_roi_sem is not None and row < len(self._avg_roi_sem):
                 sem_value = float(self._avg_roi_sem[row])
+        elif self._avg_mode == "roi_topk":
+            if self._avg_roi_topk is not None and row < len(self._avg_roi_topk):
+                mean_value = float(self._avg_roi_topk[row])
+            if (
+                self._avg_roi_topk_std is not None
+                and row < len(self._avg_roi_topk_std)
+            ):
+                std_value = float(self._avg_roi_topk_std[row])
+            if (
+                self._avg_roi_topk_sem is not None
+                and row < len(self._avg_roi_topk_sem)
+            ):
+                sem_value = float(self._avg_roi_topk_sem[row])
 
         if self._normalize_intensity and self._normalization_scale > 0.0:
             mean_value /= self._normalization_scale
             std_value /= self._normalization_scale
             sem_value /= self._normalization_scale
 
-        if col in (8, 9, 10):
+        if col in (9, 10, 11):
             mean_text, std_text, sem_text = format_metric_triplet(
                 mean_value,
                 std_value,
                 sem_value,
                 self._rounding_mode,
             )
-            if col == 8:
-                return mean_text
             if col == 9:
+                return mean_text
+            if col == 10:
                 return std_text
             return sem_text
-        if col == 11:
+        if col == 12:
             if self._dn_per_ms is None or row >= len(self._dn_per_ms):
                 return "-"
             dn_per_ms = float(self._dn_per_ms[row])
@@ -288,28 +316,28 @@ class MetricsTableModel(QAbstractTableModel):
         if self._avg_header == header_text:
             return
         self._avg_header = header_text
-        self.headerDataChanged.emit(Qt.Horizontal, 8, 8)
+        self.headerDataChanged.emit(Qt.Horizontal, 9, 9)
 
     def set_std_header(self, header_text: str) -> None:
         """Set dynamic label for uncertainty column."""
         if self._std_header == header_text:
             return
         self._std_header = header_text
-        self.headerDataChanged.emit(Qt.Horizontal, 9, 9)
+        self.headerDataChanged.emit(Qt.Horizontal, 10, 10)
 
     def set_sem_header(self, header_text: str) -> None:
         """Set dynamic label for standard-error column."""
         if self._sem_header == header_text:
             return
         self._sem_header = header_text
-        self.headerDataChanged.emit(Qt.Horizontal, 10, 10)
+        self.headerDataChanged.emit(Qt.Horizontal, 11, 11)
 
     def set_dn_per_ms_header(self, header_text: str) -> None:
         """Set dynamic label for DN-per-millisecond column."""
         if self._dn_per_ms_header == header_text:
             return
         self._dn_per_ms_header = header_text
-        self.headerDataChanged.emit(Qt.Horizontal, 11, 11)
+        self.headerDataChanged.emit(Qt.Horizontal, 12, 12)
 
     def set_sort_indicator(
         self,
@@ -354,7 +382,7 @@ class MetricsTableModel(QAbstractTableModel):
         if not self._paths:
             return
         top_left = self.index(0, 4)
-        bottom_right = self.index(len(self._paths) - 1, 11)
+        bottom_right = self.index(len(self._paths) - 1, 12)
         self.dataChanged.emit(top_left, bottom_right, [Qt.DisplayRole])
 
     def set_rounding_mode(self, mode: str) -> None:
@@ -365,8 +393,8 @@ class MetricsTableModel(QAbstractTableModel):
         self._rounding_mode = normalized
         if not self._paths:
             return
-        top_left = self.index(0, 8)
-        bottom_right = self.index(len(self._paths) - 1, 11)
+        top_left = self.index(0, 9)
+        bottom_right = self.index(len(self._paths) - 1, 12)
         self.dataChanged.emit(
             top_left,
             bottom_right,
@@ -381,6 +409,7 @@ class MetricsTableModel(QAbstractTableModel):
             self._exposure_ms = None
             self._maxs = None
             self._roi_maxs = None
+            self._roi_sums = None
             self._min_non_zero = None
             self._sat_counts = None
             self._avg_topk = None
@@ -390,6 +419,9 @@ class MetricsTableModel(QAbstractTableModel):
             self._avg_roi = None
             self._avg_roi_std = None
             self._avg_roi_sem = None
+            self._avg_roi_topk = None
+            self._avg_roi_topk_std = None
+            self._avg_roi_topk_sem = None
             self._dn_per_ms = None
             self.set_average_header("Average Metric")
             self.set_std_header("Std")
@@ -403,6 +435,7 @@ class MetricsTableModel(QAbstractTableModel):
         self._exposure_ms = None
         self._maxs = None
         self._roi_maxs = None
+        self._roi_sums = None
         self._min_non_zero = None
         self._sat_counts = None
         self._low_signal_flags = None
@@ -412,6 +445,9 @@ class MetricsTableModel(QAbstractTableModel):
         self._avg_roi = None
         self._avg_roi_std = None
         self._avg_roi_sem = None
+        self._avg_roi_topk = None
+        self._avg_roi_topk_std = None
+        self._avg_roi_topk_sem = None
         self._dn_per_ms = None
         self._avg_mode = "none"
         self._avg_header = "Average Metric"
@@ -535,6 +571,7 @@ class MetricsTableModel(QAbstractTableModel):
         exposure_ms: np.ndarray,
         maxs: np.ndarray,
         roi_maxs: Optional[np.ndarray],
+        roi_sums: Optional[np.ndarray],
         min_non_zero: np.ndarray,
         sat_counts: np.ndarray,
         low_signal_flags: Optional[np.ndarray],
@@ -545,6 +582,9 @@ class MetricsTableModel(QAbstractTableModel):
         avg_roi: Optional[np.ndarray],
         avg_roi_std: Optional[np.ndarray],
         avg_roi_sem: Optional[np.ndarray],
+        avg_roi_topk: Optional[np.ndarray],
+        avg_roi_topk_std: Optional[np.ndarray],
+        avg_roi_topk_sem: Optional[np.ndarray],
         dn_per_ms: Optional[np.ndarray],
     ) -> None:
         """Store the latest table payload references."""
@@ -554,6 +594,7 @@ class MetricsTableModel(QAbstractTableModel):
         self._exposure_ms = exposure_ms
         self._maxs = maxs
         self._roi_maxs = roi_maxs
+        self._roi_sums = roi_sums
         self._min_non_zero = min_non_zero
         self._sat_counts = sat_counts
         self._low_signal_flags = low_signal_flags
@@ -564,6 +605,9 @@ class MetricsTableModel(QAbstractTableModel):
         self._avg_roi = avg_roi
         self._avg_roi_std = avg_roi_std
         self._avg_roi_sem = avg_roi_sem
+        self._avg_roi_topk = avg_roi_topk
+        self._avg_roi_topk_std = avg_roi_topk_std
+        self._avg_roi_topk_sem = avg_roi_topk_sem
         self._dn_per_ms = dn_per_ms
 
     def _emit_metric_diffs(
@@ -573,6 +617,7 @@ class MetricsTableModel(QAbstractTableModel):
         previous_exposure_ms: Optional[np.ndarray],
         previous_maxs: Optional[np.ndarray],
         previous_roi_maxs: Optional[np.ndarray],
+        previous_roi_sums: Optional[np.ndarray],
         previous_min_non_zero: Optional[np.ndarray],
         previous_sat_counts: Optional[np.ndarray],
         previous_low_signal_flags: Optional[np.ndarray],
@@ -583,12 +628,16 @@ class MetricsTableModel(QAbstractTableModel):
         previous_avg_roi: Optional[np.ndarray],
         previous_avg_roi_std: Optional[np.ndarray],
         previous_avg_roi_sem: Optional[np.ndarray],
+        previous_avg_roi_topk: Optional[np.ndarray],
+        previous_avg_roi_topk_std: Optional[np.ndarray],
+        previous_avg_roi_topk_sem: Optional[np.ndarray],
         previous_dn_per_ms: Optional[np.ndarray],
         n_rows: int,
         current_iris_positions: Optional[np.ndarray],
         current_exposure_ms: Optional[np.ndarray],
         current_maxs: Optional[np.ndarray],
         current_roi_maxs: Optional[np.ndarray],
+        current_roi_sums: Optional[np.ndarray],
         current_min_non_zero: Optional[np.ndarray],
         current_sat_counts: Optional[np.ndarray],
         current_low_signal_flags: Optional[np.ndarray],
@@ -599,6 +648,9 @@ class MetricsTableModel(QAbstractTableModel):
         current_avg_roi: Optional[np.ndarray],
         current_avg_roi_std: Optional[np.ndarray],
         current_avg_roi_sem: Optional[np.ndarray],
+        current_avg_roi_topk: Optional[np.ndarray],
+        current_avg_roi_topk_std: Optional[np.ndarray],
+        current_avg_roi_topk_sem: Optional[np.ndarray],
         current_dn_per_ms: Optional[np.ndarray],
     ) -> None:
         """Emit minimal dataChanged regions for an in-place table update."""
@@ -632,6 +684,10 @@ class MetricsTableModel(QAbstractTableModel):
         )
         self._emit_changes_for_mask(
             6,
+            self._diff_mask_float(previous_roi_sums, current_roi_sums, n_rows),
+        )
+        self._emit_changes_for_mask(
+            7,
             self._diff_mask_int(
                 previous_min_non_zero,
                 current_min_non_zero,
@@ -641,8 +697,8 @@ class MetricsTableModel(QAbstractTableModel):
         sat_mask = self._diff_mask_int(
             previous_sat_counts,
             current_sat_counts,
-            n_rows,
-        )
+                n_rows,
+            )
         if previous_low_signal_flags is None and current_low_signal_flags is None:
             low_signal_mask = np.zeros(n_rows, dtype=bool)
         else:
@@ -651,7 +707,7 @@ class MetricsTableModel(QAbstractTableModel):
                 current_low_signal_flags,
                 n_rows,
             )
-        self._emit_changes_for_mask(7, sat_mask, roles=[Qt.DisplayRole])
+        self._emit_changes_for_mask(8, sat_mask, roles=[Qt.DisplayRole])
         self._emit_row_role_changes_for_mask(
             sat_mask | low_signal_mask,
             [Qt.BackgroundRole],
@@ -693,16 +749,32 @@ class MetricsTableModel(QAbstractTableModel):
                 current_avg_roi_sem,
                 n_rows,
             )
+        elif current_avg_mode == "roi_topk":
+            mean_mask = self._diff_mask_float(
+                previous_avg_roi_topk,
+                current_avg_roi_topk,
+                n_rows,
+            )
+            std_mask = self._diff_mask_float(
+                previous_avg_roi_topk_std,
+                current_avg_roi_topk_std,
+                n_rows,
+            )
+            sem_mask = self._diff_mask_float(
+                previous_avg_roi_topk_sem,
+                current_avg_roi_topk_sem,
+                n_rows,
+            )
         else:
             mean_mask = np.zeros(n_rows, dtype=bool)
             std_mask = np.zeros(n_rows, dtype=bool)
             sem_mask = np.zeros(n_rows, dtype=bool)
 
-        self._emit_changes_for_mask(8, mean_mask)
-        self._emit_changes_for_mask(9, std_mask)
-        self._emit_changes_for_mask(10, sem_mask)
+        self._emit_changes_for_mask(9, mean_mask)
+        self._emit_changes_for_mask(10, std_mask)
+        self._emit_changes_for_mask(11, sem_mask)
         self._emit_changes_for_mask(
-            11,
+            12,
             self._diff_mask_float(previous_dn_per_ms, current_dn_per_ms, n_rows),
         )
 
@@ -714,6 +786,7 @@ class MetricsTableModel(QAbstractTableModel):
         exposure_ms: np.ndarray,
         maxs: np.ndarray,
         roi_maxs: Optional[np.ndarray],
+        roi_sums: Optional[np.ndarray],
         min_non_zero: np.ndarray,
         sat_counts: np.ndarray,
         low_signal_flags: Optional[np.ndarray],
@@ -724,6 +797,9 @@ class MetricsTableModel(QAbstractTableModel):
         avg_roi: Optional[np.ndarray],
         avg_roi_std: Optional[np.ndarray],
         avg_roi_sem: Optional[np.ndarray],
+        avg_roi_topk: Optional[np.ndarray] = None,
+        avg_roi_topk_std: Optional[np.ndarray] = None,
+        avg_roi_topk_sem: Optional[np.ndarray] = None,
         dn_per_ms: Optional[np.ndarray],
     ) -> str:
         """Update metric arrays and emit minimal `dataChanged` ranges.
@@ -740,6 +816,8 @@ class MetricsTableModel(QAbstractTableModel):
             Per-image max intensity values.
         roi_maxs : numpy.ndarray or None
             Per-image maximum intensity values within the applied ROI.
+        roi_sums : numpy.ndarray or None
+            Per-image sum of intensity values within the applied ROI.
         min_non_zero : numpy.ndarray
             Per-image minimum non-zero values.
         sat_counts : numpy.ndarray
@@ -760,6 +838,12 @@ class MetricsTableModel(QAbstractTableModel):
             ROI standard deviations.
         avg_roi_sem : numpy.ndarray or None
             ROI standard errors.
+        avg_roi_topk : numpy.ndarray or None
+            ROI-constrained Top-K mean values.
+        avg_roi_topk_std : numpy.ndarray or None
+            ROI-constrained Top-K standard deviations.
+        avg_roi_topk_sem : numpy.ndarray or None
+            ROI-constrained Top-K standard errors.
         dn_per_ms : numpy.ndarray or None
             Per-image DN-per-millisecond values from active averaging metric.
 
@@ -781,6 +865,7 @@ class MetricsTableModel(QAbstractTableModel):
             old_exposure_ms = self._exposure_ms
             old_maxs = self._maxs
             old_roi_maxs = self._roi_maxs
+            old_roi_sums = self._roi_sums
             old_min_non_zero = self._min_non_zero
             old_sat_counts = self._sat_counts
             old_low_signal_flags = self._low_signal_flags
@@ -791,6 +876,9 @@ class MetricsTableModel(QAbstractTableModel):
             old_avg_roi = self._avg_roi
             old_avg_roi_std = self._avg_roi_std
             old_avg_roi_sem = self._avg_roi_sem
+            old_avg_roi_topk = self._avg_roi_topk
+            old_avg_roi_topk_std = self._avg_roi_topk_std
+            old_avg_roi_topk_sem = self._avg_roi_topk_sem
             old_dn_per_ms = self._dn_per_ms
 
             self.beginInsertRows(
@@ -804,6 +892,7 @@ class MetricsTableModel(QAbstractTableModel):
                 exposure_ms=exposure_ms,
                 maxs=maxs,
                 roi_maxs=roi_maxs,
+                roi_sums=roi_sums,
                 min_non_zero=min_non_zero,
                 sat_counts=sat_counts,
                 low_signal_flags=low_signal_flags,
@@ -814,6 +903,9 @@ class MetricsTableModel(QAbstractTableModel):
                 avg_roi=avg_roi,
                 avg_roi_std=avg_roi_std,
                 avg_roi_sem=avg_roi_sem,
+                avg_roi_topk=avg_roi_topk,
+                avg_roi_topk_std=avg_roi_topk_std,
+                avg_roi_topk_sem=avg_roi_topk_sem,
                 dn_per_ms=dn_per_ms,
             )
             self.endInsertRows()
@@ -822,6 +914,7 @@ class MetricsTableModel(QAbstractTableModel):
                 previous_exposure_ms=old_exposure_ms,
                 previous_maxs=old_maxs,
                 previous_roi_maxs=old_roi_maxs,
+                previous_roi_sums=old_roi_sums,
                 previous_min_non_zero=old_min_non_zero,
                 previous_sat_counts=old_sat_counts,
                 previous_low_signal_flags=old_low_signal_flags,
@@ -832,12 +925,16 @@ class MetricsTableModel(QAbstractTableModel):
                 previous_avg_roi=old_avg_roi,
                 previous_avg_roi_std=old_avg_roi_std,
                 previous_avg_roi_sem=old_avg_roi_sem,
+                previous_avg_roi_topk=old_avg_roi_topk,
+                previous_avg_roi_topk_std=old_avg_roi_topk_std,
+                previous_avg_roi_topk_sem=old_avg_roi_topk_sem,
                 previous_dn_per_ms=old_dn_per_ms,
                 n_rows=old_count,
                 current_iris_positions=self._prefix_array(iris_positions, old_count),
                 current_exposure_ms=self._prefix_array(exposure_ms, old_count),
                 current_maxs=self._prefix_array(maxs, old_count),
                 current_roi_maxs=self._prefix_array(roi_maxs, old_count),
+                current_roi_sums=self._prefix_array(roi_sums, old_count),
                 current_min_non_zero=self._prefix_array(min_non_zero, old_count),
                 current_sat_counts=self._prefix_array(sat_counts, old_count),
                 current_low_signal_flags=self._prefix_array(
@@ -851,6 +948,15 @@ class MetricsTableModel(QAbstractTableModel):
                 current_avg_roi=self._prefix_array(avg_roi, old_count),
                 current_avg_roi_std=self._prefix_array(avg_roi_std, old_count),
                 current_avg_roi_sem=self._prefix_array(avg_roi_sem, old_count),
+                current_avg_roi_topk=self._prefix_array(avg_roi_topk, old_count),
+                current_avg_roi_topk_std=self._prefix_array(
+                    avg_roi_topk_std,
+                    old_count,
+                ),
+                current_avg_roi_topk_sem=self._prefix_array(
+                    avg_roi_topk_sem,
+                    old_count,
+                ),
                 current_dn_per_ms=self._prefix_array(dn_per_ms, old_count),
             )
             return "append"
@@ -862,6 +968,7 @@ class MetricsTableModel(QAbstractTableModel):
                 exposure_ms=exposure_ms,
                 maxs=maxs,
                 roi_maxs=roi_maxs,
+                roi_sums=roi_sums,
                 min_non_zero=min_non_zero,
                 sat_counts=sat_counts,
                 low_signal_flags=low_signal_flags,
@@ -872,6 +979,9 @@ class MetricsTableModel(QAbstractTableModel):
                 avg_roi=avg_roi,
                 avg_roi_std=avg_roi_std,
                 avg_roi_sem=avg_roi_sem,
+                avg_roi_topk=avg_roi_topk,
+                avg_roi_topk_std=avg_roi_topk_std,
+                avg_roi_topk_sem=avg_roi_topk_sem,
                 dn_per_ms=dn_per_ms,
             )
             self.endResetModel()
@@ -881,6 +991,7 @@ class MetricsTableModel(QAbstractTableModel):
         old_exposure_ms = self._exposure_ms
         old_maxs = self._maxs
         old_roi_maxs = self._roi_maxs
+        old_roi_sums = self._roi_sums
         old_min_non_zero = self._min_non_zero
         old_sat_counts = self._sat_counts
         old_low_signal_flags = self._low_signal_flags
@@ -891,6 +1002,9 @@ class MetricsTableModel(QAbstractTableModel):
         old_avg_roi = self._avg_roi
         old_avg_roi_std = self._avg_roi_std
         old_avg_roi_sem = self._avg_roi_sem
+        old_avg_roi_topk = self._avg_roi_topk
+        old_avg_roi_topk_std = self._avg_roi_topk_std
+        old_avg_roi_topk_sem = self._avg_roi_topk_sem
         old_dn_per_ms = self._dn_per_ms
 
         self._assign_metrics(
@@ -899,6 +1013,7 @@ class MetricsTableModel(QAbstractTableModel):
             exposure_ms=exposure_ms,
             maxs=maxs,
             roi_maxs=roi_maxs,
+            roi_sums=roi_sums,
             min_non_zero=min_non_zero,
             sat_counts=sat_counts,
             low_signal_flags=low_signal_flags,
@@ -909,6 +1024,9 @@ class MetricsTableModel(QAbstractTableModel):
             avg_roi=avg_roi,
             avg_roi_std=avg_roi_std,
             avg_roi_sem=avg_roi_sem,
+            avg_roi_topk=avg_roi_topk,
+            avg_roi_topk_std=avg_roi_topk_std,
+            avg_roi_topk_sem=avg_roi_topk_sem,
             dn_per_ms=dn_per_ms,
         )
 
@@ -918,6 +1036,7 @@ class MetricsTableModel(QAbstractTableModel):
             previous_exposure_ms=old_exposure_ms,
             previous_maxs=old_maxs,
             previous_roi_maxs=old_roi_maxs,
+            previous_roi_sums=old_roi_sums,
             previous_min_non_zero=old_min_non_zero,
             previous_sat_counts=old_sat_counts,
             previous_low_signal_flags=old_low_signal_flags,
@@ -928,12 +1047,16 @@ class MetricsTableModel(QAbstractTableModel):
             previous_avg_roi=old_avg_roi,
             previous_avg_roi_std=old_avg_roi_std,
             previous_avg_roi_sem=old_avg_roi_sem,
+            previous_avg_roi_topk=old_avg_roi_topk,
+            previous_avg_roi_topk_std=old_avg_roi_topk_std,
+            previous_avg_roi_topk_sem=old_avg_roi_topk_sem,
             previous_dn_per_ms=old_dn_per_ms,
             n_rows=n_rows,
             current_iris_positions=self._iris_positions,
             current_exposure_ms=self._exposure_ms,
             current_maxs=self._maxs,
             current_roi_maxs=self._roi_maxs,
+            current_roi_sums=self._roi_sums,
             current_min_non_zero=self._min_non_zero,
             current_sat_counts=self._sat_counts,
             current_low_signal_flags=self._low_signal_flags,
@@ -944,6 +1067,9 @@ class MetricsTableModel(QAbstractTableModel):
             current_avg_roi=self._avg_roi,
             current_avg_roi_std=self._avg_roi_std,
             current_avg_roi_sem=self._avg_roi_sem,
+            current_avg_roi_topk=self._avg_roi_topk,
+            current_avg_roi_topk_std=self._avg_roi_topk_std,
+            current_avg_roi_topk_sem=self._avg_roi_topk_sem,
             current_dn_per_ms=self._dn_per_ms,
         )
         return "updated"
@@ -990,7 +1116,7 @@ class MetricsSortProxyModel(QtCore.QSortFilterProxyModel):
                 return str(left_value or "").lower() < str(right_value or "").lower()
             return left_text < right_text
 
-        if column in {2, 3, 4, 5, 6, 7, 8, 9, 10, 11}:
+        if column in {2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}:
             left_num = self._numeric_value(left_value)
             right_num = self._numeric_value(right_value)
             if left_num is None and right_num is None:

@@ -31,10 +31,14 @@ class RoiApplyResult:
 
     job_id: int
     maxs: np.ndarray
+    sums: np.ndarray
     means: np.ndarray
     stds: np.ndarray
     sems: np.ndarray
     valid_count: int
+    topk_means: np.ndarray | None = None
+    topk_stds: np.ndarray | None = None
+    topk_sems: np.ndarray | None = None
     failures: tuple[ProcessingFailure, ...] = ()
 
 
@@ -49,9 +53,13 @@ class MetricsPipelineController:
         self.avg_maxs_std: np.ndarray | None = None
         self.avg_maxs_sem: np.ndarray | None = None
         self.roi_maxs: np.ndarray | None = None
+        self.roi_sums: np.ndarray | None = None
         self.roi_means: np.ndarray | None = None
         self.roi_stds: np.ndarray | None = None
         self.roi_sems: np.ndarray | None = None
+        self.roi_topk_means: np.ndarray | None = None
+        self.roi_topk_stds: np.ndarray | None = None
+        self.roi_topk_sems: np.ndarray | None = None
         self.roi_applied_to_all = False
         self.dn_per_ms_values: np.ndarray | None = None
         self.dn_per_ms_stds: np.ndarray | None = None
@@ -88,9 +96,13 @@ class MetricsPipelineController:
         self._loaded_maxs_buffer: np.ndarray | None = None
         self._loaded_sat_counts_buffer: np.ndarray | None = None
         self._loaded_roi_maxs_buffer: np.ndarray | None = None
+        self._loaded_roi_sums_buffer: np.ndarray | None = None
         self._loaded_roi_means_buffer: np.ndarray | None = None
         self._loaded_roi_stds_buffer: np.ndarray | None = None
         self._loaded_roi_sems_buffer: np.ndarray | None = None
+        self._loaded_roi_topk_means_buffer: np.ndarray | None = None
+        self._loaded_roi_topk_stds_buffer: np.ndarray | None = None
+        self._loaded_roi_topk_sems_buffer: np.ndarray | None = None
         self._loaded_bg_applied_mask_buffer: np.ndarray | None = None
 
     def _current_loaded_dataset_count(self) -> int:
@@ -103,6 +115,7 @@ class MetricsPipelineController:
             self.min_non_zero,
             self.sat_counts,
             self.roi_maxs,
+            self.roi_sums,
         ):
             if values is not None:
                 return int(len(values))
@@ -146,6 +159,11 @@ class MetricsPipelineController:
             if self._loaded_roi_maxs_buffer is not None
             else None
         )
+        self.roi_sums = (
+            self._loaded_roi_sums_buffer[:count]
+            if self._loaded_roi_sums_buffer is not None
+            else None
+        )
         self.roi_means = (
             self._loaded_roi_means_buffer[:count]
             if self._loaded_roi_means_buffer is not None
@@ -159,6 +177,21 @@ class MetricsPipelineController:
         self.roi_sems = (
             self._loaded_roi_sems_buffer[:count]
             if self._loaded_roi_sems_buffer is not None
+            else None
+        )
+        self.roi_topk_means = (
+            self._loaded_roi_topk_means_buffer[:count]
+            if self._loaded_roi_topk_means_buffer is not None
+            else None
+        )
+        self.roi_topk_stds = (
+            self._loaded_roi_topk_stds_buffer[:count]
+            if self._loaded_roi_topk_stds_buffer is not None
+            else None
+        )
+        self.roi_topk_sems = (
+            self._loaded_roi_topk_sems_buffer[:count]
+            if self._loaded_roi_topk_sems_buffer is not None
             else None
         )
         self.bg_applied_mask = (
@@ -196,9 +229,13 @@ class MetricsPipelineController:
         count = max(0, int(path_count))
         self.roi_applied_to_all = False
         self.roi_maxs = np.full(count, np.nan, dtype=np.float64)
+        self.roi_sums = np.full(count, np.nan, dtype=np.float64)
         self.roi_means = np.full(count, np.nan, dtype=np.float64)
         self.roi_stds = np.full(count, np.nan, dtype=np.float64)
         self.roi_sems = np.full(count, np.nan, dtype=np.float64)
+        self.roi_topk_means = np.full(count, np.nan, dtype=np.float64)
+        self.roi_topk_stds = np.full(count, np.nan, dtype=np.float64)
+        self.roi_topk_sems = np.full(count, np.nan, dtype=np.float64)
 
     def initialize_loaded_dataset(self, path_count: int) -> None:
         """Initialize dataset-dependent state after a new dataset load."""
@@ -246,9 +283,13 @@ class MetricsPipelineController:
         maxs = np.zeros(capacity, dtype=np.int64)
         sat_counts = np.zeros(capacity, dtype=np.int64)
         roi_maxs = np.full(capacity, np.nan, dtype=np.float64)
+        roi_sums = np.full(capacity, np.nan, dtype=np.float64)
         roi_means = np.full(capacity, np.nan, dtype=np.float64)
         roi_stds = np.full(capacity, np.nan, dtype=np.float64)
         roi_sems = np.full(capacity, np.nan, dtype=np.float64)
+        roi_topk_means = np.full(capacity, np.nan, dtype=np.float64)
+        roi_topk_stds = np.full(capacity, np.nan, dtype=np.float64)
+        roi_topk_sems = np.full(capacity, np.nan, dtype=np.float64)
         bg_applied_mask = np.zeros(capacity, dtype=bool)
 
         self._copy_prefix(
@@ -276,6 +317,12 @@ class MetricsPipelineController:
             dtype=np.float64,
         )
         self._copy_prefix(
+            roi_sums,
+            self.roi_sums,
+            loaded_count,
+            dtype=np.float64,
+        )
+        self._copy_prefix(
             roi_means,
             self.roi_means,
             loaded_count,
@@ -284,6 +331,24 @@ class MetricsPipelineController:
         self._copy_prefix(
             roi_stds,
             self.roi_stds,
+            loaded_count,
+            dtype=np.float64,
+        )
+        self._copy_prefix(
+            roi_topk_means,
+            self.roi_topk_means,
+            loaded_count,
+            dtype=np.float64,
+        )
+        self._copy_prefix(
+            roi_topk_stds,
+            self.roi_topk_stds,
+            loaded_count,
+            dtype=np.float64,
+        )
+        self._copy_prefix(
+            roi_topk_sems,
+            self.roi_topk_sems,
             loaded_count,
             dtype=np.float64,
         )
@@ -306,9 +371,13 @@ class MetricsPipelineController:
         self._loaded_maxs_buffer = maxs
         self._loaded_sat_counts_buffer = sat_counts
         self._loaded_roi_maxs_buffer = roi_maxs
+        self._loaded_roi_sums_buffer = roi_sums
         self._loaded_roi_means_buffer = roi_means
         self._loaded_roi_stds_buffer = roi_stds
         self._loaded_roi_sems_buffer = roi_sems
+        self._loaded_roi_topk_means_buffer = roi_topk_means
+        self._loaded_roi_topk_stds_buffer = roi_topk_stds
+        self._loaded_roi_topk_sems_buffer = roi_topk_sems
         self._loaded_bg_applied_mask_buffer = bg_applied_mask
         self._sync_loaded_dataset_views()
 
@@ -337,9 +406,13 @@ class MetricsPipelineController:
         assert self._loaded_maxs_buffer is not None
         assert self._loaded_sat_counts_buffer is not None
         assert self._loaded_roi_maxs_buffer is not None
+        assert self._loaded_roi_sums_buffer is not None
         assert self._loaded_roi_means_buffer is not None
         assert self._loaded_roi_stds_buffer is not None
         assert self._loaded_roi_sems_buffer is not None
+        assert self._loaded_roi_topk_means_buffer is not None
+        assert self._loaded_roi_topk_stds_buffer is not None
+        assert self._loaded_roi_topk_sems_buffer is not None
         assert self._loaded_bg_applied_mask_buffer is not None
 
         start = int(self._loaded_dataset_count)
@@ -348,9 +421,13 @@ class MetricsPipelineController:
         self._loaded_maxs_buffer[start:end] = maxs_arr
         self._loaded_sat_counts_buffer[start:end] = 0
         self._loaded_roi_maxs_buffer[start:end].fill(np.nan)
+        self._loaded_roi_sums_buffer[start:end].fill(np.nan)
         self._loaded_roi_means_buffer[start:end].fill(np.nan)
         self._loaded_roi_stds_buffer[start:end].fill(np.nan)
         self._loaded_roi_sems_buffer[start:end].fill(np.nan)
+        self._loaded_roi_topk_means_buffer[start:end].fill(np.nan)
+        self._loaded_roi_topk_stds_buffer[start:end].fill(np.nan)
+        self._loaded_roi_topk_sems_buffer[start:end].fill(np.nan)
         self._loaded_bg_applied_mask_buffer[start:end] = False
         self._loaded_dataset_count = end
         self._sync_loaded_dataset_views()
@@ -385,10 +462,18 @@ class MetricsPipelineController:
             self.roi_means = np.full(count, np.nan, dtype=np.float64)
         if self.roi_maxs is None or len(self.roi_maxs) != count:
             self.roi_maxs = np.full(count, np.nan, dtype=np.float64)
+        if self.roi_sums is None or len(self.roi_sums) != count:
+            self.roi_sums = np.full(count, np.nan, dtype=np.float64)
         if self.roi_stds is None or len(self.roi_stds) != count:
             self.roi_stds = np.full(count, np.nan, dtype=np.float64)
         if self.roi_sems is None or len(self.roi_sems) != count:
             self.roi_sems = np.full(count, np.nan, dtype=np.float64)
+        if self.roi_topk_means is None or len(self.roi_topk_means) != count:
+            self.roi_topk_means = np.full(count, np.nan, dtype=np.float64)
+        if self.roi_topk_stds is None or len(self.roi_topk_stds) != count:
+            self.roi_topk_stds = np.full(count, np.nan, dtype=np.float64)
+        if self.roi_topk_sems is None or len(self.roi_topk_sems) != count:
+            self.roi_topk_sems = np.full(count, np.nan, dtype=np.float64)
 
     def apply_dynamic_stats_result(
         self,
@@ -427,9 +512,25 @@ class MetricsPipelineController:
         self._clear_loaded_dataset_buffer_state()
         self.roi_applied_to_all = True
         self.roi_maxs = np.asarray(result.maxs, dtype=np.float64)
+        self.roi_sums = np.asarray(result.sums, dtype=np.float64)
         self.roi_means = np.asarray(result.means, dtype=np.float64)
         self.roi_stds = np.asarray(result.stds, dtype=np.float64)
         self.roi_sems = np.asarray(result.sems, dtype=np.float64)
+        self.roi_topk_means = (
+            np.asarray(result.topk_means, dtype=np.float64)
+            if result.topk_means is not None
+            else None
+        )
+        self.roi_topk_stds = (
+            np.asarray(result.topk_stds, dtype=np.float64)
+            if result.topk_stds is not None
+            else None
+        )
+        self.roi_topk_sems = (
+            np.asarray(result.topk_sems, dtype=np.float64)
+            if result.topk_sems is not None
+            else None
+        )
 
     def low_signal_mask(
         self,

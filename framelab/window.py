@@ -138,12 +138,13 @@ class FrameLabWindow(
         "exposure_ms": 3,
         "max_pixel": 4,
         "roi_max": 5,
-        "min_non_zero": 6,
-        "sat_count": 7,
-        "avg": 8,
-        "std": 9,
-        "sem": 10,
-        "dn_per_ms": 11,
+        "roi_sum": 6,
+        "min_non_zero": 7,
+        "sat_count": 8,
+        "avg": 9,
+        "std": 10,
+        "sem": 11,
+        "dn_per_ms": 12,
     }
     BASE_VISIBLE_DATA_COLUMNS = {"path", "parent", "grandparent"}
     BASE_VISIBLE_MEASURE_COLUMNS = {
@@ -154,7 +155,7 @@ class FrameLabWindow(
         "sat_count",
     }
     MODE_MEASURE_COLUMNS = {"avg", "std", "sem", "dn_per_ms"}
-    ROI_MODE_MEASURE_COLUMNS = {"roi_max"}
+    ROI_MODE_MEASURE_COLUMNS = {"roi_max", "roi_sum"}
     DATA_OPTIONAL_COLUMNS = (
         ("iris_pos", label_for_metadata_field("iris_position")),
         ("exposure_ms", label_for_metadata_field("exposure_ms")),
@@ -166,6 +167,7 @@ class FrameLabWindow(
         ("exposure_ms", label_for_metadata_field("exposure_ms")),
         ("max_pixel", "Max Pixel"),
         ("roi_max", "ROI Max"),
+        ("roi_sum", "ROI Sum"),
         ("min_non_zero", "Min > 0"),
         ("sat_count", "# Saturated"),
         ("avg", "Average Metric"),
@@ -2426,7 +2428,7 @@ class FrameLabWindow(
             metrics.roi_applied_to_all = bool(measure_state.roi_applied_to_all)
             if (
                 self._has_loaded_data()
-                and measure_state.average_mode == "roi"
+                and measure_state.average_mode in {"roi", "roi_topk"}
                 and metrics.roi_rect is not None
                 and metrics.roi_applied_to_all
             ):
@@ -3072,6 +3074,11 @@ class FrameLabWindow(
         "roi_maxs",
         "Compatibility proxy for controller-owned ROI max values.",
     )
+    roi_sums = _controller_property(
+        "metrics_state",
+        "roi_sums",
+        "Compatibility proxy for controller-owned ROI sum values.",
+    )
     roi_stds = _controller_property(
         "metrics_state",
         "roi_stds",
@@ -3081,6 +3088,21 @@ class FrameLabWindow(
         "metrics_state",
         "roi_sems",
         "Compatibility proxy for controller-owned ROI std err values.",
+    )
+    roi_topk_means = _controller_property(
+        "metrics_state",
+        "roi_topk_means",
+        "Compatibility proxy for controller-owned ROI Top-K means.",
+    )
+    roi_topk_stds = _controller_property(
+        "metrics_state",
+        "roi_topk_stds",
+        "Compatibility proxy for controller-owned ROI Top-K std values.",
+    )
+    roi_topk_sems = _controller_property(
+        "metrics_state",
+        "roi_topk_sems",
+        "Compatibility proxy for controller-owned ROI Top-K std err values.",
     )
     dn_per_ms_values = _controller_property(
         "metrics_state",

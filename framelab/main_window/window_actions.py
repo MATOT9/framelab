@@ -65,6 +65,8 @@ class WindowActionsMixin:
             return False
 
         metrics.roi_rect = (x0, y0, x1, y1)
+        if self._current_average_mode() == "roi_topk" and hasattr(self, "avg_spin"):
+            metrics.avg_count_value = self.avg_spin.value()
         self.image_preview.set_roi_rect(metrics.roi_rect)
         self._reset_roi_metrics()
 
@@ -73,13 +75,34 @@ class WindowActionsMixin:
             path_count=dataset.path_count(),
         )
         if active_index is not None:
-            roi_max, roi_mean, roi_std, roi_sem = self._compute_roi_stats_for_index(
+            roi_result = self._compute_roi_stats_for_index(
                 active_index,
             )
-            metrics.roi_maxs[active_index] = roi_max
-            metrics.roi_means[active_index] = roi_mean
-            metrics.roi_stds[active_index] = roi_std
-            metrics.roi_sems[active_index] = roi_sem
+            metrics.roi_maxs[active_index] = float(
+                roi_result.get("roi_max", float("nan")),
+            )
+            metrics.roi_sums[active_index] = float(
+                roi_result.get("roi_sum", float("nan")),
+            )
+            metrics.roi_means[active_index] = float(
+                roi_result.get("roi_mean", float("nan")),
+            )
+            metrics.roi_stds[active_index] = float(
+                roi_result.get("roi_std", float("nan")),
+            )
+            metrics.roi_sems[active_index] = float(
+                roi_result.get("roi_sem", float("nan")),
+            )
+            if self._current_average_mode() == "roi_topk":
+                metrics.roi_topk_means[active_index] = float(
+                    roi_result.get("roi_topk_mean", float("nan")),
+                )
+                metrics.roi_topk_stds[active_index] = float(
+                    roi_result.get("roi_topk_std", float("nan")),
+                )
+                metrics.roi_topk_sems[active_index] = float(
+                    roi_result.get("roi_topk_sem", float("nan")),
+                )
 
         self._update_average_controls()
         self._refresh_table()
@@ -252,7 +275,7 @@ class WindowActionsMixin:
         if (
             not self._has_loaded_data()
             or metrics.roi_rect is None
-            or self._current_average_mode() != "roi"
+            or self._current_average_mode() not in {"roi", "roi_topk"}
         ):
             return
 
@@ -302,7 +325,7 @@ class WindowActionsMixin:
         metrics = self.metrics_state
         if (
             not self._has_loaded_data()
-            or self._current_average_mode() != "roi"
+            or self._current_average_mode() not in {"roi", "roi_topk"}
         ):
             return
 
@@ -392,6 +415,15 @@ class WindowActionsMixin:
                 else:
                     x0, y0, x1, y1 = metrics.roi_rect
                     msg += f" | ROI=({x0},{y0})-({x1},{y1})"
+            elif mode == "roi_topk":
+                if metrics.roi_rect is None:
+                    msg += " | ROI Top-K: draw rectangle on preview"
+                else:
+                    x0, y0, x1, y1 = metrics.roi_rect
+                    msg += (
+                        f" | ROI=({x0},{y0})-({x1},{y1})"
+                        f" | Top-K mean over {metrics.avg_count_value} ROI px"
+                    )
             if metrics.background_config.enabled:
                 if metrics.background_library.global_ref is not None:
                     msg += " | BG=global ref"
@@ -469,7 +501,10 @@ class WindowActionsMixin:
                 row_values.append("" if value is None else str(value))
             rows.append(row_values)
 
-        if self._current_average_mode() == "roi" and metrics.roi_rect is not None:
+        if (
+            self._current_average_mode() in {"roi", "roi_topk"}
+            and metrics.roi_rect is not None
+        ):
             x0, y0, x1, y1 = metrics.roi_rect
             headers.extend(["ROI_X0", "ROI_Y0", "ROI_X1", "ROI_Y1"])
             roi_values = [str(x0), str(y0), str(x1), str(y1)]
