@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 import re
 from pathlib import Path
 
@@ -12,6 +13,12 @@ from .image_io import is_supported_image
 FRAME_PATTERN = re.compile(r"^f(?P<index>\d+)$", re.IGNORECASE)
 EBUS_PATTERN = re.compile(
     r"^(?P<index>\d+)_(?P<timestamp>[0-9A-Fa-f]+)$",
+)
+UTC_TIMESTAMP_PATTERN = re.compile(
+    r"(?:^|[_-])"
+    r"(?P<date>\d{8})_(?P<time>\d{6})_(?P<msec>\d{3})Z"
+    r"(?:$|[_-])",
+    re.IGNORECASE,
 )
 
 
@@ -23,6 +30,46 @@ class FrameNameInfo:
     naming: str
     ebus_timestamp_hex: str | None = None
     ebus_timestamp_ms: int | None = None
+    utc_timestamp_ms: int | None = None
+    utc_timestamp_iso: str | None = None
+
+
+def _parse_utc_timestamp_match(
+    match: re.Match[str],
+) -> tuple[int, str] | None:
+    """Return epoch milliseconds and ISO text for a UTC filename timestamp."""
+
+    try:
+        date_text = match.group("date")
+        time_text = match.group("time")
+        millisecond = int(match.group("msec"), 10)
+        timestamp = datetime(
+            int(date_text[0:4]),
+            int(date_text[4:6]),
+            int(date_text[6:8]),
+            int(time_text[0:2]),
+            int(time_text[2:4]),
+            int(time_text[4:6]),
+            millisecond * 1000,
+            tzinfo=timezone.utc,
+        )
+    except Exception:
+        return None
+    epoch_ms = int(round(timestamp.timestamp() * 1000.0))
+    iso_text = timestamp.isoformat(timespec="milliseconds").replace("+00:00", "Z")
+    return (epoch_ms, iso_text)
+
+
+def _leading_index_before_utc_timestamp(stem: str, match: re.Match[str]) -> int | None:
+    """Return a leading numeric frame index immediately before a UTC timestamp."""
+
+    prefix = stem[:match.start()].rstrip("_-")
+    if not prefix or not prefix.isdigit():
+        return None
+    try:
+        return int(prefix, 10)
+    except ValueError:
+        return None
 
 
 @dataclass(frozen=True)
@@ -53,6 +100,23 @@ def parse_frame_name(stem: str) -> FrameNameInfo:
             frame_index=int(frame_match.group("index")),
             naming="f_index",
         )
+
+    utc_match = UTC_TIMESTAMP_PATTERN.search(stem)
+    if utc_match is not None:
+        parsed_utc = _parse_utc_timestamp_match(utc_match)
+        if parsed_utc is not None:
+            utc_timestamp_ms, utc_timestamp_iso = parsed_utc
+            frame_index = _leading_index_before_utc_timestamp(stem, utc_match)
+            return FrameNameInfo(
+                frame_index=frame_index,
+                naming=(
+                    "utc_index_timestamp"
+                    if frame_index is not None
+                    else "utc_timestamp"
+                ),
+                utc_timestamp_ms=utc_timestamp_ms,
+                utc_timestamp_iso=utc_timestamp_iso,
+            )
 
     ebus_match = EBUS_PATTERN.match(stem)
     if ebus_match is None:

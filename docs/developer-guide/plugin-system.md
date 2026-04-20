@@ -249,6 +249,7 @@ The shipped plugin set is a useful guide to intended plugin patterns.
 ### Analysis-page plugins
 
 - **iris_gain** / **Intensity Trend Explorer** — embedded analysis view with explicit `AnalysisContext` consumption and UI-capability hints
+- **event_signature** / **Event Signature** — embedded per-frame signature plot using existing max-pixel, ROI Top-K, frame-index, and elapsed-time context fields
 
 These examples show that the plugin system must support both:
 - dialog-style runtime tools exposed from the **Plugins** menu

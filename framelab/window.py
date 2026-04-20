@@ -145,6 +145,7 @@ class FrameLabWindow(
         "std": 10,
         "sem": 11,
         "dn_per_ms": 12,
+        "elapsed_time_s": 13,
     }
     BASE_VISIBLE_DATA_COLUMNS = {"path", "parent", "grandparent"}
     BASE_VISIBLE_MEASURE_COLUMNS = {

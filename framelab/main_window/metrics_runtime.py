@@ -1065,6 +1065,7 @@ class MetricsRuntimeMixin:
             getattr(self, "_dataset_load_batch_applying", False),
         )
         iris_positions, exposure_ms = self._metadata_numeric_arrays()
+        elapsed_time_s = self._metadata_elapsed_time_s_array()
         if (
             streaming_update
             and self._average_mode_uses_roi(mode)
@@ -1107,6 +1108,7 @@ class MetricsRuntimeMixin:
             avg_roi_topk_std=metrics.roi_topk_stds if mode == "roi_topk" else None,
             avg_roi_topk_sem=metrics.roi_topk_sems if mode == "roi_topk" else None,
             dn_per_ms=metrics.dn_per_ms_values,
+            elapsed_time_s=elapsed_time_s,
         )
         self._apply_table_sort()
         n_rows = dataset.path_count()

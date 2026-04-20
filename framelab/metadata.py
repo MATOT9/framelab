@@ -662,6 +662,10 @@ def extract_path_metadata(
         values["ebus_timestamp_hex"] = frame_info.ebus_timestamp_hex
     if frame_info.ebus_timestamp_ms is not None:
         values["ebus_timestamp_ms"] = int(frame_info.ebus_timestamp_ms)
+    if frame_info.utc_timestamp_ms is not None:
+        values["utc_timestamp_ms"] = int(frame_info.utc_timestamp_ms)
+    if frame_info.utc_timestamp_iso is not None:
+        values["utc_timestamp_iso"] = frame_info.utc_timestamp_iso
 
     path_iris_position = (
         _find_iris_position(parent)

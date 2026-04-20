@@ -70,6 +70,7 @@ Enable:
 - **Acquisition Datacard Wizard** when metadata editing may be needed
 - **Background Correction** when you use background-reference workflows
 - **Intensity Trend Explorer** when you intend to analyze the results immediately
+- **Event Signature** when you need per-frame event traces
 
 ### Structure and session-preparation session
 
@@ -97,3 +98,4 @@ Opening the **Plugins** menu later does not load a plugin that was disabled befo
 - [Datacard Wizard](data/datacard-wizard.md)
 - [Measure Workflow](measure-workflow.md)
 - [Intensity Trend Explorer](analysis/intensity-trend-explorer.md)
+- [Event Signature](analysis/event-signature.md)

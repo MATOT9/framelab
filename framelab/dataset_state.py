@@ -83,6 +83,33 @@ def _normalize_path_metadata_payload(
     return normalized
 
 
+def _with_elapsed_time_metadata(
+    paths: Iterable[str],
+    path_metadata: dict[str, dict[str, object]],
+) -> dict[str, dict[str, object]]:
+    """Add elapsed-time metadata for rows carrying filename UTC timestamps."""
+
+    normalized = {
+        str(path): dict(payload)
+        for path, payload in path_metadata.items()
+    }
+    first_timestamp_ms: float | None = None
+    for path in paths:
+        metadata = normalized.get(str(path))
+        if metadata is None:
+            continue
+        metadata.pop("elapsed_time_s", None)
+        timestamp_ms = _finite_float(metadata.get("utc_timestamp_ms"))
+        if timestamp_ms is None:
+            continue
+        if first_timestamp_ms is None:
+            first_timestamp_ms = timestamp_ms
+        elapsed_s = (timestamp_ms - first_timestamp_ms) / 1000.0
+        if math.isfinite(elapsed_s):
+            metadata["elapsed_time_s"] = float(elapsed_s)
+    return normalized
+
+
 @dataclass(frozen=True, slots=True)
 class DatasetScopeNode:
     """One node in the active workflow ancestry chain."""
@@ -292,10 +319,11 @@ class DatasetStateController:
         mapping: dict[str, dict[str, object]],
     ) -> None:
         """Replace cached metadata for the currently loaded paths."""
-        self.path_metadata = {
+        normalized = {
             str(path): _normalize_path_metadata_payload(payload)
             for path, payload in mapping.items()
         }
+        self.path_metadata = _with_elapsed_time_metadata(self.paths, normalized)
 
     def update_path_metadata(
         self,
@@ -308,7 +336,7 @@ class DatasetStateController:
         merged = dict(self.path_metadata)
         for path, payload in mapping.items():
             merged[str(path)] = _normalize_path_metadata_payload(payload)
-        self.path_metadata = merged
+        self.path_metadata = _with_elapsed_time_metadata(self.paths, merged)
 
     def set_metadata_visible_paths(self, paths: Iterable[str]) -> None:
         """Store current metadata-table visible row ordering."""

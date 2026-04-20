@@ -16,7 +16,7 @@ This is a compact snapshot of the current implementation. Prefer canonical docs 
 - Current plugin pages are `data`, `measure`, and `analysis`.
 - Current data plugins include Acquisition Datacard Wizard and Session Manager (Legacy).
 - Current measure plugin coverage includes Background Correction.
-- Current analysis plugin coverage includes Intensity Trend Explorer.
+- Current analysis plugin coverage includes Intensity Trend Explorer and Event Signature.
 - eBUS Config Tools are built into the host app under `Edit -> Advanced -> eBUS Config Tools`; they no longer participate as a selectable plugin.
 - Stale `ebus_config_tools` ids in plugin selection data are tolerated by resolving only ids that still have manifests.
 
@@ -34,7 +34,7 @@ This is a compact snapshot of the current implementation. Prefer canonical docs 
 - Calibration sessions may be discovered directly under a campaign or under `01_sessions/` / `sessions/`.
 - Acquisitions are tolerated by workflow loading if they have datacards even when naming is less strict.
 - Structure-authoring tools remain stricter and prefer `acq-####` or `acq-####__label`.
-- Metadata resolution combines path-derived data, `.framelab/nodecard.json`, campaign/session/acquisition datacards, effective eBUS-managed acquisition fields, and frame-targeted overrides.
+- Metadata resolution combines path-derived data, filename UTC timestamps, `.framelab/nodecard.json`, campaign/session/acquisition datacards, effective eBUS-managed acquisition fields, and frame-targeted overrides.
 
 ## eBUS
 
@@ -46,7 +46,7 @@ This is a compact snapshot of the current implementation. Prefer canonical docs 
 
 ## Measurement And Analysis
 
-- Measure workflows cover thresholding, Top-K mean/std/SEM, ROI max/sum/mean/std/SEM, ROI + Top-K mean/std/SEM, normalization, background correction, and exposure-normalized quantities such as `DN/ms`.
+- Measure workflows cover thresholding, Top-K mean/std/SEM, ROI max/sum/mean/std/SEM, ROI + Top-K mean/std/SEM, normalization, background correction, exposure-normalized quantities such as `DN/ms`, and elapsed-time display for timestamped acquisition filenames.
 - Dataset-wide metric work is coordinated through worker objects and applied back on the UI thread.
 - Analyze workflows consume an `AnalysisContext` built from dataset metadata, metric state, normalization state, and background state.
 - Analysis plugins should consume that context rather than reaching back into raw host state.

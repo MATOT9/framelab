@@ -19,6 +19,8 @@ def test_build_context_normalizes_metric_fields_but_keeps_raw_metadata() -> None
             "/tmp/a.tif": {
                 "iris_position": 3,
                 "exposure_ms": 25.0,
+                "frame_index": 7,
+                "utc_timestamp_ms": 1776623606086,
             },
         },
     )
@@ -58,6 +60,8 @@ def test_build_context_normalizes_metric_fields_but_keeps_raw_metadata() -> None
     assert float(record.metadata["min_non_zero"]) == 4.0
     assert float(record.metadata["sat_count"]) == 3.0
     assert float(record.metadata["exposure_ms"]) == 25.0
+    assert float(record.metadata["frame_index"]) == 7.0
+    assert float(record.metadata["elapsed_time_s"]) == pytest.approx(0.0)
 
 
 def test_build_context_sets_background_flags_and_reference_labels() -> None:
@@ -114,6 +118,9 @@ def test_build_context_uses_roi_topk_metric_arrays() -> None:
     assert record.mean == pytest.approx(35.0)
     assert record.std == pytest.approx(5.0)
     assert record.sem == pytest.approx(2.5)
+    assert record.metadata["roi_topk_mean"] == pytest.approx(35.0)
+    assert record.metadata["roi_topk_std"] == pytest.approx(5.0)
+    assert record.metadata["roi_topk_sem"] == pytest.approx(2.5)
 
 
 def test_build_context_exposes_workflow_scope_and_effective_metadata() -> None:

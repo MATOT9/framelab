@@ -57,11 +57,12 @@ Exact button text may differ slightly depending on whether you are in workflow m
 
 A scan is not only file listing. It is the dataset intake pass used by the rest of the app. During scan, the app:
 
-- recursively discovers supported `.tif` and `.tiff` files
+- recursively discovers supported image files
 - applies the current skip rules before loading
 - reads each remaining file as a 2D image and skips unreadable items
 - caches loaded images for preview and later measurement use
 - computes initial static quick-look values such as max pixel and minimum non-zero
+- parses UTC filename timestamps like `YYYYMMDD_HHMMSS_mmmZ` when present and derives elapsed seconds from the first timestamp in the loaded scope
 - determines whether hierarchical JSON metadata is available anywhere in the selected dataset tree
 - rebuilds metadata for every loaded row using the active metadata-source mode
 - refreshes the Data table, Measure state, and downstream analysis context

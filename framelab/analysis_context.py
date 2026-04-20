@@ -70,6 +70,24 @@ class AnalysisContextController:
                 metadata["min_non_zero"] = float(metrics.min_non_zero[row])
             if metrics.sat_counts is not None and row < len(metrics.sat_counts):
                 metadata["sat_count"] = float(metrics.sat_counts[row])
+            if metrics.roi_topk_means is not None and row < len(metrics.roi_topk_means):
+                roi_topk_mean = float(metrics.roi_topk_means[row])
+                if np.isfinite(roi_topk_mean):
+                    metadata["roi_topk_mean"] = roi_topk_mean
+            if (
+                metrics.roi_topk_stds is not None
+                and row < len(metrics.roi_topk_stds)
+            ):
+                roi_topk_std = float(metrics.roi_topk_stds[row])
+                if np.isfinite(roi_topk_std):
+                    metadata["roi_topk_std"] = roi_topk_std
+            if (
+                metrics.roi_topk_sems is not None
+                and row < len(metrics.roi_topk_sems)
+            ):
+                roi_topk_sem = float(metrics.roi_topk_sems[row])
+                if np.isfinite(roi_topk_sem):
+                    metadata["roi_topk_sem"] = roi_topk_sem
             if (
                 metrics.dn_per_ms_values is not None
                 and row < len(metrics.dn_per_ms_values)

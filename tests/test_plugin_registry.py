@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from framelab.plugins import discover_plugin_manifests
+from framelab.plugins import discover_plugin_manifests, load_enabled_page_plugins
 from framelab.plugins.selection import (
     load_selected_plugin_ids,
     save_selected_plugin_ids,
@@ -34,6 +34,20 @@ def test_session_manager_manifest_is_marked_legacy() -> None:
     assert "session_manager" in manifests
     manifest = manifests["session_manager"]
     assert manifest.display_name == "Session Manager (Legacy)"
+
+
+def test_event_signature_manifest_is_discovered() -> None:
+    manifests = {
+        manifest.plugin_id: manifest
+        for manifest in discover_plugin_manifests("analysis")
+    }
+    assert "event_signature" in manifests
+    manifest = manifests["event_signature"]
+    assert manifest.display_name == "Event Signature"
+    assert manifest.page == "analysis"
+
+    plugin_classes = load_enabled_page_plugins("analysis", ("event_signature",))
+    assert [plugin.plugin_id for plugin in plugin_classes] == ["event_signature"]
 
 
 def test_stale_ebus_plugin_selection_id_is_ignored() -> None:

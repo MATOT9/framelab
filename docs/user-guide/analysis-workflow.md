@@ -68,6 +68,8 @@ Analysis plugins consume a prepared `AnalysisContext`, not raw TIFF files. That 
 - per-row metadata resolved from the selected metadata source
 - mean/std/SEM values for the active average mode
 - peak, min non-zero, and saturation count metadata where available
+- frame index and elapsed-time metadata where available
+- ROI Top-K values where available
 - `DN/ms`, `DN/ms` std, and `DN/ms` SEM where available
 - background-state labels
 - the active raw versus normalized intensity context
@@ -92,18 +94,14 @@ In practice, the table and the plot should be read together:
 
 A plot alone is usually insufficient when you need to verify aggregation behavior or judge whether a trend is supported by enough samples.
 
-## Current built-in analysis plugin
+## Current built-in analysis plugins
 
-The current built-in analysis plugin is **Intensity Trend Explorer**. Use its dedicated page for plugin-specific details such as:
+The current built-in analysis plugins are:
 
-- axis options
-- gain semantics
-- curve construction
-- error-bar meaning
-- overlay behavior
-- plugin-specific runtime actions
+- **Intensity Trend Explorer** for exposure and iris-position trend studies.
+- **Event Signature** for per-frame event traces against frame index or elapsed time.
 
-See: [Intensity Trend Explorer](analysis/intensity-trend-explorer.md)
+See: [Intensity Trend Explorer](analysis/intensity-trend-explorer.md) and [Event Signature](analysis/event-signature.md)
 
 ## Common failure patterns
 

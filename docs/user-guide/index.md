@@ -18,7 +18,8 @@ The pages below are organized in the same order as a normal session: startup, wo
 10. [Measure Workflow](measure-workflow.md)
 11. [Analysis Workflow](analysis-workflow.md)
 12. [Intensity Trend Explorer](analysis/intensity-trend-explorer.md)
-13. [Troubleshooting](troubleshooting.md)
+13. [Event Signature](analysis/event-signature.md)
+14. [Troubleshooting](troubleshooting.md)
 
 ## Page summary
 
@@ -34,6 +35,7 @@ The pages below are organized in the same order as a normal session: startup, wo
 - [Measure Workflow](measure-workflow.md): thresholding, Top-K, ROI, normalization, background subtraction, and measurement interpretation.
 - [Analysis Workflow](analysis-workflow.md): using analysis plugins after the dataset and measurements are already valid.
 - [Intensity Trend Explorer](analysis/intensity-trend-explorer.md): analysis-plugin controls, trend interpretation, gain, uncertainty, and overlays.
+- [Event Signature](analysis/event-signature.md): per-frame event traces against frame index or filename-derived elapsed time.
 - [Troubleshooting](troubleshooting.md): workflow-stage troubleshooting for normal app use.
 
 ## Operating principle

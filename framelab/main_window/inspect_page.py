@@ -917,6 +917,18 @@ class InspectPageMixin:
             exposure_values[row] = self._metadata_exposure_ms(metadata)
         return (iris_values, exposure_values)
 
+    def _metadata_elapsed_time_s_array(self) -> np.ndarray:
+        """Build per-row elapsed-time values from cached metadata."""
+        dataset = self.dataset_state
+        n_rows = dataset.path_count()
+        elapsed_values = np.full(n_rows, np.nan, dtype=np.float64)
+        for row, path in enumerate(dataset.paths):
+            metadata = dataset.metadata_for_path(path)
+            elapsed_values[row] = self._as_finite_float(
+                metadata.get("elapsed_time_s"),
+            )
+        return elapsed_values
+
     def _compute_dn_per_ms_metrics(
         self,
         mode: str,

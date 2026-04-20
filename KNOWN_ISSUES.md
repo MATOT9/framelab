@@ -8,7 +8,6 @@ This file is the compact registry of known bugs, fragile zones, and incomplete a
 - The Trials workflow profile folder structure and "create new" behavior are not yet reliable.
 - The app can lag when changing workflow tabs.
 - Some badges or chips may disappear after changing active workflow scope.
-- The right-click menu is unavailable when there is no active preview.
 - The standalone build path has had permission errors when deleting `.pyd` files.
 - Workspace/preferences persistence was recently reshaped; keep verifying that session-like UI state is restored only from `.framelab` files while preferences remain in `config/preferences.ini`.
 

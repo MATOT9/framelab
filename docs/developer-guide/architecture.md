@@ -180,6 +180,8 @@ For each discovered image, metadata is resolved through `framelab/metadata.py`. 
 
 This is the authoritative path for turning files into structured per-row metadata. Do not reimplement metadata resolution inside UI code or analysis plugins.
 
+Filename UTC timestamp tokens matching `YYYYMMDD_HHMMSS_mmmZ` are parsed into per-row metadata during this path. When any loaded row has such a timestamp, `DatasetStateController` derives `elapsed_time_s` from the first valid timestamp in the loaded scope order.
+
 ### Stage 3: measurement metrics
 
 The Measure workflow computes per-image metrics such as:
@@ -191,6 +193,7 @@ The Measure workflow computes per-image metrics such as:
 - ROI max/sum/mean/std/SEM
 - ROI + Top-K mean/std/SEM
 - `DN/ms`
+- elapsed time from filename UTC timestamps when present
 - background-match status
 
 These results are stored through `MetricsPipelineController`. Dynamic metric computation is delegated to worker classes in `framelab/workers.py` and orchestrated by `MetricsRuntimeMixin`, which applies worker results back into controller-owned state. Global Top-K uses the dynamic metrics path, while ROI-derived modes, including ROI + Top-K, use `RoiApplyWorker` so the Top-K population is selected inside the ROI.
@@ -202,6 +205,7 @@ The Analyze workflow does not re-measure images. It packages the current dataset
 - measurement-mode-dependent mean/std/SEM values
 - per-row metadata
 - normalized intensity-derived fields when normalization is enabled
+- ROI Top-K values and elapsed-time metadata when available
 - background state flags and reference labels
 
 The analysis plugin interface should be treated as a consumer of this prebuilt context, not as a place to reach back into raw host state ad hoc.

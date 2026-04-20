@@ -140,6 +140,46 @@ def test_set_path_metadata_backfills_canonical_exposure_and_iris_keys(
     assert controller.source_index_for_path("/tmp/dataset/missing.tif") is None
 
 
+def test_path_metadata_derives_elapsed_time_from_first_utc_timestamp(
+    controller: DatasetStateController,
+) -> None:
+    path_a = "/tmp/dataset/a.bin"
+    path_b = "/tmp/dataset/b.bin"
+    path_c = "/tmp/dataset/c.bin"
+    controller.set_loaded_dataset("/tmp/dataset", [path_a, path_b, path_c])
+
+    controller.set_path_metadata(
+        {
+            path_a: {"utc_timestamp_ms": 1776623606086},
+            path_b: {"utc_timestamp_ms": 1776623607336},
+            path_c: {},
+        },
+    )
+
+    assert controller.metadata_for_path(path_a)["elapsed_time_s"] == pytest.approx(0.0)
+    assert controller.metadata_for_path(path_b)["elapsed_time_s"] == pytest.approx(1.25)
+    assert "elapsed_time_s" not in controller.metadata_for_path(path_c)
+
+
+def test_path_metadata_update_recomputes_elapsed_time_and_removes_stale_values(
+    controller: DatasetStateController,
+) -> None:
+    path_a = "/tmp/dataset/a.bin"
+    path_b = "/tmp/dataset/b.bin"
+    controller.set_loaded_dataset("/tmp/dataset", [path_a, path_b])
+    controller.set_path_metadata(
+        {
+            path_a: {"utc_timestamp_ms": 1000},
+            path_b: {"utc_timestamp_ms": 2000},
+        },
+    )
+
+    controller.update_path_metadata({path_a: {}})
+
+    assert "elapsed_time_s" not in controller.metadata_for_path(path_a)
+    assert controller.metadata_for_path(path_b)["elapsed_time_s"] == pytest.approx(0.0)
+
+
 def test_incremental_metadata_update_and_subtree_lookup(
     controller: DatasetStateController,
 ) -> None:

@@ -1,0 +1,8 @@
+{
+  "plugin_id": "event_signature",
+  "display_name": "Event Signature",
+  "page": "analysis",
+  "entrypoint_module": "framelab.plugins.analysis.signature_event.plugin",
+  "dependencies": [],
+  "description": "Plot per-frame event signatures against frame index or elapsed time."
+}

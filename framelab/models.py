@@ -30,6 +30,7 @@ class MetricsTableModel(QAbstractTableModel):
         "Std",
         "Std Err",
         "DN/ms",
+        "elapsed time [s]",
     )
     SATURATED_ROW_BRUSH = QtGui.QBrush(QtGui.QColor(210, 48, 48, 72))
     LOW_SIGNAL_ROW_BRUSH = QtGui.QBrush(QtGui.QColor(214, 157, 51, 72))
@@ -55,6 +56,7 @@ class MetricsTableModel(QAbstractTableModel):
         self._avg_roi_topk_std: Optional[np.ndarray] = None
         self._avg_roi_topk_sem: Optional[np.ndarray] = None
         self._dn_per_ms: Optional[np.ndarray] = None
+        self._elapsed_time_s: Optional[np.ndarray] = None
         self._avg_mode = "none"
         self._avg_header = "Average Metric"
         self._std_header = "Std"
@@ -103,6 +105,7 @@ class MetricsTableModel(QAbstractTableModel):
                 f"{self._dn_per_ms_header}: average intensity divided by "
                 "exposure time."
             ),
+            13: "Elapsed seconds relative to the first UTC timestamp in scope.",
         }
         return tips.get(section)
 
@@ -308,6 +311,13 @@ class MetricsTableModel(QAbstractTableModel):
             if self._normalize_intensity and self._normalization_scale > 0.0:
                 dn_per_ms /= self._normalization_scale
             return f"{dn_per_ms:.6g}"
+        if col == 13:
+            if self._elapsed_time_s is None or row >= len(self._elapsed_time_s):
+                return "-"
+            elapsed_s = float(self._elapsed_time_s[row])
+            if not np.isfinite(elapsed_s):
+                return "-"
+            return f"{elapsed_s:.3f}"
 
         return None
 
@@ -423,6 +433,7 @@ class MetricsTableModel(QAbstractTableModel):
             self._avg_roi_topk_std = None
             self._avg_roi_topk_sem = None
             self._dn_per_ms = None
+            self._elapsed_time_s = None
             self.set_average_header("Average Metric")
             self.set_std_header("Std")
             self.set_sem_header("Std Err")
@@ -449,6 +460,7 @@ class MetricsTableModel(QAbstractTableModel):
         self._avg_roi_topk_std = None
         self._avg_roi_topk_sem = None
         self._dn_per_ms = None
+        self._elapsed_time_s = None
         self._avg_mode = "none"
         self._avg_header = "Average Metric"
         self._std_header = "Std"
@@ -586,6 +598,7 @@ class MetricsTableModel(QAbstractTableModel):
         avg_roi_topk_std: Optional[np.ndarray],
         avg_roi_topk_sem: Optional[np.ndarray],
         dn_per_ms: Optional[np.ndarray],
+        elapsed_time_s: Optional[np.ndarray],
     ) -> None:
         """Store the latest table payload references."""
 
@@ -609,6 +622,7 @@ class MetricsTableModel(QAbstractTableModel):
         self._avg_roi_topk_std = avg_roi_topk_std
         self._avg_roi_topk_sem = avg_roi_topk_sem
         self._dn_per_ms = dn_per_ms
+        self._elapsed_time_s = elapsed_time_s
 
     def _emit_metric_diffs(
         self,
@@ -632,6 +646,7 @@ class MetricsTableModel(QAbstractTableModel):
         previous_avg_roi_topk_std: Optional[np.ndarray],
         previous_avg_roi_topk_sem: Optional[np.ndarray],
         previous_dn_per_ms: Optional[np.ndarray],
+        previous_elapsed_time_s: Optional[np.ndarray],
         n_rows: int,
         current_iris_positions: Optional[np.ndarray],
         current_exposure_ms: Optional[np.ndarray],
@@ -652,6 +667,7 @@ class MetricsTableModel(QAbstractTableModel):
         current_avg_roi_topk_std: Optional[np.ndarray],
         current_avg_roi_topk_sem: Optional[np.ndarray],
         current_dn_per_ms: Optional[np.ndarray],
+        current_elapsed_time_s: Optional[np.ndarray],
     ) -> None:
         """Emit minimal dataChanged regions for an in-place table update."""
 
@@ -777,6 +793,14 @@ class MetricsTableModel(QAbstractTableModel):
             12,
             self._diff_mask_float(previous_dn_per_ms, current_dn_per_ms, n_rows),
         )
+        self._emit_changes_for_mask(
+            13,
+            self._diff_mask_float(
+                previous_elapsed_time_s,
+                current_elapsed_time_s,
+                n_rows,
+            ),
+        )
 
     def update_metrics(
         self,
@@ -801,6 +825,7 @@ class MetricsTableModel(QAbstractTableModel):
         avg_roi_topk_std: Optional[np.ndarray] = None,
         avg_roi_topk_sem: Optional[np.ndarray] = None,
         dn_per_ms: Optional[np.ndarray],
+        elapsed_time_s: Optional[np.ndarray] = None,
     ) -> str:
         """Update metric arrays and emit minimal `dataChanged` ranges.
 
@@ -846,6 +871,8 @@ class MetricsTableModel(QAbstractTableModel):
             ROI-constrained Top-K standard errors.
         dn_per_ms : numpy.ndarray or None
             Per-image DN-per-millisecond values from active averaging metric.
+        elapsed_time_s : numpy.ndarray or None
+            Per-image elapsed seconds derived from filename UTC timestamps.
 
         Returns
         -------
@@ -880,6 +907,7 @@ class MetricsTableModel(QAbstractTableModel):
             old_avg_roi_topk_std = self._avg_roi_topk_std
             old_avg_roi_topk_sem = self._avg_roi_topk_sem
             old_dn_per_ms = self._dn_per_ms
+            old_elapsed_time_s = self._elapsed_time_s
 
             self.beginInsertRows(
                 QModelIndex(),
@@ -907,6 +935,7 @@ class MetricsTableModel(QAbstractTableModel):
                 avg_roi_topk_std=avg_roi_topk_std,
                 avg_roi_topk_sem=avg_roi_topk_sem,
                 dn_per_ms=dn_per_ms,
+                elapsed_time_s=elapsed_time_s,
             )
             self.endInsertRows()
             self._emit_metric_diffs(
@@ -929,6 +958,7 @@ class MetricsTableModel(QAbstractTableModel):
                 previous_avg_roi_topk_std=old_avg_roi_topk_std,
                 previous_avg_roi_topk_sem=old_avg_roi_topk_sem,
                 previous_dn_per_ms=old_dn_per_ms,
+                previous_elapsed_time_s=old_elapsed_time_s,
                 n_rows=old_count,
                 current_iris_positions=self._prefix_array(iris_positions, old_count),
                 current_exposure_ms=self._prefix_array(exposure_ms, old_count),
@@ -958,6 +988,10 @@ class MetricsTableModel(QAbstractTableModel):
                     old_count,
                 ),
                 current_dn_per_ms=self._prefix_array(dn_per_ms, old_count),
+                current_elapsed_time_s=self._prefix_array(
+                    elapsed_time_s,
+                    old_count,
+                ),
             )
             return "append"
         if row_changed or path_changed:
@@ -983,6 +1017,7 @@ class MetricsTableModel(QAbstractTableModel):
                 avg_roi_topk_std=avg_roi_topk_std,
                 avg_roi_topk_sem=avg_roi_topk_sem,
                 dn_per_ms=dn_per_ms,
+                elapsed_time_s=elapsed_time_s,
             )
             self.endResetModel()
             return "reset"
@@ -1006,6 +1041,7 @@ class MetricsTableModel(QAbstractTableModel):
         old_avg_roi_topk_std = self._avg_roi_topk_std
         old_avg_roi_topk_sem = self._avg_roi_topk_sem
         old_dn_per_ms = self._dn_per_ms
+        old_elapsed_time_s = self._elapsed_time_s
 
         self._assign_metrics(
             paths=owned_paths,
@@ -1028,6 +1064,7 @@ class MetricsTableModel(QAbstractTableModel):
             avg_roi_topk_std=avg_roi_topk_std,
             avg_roi_topk_sem=avg_roi_topk_sem,
             dn_per_ms=dn_per_ms,
+            elapsed_time_s=elapsed_time_s,
         )
 
         n_rows = len(self._paths)
@@ -1051,6 +1088,7 @@ class MetricsTableModel(QAbstractTableModel):
             previous_avg_roi_topk_std=old_avg_roi_topk_std,
             previous_avg_roi_topk_sem=old_avg_roi_topk_sem,
             previous_dn_per_ms=old_dn_per_ms,
+            previous_elapsed_time_s=old_elapsed_time_s,
             n_rows=n_rows,
             current_iris_positions=self._iris_positions,
             current_exposure_ms=self._exposure_ms,
@@ -1071,6 +1109,7 @@ class MetricsTableModel(QAbstractTableModel):
             current_avg_roi_topk_std=self._avg_roi_topk_std,
             current_avg_roi_topk_sem=self._avg_roi_topk_sem,
             current_dn_per_ms=self._dn_per_ms,
+            current_elapsed_time_s=self._elapsed_time_s,
         )
         return "updated"
 
@@ -1116,7 +1155,7 @@ class MetricsSortProxyModel(QtCore.QSortFilterProxyModel):
                 return str(left_value or "").lower() < str(right_value or "").lower()
             return left_text < right_text
 
-        if column in {2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}:
+        if column in {2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13}:
             left_num = self._numeric_value(left_value)
             right_num = self._numeric_value(right_value)
             if left_num is None and right_num is None:

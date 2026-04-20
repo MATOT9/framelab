@@ -25,9 +25,10 @@ This is an important distinction: the plugin provides a focused runtime tool, bu
 
 ### Analysis plugins
 
-Analysis plugins extend the **Analyze** tab with specialized plotting or result interpretation tools. In the current app, the built-in analysis plugin is:
+Analysis plugins extend the **Analyze** tab with specialized plotting or result interpretation tools. In the current app, the built-in analysis plugins are:
 
 - **Intensity Trend Explorer** — plot measurement-stage quantities against exposure or iris position, with optional error bars and trend overlays
+- **Event Signature** — plot max pixel or ROI Top-K values against frame index or filename-derived elapsed time
 
 ## What a plugin can contribute
 
@@ -81,6 +82,7 @@ This page is the generic overview. Detailed usage belongs to the pages that matc
 - [Session Manager (Legacy)](data/session-manager.md)
 - [Datacard Wizard](data/datacard-wizard.md)
 - [Intensity Trend Explorer](analysis/intensity-trend-explorer.md)
+- [Event Signature](analysis/event-signature.md)
 
 Related built-in workflow page:
 

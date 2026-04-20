@@ -53,6 +53,20 @@ def _write_measure_dataset(tmp_path: Path) -> Path:
     return dataset_root
 
 
+def _write_timestamped_measure_dataset(tmp_path: Path) -> Path:
+    dataset_root = tmp_path / "timestamped-measure-dataset"
+    dataset_root.mkdir(parents=True, exist_ok=True)
+    imwrite(
+        dataset_root / "00000000_20260419_183326_086Z_w4_h4_pMono12Packed.tiff",
+        np.full((4, 4), 4, dtype=np.uint16),
+    )
+    imwrite(
+        dataset_root / "00000001_20260419_183327_336Z_w4_h4_pMono12Packed.tiff",
+        np.full((4, 4), 12, dtype=np.uint16),
+    )
+    return dataset_root
+
+
 def _set_measure_current_row(window: FrameLabWindow, source_row: int) -> None:
     model = window.table.model()
     assert model is not None
@@ -178,6 +192,47 @@ def test_low_signal_threshold_does_not_add_preview_pixel_overlay(
         (rgb[..., 0] == 255)
         & (rgb[..., 1] == 0)
         & (rgb[..., 2] == 0)
+    )
+
+
+def test_elapsed_time_column_shows_only_for_timestamped_scopes(
+    tmp_path: Path,
+    measure_window: FrameLabWindow,
+    wait_for_dataset_load,
+) -> None:
+    elapsed_column = measure_window.MEASURE_COLUMN_INDEX["elapsed_time_s"]
+    plain_root = _write_measure_dataset(tmp_path)
+    measure_window.folder_edit.setText(str(plain_root))
+    measure_window.load_folder()
+    wait_for_dataset_load(measure_window)
+
+    assert measure_window.table.isColumnHidden(elapsed_column)
+
+    timestamped_root = _write_timestamped_measure_dataset(tmp_path)
+    measure_window.folder_edit.setText(str(timestamped_root))
+    measure_window.load_folder()
+    wait_for_dataset_load(measure_window)
+
+    assert not measure_window.table.isColumnHidden(elapsed_column)
+    assert (
+        measure_window.table_model.headerData(
+            elapsed_column,
+            QtCore.Qt.Horizontal,
+            QtCore.Qt.UserRole,
+        )
+        == "elapsed time [s]"
+    )
+    assert (
+        measure_window.table_model.data(
+            measure_window.table_model.index(0, elapsed_column),
+        )
+        == "0.000"
+    )
+    assert (
+        measure_window.table_model.data(
+            measure_window.table_model.index(1, elapsed_column),
+        )
+        == "1.250"
     )
 
 

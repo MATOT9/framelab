@@ -10,6 +10,7 @@ from framelab.metadata import (
     extract_path_metadata,
     invalidate_metadata_cache,
 )
+from framelab.frame_indexing import parse_frame_name
 from framelab.node_metadata import save_nodecard
 
 
@@ -613,6 +614,17 @@ def test_frame_index_mode_reports_ebus_index_and_timestamp_fields(
     assert int(metadata["frame_index"]) == 7
     assert metadata.get("ebus_timestamp_hex") == "0000002A"
     assert int(metadata["ebus_timestamp_ms"]) == 42
+
+
+def test_utc_timestamp_filename_fields_are_extracted() -> None:
+    info = parse_frame_name(
+        "00000000_20260419_183326_086Z_w1280_h720_pMono12Packed",
+    )
+
+    assert info.naming == "utc_index_timestamp"
+    assert info.frame_index == 0
+    assert info.utc_timestamp_iso == "2026-04-19T18:33:26.086Z"
+    assert info.utc_timestamp_ms == 1776623606086
 
 
 def test_frame_index_mode_reports_ebus_timestamp_order_when_indices_repeat(

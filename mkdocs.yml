@@ -81,6 +81,7 @@ nav:
       - Analysis Workflow:
           - Overview: user-guide/analysis-workflow.md
           - Intensity Trend Explorer: user-guide/analysis/intensity-trend-explorer.md
+          - Event Signature: user-guide/analysis/event-signature.md
       - User Troubleshooting: user-guide/troubleshooting.md
   - Developer Guide:
       - Overview: developer-guide/index.md

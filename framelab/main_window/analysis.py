@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from typing import Optional
 
 from PySide6 import QtWidgets as qtw
@@ -600,6 +601,23 @@ class AnalysisPageMixin:
                 visible.add(key)
             else:
                 visible.discard(key)
+
+        has_elapsed_time = False
+        dataset = getattr(self, "dataset_state", None)
+        if dataset is not None:
+            for path in getattr(dataset, "paths", ()):
+                metadata = dataset.metadata_for_path(path)
+                try:
+                    value = float(metadata.get("elapsed_time_s"))
+                except Exception:
+                    continue
+                if math.isfinite(value):
+                    has_elapsed_time = True
+                    break
+        if has_elapsed_time:
+            visible.add("elapsed_time_s")
+        else:
+            visible.discard("elapsed_time_s")
 
         if not mode_has_average:
             visible.difference_update(self.MODE_MEASURE_COLUMNS)

@@ -303,6 +303,8 @@ Use them together. The table tells you what the app computed. The preview and hi
 
 **ROI Max** and **ROI Sum** are shown in ROI modes.
 
+When scanned filenames contain UTC timestamp tokens like `YYYYMMDD_HHMMSS_mmmZ`, the table also shows **elapsed time [s]**. The first valid timestamp in the loaded scope is `0.000`; later rows are relative to that timestamp. Scopes without these filename timestamps do not show the column.
+
 The table can also be exported through **File -> Export Image Metrics Table...** when you need the currently visible rows outside the app.
 
 ## Common edge cases
