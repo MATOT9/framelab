@@ -304,3 +304,68 @@ def test_scope_switch_keeps_measure_table_proxy_sorted_and_in_sync(
         )
         _assert_measure_table_rows_in_sync(window, expected_rows)
         assert window._sort_column == 1
+
+
+def test_rescan_ignores_stale_dynamic_stats_from_previous_scope(
+    tmp_path: Path,
+    framelab_window_factory,
+    monkeypatch,
+    wait_until,
+    wait_for_dataset_load,
+) -> None:
+    first_root = _write_dataset(tmp_path / "stats-scope-a", 8)
+    second_root = _write_dataset(tmp_path / "stats-scope-b", 3)
+    original_run = workers_module.DynamicStatsWorker.run
+    release_first_stats = threading.Event()
+    first_stats_started = threading.Event()
+
+    def _slow_dynamic_run(self) -> None:
+        if any(
+            Path(path).resolve().is_relative_to(first_root.resolve())
+            for path in self._paths
+        ):
+            first_stats_started.set()
+            assert release_first_stats.wait(timeout=5.0)
+        original_run(self)
+
+    monkeypatch.setattr(
+        workers_module.DynamicStatsWorker,
+        "run",
+        _slow_dynamic_run,
+    )
+
+    window = framelab_window_factory(enabled_plugin_ids=())
+    monkeypatch.setattr(window, "_cached_dynamic_payloads", lambda _signature: ({}, {}))
+
+    window.folder_edit.setText(str(first_root))
+    window.load_folder()
+    wait_for_dataset_load(window, timeout_ms=12000)
+    wait_until(first_stats_started.is_set, timeout_ms=4000)
+    assert window.metrics_state.is_stats_running
+
+    window.folder_edit.setText(str(second_root))
+    window.load_folder(suppress_auto_metrics=True)
+    release_first_stats.set()
+
+    wait_for_dataset_load(window, timeout_ms=12000)
+    wait_until(
+        lambda: (
+            window.dataset_state.dataset_root == second_root.resolve()
+            and window.dataset_state.path_count() == 3
+            and not window.metrics_state.is_stats_running
+            and window._stats_thread is None
+            and window.metrics_state.maxs is not None
+            and len(window.metrics_state.maxs) == 3
+            and window.metrics_state.min_non_zero is not None
+            and len(window.metrics_state.min_non_zero) == 3
+            and window.metrics_state.sat_counts is not None
+            and len(window.metrics_state.sat_counts) == 3
+            and all(
+                Path(path).resolve().is_relative_to(second_root.resolve())
+                for path in window.dataset_state.paths
+            )
+        ),
+        timeout_ms=15000,
+    )
+
+    _assert_measure_table_rows_in_sync(window, 3)

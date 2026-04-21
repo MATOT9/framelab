@@ -135,6 +135,11 @@ def test_job_state_helpers_track_stats_and_roi_lifecycle(
     assert not state.is_stats_running
     assert state.stats_update_kind == "idle"
 
+    cancelled_stats_job_id = state.cancel_stats_job()
+    assert cancelled_stats_job_id == 2
+    assert not state.is_stats_running
+    assert state.stats_update_kind == "idle"
+
     roi_job_id = state.begin_roi_apply(13)
     assert roi_job_id == 1
     assert state.is_roi_applying

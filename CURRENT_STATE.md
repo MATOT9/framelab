@@ -25,7 +25,8 @@ This is a compact snapshot of the current implementation. Prefer canonical docs 
 - Persistent UI preferences live in `config/preferences.ini`.
 - Reopenable session state is saved to explicit `.framelab` workspace files.
 - Workspace documents currently restore workflow context, dataset scope, selected image, skip rules, Measure settings, ROI, background settings, active page/plugin, preview visibility, panel state, and splitter sizes.
-- Unless a `.framelab` file is opened, the app should behave like a fresh session except for persistent preferences.
+- The Select Workflow dialog can also open a saved `.framelab` workspace document, and recent workspace-document paths are remembered globally for quick reopen.
+- Unless a `.framelab` file is opened, the app should behave like a fresh session except for persistent preferences and recent workspace-document history.
 - Legacy `ui_state.ini` is retained only as a limited migration source for preferences when `preferences.ini` is missing.
 
 ## Workflow And Metadata

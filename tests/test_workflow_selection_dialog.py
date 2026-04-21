@@ -11,7 +11,7 @@ from PySide6.QtCore import Qt
 
 import framelab.workflow_selection_dialog as workflow_selection_dialog_module
 from framelab.node_metadata import load_nodecard
-from framelab.ui_settings import RecentWorkflowEntry
+from framelab.ui_settings import RecentWorkflowEntry, RecentWorkspaceDocumentEntry
 from framelab.workflow_selection_dialog import WorkflowSelectionDialog
 
 
@@ -194,6 +194,62 @@ def test_workflow_selection_dialog_browse_uses_shared_directory_helper(
     dialog._browse_workspace()
 
     assert dialog._workspace_edit.text() == chosen
+
+
+def test_workflow_selection_dialog_can_open_workspace_document_from_button(
+    tmp_path: Path,
+    framelab_window_factory,
+    monkeypatch,
+) -> None:
+    window = framelab_window_factory(enabled_plugin_ids=())
+    dialog = WorkflowSelectionDialog(window)
+    chosen = str(tmp_path / "saved-session.framelab")
+    opened: list[tuple[str, bool]] = []
+
+    monkeypatch.setattr(
+        workflow_selection_dialog_module,
+        "choose_open_file",
+        lambda *args, **kwargs: chosen,
+    )
+    monkeypatch.setattr(
+        window,
+        "_open_workspace_document_path",
+        lambda path, *, prompt_before=False: opened.append((str(path), bool(prompt_before))) or True,
+    )
+
+    dialog._open_workspace_document_from_dialog()
+
+    assert opened == [(chosen, True)]
+    assert dialog.result() == qtw.QDialog.Accepted
+
+
+def test_workflow_selection_dialog_recent_workspace_menu_uses_history(
+    tmp_path: Path,
+    framelab_window_factory,
+    monkeypatch,
+) -> None:
+    window = framelab_window_factory(enabled_plugin_ids=())
+    recent_path = str((tmp_path / "recent-session.framelab").resolve())
+    window.ui_state_snapshot.recent_workspace_documents = [
+        RecentWorkspaceDocumentEntry(path=recent_path),
+    ]
+    dialog = WorkflowSelectionDialog(window)
+    opened: list[tuple[str, bool]] = []
+
+    monkeypatch.setattr(
+        window,
+        "_open_workspace_document_path",
+        lambda path, *, prompt_before=False: opened.append((str(path), bool(prompt_before))) or True,
+    )
+
+    actions = dialog._recent_workspace_menu.actions()
+    assert len(actions) == 1
+    assert actions[0].text() == Path(recent_path).name
+
+    actions[0].trigger()
+
+    assert opened == [(recent_path, True)]
+    assert dialog.result() == qtw.QDialog.Accepted
 
 
 def test_workflow_selection_dialog_warns_for_folder_above_workspace_root(

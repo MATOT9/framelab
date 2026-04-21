@@ -7,9 +7,9 @@ from pathlib import Path
 from PySide6 import QtCore, QtWidgets as qtw
 from PySide6.QtCore import Qt
 
-from .file_dialogs import choose_existing_directory
+from .file_dialogs import choose_existing_directory, choose_open_file
 from .ui_primitives import ChipSpec, SummaryItem, build_page_header, build_summary_strip
-from .ui_settings import RecentWorkflowEntry
+from .ui_settings import RecentWorkflowEntry, RecentWorkspaceDocumentEntry
 from .window_drag import apply_secondary_window_geometry, configure_secondary_window
 from .workflow import workflow_profile_by_id
 from .workflow_widgets import WorkflowBreadcrumbBar
@@ -128,6 +128,19 @@ class WorkflowSelectionDialog(qtw.QDialog):
 
         actions = qtw.QHBoxLayout()
         actions.setSpacing(8)
+
+        self._open_workspace_button = qtw.QToolButton()
+        self._open_workspace_button.setObjectName("DockActionButton")
+        self._open_workspace_button.setText("Open Workspace File...")
+        self._open_workspace_button.setToolButtonStyle(Qt.ToolButtonTextOnly)
+        self._open_workspace_button.setPopupMode(qtw.QToolButton.MenuButtonPopup)
+        self._open_workspace_button.setToolTip(
+            "Open a saved .framelab workspace document instead of selecting a workflow root manually.",
+        )
+        self._open_workspace_button.clicked.connect(self._open_workspace_document_from_dialog)
+        self._recent_workspace_menu = qtw.QMenu(self._open_workspace_button)
+        self._open_workspace_button.setMenu(self._recent_workspace_menu)
+        actions.addWidget(self._open_workspace_button)
 
         self._clear_button = qtw.QPushButton("Clear Workflow")
         self._clear_button.clicked.connect(self._clear_workflow)
@@ -270,6 +283,9 @@ class WorkflowSelectionDialog(qtw.QDialog):
             else ()
         )
         recent_entries = tuple(getattr(self._host_window, "recent_workflow_entries")())
+        recent_workspace_documents = tuple(
+            getattr(self._host_window, "recent_workspace_document_entries")()
+        )
 
         self._header.set_chips(
             [
@@ -358,6 +374,7 @@ class WorkflowSelectionDialog(qtw.QDialog):
         self._workspace_edit.setText(current_root_text)
         del blocker
         self._populate_recent_list(recent_entries)
+        self._refresh_recent_workspace_menu(recent_workspace_documents)
         self._selected_recent_entry = None
         self._warning_label.setText("")
         self._update_anchor_hint()
@@ -528,6 +545,73 @@ class WorkflowSelectionDialog(qtw.QDialog):
         self._warning_label.setText(resolution.info_text)
         self.accept()
 
+    def _refresh_recent_workspace_menu(
+        self,
+        recent_documents: tuple[RecentWorkspaceDocumentEntry, ...],
+    ) -> None:
+        """Rebuild the recent workspace-document menu for quick reopen."""
+
+        self._recent_workspace_menu.clear()
+        if not recent_documents:
+            action = self._recent_workspace_menu.addAction("No recent workspace files")
+            action.setEnabled(False)
+            self._open_workspace_button.setToolTip(
+                "Open a saved .framelab workspace document instead of selecting a workflow root manually.",
+            )
+            return
+
+        for entry in recent_documents:
+            label = Path(entry.path).name or entry.path
+            action = self._recent_workspace_menu.addAction(label)
+            action.setToolTip(entry.path)
+            action.triggered.connect(
+                lambda _checked=False, path=entry.path: self._open_workspace_document_path(path),
+            )
+        self._open_workspace_button.setToolTip(
+            "Open a saved .framelab workspace document. Use the arrow for recent files.",
+        )
+
+    def _open_workspace_document_from_dialog(self) -> None:
+        """Prompt for and open one saved ``.framelab`` workspace document."""
+
+        host_open = getattr(self._host_window, "_open_workspace_document_path", None)
+        if not callable(host_open):
+            self._warning_label.setText("Host window does not support workspace-file loading.")
+            return
+        current_path = getattr(self._host_window, "_workspace_document_path", None)
+        recent_documents = tuple(
+            getattr(self._host_window, "recent_workspace_document_entries")()
+        )
+        if current_path is not None:
+            start = str(Path(current_path).expanduser())
+        elif recent_documents:
+            start = recent_documents[0].path
+        else:
+            start = str(Path.home())
+        selected_path = choose_open_file(
+            self,
+            "Open Workspace File",
+            start,
+            name_filters=("FrameLab Workspace (*.framelab)", "All files (*)"),
+            selected_name_filter="FrameLab Workspace (*.framelab)",
+        )
+        if not selected_path:
+            return
+        self._open_workspace_document_path(selected_path)
+
+    def _open_workspace_document_path(self, path: str | Path) -> None:
+        """Open one saved workspace document through the host and close on success."""
+
+        host_open = getattr(self._host_window, "_open_workspace_document_path", None)
+        if not callable(host_open):
+            self._warning_label.setText("Host window does not support workspace-file loading.")
+            return
+        success = bool(host_open(path, prompt_before=True))
+        if not success:
+            return
+        self._warning_label.setText("Opened saved workspace document.")
+        self.accept()
+
     def _sync_action_state(self) -> None:
         """Keep primary actions aligned with the current shell state."""
 
@@ -535,6 +619,9 @@ class WorkflowSelectionDialog(qtw.QDialog):
             getattr(self._host_window.workflow_state_controller, "profile_id", None),
         )
         self._clear_button.setEnabled(has_loaded_workflow)
+        self._open_workspace_button.setEnabled(
+            callable(getattr(self._host_window, "_open_workspace_document_path", None)),
+        )
         self._load_button.setEnabled(
             bool(self._workspace_edit.text().strip())
             and self._profile_combo.currentIndex() >= 0

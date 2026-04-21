@@ -579,6 +579,13 @@ class MetricsPipelineController:
         self.is_stats_running = False
         self.stats_update_kind = "idle"
 
+    def cancel_stats_job(self) -> int:
+        """Invalidate the current dynamic-stats job and clear running state."""
+
+        self.stats_job_id += 1
+        self.finish_stats_job()
+        return self.stats_job_id
+
     def begin_roi_apply(self, total: int) -> int:
         """Advance and record one in-flight dataset-wide ROI apply job."""
         self.roi_apply_job_id += 1

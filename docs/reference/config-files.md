@@ -47,6 +47,7 @@ Important notes:
 
 - the file is created when preferences are first saved
 - this file does not restore the last workflow session on app launch
+- it does remember recent `.framelab` workspace-document paths used by File -> Open Workspace File and the Select Workflow dialog
 - limited legacy migration may seed preferences from an older `ui_state.ini` when `preferences.ini` is missing
 - deleting it is safe; the app will recreate it from defaults
 

@@ -58,7 +58,12 @@ from .plugins import (
 )
 from .plugins.analysis import AnalysisPlugin
 from .ui_density import AdaptiveUiContext, UiDensityResolver
-from .ui_settings import RecentWorkflowEntry, UiStateSnapshot, UiStateStore
+from .ui_settings import (
+    RecentWorkflowEntry,
+    RecentWorkspaceDocumentEntry,
+    UiStateSnapshot,
+    UiStateStore,
+)
 from .workspace_document import (
     WorkspaceDocumentBackgroundState,
     WorkspaceDocumentDatasetState,
@@ -1161,6 +1166,11 @@ class FrameLabWindow(
 
         return tuple(self.ui_state_snapshot.recent_workflows)
 
+    def recent_workspace_document_entries(self) -> tuple[RecentWorkspaceDocumentEntry, ...]:
+        """Return recent ``.framelab`` document paths in most-recent-first order."""
+
+        return tuple(self.ui_state_snapshot.recent_workspace_documents)
+
     def _workflow_selected_folder(self) -> Path | None:
         """Return the current folder-edit path when present."""
 
@@ -1961,6 +1971,42 @@ class FrameLabWindow(
             updated.append(entry)
         self.ui_state_snapshot.recent_workflows = updated[:8]
 
+    def _remember_recent_workspace_document(
+        self,
+        path: str | Path | None,
+    ) -> None:
+        """Track one recently opened or saved ``.framelab`` document path."""
+
+        if path is None:
+            return
+        try:
+            normalized_path = str(Path(path).expanduser().resolve())
+        except Exception:
+            normalized_path = str(path).strip()
+        if not normalized_path:
+            return
+
+        current = RecentWorkspaceDocumentEntry(path=normalized_path)
+        updated = [current]
+        for entry in self.ui_state_snapshot.recent_workspace_documents:
+            if entry.path == current.path:
+                continue
+            updated.append(entry)
+        self.ui_state_snapshot.recent_workspace_documents = updated[:8]
+
+    def _preferred_workspace_document_open_start_path(self) -> Path:
+        """Return the best starting path for opening a workspace document."""
+
+        if self._workspace_document_path is not None:
+            return self._workspace_document_path.parent
+        recent_documents = self.ui_state_snapshot.recent_workspace_documents
+        if recent_documents:
+            try:
+                return Path(recent_documents[0].path).expanduser()
+            except Exception:
+                pass
+        return self._suggest_workspace_document_path().parent
+
     def _current_analysis_plugin_id(self) -> str | None:
         """Return the active analysis plugin id if one is selected."""
 
@@ -2304,6 +2350,7 @@ class FrameLabWindow(
         self._workspace_document_path = path.expanduser()
         self._workspace_document_reference_payload = reference_payload
         self._workspace_document_dirty = False
+        self._remember_recent_workspace_document(self._workspace_document_path)
         self._update_workspace_document_window_title()
         self._set_status(f"Opened workspace file {self._workspace_document_path.name}")
         if warnings:
@@ -2586,11 +2633,7 @@ class FrameLabWindow(
     def _select_workspace_document_path_to_open(self) -> Path | None:
         """Prompt for one workspace-document path to open."""
 
-        initial_dir = (
-            str(self._workspace_document_path.parent)
-            if self._workspace_document_path is not None
-            else str(self._suggest_workspace_document_path().parent)
-        )
+        initial_dir = str(self._preferred_workspace_document_open_start_path())
         selected_path = choose_open_file(
             self,
             "Open Workspace File",
@@ -2633,6 +2676,7 @@ class FrameLabWindow(
         self._workspace_document_path = final_path
         self._workspace_document_reference_payload = snapshot.to_payload()
         self._workspace_document_dirty = False
+        self._remember_recent_workspace_document(final_path)
         self._update_workspace_document_window_title()
         self._set_status(f"Saved workspace file to {final_path.name}")
         return True
@@ -2722,15 +2766,25 @@ class FrameLabWindow(
             return False
         return True
 
+    def _open_workspace_document_path(
+        self,
+        path: Path | str,
+        *,
+        prompt_before: bool = False,
+    ) -> bool:
+        """Open one workspace document path with optional dirty-session prompt."""
+
+        if prompt_before and not self._maybe_save_workspace_document_before_destructive_action():
+            return False
+        return self._open_workspace_document(path)
+
     def _open_workspace_document_from_dialog(self) -> None:
         """Prompt for and open a workspace document."""
 
-        if not self._maybe_save_workspace_document_before_destructive_action():
-            return
         selected_path = self._select_workspace_document_path_to_open()
         if selected_path is None:
             return
-        self._open_workspace_document(selected_path)
+        self._open_workspace_document_path(selected_path, prompt_before=True)
 
     def _save_ui_state(self) -> None:
         """Persist current UI preferences and keep the runtime snapshot in sync."""
@@ -2763,6 +2817,9 @@ class FrameLabWindow(
             workflow_anchor_type_id=self.workflow_state_controller.anchor_type_id,
             workflow_active_node_id=self.workflow_state_controller.active_node_id,
             recent_workflows=list(self.ui_state_snapshot.recent_workflows),
+            recent_workspace_documents=list(
+                self.ui_state_snapshot.recent_workspace_documents
+            ),
         )
         self.ui_state_store.save(snapshot)
         self.ui_state_snapshot = snapshot

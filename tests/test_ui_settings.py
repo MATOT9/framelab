@@ -10,6 +10,7 @@ import pytest
 from framelab.ui_settings import (
     DensityMode,
     RecentWorkflowEntry,
+    RecentWorkspaceDocumentEntry,
     UiPreferences,
     UiStateSnapshot,
     UiStateStore,
@@ -53,6 +54,7 @@ def test_load_returns_default_preferences_and_no_cached_ui_state(
     assert snapshot.workflow_anchor_type_id is None
     assert snapshot.workflow_active_node_id is None
     assert snapshot.recent_workflows == []
+    assert snapshot.recent_workspace_documents == []
 
 
 def test_save_and_reload_round_trips_preferences_only(
@@ -94,6 +96,11 @@ def test_save_and_reload_round_trips_preferences_only(
                 active_node_id="calibration:root",
             ),
         ],
+        recent_workspace_documents=[
+            RecentWorkspaceDocumentEntry(
+                path="/tmp/workspaces/calibration/session.framelab",
+            ),
+        ],
     )
 
     store.save(snapshot)
@@ -121,12 +128,18 @@ def test_save_and_reload_round_trips_preferences_only(
     assert reloaded.workflow_anchor_type_id is None
     assert reloaded.workflow_active_node_id is None
     assert reloaded.recent_workflows == []
+    assert reloaded.recent_workspace_documents == [
+        RecentWorkspaceDocumentEntry(
+            path="/tmp/workspaces/calibration/session.framelab",
+        ),
+    ]
 
     config = ConfigParser()
     config.read(config_path, encoding="utf-8")
     assert config.get("appearance", "theme") == "light"
     assert not config.has_section("panels")
     assert not config.has_section("splitters")
+    assert config.has_section("recent_workspace_documents")
     assert not config.has_section("recent_workflows")
     assert not config.has_option("workspace", "last_workflow_tab")
     assert not config.has_option("workspace", "workflow_root")
@@ -190,6 +203,7 @@ def test_invalid_values_fall_back_to_defaults_and_ignore_cached_state(
     assert snapshot.workflow_anchor_type_id is None
     assert snapshot.workflow_active_node_id is None
     assert snapshot.recent_workflows == []
+    assert snapshot.recent_workspace_documents == []
 
 
 def test_legacy_cached_ui_state_sections_are_ignored(
@@ -234,6 +248,7 @@ def test_legacy_cached_ui_state_sections_are_ignored(
     assert snapshot.workflow_anchor_type_id is None
     assert snapshot.workflow_active_node_id is None
     assert snapshot.recent_workflows == []
+    assert snapshot.recent_workspace_documents == []
 
 
 def test_compatibility_helpers_no_longer_persist_ui_state(

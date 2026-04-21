@@ -5,7 +5,7 @@ Use this page when you want the shortest reliable path from launch to interpreta
 ## Recommended session flow
 
 1. Launch the app and enable only the plugins required for the session.
-2. Choose the workflow profile and workspace root.
+2. Choose the workflow profile and workspace root, or open a saved `.framelab` workspace document from **Select Workflow**.
 3. Confirm the active node, breadcrumb, and scope chips in **Workflow Explorer**.
 4. If the filesystem layout is still being designed or repaired, stop and read [Workflow Structure and Required Folder Layout](workflow-structure.md) before scanning.
 5. Use **Metadata Inspector** to confirm inherited and local metadata for the active node.
@@ -22,6 +22,8 @@ Use this page when you want the shortest reliable path from launch to interpreta
 When time is limited, make these decisions in order.
 
 ### 1. Confirm the workflow profile and scope
+
+If you already saved a `.framelab` workspace document for this session type, you can reopen it directly from **Select Workflow** instead of reselecting the workflow root and page state manually.
 
 For most work, use the **Calibration** profile. Its intended logical hierarchy is:
 

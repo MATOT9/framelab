@@ -19,6 +19,7 @@ _SECTION_ANALYSIS_PAGE = "analysis_page"
 _SECTION_PANELS = "panels"
 _SECTION_SPLITTERS = "splitters"
 _SECTION_RECENT_WORKFLOWS = "recent_workflows"
+_SECTION_RECENT_WORKSPACE_DOCUMENTS = "recent_workspace_documents"
 _TRUE_VALUES = {"1", "true", "yes", "on"}
 _FALSE_VALUES = {"0", "false", "no", "off"}
 
@@ -68,6 +69,13 @@ class RecentWorkflowEntry:
 
 
 @dataclass(slots=True)
+class RecentWorkspaceDocumentEntry:
+    """One recently used ``.framelab`` workspace-document path."""
+
+    path: str
+
+
+@dataclass(slots=True)
 class UiStateSnapshot:
     """Complete UI snapshot persisted between launches."""
 
@@ -81,6 +89,7 @@ class UiStateSnapshot:
     workflow_anchor_type_id: str | None = None
     workflow_active_node_id: str | None = None
     recent_workflows: list[RecentWorkflowEntry] = field(default_factory=list)
+    recent_workspace_documents: list[RecentWorkspaceDocumentEntry] = field(default_factory=list)
 
 
 def preferences_config_path() -> Path:
@@ -192,6 +201,41 @@ def _serialize_recent_workflow_entry(entry: RecentWorkflowEntry) -> str:
             "anchor_type_id": entry.anchor_type_id,
             "active_node_id": entry.active_node_id,
         },
+        ensure_ascii=True,
+        sort_keys=True,
+    )
+
+
+def _parse_recent_workspace_document_entry(
+    value: object,
+) -> RecentWorkspaceDocumentEntry | None:
+    text = str(value).strip()
+    if not text:
+        return None
+    try:
+        payload = json.loads(text)
+    except Exception:
+        payload = text
+    if isinstance(payload, dict):
+        candidate = str(payload.get("path", "")).strip()
+    else:
+        candidate = str(payload).strip()
+    if not candidate:
+        return None
+    try:
+        normalized = str(Path(candidate).expanduser())
+    except Exception:
+        normalized = candidate
+    if not normalized:
+        return None
+    return RecentWorkspaceDocumentEntry(path=normalized)
+
+
+def _serialize_recent_workspace_document_entry(
+    entry: RecentWorkspaceDocumentEntry,
+) -> str:
+    return json.dumps(
+        {"path": entry.path},
         ensure_ascii=True,
         sort_keys=True,
     )
@@ -337,16 +381,28 @@ class UiStateStore:
             ),
         )
 
+        recent_workspace_documents: list[RecentWorkspaceDocumentEntry] = []
+        if config.has_section(_SECTION_RECENT_WORKSPACE_DOCUMENTS):
+            for _key, raw_value in sorted(config.items(_SECTION_RECENT_WORKSPACE_DOCUMENTS)):
+                entry = _parse_recent_workspace_document_entry(raw_value)
+                if entry is None:
+                    continue
+                if any(existing.path == entry.path for existing in recent_workspace_documents):
+                    continue
+                recent_workspace_documents.append(entry)
+
         return UiStateSnapshot(
             preferences=preferences,
+            recent_workspace_documents=recent_workspace_documents,
         )
 
     def save(self, snapshot: UiStateSnapshot) -> None:
-        """Persist application preferences only.
+        """Persist application preferences and recent workspace-document history.
 
-        Session-style state such as workflow selection, recent entries, splitter
-        sizes, panel states, and last-tab memory now lives only in ``.framelab``
-        workspace documents or the current process.
+        Session-style state such as workflow selection, recent workflow entries,
+        splitter sizes, panel states, and last-tab memory now lives only in
+        ``.framelab`` workspace documents or the current process. Recent
+        ``.framelab`` file history remains a global convenience preference.
         """
 
         config = ConfigParser()
@@ -432,6 +488,18 @@ class UiStateStore:
                 snapshot.preferences.collapse_analysis_plugin_controls_by_default
             ),
         )
+        recent_workspace_documents: dict[str, str] = {}
+        for index, entry in enumerate(snapshot.recent_workspace_documents, start=1):
+            path_text = str(entry.path).strip()
+            if not path_text:
+                continue
+            key = f"entry_{index:02d}"
+            recent_workspace_documents[key] = _serialize_recent_workspace_document_entry(entry)
+        self._replace_section(
+            config,
+            _SECTION_RECENT_WORKSPACE_DOCUMENTS,
+            recent_workspace_documents,
+        )
         self._write_config(config)
 
     def set_panel_state(self, key: str, expanded: bool) -> None:
@@ -500,6 +568,8 @@ class UiStateStore:
 __all__ = [
     "DensityMode",
     "UiPanelState",
+    "RecentWorkflowEntry",
+    "RecentWorkspaceDocumentEntry",
     "UiPreferences",
     "UiStateSnapshot",
     "UiStateStore",

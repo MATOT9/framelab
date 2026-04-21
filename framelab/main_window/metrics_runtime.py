@@ -510,14 +510,27 @@ class MetricsRuntimeMixin:
         """Stop any in-flight dynamic metrics worker."""
         metrics = self.metrics_state
         thread = self._stats_thread
+        worker = self._stats_worker
         self._dynamic_cache_pending = None
-        metrics.finish_stats_job()
+        metrics.cancel_stats_job()
         self._stop_threshold_summary_animation()
         if thread is None:
             return
-        if thread.isRunning():
-            thread.requestInterruption()
-            thread.quit()
+        if worker is not None:
+            try:
+                worker.finished.disconnect(self._on_dynamic_stats_finished)
+            except Exception:
+                pass
+            try:
+                worker.failed.disconnect(self._on_dynamic_stats_failed)
+            except Exception:
+                pass
+        if not thread.isRunning():
+            if worker is not None:
+                self._on_stats_thread_finished(thread, worker)
+            return
+        thread.requestInterruption()
+        thread.quit()
 
     def _on_stats_thread_finished(
         self,

@@ -6,7 +6,7 @@ This file is the compact registry of known bugs, fragile zones, and incomplete a
 
 - The pytest suite needs refactoring to avoid stalls and very long runners.
 - The Trials workflow profile folder structure and "create new" behavior are not yet reliable.
-- The app can lag when changing workflow tabs.
+- The app can still lag when changing workflow tabs under heavy preview or analysis work.
 - Some badges or chips may disappear after changing active workflow scope.
 - The standalone build path has had permission errors when deleting `.pyd` files.
 - Workspace/preferences persistence was recently reshaped; keep verifying that session-like UI state is restored only from `.framelab` files while preferences remain in `config/preferences.ini`.
