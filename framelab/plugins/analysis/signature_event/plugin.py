@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Optional
 
 import numpy as np
-from PySide6 import QtGui, QtWidgets as qtw
+from PySide6 import QtWidgets as qtw
 from PySide6.QtCore import QSignalBlocker, Qt
 
 from ....mpl_canvas import FigureCanvasQTAgg
@@ -424,10 +424,8 @@ class EventSignatureAnalysisPlugin(AnalysisPlugin):
             ax.plot(
                 points[:, 0],
                 points[:, 1],
-                marker="o",
-                linewidth=1.4,
-                markersize=4.0,
-                color=line,
+                lw=1.4,
+                c=line,
             )
             if points.shape[0] == 1:
                 x = float(points[0, 0])
@@ -436,5 +434,6 @@ class EventSignatureAnalysisPlugin(AnalysisPlugin):
                 ax.set_ylim(y - 0.5, y + 0.5)
             else:
                 ax.margins(x=0.04, y=0.08)
+
         self._figure.tight_layout(pad=1.0)
         self._canvas.draw_idle()
