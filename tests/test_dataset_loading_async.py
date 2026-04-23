@@ -264,6 +264,33 @@ def test_large_async_dataset_load_keeps_measure_table_proxy_in_sync(
     assert window.table.model() is window.table_proxy
 
 
+def test_scan_completion_does_not_start_dynamic_stats(
+    tmp_path: Path,
+    framelab_window_factory,
+    monkeypatch,
+    wait_for_dataset_load,
+) -> None:
+    dataset_root = _write_dataset(tmp_path / "scan-only-dataset", 4)
+    window = framelab_window_factory(enabled_plugin_ids=())
+    dynamic_calls: list[dict[str, object]] = []
+
+    monkeypatch.setattr(
+        window,
+        "_start_dynamic_stats_job",
+        lambda **kwargs: dynamic_calls.append(dict(kwargs)),
+    )
+
+    window.folder_edit.setText(str(dataset_root))
+    window.load_folder()
+    wait_for_dataset_load(window, timeout_ms=12000)
+
+    assert dynamic_calls == []
+    assert window.metrics_state.maxs is not None
+    assert window.metrics_state.min_non_zero is not None
+    assert window.metrics_state.sat_counts is None
+    _assert_measure_table_rows_in_sync(window, 4)
+
+
 def test_scope_switch_keeps_measure_table_proxy_sorted_and_in_sync(
     tmp_path: Path,
     framelab_window_factory,
@@ -315,39 +342,32 @@ def test_rescan_ignores_stale_dynamic_stats_from_previous_scope(
 ) -> None:
     first_root = _write_dataset(tmp_path / "stats-scope-a", 8)
     second_root = _write_dataset(tmp_path / "stats-scope-b", 3)
-    original_run = workers_module.DynamicStatsWorker.run
-    release_first_stats = threading.Event()
-    first_stats_started = threading.Event()
-
-    def _slow_dynamic_run(self) -> None:
-        if any(
-            Path(path).resolve().is_relative_to(first_root.resolve())
-            for path in self._paths
-        ):
-            first_stats_started.set()
-            assert release_first_stats.wait(timeout=5.0)
-        original_run(self)
-
-    monkeypatch.setattr(
-        workers_module.DynamicStatsWorker,
-        "run",
-        _slow_dynamic_run,
-    )
-
     window = framelab_window_factory(enabled_plugin_ids=())
-    monkeypatch.setattr(window, "_cached_dynamic_payloads", lambda _signature: ({}, {}))
 
     window.folder_edit.setText(str(first_root))
     window.load_folder()
     wait_for_dataset_load(window, timeout_ms=12000)
-    wait_until(first_stats_started.is_set, timeout_ms=4000)
+    stale_job_id = window.metrics_state.begin_stats_job(
+        update_kind="full",
+        refresh_analysis=True,
+    )
     assert window.metrics_state.is_stats_running
+    stale_result = workers_module.DynamicStatsResult(
+        job_id=stale_job_id,
+        sat_counts=np.full(8, 99, dtype=np.int64),
+        avg_topk=None,
+        avg_topk_std=None,
+        avg_topk_sem=None,
+        max_pixels=np.full(8, 99, dtype=np.int64),
+        min_non_zero=np.full(8, 99, dtype=np.int64),
+        bg_applied_mask=np.ones(8, dtype=bool),
+    )
 
     window.folder_edit.setText(str(second_root))
     window.load_folder(suppress_auto_metrics=True)
-    release_first_stats.set()
 
     wait_for_dataset_load(window, timeout_ms=12000)
+    window._on_dynamic_stats_finished(stale_result)
     wait_until(
         lambda: (
             window.dataset_state.dataset_root == second_root.resolve()
@@ -358,8 +378,7 @@ def test_rescan_ignores_stale_dynamic_stats_from_previous_scope(
             and len(window.metrics_state.maxs) == 3
             and window.metrics_state.min_non_zero is not None
             and len(window.metrics_state.min_non_zero) == 3
-            and window.metrics_state.sat_counts is not None
-            and len(window.metrics_state.sat_counts) == 3
+            and window.metrics_state.sat_counts is None
             and all(
                 Path(path).resolve().is_relative_to(second_root.resolve())
                 for path in window.dataset_state.paths

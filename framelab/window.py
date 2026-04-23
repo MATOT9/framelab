@@ -1084,6 +1084,7 @@ class FrameLabWindow(
         *,
         anchor_type_id: str | None = None,
         active_node_id: str | None = None,
+        unload_mismatched_dataset: bool = True,
     ) -> str | None:
         """Load or clear the current workflow context."""
 
@@ -1124,7 +1125,7 @@ class FrameLabWindow(
         if hasattr(self, "folder_edit"):
             self._sync_dataset_scope_to_workflow(
                 update_folder_edit=True,
-                unload_mismatched_dataset=True,
+                unload_mismatched_dataset=unload_mismatched_dataset,
             )
         self._notify_workflow_scope_changed()
         self._schedule_workspace_document_dirty_state_refresh()
@@ -1330,47 +1331,59 @@ class FrameLabWindow(
         result: object,
         *,
         force_refresh_if_loaded: bool = False,
-    ) -> None:
+    ) -> bool:
         """Apply acquisition-path mutations to the currently loaded dataset view."""
 
         if not hasattr(result, "deleted_paths") or not hasattr(result, "renamed_paths"):
-            return
-        loaded_folder = self._workflow_selected_folder()
+            return False
+        loaded_folder = self.dataset_state.dataset_root
         if loaded_folder is None:
-            return
+            return False
+        loaded_folder = Path(loaded_folder).expanduser().resolve()
         unloaded = False
         deleted_paths = tuple(getattr(result, "deleted_paths", ()))
         renamed_paths = tuple(getattr(result, "renamed_paths", ()))
         for deleted_path in deleted_paths:
-            if loaded_folder == deleted_path or deleted_path in loaded_folder.parents:
+            deleted_root = Path(deleted_path).expanduser().resolve()
+            if loaded_folder == deleted_root or deleted_root in loaded_folder.parents:
                 if hasattr(self, "unload_folder"):
                     self.unload_folder(clear_folder_edit=True)
                 unloaded = True
                 break
         if unloaded:
-            return
+            return False
 
-        for old_path, new_path in renamed_paths:
-            if loaded_folder == old_path or old_path in loaded_folder.parents:
-                relative = loaded_folder.relative_to(old_path)
-                new_loaded_path = new_path.joinpath(relative)
-                self._set_folder_edit_text(str(new_loaded_path))
-                if hasattr(self, "load_folder"):
-                    self.load_folder()
-                return
+        if renamed_paths and self.dataset_state.remap_loaded_dataset_paths(renamed_paths):
+            if self.dataset_state.dataset_root is not None:
+                self._set_folder_edit_text(str(self.dataset_state.dataset_root))
+            self._clear_image_cache()
+            return True
 
         if deleted_paths and force_refresh_if_loaded and self.dataset_state.has_loaded_data():
-            if hasattr(self, "load_folder"):
-                self.load_folder()
-            return
-
-        created_paths = tuple(getattr(result, "created_paths", ()))
-        if created_paths and self.dataset_state.has_loaded_data():
-            for created_path in created_paths:
-                if loaded_folder == created_path or loaded_folder in created_path.parents:
+            for deleted_path in deleted_paths:
+                deleted_root = Path(deleted_path).expanduser().resolve()
+                if loaded_folder == deleted_root or loaded_folder in deleted_root.parents:
                     if hasattr(self, "load_folder"):
                         self.load_folder()
-                    return
+                    return False
+        return False
+
+    def _refresh_loaded_dataset_after_path_remap(self) -> None:
+        """Refresh path-derived UI state after in-memory loaded-path rewrites."""
+
+        clear_metadata_cache()
+        if hasattr(self, "_refresh_metadata_cache"):
+            self._refresh_metadata_cache(clear_cache=True)
+        if hasattr(self, "_refresh_ebus_config_status"):
+            self._refresh_ebus_config_status(self.dataset_state.dataset_root)
+        if hasattr(self, "_refresh_metadata_table"):
+            self._refresh_metadata_table()
+        if hasattr(self, "_refresh_table"):
+            self._refresh_table(update_analysis=True)
+        elif hasattr(self, "_invalidate_analysis_context"):
+            self._invalidate_analysis_context(refresh_visible_plugin=True)
+        self._refresh_workspace_document_dirty_state()
+        self._set_status()
 
     def _map_path_through_workflow_mutation(
         self,
@@ -1402,7 +1415,7 @@ class FrameLabWindow(
     ) -> None:
         """Refresh workflow and dataset state after session/acquisition edits."""
 
-        self._apply_loaded_dataset_path_mutation(
+        remapped_loaded_dataset = self._apply_loaded_dataset_path_mutation(
             result,
             force_refresh_if_loaded=force_refresh_if_loaded,
         )
@@ -1431,6 +1444,7 @@ class FrameLabWindow(
             str(workspace_root),
             controller.profile_id,
             anchor_type_id=anchor_type_id,
+            unload_mismatched_dataset=False,
         )
         if target_path is not None:
             node_id = self.workflow_state_controller.resolve_node_id_for_path(target_path)
@@ -1439,6 +1453,8 @@ class FrameLabWindow(
                     node_id,
                     unload_mismatched_dataset=False,
                 )
+        if remapped_loaded_dataset:
+            self._refresh_loaded_dataset_after_path_remap()
 
     def _open_workflow_acquisition_creation_dialog(
         self,

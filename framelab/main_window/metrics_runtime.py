@@ -1046,7 +1046,6 @@ class MetricsRuntimeMixin:
         """Refresh the measure table and linked preview state."""
         if (
             not self._has_loaded_data()
-            or self.metrics_state.sat_counts is None
             or self.metrics_state.min_non_zero is None
             or self.metrics_state.maxs is None
         ):
@@ -1316,7 +1315,6 @@ class MetricsRuntimeMixin:
             not self._has_loaded_data()
             or metrics.min_non_zero is None
             or metrics.maxs is None
-            or metrics.sat_counts is None
             or not (0 <= idx < dataset.path_count())
         ):
             return
@@ -1403,9 +1401,12 @@ class MetricsRuntimeMixin:
         image_name = Path(image_path).name
         info = (
             f"{image_name} | min_non_zero={int(metrics.min_non_zero[idx])} "
-            f"max={int(metrics.maxs[idx])} "
-            f"| saturated={int(metrics.sat_counts[idx])}"
+            f"max={int(metrics.maxs[idx])}"
         )
+        if metrics.sat_counts is not None and idx < len(metrics.sat_counts):
+            info += f" | saturated={int(metrics.sat_counts[idx])}"
+        else:
+            info += " | saturated=not computed"
         if (
             float(metrics.low_signal_threshold_value) > 0.0
             and int(metrics.maxs[idx]) <= int(metrics.low_signal_threshold_value)

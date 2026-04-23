@@ -830,7 +830,7 @@ class DatasetLoadingMixin:
         *,
         workflow_notice: str | None = None,
         after_load=None,
-        suppress_auto_metrics: bool = False,
+        suppress_auto_metrics: bool = True,
     ) -> int:
         """Start one asynchronous dataset load job and return its job id."""
 
@@ -1163,7 +1163,7 @@ class DatasetLoadingMixin:
             self.base_status += f" ({', '.join(skipped_parts)})"
 
         auto_metrics = bool(
-            self._dataset_load_auto_metrics.pop(int(summary.job_id), True),
+            self._dataset_load_auto_metrics.pop(int(summary.job_id), False),
         )
         workflow_notice = self._dataset_load_workflow_notices.pop(
             int(summary.job_id),
@@ -1174,6 +1174,8 @@ class DatasetLoadingMixin:
             self._apply_live_update()
         else:
             self._refresh_table(update_analysis=False)
+            if hasattr(self, "_invalidate_analysis_context"):
+                self._invalidate_analysis_context(refresh_visible_plugin=True)
             self._update_background_status_label()
             self._apply_dynamic_visibility_policy()
             self._update_average_controls()
@@ -1218,7 +1220,7 @@ class DatasetLoadingMixin:
         self,
         *,
         after_load=None,
-        suppress_auto_metrics: bool = False,
+        suppress_auto_metrics: bool = True,
     ) -> None:
         """Start asynchronous dataset loading for the selected folder."""
         folder = Path(self.folder_edit.text().strip()).expanduser()

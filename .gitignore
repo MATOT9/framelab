@@ -10,6 +10,8 @@ json_templates
 test.py
 */.tmp
 .codex
+STAGED_PIPELINE_CONTEXT_AND_TASKS.md
+*/staged_pipeline_refactor_context.md
 
 # Software cache
 .framelab

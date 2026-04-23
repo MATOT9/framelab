@@ -411,6 +411,35 @@ def test_visible_analysis_page_coalesces_multiple_context_invalidations(
     assert not analysis_window._analysis_context_dirty
 
 
+def test_visible_analysis_page_scan_refresh_does_not_start_dynamic_metrics(
+    analysis_window: FrameLabWindow,
+    process_events,
+    monkeypatch,
+    tmp_path: Path,
+    wait_for_dataset_load,
+) -> None:
+    folder = tmp_path / "analysis-scan-only"
+    folder.mkdir()
+    imwrite(folder / "frame_0001.tiff", np.full((4, 4), 12, dtype=np.uint16))
+    dynamic_calls: list[dict[str, object]] = []
+
+    monkeypatch.setattr(
+        analysis_window,
+        "_start_dynamic_stats_job",
+        lambda **kwargs: dynamic_calls.append(dict(kwargs)),
+    )
+
+    _show_analysis_page(analysis_window, process_events)
+    analysis_window.folder_edit.setText(str(folder))
+    analysis_window.load_folder()
+    wait_for_dataset_load(analysis_window)
+    process_events()
+
+    assert dynamic_calls == []
+    assert not analysis_window.metrics_state.is_stats_running
+    assert analysis_window.metrics_state.sat_counts is None
+
+
 def test_custom_workflow_disables_analysis_context_delivery(
     analysis_window: FrameLabWindow,
     process_events,

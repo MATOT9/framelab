@@ -28,9 +28,9 @@ process start
   -> construct main window
   -> load enabled plugin classes
   -> scan dataset scope
-  -> resolve metadata
-  -> compute metrics
-  -> build analysis context
+  -> resolve metadata and static scan metrics
+  -> explicitly apply downstream metric jobs when requested
+  -> build analysis context from available state
   -> push context to loaded analysis plugins
 ```
 
@@ -149,7 +149,7 @@ The core runtime pipeline is more important than the module list. Most maintenan
 supported image discovery
   -> path + nodecard/datacard metadata resolution
   -> controller-owned runtime state + caches
-  -> measurement metrics
+  -> static scan metrics and explicit measurement jobs
   -> analysis context build
   -> plugin update
 ```
@@ -184,7 +184,9 @@ Filename UTC timestamp tokens matching `YYYYMMDD_HHMMSS_mmmZ` are parsed into pe
 
 ### Stage 3: measurement metrics
 
-The Measure workflow computes per-image metrics such as:
+Dataset scanning computes only lightweight pass-1 values needed for a responsive loaded state, including max pixel, minimum non-zero pixel, resolved metadata, and elapsed time from filename UTC timestamps when present. It does not automatically start downstream dynamic metric workers after scan completion.
+
+The Measure workflow can then explicitly compute per-image metrics such as:
 
 - max pixel
 - minimum non-zero pixel

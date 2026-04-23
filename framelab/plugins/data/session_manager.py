@@ -708,14 +708,20 @@ class SessionManagerDialog(qtw.QDialog):
         """Apply acquisition-path mutations to the host dataset selection."""
         if not hasattr(result, "deleted_paths") or not hasattr(result, "renamed_paths"):
             return
-        loaded_folder = _selected_folder(self._host_window)
+        dataset = getattr(self._host_window, "dataset_state", None)
+        loaded_folder = (
+            Path(dataset.dataset_root).expanduser().resolve()
+            if dataset is not None and dataset.dataset_root is not None
+            else None
+        )
         if loaded_folder is None:
             return
         unloaded = False
         deleted_paths = tuple(getattr(result, "deleted_paths", ()))
         renamed_paths = tuple(getattr(result, "renamed_paths", ()))
         for deleted_path in deleted_paths:
-            if loaded_folder == deleted_path or deleted_path in loaded_folder.parents:
+            deleted_root = Path(deleted_path).expanduser().resolve()
+            if loaded_folder == deleted_root or deleted_root in loaded_folder.parents:
                 unload = getattr(self._host_window, "unload_folder", None)
                 if callable(unload):
                     unload(clear_folder_edit=True)
@@ -724,23 +730,34 @@ class SessionManagerDialog(qtw.QDialog):
         if unloaded:
             return
 
-        new_loaded_path = loaded_folder
-        for old_path, new_path in renamed_paths:
-            if loaded_folder == old_path or old_path in loaded_folder.parents:
-                relative = loaded_folder.relative_to(old_path)
-                new_loaded_path = new_path.joinpath(relative)
-                folder_edit = getattr(self._host_window, "folder_edit", None)
-                if isinstance(folder_edit, qtw.QLineEdit):
-                    folder_edit.setText(str(new_loaded_path))
-                load_folder = getattr(self._host_window, "load_folder", None)
-                if callable(load_folder):
-                    load_folder()
-                return
+        if (
+            renamed_paths
+            and dataset is not None
+            and dataset.remap_loaded_dataset_paths(renamed_paths)
+        ):
+            folder_edit = getattr(self._host_window, "folder_edit", None)
+            if isinstance(folder_edit, qtw.QLineEdit) and dataset.dataset_root is not None:
+                folder_edit.setText(str(dataset.dataset_root))
+            clear_cache = getattr(self._host_window, "_clear_image_cache", None)
+            if callable(clear_cache):
+                clear_cache()
+            refresh = getattr(
+                self._host_window,
+                "_refresh_loaded_dataset_after_path_remap",
+                None,
+            )
+            if callable(refresh):
+                refresh()
+            return
 
         if deleted_paths and force_refresh_if_loaded:
-            load_folder = getattr(self._host_window, "load_folder", None)
-            if callable(load_folder):
-                load_folder()
+            for deleted_path in deleted_paths:
+                deleted_root = Path(deleted_path).expanduser().resolve()
+                if loaded_folder == deleted_root or loaded_folder in deleted_root.parents:
+                    load_folder = getattr(self._host_window, "load_folder", None)
+                    if callable(load_folder):
+                        load_folder()
+                    return
 
 
 class SessionManagerPlugin:

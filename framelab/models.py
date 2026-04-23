@@ -212,10 +212,8 @@ class MetricsTableModel(QAbstractTableModel):
         if (
             self._maxs is None
             or self._min_non_zero is None
-            or self._sat_counts is None
             or row >= len(self._maxs)
             or row >= len(self._min_non_zero)
-            or row >= len(self._sat_counts)
         ):
             return "-"
 
@@ -246,6 +244,8 @@ class MetricsTableModel(QAbstractTableModel):
         if col == 7:
             return str(int(self._min_non_zero[row]))
         if col == 8:
+            if self._sat_counts is None or row >= len(self._sat_counts):
+                return "-"
             return str(int(self._sat_counts[row]))
 
         mean_value = float("nan")
@@ -585,7 +585,7 @@ class MetricsTableModel(QAbstractTableModel):
         roi_maxs: Optional[np.ndarray],
         roi_sums: Optional[np.ndarray],
         min_non_zero: np.ndarray,
-        sat_counts: np.ndarray,
+        sat_counts: Optional[np.ndarray],
         low_signal_flags: Optional[np.ndarray],
         avg_mode: str,
         avg_topk: Optional[np.ndarray],
@@ -812,7 +812,7 @@ class MetricsTableModel(QAbstractTableModel):
         roi_maxs: Optional[np.ndarray],
         roi_sums: Optional[np.ndarray],
         min_non_zero: np.ndarray,
-        sat_counts: np.ndarray,
+        sat_counts: Optional[np.ndarray],
         low_signal_flags: Optional[np.ndarray],
         avg_mode: str,
         avg_topk: Optional[np.ndarray],

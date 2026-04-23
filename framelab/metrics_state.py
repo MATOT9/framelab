@@ -253,18 +253,16 @@ class MetricsPipelineController:
             else None
         )
         self.reset_roi_metrics(count)
-        self.sat_counts = np.zeros(count, dtype=np.int64)
+        self.sat_counts = None
         self.avg_maxs = None
         self.avg_maxs_std = None
         self.avg_maxs_sem = None
         self.dn_per_ms_values = None
         self.dn_per_ms_stds = None
         self.dn_per_ms_sems = None
-        self.bg_applied_mask = np.zeros(count, dtype=bool)
-        self.bg_total_count = count
-        self.bg_unmatched_count = (
-            count if self.background_config.enabled else 0
-        )
+        self.bg_applied_mask = None
+        self.bg_total_count = 0
+        self.bg_unmatched_count = 0
 
     def reserve_loaded_dataset(self, total_candidates: int) -> None:
         """Reserve capacity for one incremental dataset load."""

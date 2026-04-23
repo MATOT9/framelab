@@ -65,9 +65,9 @@ A scan is not only file listing. It is the dataset intake pass used by the rest 
 - parses UTC filename timestamps like `YYYYMMDD_HHMMSS_mmmZ` when present and derives elapsed seconds from the first timestamp in the loaded scope
 - determines whether hierarchical JSON metadata is available anywhere in the selected dataset tree
 - rebuilds metadata for every loaded row using the active metadata-source mode
-- refreshes the Data table, Measure state, and downstream analysis context
+- refreshes the Data table, Measure state, and downstream analysis context using only already available scan-time data
 
-Treat a scan as a dataset-state reset, not as a cosmetic refresh.
+Treat a scan as a dataset-state reset, not as a cosmetic refresh. Deeper measurement work such as saturation counts, Top-K values, ROI dataset-wide metrics, and background-derived dataset metrics is started from the Measure controls when you explicitly apply those settings.
 
 ## Skip rules
 

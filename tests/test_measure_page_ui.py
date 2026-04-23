@@ -163,6 +163,35 @@ def test_low_signal_threshold_updates_summary_and_row_highlighting(
     )
 
 
+def test_scan_only_measure_table_keeps_static_metrics_available(
+    tmp_path: Path,
+    measure_window: FrameLabWindow,
+    wait_for_dataset_load,
+) -> None:
+    dataset_root = _write_measure_dataset(tmp_path)
+    measure_window.folder_edit.setText(str(dataset_root))
+    measure_window.load_folder()
+    wait_for_dataset_load(measure_window)
+
+    max_column = measure_window.MEASURE_COLUMN_INDEX["max_pixel"]
+    min_column = measure_window.MEASURE_COLUMN_INDEX["min_non_zero"]
+    saturation_column = measure_window.MEASURE_COLUMN_INDEX["sat_count"]
+
+    assert measure_window.table_model.data(
+        measure_window.table_model.index(0, max_column),
+    ) == "4"
+    assert measure_window.table_model.data(
+        measure_window.table_model.index(0, min_column),
+    ) == "4"
+    assert measure_window.table_model.data(
+        measure_window.table_model.index(0, saturation_column),
+    ) == "-"
+    assert (
+        _measure_summary_values(measure_window).get("Saturated Images")
+        == "Not computed"
+    )
+
+
 def test_low_signal_threshold_does_not_add_preview_pixel_overlay(
     tmp_path: Path,
     measure_window: FrameLabWindow,

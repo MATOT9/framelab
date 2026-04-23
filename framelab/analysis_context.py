@@ -113,21 +113,18 @@ class AnalysisContextController:
                 metadata["dn_per_ms_std"] = dn_per_ms_std
                 metadata["dn_per_ms_sem"] = dn_per_ms_sem
 
-            background_applied = bool(
-                metrics.bg_applied_mask is not None
-                and row < len(metrics.bg_applied_mask)
-                and metrics.bg_applied_mask[row]
-            )
             metadata["background_enabled"] = bool(metrics.background_config.enabled)
-            metadata["background_applied"] = background_applied
-            if background_applied:
-                metadata["background_reference"] = (
-                    self._background_reference_label_resolver(path)
-                )
-            elif metrics.background_config.enabled:
-                metadata["background_reference"] = "raw_fallback"
-            else:
-                metadata["background_reference"] = "disabled"
+            if metrics.bg_applied_mask is not None and row < len(metrics.bg_applied_mask):
+                background_applied = bool(metrics.bg_applied_mask[row])
+                metadata["background_applied"] = background_applied
+                if background_applied:
+                    metadata["background_reference"] = (
+                        self._background_reference_label_resolver(path)
+                    )
+                elif metrics.background_config.enabled:
+                    metadata["background_reference"] = "raw_fallback"
+                else:
+                    metadata["background_reference"] = "disabled"
 
             mean = (
                 float(means[row])

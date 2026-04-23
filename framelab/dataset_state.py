@@ -27,6 +27,25 @@ def _normalize_subtree_root(root: str | Path) -> Path:
     return (candidate.parent if candidate.suffix else candidate).resolve()
 
 
+def _map_path_through_renames(
+    path: str | Path,
+    renamed_paths: Iterable[tuple[Path, Path]],
+) -> Path:
+    """Return ``path`` rewritten through ordered filesystem rename pairs."""
+
+    mapped = Path(path).expanduser()
+    for old_path, new_path in renamed_paths:
+        old_root = Path(old_path).expanduser().resolve()
+        new_root = Path(new_path).expanduser().resolve()
+        try:
+            resolved = mapped.resolve()
+            relative = resolved.relative_to(old_root)
+        except ValueError:
+            continue
+        mapped = new_root.joinpath(relative)
+    return mapped
+
+
 def _finite_float(value: Any) -> float | None:
     """Return one finite float or ``None`` when conversion fails."""
 
@@ -202,6 +221,53 @@ class DatasetStateController:
             return []
         self.paths.extend(appended)
         return appended
+
+    def remap_loaded_dataset_paths(
+        self,
+        renamed_paths: Iterable[tuple[Path, Path]],
+    ) -> bool:
+        """Rewrite loaded dataset paths after workflow filesystem renames."""
+
+        normalized_pairs = tuple(
+            (Path(old_path).expanduser(), Path(new_path).expanduser())
+            for old_path, new_path in renamed_paths
+        )
+        if not normalized_pairs:
+            return False
+
+        changed = False
+        if self.dataset_root is not None:
+            mapped_root = _map_path_through_renames(
+                self.dataset_root,
+                normalized_pairs,
+            )
+            if mapped_root != self.dataset_root:
+                self.dataset_root = mapped_root
+                changed = True
+
+        new_paths: list[str] = []
+        for path in self.paths:
+            mapped_path = str(_map_path_through_renames(path, normalized_pairs))
+            new_paths.append(mapped_path)
+            changed = changed or mapped_path != str(path)
+
+        if not changed:
+            return False
+
+        old_to_new = dict(zip(self.paths, new_paths))
+        self.paths = new_paths
+        self.path_metadata = _with_elapsed_time_metadata(
+            self.paths,
+            {
+                old_to_new.get(str(path), str(path)): dict(payload)
+                for path, payload in self.path_metadata.items()
+            },
+        )
+        self.metadata_visible_paths = [
+            old_to_new.get(str(path), str(path))
+            for path in self.metadata_visible_paths
+        ]
+        return True
 
     def set_manual_scope(
         self,

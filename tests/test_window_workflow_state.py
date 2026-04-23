@@ -870,6 +870,87 @@ def test_window_can_rename_acquisition_from_workflow_structure_tools(
     assert window.folder_edit.text() == str(renamed_root.resolve())
 
 
+def test_loaded_acquisition_rename_remaps_dataset_without_rescan(
+    tmp_path: Path,
+    framelab_window_factory,
+    monkeypatch,
+    wait_for_dataset_load,
+) -> None:
+    workspace_root, _session_root, _first, second, _session_node_id, _acq_node_id = (
+        _make_calibration_workspace_with_frames(tmp_path)
+    )
+    second_node_id = (
+        "calibration:acquisition:"
+        "camera-a/campaign-2026/2026-03-05__sess01/acquisitions/acq-0012__bright"
+    )
+    window = framelab_window_factory(enabled_plugin_ids=())
+    window.set_workflow_context(
+        str(workspace_root),
+        "calibration",
+        active_node_id=second_node_id,
+    )
+    window.load_folder()
+    wait_for_dataset_load(window)
+    load_calls: list[dict[str, object]] = []
+    monkeypatch.setattr(
+        window,
+        "load_folder",
+        lambda *args, **kwargs: load_calls.append(dict(kwargs)),
+    )
+    monkeypatch.setattr(
+        qtw.QInputDialog,
+        "getText",
+        lambda *args, **kwargs: ("renamed", True),
+    )
+
+    window._rename_workflow_acquisition(second_node_id)
+
+    renamed_root = second.with_name("acq-0012__renamed")
+    assert load_calls == []
+    assert window.dataset_state.dataset_root == renamed_root.resolve()
+    assert window.dataset_state.path_count() == 1
+    assert Path(window.dataset_state.paths[0]).resolve().is_relative_to(
+        renamed_root.resolve(),
+    )
+    assert window.folder_edit.text() == str(renamed_root.resolve())
+
+
+def test_empty_acquisition_rename_does_not_scan_or_show_no_files(
+    tmp_path: Path,
+    framelab_window_factory,
+    monkeypatch,
+) -> None:
+    workspace_root, second_node_id = _make_calibration_workspace(tmp_path)
+    window = framelab_window_factory(enabled_plugin_ids=())
+    window.set_workflow_context(
+        str(workspace_root),
+        "calibration",
+        active_node_id=second_node_id,
+    )
+    load_calls: list[dict[str, object]] = []
+    info_messages: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        window,
+        "load_folder",
+        lambda *args, **kwargs: load_calls.append(dict(kwargs)),
+    )
+    monkeypatch.setattr(
+        window,
+        "_show_info",
+        lambda title, message: info_messages.append((str(title), str(message))),
+    )
+    monkeypatch.setattr(
+        qtw.QInputDialog,
+        "getText",
+        lambda *args, **kwargs: ("renamed", True),
+    )
+
+    window._rename_workflow_acquisition(second_node_id)
+
+    assert load_calls == []
+    assert not any("No supported image files" in message for _title, message in info_messages)
+
+
 def test_window_can_rename_session_from_workflow_explorer_context_tools(
     tmp_path: Path,
     framelab_window_factory,
@@ -983,9 +1064,16 @@ def test_window_can_create_and_delete_session_from_workflow_structure_tools(
         "calibration",
         active_node_id=campaign_node_id,
     )
+    load_calls: list[dict[str, object]] = []
+    monkeypatch.setattr(
+        window,
+        "load_folder",
+        lambda *args, **kwargs: load_calls.append(dict(kwargs)),
+    )
 
     created_root = window._create_workflow_session(campaign_node_id, "2026-03-06__sess02")
 
+    assert load_calls == []
     assert created_root == session_root.parent / "2026-03-06__sess02"
     assert created_root is not None and created_root.is_dir()
     assert window.workflow_state_controller.active_node_id == created_node_id
@@ -1035,3 +1123,51 @@ def test_window_can_reindex_session_from_workflow_structure_tools(
     assert (session_root / "acquisitions" / "acq-0021__dark").is_dir()
     assert (session_root / "acquisitions" / "acq-0022__bright").is_dir()
     assert window.workflow_state_controller.active_node_id == session_node_id
+
+
+def test_loaded_session_reindex_remaps_dataset_without_rescan(
+    tmp_path: Path,
+    framelab_window_factory,
+    monkeypatch,
+    wait_for_dataset_load,
+) -> None:
+    workspace_root, session_root, first, second, session_node_id, _acq_node_id = (
+        _make_calibration_workspace_with_frames(tmp_path)
+    )
+    window = framelab_window_factory(enabled_plugin_ids=())
+    window.set_workflow_context(
+        str(workspace_root),
+        "calibration",
+        active_node_id=session_node_id,
+    )
+    window.load_folder()
+    wait_for_dataset_load(window)
+    load_calls: list[dict[str, object]] = []
+    monkeypatch.setattr(
+        window,
+        "load_folder",
+        lambda *args, **kwargs: load_calls.append(dict(kwargs)),
+    )
+    monkeypatch.setattr(
+        qtw.QInputDialog,
+        "getInt",
+        lambda *args, **kwargs: (21, True),
+    )
+    monkeypatch.setattr(
+        qtw.QMessageBox,
+        "question",
+        lambda *args, **kwargs: qtw.QMessageBox.Yes,
+    )
+
+    window._reindex_workflow_session(session_node_id)
+
+    first_new = session_root / "acquisitions" / "acq-0021__dark" / "frames" / "f0.tiff"
+    second_new = session_root / "acquisitions" / "acq-0022__bright" / "frames" / "f0.tiff"
+    assert load_calls == []
+    assert not first.exists()
+    assert not second.exists()
+    assert window.dataset_state.dataset_root == session_root.resolve()
+    assert {Path(path).resolve() for path in window.dataset_state.paths} == {
+        first_new.resolve(),
+        second_new.resolve(),
+    }

@@ -96,6 +96,33 @@ def test_build_context_sets_background_flags_and_reference_labels() -> None:
     assert record_b.metadata["background_reference"] == "raw_fallback"
 
 
+def test_build_context_omits_uncomputed_downstream_fields() -> None:
+    dataset = DatasetStateController()
+    dataset.set_loaded_dataset(None, ["/tmp/a.tif"])
+    metrics = MetricsPipelineController()
+    metrics.maxs = np.array([100], dtype=np.int64)
+    metrics.min_non_zero = np.array([4], dtype=np.int64)
+    metrics.background_config.enabled = True
+
+    controller = AnalysisContextController(
+        dataset,
+        metrics,
+        background_reference_label_resolver=lambda path: f"ref:{path}",
+    )
+    context = controller.build_context(
+        mode="none",
+        normalization_scale=1.0,
+    )
+
+    record = context.records[0]
+    assert record.metadata["max_pixel"] == 100.0
+    assert record.metadata["min_non_zero"] == 4.0
+    assert record.metadata["background_enabled"]
+    assert "sat_count" not in record.metadata
+    assert "background_applied" not in record.metadata
+    assert "background_reference" not in record.metadata
+
+
 def test_build_context_uses_roi_topk_metric_arrays() -> None:
     dataset = DatasetStateController()
     dataset.set_loaded_dataset(None, ["/tmp/a.tif"])

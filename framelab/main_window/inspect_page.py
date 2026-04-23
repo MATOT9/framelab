@@ -1216,6 +1216,12 @@ class InspectPageMixin:
                 "Threshold changed in the control bar. Apply it to refresh "
                 "saturated-image counts."
             )
+        elif metrics.sat_counts is None:
+            saturation_text = "Not computed"
+            saturation_level = "neutral"
+            saturation_tooltip = (
+                "Apply the saturation threshold to compute saturated-image counts."
+            )
         else:
             saturated_images = 0
             if (
