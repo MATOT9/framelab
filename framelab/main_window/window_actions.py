@@ -10,6 +10,7 @@ from PySide6 import QtWidgets as qtw
 from PySide6.QtCore import Qt
 
 from ..file_dialogs import choose_open_file, choose_save_file
+from ..metrics_state import MetricFamily, MetricFamilyState
 from ..native.backend import consume_backend_status_notice
 from ..stylesheets import DARK_THEME, LIGHT_THEME
 from ..payload_utils import read_json_dict, write_json_dict
@@ -65,8 +66,6 @@ class WindowActionsMixin:
             return False
 
         metrics.roi_rect = (x0, y0, x1, y1)
-        if self._current_average_mode() == "roi_topk" and hasattr(self, "avg_spin"):
-            metrics.avg_count_value = self.avg_spin.value()
         self.image_preview.set_roi_rect(metrics.roi_rect)
         self._reset_roi_metrics()
 
@@ -104,6 +103,15 @@ class WindowActionsMixin:
                     roi_result.get("roi_topk_sem", float("nan")),
                 )
 
+        metrics.set_metric_family_state(
+            MetricFamily.ROI,
+            MetricFamilyState.PENDING_INPUTS,
+        )
+        if self._current_average_mode() == "roi_topk":
+            metrics.set_metric_family_state(
+                MetricFamily.ROI_TOPK,
+                MetricFamilyState.PENDING_INPUTS,
+            )
         self._update_average_controls()
         self._refresh_table()
         self._refresh_workspace_document_dirty_state()

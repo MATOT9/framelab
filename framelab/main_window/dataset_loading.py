@@ -33,6 +33,7 @@ from ..metrics_cache import (
     STATIC_METRIC_KIND,
     static_metric_signature_hash,
 )
+from ..metrics_state import MetricFamily, MetricFamilyState
 from ..processing_failures import (
     ProcessingFailure,
     failure_reason_from_exception,
@@ -450,7 +451,18 @@ class DatasetLoadingMixin:
 
     def _invalidate_background_cache(self) -> None:
         """Invalidate corrected-image cache after background changes."""
-        self.metrics_state.background_signature += 1
+        metrics = self.metrics_state
+        metrics.background_signature += 1
+        if getattr(self, "_has_loaded_data", None) and self._has_loaded_data():
+            for family in (
+                MetricFamily.BACKGROUND_APPLIED,
+                MetricFamily.SATURATION,
+                MetricFamily.TOPK,
+                MetricFamily.ROI,
+                MetricFamily.ROI_TOPK,
+            ):
+                if metrics.metric_family_state(family) == MetricFamilyState.READY:
+                    metrics.set_metric_family_state(family, MetricFamilyState.STALE)
         self._corrected_cache.clear()
 
     def _background_library_snapshot(self) -> BackgroundLibrary:

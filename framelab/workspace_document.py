@@ -136,6 +136,9 @@ class WorkspaceDocumentMeasureState:
     threshold_value: float = 65520.0
     low_signal_threshold_value: float = 0.0
     avg_count_value: int = 32
+    pending_threshold_value: float = 65520.0
+    pending_low_signal_threshold_value: float = 0.0
+    pending_avg_count_value: int = 32
     rounding_mode: str = "off"
     normalize_intensity_values: bool = False
     roi_rect: tuple[int, int, int, int] | None = None
@@ -206,6 +209,11 @@ class WorkspaceDocumentSnapshot:
                 "threshold_value": self.measure.threshold_value,
                 "low_signal_threshold_value": self.measure.low_signal_threshold_value,
                 "avg_count_value": self.measure.avg_count_value,
+                "pending_threshold_value": self.measure.pending_threshold_value,
+                "pending_low_signal_threshold_value": (
+                    self.measure.pending_low_signal_threshold_value
+                ),
+                "pending_avg_count_value": self.measure.pending_avg_count_value,
                 "rounding_mode": self.measure.rounding_mode,
                 "normalize_intensity_values": self.measure.normalize_intensity_values,
                 "roi_rect": (
@@ -262,6 +270,39 @@ class WorkspaceDocumentSnapshot:
         active_page = _clean_text(ui.get("active_page")) or "data"
         if active_page not in {"data", "measure", "analysis"}:
             active_page = "data"
+        threshold_value = _parse_float(
+            measure.get("threshold_value"),
+            65520.0,
+        )
+        if threshold_value is None:
+            threshold_value = 65520.0
+        low_signal_threshold_value = _parse_float(
+            measure.get("low_signal_threshold_value"),
+            0.0,
+        )
+        if low_signal_threshold_value is None:
+            low_signal_threshold_value = 0.0
+        avg_count_value = _parse_int(measure.get("avg_count_value"), 32)
+        if avg_count_value is None or avg_count_value < 1:
+            avg_count_value = 32
+        pending_threshold_value = _parse_float(
+            measure.get("pending_threshold_value"),
+            threshold_value,
+        )
+        if pending_threshold_value is None:
+            pending_threshold_value = threshold_value
+        pending_low_signal_threshold_value = _parse_float(
+            measure.get("pending_low_signal_threshold_value"),
+            low_signal_threshold_value,
+        )
+        if pending_low_signal_threshold_value is None:
+            pending_low_signal_threshold_value = low_signal_threshold_value
+        pending_avg_count_value = _parse_int(
+            measure.get("pending_avg_count_value"),
+            avg_count_value,
+        )
+        if pending_avg_count_value is None or pending_avg_count_value < 1:
+            pending_avg_count_value = avg_count_value
 
         return cls(
             workflow=WorkspaceDocumentWorkflowState(
@@ -278,17 +319,12 @@ class WorkspaceDocumentSnapshot:
             ),
             measure=WorkspaceDocumentMeasureState(
                 average_mode=average_mode,
-                threshold_value=_parse_float(
-                    measure.get("threshold_value"),
-                    65520.0,
-                )
-                or 65520.0,
-                low_signal_threshold_value=_parse_float(
-                    measure.get("low_signal_threshold_value"),
-                    0.0,
-                )
-                or 0.0,
-                avg_count_value=_parse_int(measure.get("avg_count_value"), 32) or 32,
+                threshold_value=threshold_value,
+                low_signal_threshold_value=low_signal_threshold_value,
+                avg_count_value=avg_count_value,
+                pending_threshold_value=pending_threshold_value,
+                pending_low_signal_threshold_value=pending_low_signal_threshold_value,
+                pending_avg_count_value=pending_avg_count_value,
                 rounding_mode=rounding_mode,
                 normalize_intensity_values=_parse_bool(
                     measure.get("normalize_intensity_values"),

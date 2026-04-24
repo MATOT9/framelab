@@ -11,6 +11,7 @@ from PySide6 import QtCore, QtTest, QtWidgets as qtw
 from tifffile import imwrite
 
 import framelab.main_window.inspect_page as inspect_page_module
+from framelab.metrics_state import MetricFamily, MetricFamilyState
 from framelab.ui_primitives import StatusChip
 from framelab.ui_density import VisibilityPolicy
 from framelab.ui_settings import DensityMode
@@ -190,6 +191,62 @@ def test_scan_only_measure_table_keeps_static_metrics_available(
         _measure_summary_values(measure_window).get("Saturated Images")
         == "Not computed"
     )
+
+
+def test_measure_control_changes_are_pending_until_apply(
+    tmp_path: Path,
+    measure_window: FrameLabWindow,
+    monkeypatch,
+    wait_for_dataset_load,
+) -> None:
+    dataset_root = _write_measure_dataset(tmp_path)
+    dynamic_calls: list[dict[str, object]] = []
+    monkeypatch.setattr(
+        measure_window,
+        "_start_dynamic_stats_job",
+        lambda **kwargs: dynamic_calls.append(dict(kwargs)),
+    )
+
+    measure_window.folder_edit.setText(str(dataset_root))
+    measure_window.load_folder()
+    wait_for_dataset_load(measure_window)
+
+    measure_window.threshold_spin.setValue(100)
+    measure_window.low_signal_spin.setValue(8)
+    measure_window.avg_mode_combo.setCurrentIndex(
+        measure_window.avg_mode_combo.findData("topk"),
+    )
+    measure_window.avg_spin.setValue(7)
+
+    assert dynamic_calls == []
+    assert measure_window.metrics_state.threshold_value == pytest.approx(65520.0)
+    assert measure_window.metrics_state.low_signal_threshold_value == pytest.approx(0.0)
+    assert measure_window.metrics_state.avg_count_value == 32
+    assert measure_window.metrics_state.pending_threshold_value == pytest.approx(100.0)
+    assert (
+        measure_window.metrics_state.pending_low_signal_threshold_value
+        == pytest.approx(8.0)
+    )
+    assert measure_window.metrics_state.pending_avg_count_value == 7
+    assert (
+        measure_window.metrics_state.metric_family_state(MetricFamily.SATURATION)
+        == MetricFamilyState.PENDING_INPUTS
+    )
+    assert (
+        measure_window.metrics_state.metric_family_state(MetricFamily.LOW_SIGNAL)
+        == MetricFamilyState.PENDING_INPUTS
+    )
+    assert (
+        measure_window.metrics_state.metric_family_state(MetricFamily.TOPK)
+        == MetricFamilyState.PENDING_INPUTS
+    )
+
+    measure_window._apply_topk_update()
+
+    assert dynamic_calls == [{"update_kind": "full", "refresh_analysis": True}]
+    assert measure_window.metrics_state.avg_count_value == 7
+    assert measure_window.metrics_state.threshold_value == pytest.approx(65520.0)
+    assert measure_window.metrics_state.low_signal_threshold_value == pytest.approx(0.0)
 
 
 def test_low_signal_threshold_does_not_add_preview_pixel_overlay(

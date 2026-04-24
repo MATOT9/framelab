@@ -3,11 +3,43 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
 
 import numpy as np
 
 from .background import BackgroundConfig, BackgroundLibrary
 from .processing_failures import ProcessingFailure
+
+
+class MetricFamily(str, Enum):
+    """Named metric result families tracked by the pipeline controller."""
+
+    STATIC_SCAN = "static_scan"
+    SATURATION = "saturation"
+    LOW_SIGNAL = "low_signal"
+    TOPK = "topk"
+    ROI = "roi"
+    ROI_TOPK = "roi_topk"
+    BACKGROUND_APPLIED = "background_applied"
+
+
+class MetricFamilyState(str, Enum):
+    """Readiness state for one metric family."""
+
+    NOT_REQUESTED = "not_requested"
+    PENDING_INPUTS = "pending_inputs"
+    COMPUTING = "computing"
+    READY = "ready"
+    STALE = "stale"
+    FAILED = "failed"
+
+
+@dataclass(frozen=True, slots=True)
+class MetricFamilyStatus:
+    """Status payload for one metric family."""
+
+    state: MetricFamilyState
+    message: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,6 +109,13 @@ class MetricsPipelineController:
         self.threshold_value = 65520.0
         self.low_signal_threshold_value = 0.0
         self.avg_count_value = 32
+        self.pending_threshold_value = self.threshold_value
+        self.pending_low_signal_threshold_value = self.low_signal_threshold_value
+        self.pending_avg_count_value = self.avg_count_value
+        self.metric_family_statuses = {
+            family.value: MetricFamilyStatus(MetricFamilyState.NOT_REQUESTED)
+            for family in MetricFamily
+        }
         self.stats_job_id = 0
         self.stats_update_kind = "idle"
         self.stats_refresh_analysis = True
@@ -86,6 +125,166 @@ class MetricsPipelineController:
         self.roi_apply_done = 0
         self.roi_apply_total = 0
         self._clear_loaded_dataset_buffer_state()
+
+    @staticmethod
+    def _family_key(family: MetricFamily | str) -> str:
+        key = family.value if isinstance(family, MetricFamily) else str(family)
+        if key not in {entry.value for entry in MetricFamily}:
+            raise ValueError(f"Unknown metric family: {family!r}")
+        return key
+
+    @staticmethod
+    def _family_state(state: MetricFamilyState | str) -> MetricFamilyState:
+        if isinstance(state, MetricFamilyState):
+            return state
+        return MetricFamilyState(str(state))
+
+    def metric_family_status(
+        self,
+        family: MetricFamily | str,
+    ) -> MetricFamilyStatus:
+        """Return the current readiness status for one metric family."""
+
+        key = self._family_key(family)
+        return self.metric_family_statuses.get(
+            key,
+            MetricFamilyStatus(MetricFamilyState.NOT_REQUESTED),
+        )
+
+    def metric_family_state(self, family: MetricFamily | str) -> MetricFamilyState:
+        """Return the current readiness state for one metric family."""
+
+        return self.metric_family_status(family).state
+
+    def set_metric_family_state(
+        self,
+        family: MetricFamily | str,
+        state: MetricFamilyState | str,
+        message: str = "",
+    ) -> None:
+        """Set the readiness state for one metric family."""
+
+        self.metric_family_statuses[self._family_key(family)] = MetricFamilyStatus(
+            self._family_state(state),
+            str(message or ""),
+        )
+
+    def reset_metric_family_states(self) -> None:
+        """Reset all metric families to their initial not-requested state."""
+
+        for family in MetricFamily:
+            self.set_metric_family_state(
+                family,
+                MetricFamilyState.NOT_REQUESTED,
+            )
+
+    def threshold_inputs_pending(self) -> bool:
+        """Return whether saturation threshold UI differs from applied state."""
+
+        return float(self.pending_threshold_value) != float(self.threshold_value)
+
+    def low_signal_inputs_pending(self) -> bool:
+        """Return whether low-signal UI differs from applied state."""
+
+        return (
+            float(self.pending_low_signal_threshold_value)
+            != float(self.low_signal_threshold_value)
+        )
+
+    def topk_inputs_pending(self) -> bool:
+        """Return whether Top-K UI differs from applied state."""
+
+        return int(self.pending_avg_count_value) != int(self.avg_count_value)
+
+    def set_pending_threshold_value(self, value: float) -> None:
+        """Store pending saturation threshold without applying it."""
+
+        self.pending_threshold_value = float(value)
+        self._sync_pending_input_family_states()
+
+    def set_pending_low_signal_threshold_value(self, value: float) -> None:
+        """Store pending low-signal threshold without applying it."""
+
+        self.pending_low_signal_threshold_value = float(value)
+        self._sync_pending_input_family_states()
+
+    def set_pending_avg_count_value(self, value: int) -> None:
+        """Store pending Top-K count without applying it."""
+
+        self.pending_avg_count_value = max(1, int(value))
+        self._sync_pending_input_family_states()
+
+    def apply_pending_threshold_value(self) -> bool:
+        """Make the pending saturation threshold the applied value."""
+
+        changed = self.threshold_inputs_pending()
+        self.threshold_value = float(self.pending_threshold_value)
+        self._sync_pending_input_family_states()
+        return changed
+
+    def apply_pending_low_signal_threshold_value(self) -> bool:
+        """Make the pending low-signal threshold the applied value."""
+
+        changed = self.low_signal_inputs_pending()
+        self.low_signal_threshold_value = float(
+            self.pending_low_signal_threshold_value,
+        )
+        self.set_metric_family_state(
+            MetricFamily.LOW_SIGNAL,
+            (
+                MetricFamilyState.NOT_REQUESTED
+                if self.low_signal_threshold_value <= 0.0
+                else MetricFamilyState.READY
+            ),
+        )
+        self._sync_pending_input_family_states()
+        return changed
+
+    def apply_pending_avg_count_value(self) -> bool:
+        """Make the pending Top-K count the applied value."""
+
+        changed = self.topk_inputs_pending()
+        self.avg_count_value = max(1, int(self.pending_avg_count_value))
+        self._sync_pending_input_family_states()
+        return changed
+
+    def sync_pending_values_from_applied(self) -> None:
+        """Reset pending UI values to the currently applied metric inputs."""
+
+        self.pending_threshold_value = float(self.threshold_value)
+        self.pending_low_signal_threshold_value = float(
+            self.low_signal_threshold_value,
+        )
+        self.pending_avg_count_value = max(1, int(self.avg_count_value))
+        self._sync_pending_input_family_states()
+
+    def refresh_pending_input_family_states(self) -> None:
+        """Refresh family states after external pending/applied restoration."""
+
+        self._sync_pending_input_family_states()
+
+    def _sync_pending_input_family_states(self) -> None:
+        """Keep pending-input states explicit without clobbering active jobs."""
+
+        pending_by_family = {
+            MetricFamily.SATURATION: self.threshold_inputs_pending(),
+            MetricFamily.LOW_SIGNAL: self.low_signal_inputs_pending(),
+            MetricFamily.TOPK: self.topk_inputs_pending(),
+            MetricFamily.ROI_TOPK: self.topk_inputs_pending(),
+        }
+        for family, pending in pending_by_family.items():
+            state = self.metric_family_state(family)
+            if pending:
+                if state != MetricFamilyState.COMPUTING:
+                    self.set_metric_family_state(
+                        family,
+                        MetricFamilyState.PENDING_INPUTS,
+                    )
+            elif state == MetricFamilyState.PENDING_INPUTS:
+                self.set_metric_family_state(
+                    family,
+                    MetricFamilyState.NOT_REQUESTED,
+                )
 
     def _clear_loaded_dataset_buffer_state(self) -> None:
         """Drop any reserved streaming buffers used during dataset loading."""
@@ -217,6 +416,7 @@ class MetricsPipelineController:
         self.bg_applied_mask = None
         self.bg_unmatched_count = 0
         self.bg_total_count = 0
+        self.reset_metric_family_states()
 
     def clear_dataset_state(self) -> None:
         """Clear metric and ROI state tied to the currently loaded dataset."""
@@ -236,6 +436,15 @@ class MetricsPipelineController:
         self.roi_topk_means = np.full(count, np.nan, dtype=np.float64)
         self.roi_topk_stds = np.full(count, np.nan, dtype=np.float64)
         self.roi_topk_sems = np.full(count, np.nan, dtype=np.float64)
+        self.set_metric_family_state(MetricFamily.ROI, MetricFamilyState.NOT_REQUESTED)
+        self.set_metric_family_state(
+            MetricFamily.ROI_TOPK,
+            (
+                MetricFamilyState.PENDING_INPUTS
+                if self.topk_inputs_pending()
+                else MetricFamilyState.NOT_REQUESTED
+            ),
+        )
 
     def initialize_loaded_dataset(self, path_count: int) -> None:
         """Initialize dataset-dependent state after a new dataset load."""
@@ -263,6 +472,13 @@ class MetricsPipelineController:
         self.bg_applied_mask = None
         self.bg_total_count = 0
         self.bg_unmatched_count = 0
+        self.reset_metric_family_states()
+        if count > 0:
+            self.set_metric_family_state(
+                MetricFamily.STATIC_SCAN,
+                MetricFamilyState.READY,
+            )
+        self._sync_pending_input_family_states()
 
     def reserve_loaded_dataset(self, total_candidates: int) -> None:
         """Reserve capacity for one incremental dataset load."""
@@ -429,6 +645,10 @@ class MetricsPipelineController:
         self._loaded_bg_applied_mask_buffer[start:end] = False
         self._loaded_dataset_count = end
         self._sync_loaded_dataset_views()
+        self.set_metric_family_state(
+            MetricFamily.STATIC_SCAN,
+            MetricFamilyState.READY,
+        )
 
     def prepare_for_live_update(self, *, path_count: int, mode: str) -> None:
         """Ensure dataset-sized metric arrays exist for one recompute request."""
@@ -504,6 +724,31 @@ class MetricsPipelineController:
         self.bg_unmatched_count = int(
             self.bg_total_count - np.count_nonzero(self.bg_applied_mask),
         )
+        self.set_metric_family_state(
+            MetricFamily.STATIC_SCAN,
+            MetricFamilyState.READY,
+        )
+        self.set_metric_family_state(
+            MetricFamily.SATURATION,
+            (
+                MetricFamilyState.PENDING_INPUTS
+                if self.threshold_inputs_pending()
+                else MetricFamilyState.READY
+            ),
+        )
+        self.set_metric_family_state(
+            MetricFamily.BACKGROUND_APPLIED,
+            MetricFamilyState.READY,
+        )
+        if self.avg_maxs is not None:
+            self.set_metric_family_state(
+                MetricFamily.TOPK,
+                (
+                    MetricFamilyState.PENDING_INPUTS
+                    if self.topk_inputs_pending()
+                    else MetricFamilyState.READY
+                ),
+            )
 
     def apply_roi_result(self, result: RoiApplyResult) -> None:
         """Store one structured ROI-apply worker result."""
@@ -528,6 +773,22 @@ class MetricsPipelineController:
             np.asarray(result.topk_sems, dtype=np.float64)
             if result.topk_sems is not None
             else None
+        )
+        self.set_metric_family_state(
+            MetricFamily.ROI,
+            MetricFamilyState.READY,
+        )
+        self.set_metric_family_state(
+            MetricFamily.ROI_TOPK,
+            (
+                MetricFamilyState.PENDING_INPUTS
+                if self.topk_inputs_pending()
+                else (
+                    MetricFamilyState.READY
+                    if self.roi_topk_means is not None
+                    else MetricFamilyState.NOT_REQUESTED
+                )
+            ),
         )
 
     def low_signal_mask(
@@ -570,12 +831,22 @@ class MetricsPipelineController:
         )
         self.stats_refresh_analysis = bool(refresh_analysis)
         self.is_stats_running = True
+        self.set_metric_family_state(
+            MetricFamily.SATURATION,
+            MetricFamilyState.COMPUTING,
+        )
+        if self.stats_update_kind == "full":
+            self.set_metric_family_state(
+                MetricFamily.BACKGROUND_APPLIED,
+                MetricFamilyState.COMPUTING,
+            )
         return self.stats_job_id
 
     def finish_stats_job(self) -> None:
         """Clear dynamic-stats running state after completion or failure."""
         self.is_stats_running = False
         self.stats_update_kind = "idle"
+        self._sync_pending_input_family_states()
 
     def cancel_stats_job(self) -> int:
         """Invalidate the current dynamic-stats job and clear running state."""
@@ -590,6 +861,12 @@ class MetricsPipelineController:
         self.is_roi_applying = True
         self.roi_apply_done = 0
         self.roi_apply_total = max(0, int(total))
+        self.set_metric_family_state(MetricFamily.ROI, MetricFamilyState.COMPUTING)
+        if self.roi_rect is not None:
+            self.set_metric_family_state(
+                MetricFamily.ROI_TOPK,
+                MetricFamilyState.COMPUTING,
+            )
         return self.roi_apply_job_id
 
     def update_roi_apply_progress(self, done: int, total: int) -> None:
@@ -602,6 +879,7 @@ class MetricsPipelineController:
         self.is_roi_applying = False
         self.roi_apply_done = 0
         self.roi_apply_total = 0
+        self._sync_pending_input_family_states()
 
     def cancel_roi_apply(self) -> int:
         """Invalidate the current ROI apply job and clear its running state."""

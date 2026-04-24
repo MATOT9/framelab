@@ -15,7 +15,12 @@ from ..metrics_cache import (
     dynamic_metric_signature_hash,
     roi_metric_signature_hash,
 )
-from ..metrics_state import DynamicStatsResult, RoiApplyResult
+from ..metrics_state import (
+    DynamicStatsResult,
+    MetricFamily,
+    MetricFamilyState,
+    RoiApplyResult,
+)
 from ..native import backend as native_backend
 from ..processing_failures import make_processing_failure
 from ..workers import DynamicStatsWorker, RoiApplyWorker
@@ -564,6 +569,11 @@ class MetricsRuntimeMixin:
         mode = self._dynamic_stats_mode_for_average_mode(
             self._current_average_mode(),
         )
+        if update_kind == "full" and mode == "topk":
+            metrics.set_metric_family_state(
+                MetricFamily.TOPK,
+                MetricFamilyState.COMPUTING,
+            )
         dataset = self.dataset_state
         signature_hash = self._dynamic_metric_signature_hash(mode)
         identities, cached_payloads = self._cached_dynamic_payloads(signature_hash)
@@ -679,8 +689,26 @@ class MetricsRuntimeMixin:
         metrics = self.metrics_state
         if job_id != metrics.stats_job_id:
             return
+        update_kind = metrics.stats_update_kind
         self._dynamic_cache_pending = None
         metrics.finish_stats_job()
+        metrics.set_metric_family_state(
+            MetricFamily.SATURATION,
+            MetricFamilyState.FAILED,
+            message or "Unknown error",
+        )
+        if update_kind == "full":
+            metrics.set_metric_family_state(
+                MetricFamily.BACKGROUND_APPLIED,
+                MetricFamilyState.FAILED,
+                message or "Unknown error",
+            )
+            if self._current_average_mode() == "topk":
+                metrics.set_metric_family_state(
+                    MetricFamily.TOPK,
+                    MetricFamilyState.FAILED,
+                    message or "Unknown error",
+                )
         self._stop_threshold_summary_animation()
         self._update_background_status_label()
         self._set_status("Metric computation failed")
@@ -744,8 +772,6 @@ class MetricsRuntimeMixin:
             or not self._average_mode_uses_roi(mode)
         ):
             return
-        if mode == "roi_topk" and hasattr(self, "avg_spin"):
-            metrics.avg_count_value = self.avg_spin.value()
         if (
             self._roi_apply_thread is not None
             and self._roi_apply_thread.isRunning()
@@ -755,6 +781,21 @@ class MetricsRuntimeMixin:
 
         dataset = self.dataset_state
         job_id = metrics.begin_roi_apply(dataset.path_count())
+        metrics.set_metric_family_state(MetricFamily.ROI, MetricFamilyState.COMPUTING)
+        if mode == "roi_topk":
+            metrics.set_metric_family_state(
+                MetricFamily.ROI_TOPK,
+                MetricFamilyState.COMPUTING,
+            )
+        else:
+            metrics.set_metric_family_state(
+                MetricFamily.ROI_TOPK,
+                (
+                    MetricFamilyState.PENDING_INPUTS
+                    if metrics.topk_inputs_pending()
+                    else MetricFamilyState.NOT_REQUESTED
+                ),
+            )
         signature_hash = self._roi_metric_signature_hash()
         if signature_hash is None:
             return
@@ -904,6 +945,17 @@ class MetricsRuntimeMixin:
             return
         self._roi_cache_pending = None
         self._finish_roi_apply_ui()
+        self.metrics_state.set_metric_family_state(
+            MetricFamily.ROI,
+            MetricFamilyState.FAILED,
+            message or "Unknown error",
+        )
+        if self._current_average_mode() == "roi_topk":
+            self.metrics_state.set_metric_family_state(
+                MetricFamily.ROI_TOPK,
+                MetricFamilyState.FAILED,
+                message or "Unknown error",
+            )
         self._set_status("ROI apply failed")
         if hasattr(self, "_record_processing_failures"):
             self._record_processing_failures(
@@ -946,7 +998,7 @@ class MetricsRuntimeMixin:
         self._sync_column_menu_actions()
 
     def _apply_live_update(self) -> None:
-        """Apply UI-driven metric settings to the loaded dataset."""
+        """Refresh dynamic metrics using already-applied metric settings."""
         if self._is_dataset_load_running():
             self._update_average_controls()
             self._set_status("Dataset load in progress")
@@ -958,9 +1010,6 @@ class MetricsRuntimeMixin:
             return
 
         metrics = self.metrics_state
-        metrics.threshold_value = self.threshold_spin.value()
-        metrics.low_signal_threshold_value = self.low_signal_spin.value()
-        metrics.avg_count_value = self.avg_spin.value()
         count = self.dataset_state.path_count()
         mode = self._current_average_mode()
         metrics.prepare_for_live_update(path_count=count, mode=mode)
@@ -970,17 +1019,55 @@ class MetricsRuntimeMixin:
             update_kind="full",
             refresh_analysis=True,
         )
-        if mode == "roi_topk" and metrics.roi_rect is not None:
+        self._update_average_controls()
+        self._refresh_workspace_document_dirty_state()
+        self._set_status()
+
+    def _apply_topk_update(self) -> None:
+        """Apply the pending Top-K count and recompute only Top-K dependents."""
+        if self._is_dataset_load_running():
+            self._set_status("Wait for dataset loading to finish")
+            return
+        metrics = self.metrics_state
+        if hasattr(self, "avg_spin"):
+            metrics.set_pending_avg_count_value(self.avg_spin.value())
+        changed = metrics.apply_pending_avg_count_value()
+        mode = self._current_average_mode()
+
+        if not self._has_loaded_data():
+            self._update_average_controls()
+            self._refresh_workspace_document_dirty_state()
+            self._set_status()
+            return
+
+        if mode == "topk":
+            metrics.prepare_for_live_update(
+                path_count=self.dataset_state.path_count(),
+                mode=mode,
+            )
+            self._refresh_table(update_analysis=False)
+            self._start_dynamic_stats_job(
+                update_kind="full",
+                refresh_analysis=True,
+            )
+            self._set_status("Updating Top-K metrics")
+        elif mode == "roi_topk" and metrics.roi_rect is not None:
             if metrics.roi_applied_to_all:
                 self._start_roi_apply_job()
             else:
                 self._apply_roi_rect_to_current_dataset(
                     metrics.roi_rect,
-                    status_message=None,
+                    status_message=(
+                        "Updated ROI Top-K metrics"
+                        if changed
+                        else None
+                    ),
                 )
+        else:
+            self._refresh_table(update_analysis=False)
+            self._set_status()
         self._update_average_controls()
         self._refresh_workspace_document_dirty_state()
-        self._set_status()
 
     def _apply_threshold_update(self) -> None:
         """Refresh saturation display without rebuilding unrelated metrics."""
@@ -988,9 +1075,9 @@ class MetricsRuntimeMixin:
             self._set_status("Wait for dataset loading to finish")
             return
         metrics = self.metrics_state
-        threshold_value = self.threshold_spin.value()
-        threshold_changed = float(threshold_value) != float(metrics.threshold_value)
-        metrics.threshold_value = threshold_value
+        if hasattr(self, "threshold_spin"):
+            metrics.set_pending_threshold_value(self.threshold_spin.value())
+        threshold_changed = metrics.apply_pending_threshold_value()
 
         if not self._has_loaded_data():
             self._update_average_controls()
@@ -1028,7 +1115,11 @@ class MetricsRuntimeMixin:
             return
 
         metrics = self.metrics_state
-        metrics.low_signal_threshold_value = self.low_signal_spin.value()
+        if hasattr(self, "low_signal_spin"):
+            metrics.set_pending_low_signal_threshold_value(
+                self.low_signal_spin.value(),
+            )
+        metrics.apply_pending_low_signal_threshold_value()
 
         if self._has_loaded_data():
             self._refresh_table(update_analysis=False)
@@ -1041,6 +1132,39 @@ class MetricsRuntimeMixin:
             self._set_status("Low-signal detection disabled")
         else:
             self._set_status("Updated low-signal image highlighting")
+
+    def _on_threshold_control_value_changed(self, value: float) -> None:
+        """Record a pending saturation threshold edit without computing."""
+
+        self.metrics_state.set_pending_threshold_value(value)
+        if hasattr(self, "_refresh_measure_header_state"):
+            self._refresh_measure_header_state()
+        if hasattr(self, "_schedule_workspace_document_dirty_state_refresh"):
+            self._schedule_workspace_document_dirty_state_refresh()
+        else:
+            self._refresh_workspace_document_dirty_state()
+
+    def _on_low_signal_control_value_changed(self, value: float) -> None:
+        """Record a pending low-signal threshold edit without computing."""
+
+        self.metrics_state.set_pending_low_signal_threshold_value(value)
+        if hasattr(self, "_refresh_measure_header_state"):
+            self._refresh_measure_header_state()
+        if hasattr(self, "_schedule_workspace_document_dirty_state_refresh"):
+            self._schedule_workspace_document_dirty_state_refresh()
+        else:
+            self._refresh_workspace_document_dirty_state()
+
+    def _on_topk_control_value_changed(self, value: int) -> None:
+        """Record a pending Top-K edit without computing."""
+
+        self.metrics_state.set_pending_avg_count_value(value)
+        if hasattr(self, "_refresh_measure_header_state"):
+            self._refresh_measure_header_state()
+        if hasattr(self, "_schedule_workspace_document_dirty_state_refresh"):
+            self._schedule_workspace_document_dirty_state_refresh()
+        else:
+            self._refresh_workspace_document_dirty_state()
 
     def _refresh_table(self, *, update_analysis: bool = True) -> None:
         """Refresh the measure table and linked preview state."""
@@ -1595,7 +1719,9 @@ class MetricsRuntimeMixin:
         """Respond to average-mode UI changes."""
         self._update_average_controls()
         self._update_table_columns()
-        self._apply_live_update()
+        self._refresh_table(update_analysis=False)
+        self._refresh_workspace_document_dirty_state()
+        self._set_status()
 
     def _on_roi_selected(self, rect: object) -> None:
         """Store current ROI selection and refresh ROI metrics."""

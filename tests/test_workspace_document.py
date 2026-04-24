@@ -125,6 +125,9 @@ def test_workspace_document_store_round_trip(tmp_path: Path) -> None:
             threshold_value=1234.0,
             low_signal_threshold_value=111.0,
             avg_count_value=55,
+            pending_threshold_value=4321.0,
+            pending_low_signal_threshold_value=222.0,
+            pending_avg_count_value=66,
             rounding_mode="std",
             normalize_intensity_values=True,
             roi_rect=(1, 2, 3, 4),
@@ -154,6 +157,10 @@ def test_workspace_document_store_round_trip(tmp_path: Path) -> None:
     assert saved_path.suffix == ".framelab"
     assert loaded.workflow.workspace_root == "/tmp/workspace"
     assert loaded.measure.average_mode == "roi_topk"
+    assert loaded.measure.threshold_value == pytest.approx(1234.0)
+    assert loaded.measure.pending_threshold_value == pytest.approx(4321.0)
+    assert loaded.measure.pending_low_signal_threshold_value == pytest.approx(222.0)
+    assert loaded.measure.pending_avg_count_value == 66
     assert loaded.measure.roi_rect == (1, 2, 3, 4)
     assert loaded.measure.roi_applied_to_all is True
     assert loaded.measure.low_signal_threshold_value == pytest.approx(111.0)
@@ -223,7 +230,8 @@ def test_window_actions_restore_workspace_document_session(
     window.avg_mode_combo.setCurrentIndex(roi_index)
     window.threshold_spin.setValue(42)
     window.low_signal_spin.setValue(17)
-    window._apply_live_update()
+    window._apply_threshold_update()
+    window._apply_low_signal_threshold_update()
     window._on_normalize_intensity_toggled(True)
     window._set_rounding_mode("std")
     window.show_histogram_preview = True
@@ -280,6 +288,11 @@ def test_window_actions_restore_workspace_document_session(
     assert restored._current_average_mode() == "roi"
     assert restored.metrics_state.threshold_value == pytest.approx(42.0)
     assert restored.metrics_state.low_signal_threshold_value == pytest.approx(17.0)
+    assert restored.metrics_state.pending_threshold_value == pytest.approx(42.0)
+    assert (
+        restored.metrics_state.pending_low_signal_threshold_value
+        == pytest.approx(17.0)
+    )
     assert restored.metrics_state.normalize_intensity_values is True
     assert restored.metrics_state.rounding_mode == "std"
     assert restored.metrics_state.roi_rect == (0, 0, 2, 2)

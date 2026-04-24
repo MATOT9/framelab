@@ -200,6 +200,8 @@ The Measure workflow can then explicitly compute per-image metrics such as:
 
 These results are stored through `MetricsPipelineController`. Dynamic metric computation is delegated to worker classes in `framelab/workers.py` and orchestrated by `MetricsRuntimeMixin`, which applies worker results back into controller-owned state. Global Top-K uses the dynamic metrics path, while ROI-derived modes, including ROI + Top-K, use `RoiApplyWorker` so the Top-K population is selected inside the ROI.
 
+Metric readiness is tracked by named families rather than inferred only from array presence. Current families include static scan, saturation, low signal, Top-K, ROI, ROI Top-K, and background-applied status, with states such as not requested, pending inputs, computing, ready, stale, and failed. Measure-page controls store pending UI values separately from the last applied compute inputs, so changing threshold, low-signal threshold, Top-K count, or Average Mode is a view/input edit until the relevant Apply action runs.
+
 ### Stage 4: analysis context build
 
 The Analyze workflow does not re-measure images. It packages the current dataset and metric controller state into an `AnalysisContext` through `framelab/analysis_context.py`. That context is built from:
@@ -269,7 +271,8 @@ The metrics controller owns measurement settings and the latest measurement resu
 - ROI + Top-K arrays derived from the selected ROI and Top-K count
 - normalization and rounding settings
 - background configuration, loaded references, and match bookkeeping
-- threshold and Top-K settings
+- threshold, low-signal, and Top-K pending/applied settings
+- per-family metric readiness state
 - in-flight metric-job and ROI-apply job lifecycle state
 
 If state affects more than one workflow page, it probably belongs on a shared controller or the host shell rather than inside one page widget.

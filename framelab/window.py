@@ -2230,20 +2230,25 @@ class FrameLabWindow(
             ),
             measure=WorkspaceDocumentMeasureState(
                 average_mode=self._current_average_mode(),
-                threshold_value=float(
+                threshold_value=float(metrics.threshold_value),
+                low_signal_threshold_value=float(
+                    metrics.low_signal_threshold_value,
+                ),
+                avg_count_value=int(metrics.avg_count_value),
+                pending_threshold_value=float(
                     self.threshold_spin.value()
                     if hasattr(self, "threshold_spin")
-                    else metrics.threshold_value
+                    else metrics.pending_threshold_value
                 ),
-                low_signal_threshold_value=float(
+                pending_low_signal_threshold_value=float(
                     self.low_signal_spin.value()
                     if hasattr(self, "low_signal_spin")
-                    else metrics.low_signal_threshold_value
+                    else metrics.pending_low_signal_threshold_value
                 ),
-                avg_count_value=int(
+                pending_avg_count_value=int(
                     self.avg_spin.value()
                     if hasattr(self, "avg_spin")
-                    else metrics.avg_count_value
+                    else metrics.pending_avg_count_value
                 ),
                 rounding_mode=str(metrics.rounding_mode or "off"),
                 normalize_intensity_values=bool(metrics.normalize_intensity_values),
@@ -2445,23 +2450,38 @@ class FrameLabWindow(
                 del blocker
             if hasattr(self, "threshold_spin"):
                 blocker = QSignalBlocker(self.threshold_spin)
-                self.threshold_spin.setValue(float(measure_state.threshold_value))
+                self.threshold_spin.setValue(
+                    float(measure_state.pending_threshold_value),
+                )
                 del blocker
             if hasattr(self, "low_signal_spin"):
                 blocker = QSignalBlocker(self.low_signal_spin)
                 self.low_signal_spin.setValue(
-                    float(measure_state.low_signal_threshold_value),
+                    float(measure_state.pending_low_signal_threshold_value),
                 )
                 del blocker
             if hasattr(self, "avg_spin"):
                 blocker = QSignalBlocker(self.avg_spin)
-                self.avg_spin.setValue(max(1, int(measure_state.avg_count_value)))
+                self.avg_spin.setValue(
+                    max(1, int(measure_state.pending_avg_count_value)),
+                )
                 del blocker
             metrics.threshold_value = float(measure_state.threshold_value)
             metrics.low_signal_threshold_value = float(
                 measure_state.low_signal_threshold_value,
             )
             metrics.avg_count_value = max(1, int(measure_state.avg_count_value))
+            metrics.pending_threshold_value = float(
+                measure_state.pending_threshold_value,
+            )
+            metrics.pending_low_signal_threshold_value = float(
+                measure_state.pending_low_signal_threshold_value,
+            )
+            metrics.pending_avg_count_value = max(
+                1,
+                int(measure_state.pending_avg_count_value),
+            )
+            metrics.refresh_pending_input_family_states()
             metrics.rounding_mode = str(measure_state.rounding_mode)
             metrics.normalize_intensity_values = bool(
                 measure_state.normalize_intensity_values,

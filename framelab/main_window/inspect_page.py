@@ -151,6 +151,9 @@ class InspectPageMixin:
         self.threshold_spin.setToolTip(
             "Pixels above this value are counted as saturated.",
         )
+        self.threshold_spin.valueChanged.connect(
+            self._on_threshold_control_value_changed,
+        )
         metrics_row.addWidget(self.threshold_spin)
 
         apply_threshold_button = qtw.QPushButton("Apply")
@@ -178,6 +181,9 @@ class InspectPageMixin:
         self.low_signal_spin.setToolTip(
             "Images with max pixel at or below this value are flagged as low signal. "
             "Set to 0 to disable.",
+        )
+        self.low_signal_spin.valueChanged.connect(
+            self._on_low_signal_control_value_changed,
         )
         metrics_row.addWidget(self.low_signal_spin)
 
@@ -228,6 +234,7 @@ class InspectPageMixin:
         self.avg_spin.setToolTip(
             "Number of highest-intensity pixels used in Top-K modes.",
         )
+        self.avg_spin.valueChanged.connect(self._on_topk_control_value_changed)
         topk_layout.addWidget(self.avg_spin)
         self.apply_topk_button = qtw.QPushButton("Apply Top-K Count")
         self.apply_topk_button.setObjectName("AccentButton")
@@ -236,7 +243,7 @@ class InspectPageMixin:
             "Apply Top-K count and recompute metrics.",
         )
         self.apply_topk_button.clicked.connect(
-            lambda _checked=False: self._apply_live_update(),
+            lambda _checked=False: self._apply_topk_update(),
         )
         topk_layout.addWidget(self.apply_topk_button)
         metrics_row.addWidget(self.topk_controls_widget)
@@ -1184,17 +1191,8 @@ class InspectPageMixin:
             roi_text = "Inactive"
             roi_level = "neutral"
 
-        pending_threshold_apply = (
-            has_data
-            and hasattr(self, "threshold_spin")
-            and float(self.threshold_spin.value()) != float(metrics.threshold_value)
-        )
-        pending_low_signal_apply = (
-            has_data
-            and hasattr(self, "low_signal_spin")
-            and float(self.low_signal_spin.value())
-            != float(metrics.low_signal_threshold_value)
-        )
+        pending_threshold_apply = has_data and metrics.threshold_inputs_pending()
+        pending_low_signal_apply = has_data and metrics.low_signal_inputs_pending()
         if not has_data:
             saturation_text = "None"
             saturation_level = "neutral"

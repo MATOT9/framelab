@@ -5,6 +5,8 @@ import pytest
 
 from framelab.metrics_state import (
     DynamicStatsResult,
+    MetricFamily,
+    MetricFamilyState,
     MetricsPipelineController,
     RoiApplyResult,
 )
@@ -27,10 +29,18 @@ def test_initialize_loaded_dataset_resets_dataset_dependent_arrays(
     assert state.avg_maxs is None
     assert state.dn_per_ms_values is None
     assert state.roi_rect is None
-    np.testing.assert_array_equal(state.sat_counts, np.zeros(3, dtype=np.int64))
-    np.testing.assert_array_equal(state.bg_applied_mask, np.zeros(3, dtype=bool))
-    assert state.bg_total_count == 3
-    assert state.bg_unmatched_count == 3
+    assert state.sat_counts is None
+    assert state.bg_applied_mask is None
+    assert state.bg_total_count == 0
+    assert state.bg_unmatched_count == 0
+    assert (
+        state.metric_family_state(MetricFamily.STATIC_SCAN)
+        == MetricFamilyState.READY
+    )
+    assert (
+        state.metric_family_state(MetricFamily.SATURATION)
+        == MetricFamilyState.NOT_REQUESTED
+    )
     assert state.roi_maxs.shape == (3,)
     assert np.isnan(state.roi_maxs).all()
     assert state.roi_sums.shape == (3,)
@@ -39,6 +49,44 @@ def test_initialize_loaded_dataset_resets_dataset_dependent_arrays(
     assert np.isnan(state.roi_means).all()
     assert state.roi_topk_means.shape == (3,)
     assert np.isnan(state.roi_topk_means).all()
+
+
+def test_pending_inputs_are_separate_from_applied_values(
+    state: MetricsPipelineController,
+) -> None:
+    state.set_pending_threshold_value(42)
+    state.set_pending_low_signal_threshold_value(7)
+    state.set_pending_avg_count_value(5)
+
+    assert state.threshold_value == pytest.approx(65520.0)
+    assert state.low_signal_threshold_value == pytest.approx(0.0)
+    assert state.avg_count_value == 32
+    assert state.threshold_inputs_pending()
+    assert state.low_signal_inputs_pending()
+    assert state.topk_inputs_pending()
+    assert (
+        state.metric_family_state(MetricFamily.SATURATION)
+        == MetricFamilyState.PENDING_INPUTS
+    )
+    assert (
+        state.metric_family_state(MetricFamily.LOW_SIGNAL)
+        == MetricFamilyState.PENDING_INPUTS
+    )
+    assert (
+        state.metric_family_state(MetricFamily.TOPK)
+        == MetricFamilyState.PENDING_INPUTS
+    )
+
+    assert state.apply_pending_threshold_value()
+    assert state.apply_pending_low_signal_threshold_value()
+    assert state.apply_pending_avg_count_value()
+
+    assert state.threshold_value == pytest.approx(42.0)
+    assert state.low_signal_threshold_value == pytest.approx(7.0)
+    assert state.avg_count_value == 5
+    assert not state.threshold_inputs_pending()
+    assert not state.low_signal_inputs_pending()
+    assert not state.topk_inputs_pending()
 
 
 def test_prepare_for_live_update_sizes_topk_roi_and_background_arrays(
