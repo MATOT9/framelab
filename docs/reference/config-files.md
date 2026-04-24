@@ -58,6 +58,7 @@ Workspace document created explicitly by the user from the File menu. Current ru
 - restores workflow context and active node
 - restores the scanned dataset root and selected image
 - restores current skip rules for dataset intake
+- restores the Data-tab scan metric preset and Custom family selection
 - restores Measure-page state such as threshold, average mode, ROI, and background source
 - restores page/plugin selection, preview visibility, dock disclosure, and splitter positions relevant to the current session
 

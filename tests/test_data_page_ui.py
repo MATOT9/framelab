@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 from PySide6 import QtWidgets as qtw
 
+from framelab.metrics_state import MetricFamily, ScanMetricPreset
 from framelab.processing_failures import make_processing_failure
 from framelab.node_metadata import save_nodecard
 from framelab.ui_primitives import StatusChip
@@ -106,6 +107,48 @@ def test_metadata_controls_row_is_no_longer_collapsible(
     assert not hasattr(data_window, "metadata_controls_toggle")
     assert not data_window.metadata_controls_body.isHidden()
     assert not data_window.metadata_source_combo.isHidden()
+
+
+def test_scan_metric_preset_combo_updates_controller_and_header(
+    data_window: FrameLabWindow,
+) -> None:
+    index = data_window.scan_metric_preset_combo.findData(
+        ScanMetricPreset.TOPK_STUDY.value,
+    )
+
+    data_window.scan_metric_preset_combo.setCurrentIndex(index)
+
+    assert data_window.metrics_state.scan_metric_preset == ScanMetricPreset.TOPK_STUDY
+    assert data_window.metrics_state.scan_metric_families() == (
+        MetricFamily.STATIC_SCAN,
+        MetricFamily.SATURATION,
+        MetricFamily.TOPK,
+    )
+    assert data_window._workspace_document_dirty is True
+    header_chip_texts = [
+        chip.text()
+        for chip in data_window._data_header.findChildren(StatusChip)
+    ]
+    assert "Scan: Top-K Study" in header_chip_texts
+
+
+def test_custom_scan_metric_family_menu_updates_custom_setup(
+    data_window: FrameLabWindow,
+) -> None:
+    custom_index = data_window.scan_metric_preset_combo.findData(
+        ScanMetricPreset.CUSTOM.value,
+    )
+    data_window.scan_metric_preset_combo.setCurrentIndex(custom_index)
+    action = data_window._scan_metric_family_actions[MetricFamily.ROI_TOPK.value]
+
+    action.setChecked(True)
+
+    assert data_window.metrics_state.scan_metric_preset == ScanMetricPreset.CUSTOM
+    assert data_window.metrics_state.scan_metric_families() == (
+        MetricFamily.STATIC_SCAN,
+        MetricFamily.ROI_TOPK,
+    )
+    assert data_window.scan_metric_custom_button.isEnabled()
 
 
 def test_edit_advanced_menu_always_exposes_core_ebus_tools(
@@ -274,8 +317,9 @@ def test_dataset_load_failure_surfaces_primary_raw_cause_and_hint(
     assert "All 2 supported image files failed to load." in message
     assert f"Most likely cause: {reason}" in message
     assert (
-        "Add acquisition/session/campaign datacard metadata or session-local "
-        "RAW fallback values, then re-scan."
+        "Add acquisition/session/campaign metadata, attach an eBUS config in "
+        "the acquisition, or provide session-local RAW fallback values, then "
+        "re-scan."
     ) in message
     assert "Open Processing Issues for per-file details." in message
     assert ".pvcfg" not in message

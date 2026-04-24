@@ -11,7 +11,7 @@ from PySide6 import QtCore, QtTest, QtWidgets as qtw
 from tifffile import imwrite
 
 import framelab.main_window.inspect_page as inspect_page_module
-from framelab.metrics_state import MetricFamily, MetricFamilyState
+from framelab.metrics_state import MetricFamily, MetricFamilyState, ScanMetricPreset
 from framelab.ui_primitives import StatusChip
 from framelab.ui_density import VisibilityPolicy
 from framelab.ui_settings import DensityMode
@@ -174,6 +174,7 @@ def test_scan_only_measure_table_keeps_static_metrics_available(
     measure_window.load_folder()
     wait_for_dataset_load(measure_window)
 
+    assert measure_window.metrics_state.scan_metric_preset == ScanMetricPreset.MINIMAL
     max_column = measure_window.MEASURE_COLUMN_INDEX["max_pixel"]
     min_column = measure_window.MEASURE_COLUMN_INDEX["min_non_zero"]
     saturation_column = measure_window.MEASURE_COLUMN_INDEX["sat_count"]

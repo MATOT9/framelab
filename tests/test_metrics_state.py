@@ -9,6 +9,7 @@ from framelab.metrics_state import (
     MetricFamilyState,
     MetricsPipelineController,
     RoiApplyResult,
+    ScanMetricPreset,
 )
 
 
@@ -87,6 +88,55 @@ def test_pending_inputs_are_separate_from_applied_values(
     assert not state.threshold_inputs_pending()
     assert not state.low_signal_inputs_pending()
     assert not state.topk_inputs_pending()
+
+
+def test_scan_metric_setup_defaults_and_presets(
+    state: MetricsPipelineController,
+) -> None:
+    assert state.scan_metric_preset == ScanMetricPreset.MINIMAL
+    assert state.scan_metric_families() == (MetricFamily.STATIC_SCAN,)
+    assert state.scan_metric_family_values() == ["static_scan"]
+
+    state.set_scan_metric_preset(ScanMetricPreset.THRESHOLD_REVIEW)
+
+    assert state.scan_metric_families() == (
+        MetricFamily.STATIC_SCAN,
+        MetricFamily.SATURATION,
+        MetricFamily.LOW_SIGNAL,
+    )
+
+
+def test_custom_scan_metric_setup_forces_static_and_filters_unknowns(
+    state: MetricsPipelineController,
+) -> None:
+    state.set_custom_scan_metric_families(
+        [
+            MetricFamily.TOPK,
+            "roi",
+            "background_applied",
+            "missing",
+            MetricFamily.TOPK,
+        ],
+    )
+
+    assert state.scan_metric_preset == ScanMetricPreset.CUSTOM
+    assert state.scan_metric_families() == (
+        MetricFamily.STATIC_SCAN,
+        MetricFamily.TOPK,
+        MetricFamily.ROI,
+    )
+
+    state.restore_scan_metric_setup(
+        preset="not-a-preset",
+        families=["roi_topk"],
+    )
+
+    assert state.scan_metric_preset == ScanMetricPreset.MINIMAL
+    assert state.scan_metric_families() == (MetricFamily.STATIC_SCAN,)
+    assert state.custom_scan_metric_families == (
+        MetricFamily.STATIC_SCAN,
+        MetricFamily.ROI_TOPK,
+    )
 
 
 def test_prepare_for_live_update_sizes_topk_roi_and_background_arrays(

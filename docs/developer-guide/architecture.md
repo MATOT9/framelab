@@ -184,7 +184,7 @@ Filename UTC timestamp tokens matching `YYYYMMDD_HHMMSS_mmmZ` are parsed into pe
 
 ### Stage 3: measurement metrics
 
-Dataset scanning computes only lightweight pass-1 values needed for a responsive loaded state, including max pixel, minimum non-zero pixel, resolved metadata, and elapsed time from filename UTC timestamps when present. It does not automatically start downstream dynamic metric workers after scan completion.
+Dataset scanning computes only lightweight pass-1 values needed for a responsive loaded state by default, including max pixel, minimum non-zero pixel, resolved metadata, and elapsed time from filename UTC timestamps when present. The Data tab owns an explicit scan metric setup with presets for Minimal, threshold review, Top-K study, ROI study, and Custom. Non-minimal presets are treated as explicit user requests to run existing metric-family jobs after scan; plugins are not allowed to silently add scan-time work.
 
 The Measure workflow can then explicitly compute per-image metrics such as:
 
@@ -200,7 +200,7 @@ The Measure workflow can then explicitly compute per-image metrics such as:
 
 These results are stored through `MetricsPipelineController`. Dynamic metric computation is delegated to worker classes in `framelab/workers.py` and orchestrated by `MetricsRuntimeMixin`, which applies worker results back into controller-owned state. Global Top-K uses the dynamic metrics path, while ROI-derived modes, including ROI + Top-K, use `RoiApplyWorker` so the Top-K population is selected inside the ROI.
 
-Metric readiness is tracked by named families rather than inferred only from array presence. Current families include static scan, saturation, low signal, Top-K, ROI, ROI Top-K, and background-applied status, with states such as not requested, pending inputs, computing, ready, stale, and failed. Measure-page controls store pending UI values separately from the last applied compute inputs, so changing threshold, low-signal threshold, Top-K count, or Average Mode is a view/input edit until the relevant Apply action runs.
+Metric readiness is tracked by named families rather than inferred only from array presence. Current families include static scan, saturation, low signal, Top-K, ROI, ROI Top-K, and background-applied status, with states such as not requested, pending inputs, computing, ready, stale, and failed. The scan setup stores which of those families are allowed to run at scan time, while Measure-page controls store pending UI values separately from the last applied compute inputs. Changing threshold, low-signal threshold, Top-K count, or Average Mode is a view/input edit until the relevant Apply action runs.
 
 ### Stage 4: analysis context build
 
@@ -272,6 +272,7 @@ The metrics controller owns measurement settings and the latest measurement resu
 - normalization and rounding settings
 - background configuration, loaded references, and match bookkeeping
 - threshold, low-signal, and Top-K pending/applied settings
+- Data-tab scan metric preset and Custom family selection
 - per-family metric readiness state
 - in-flight metric-job and ROI-apply job lifecycle state
 

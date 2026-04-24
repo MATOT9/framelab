@@ -21,6 +21,11 @@ from ..metadata import (
     invalidate_metadata_cache,
     path_has_json_metadata,
 )
+from ..metrics_state import (
+    MetricFamily,
+    SCAN_METRIC_OPTIONAL_FAMILIES,
+    ScanMetricPreset,
+)
 from ..node_metadata import NODECARD_DIR_NAME, NODECARD_FILE_NAME
 from ..raw_decode import SUPPORTED_MONO_RAW_PIXEL_FORMATS, is_raw_image_path
 from ..ui_primitives import (
@@ -159,6 +164,22 @@ class _SkipRulesEditorDialog(qtw.QDialog):
 class DataPageMixin:
     """Dataset input, skip rules, and metadata table helpers."""
 
+    SCAN_METRIC_PRESET_LABELS = (
+        (ScanMetricPreset.MINIMAL, "Minimal"),
+        (ScanMetricPreset.THRESHOLD_REVIEW, "Threshold Review"),
+        (ScanMetricPreset.TOPK_STUDY, "Top-K Study"),
+        (ScanMetricPreset.ROI_STUDY, "ROI Study"),
+        (ScanMetricPreset.CUSTOM, "Custom"),
+    )
+    SCAN_METRIC_FAMILY_LABELS = {
+        MetricFamily.STATIC_SCAN: "Static",
+        MetricFamily.SATURATION: "Saturation",
+        MetricFamily.LOW_SIGNAL: "Low Signal",
+        MetricFamily.TOPK: "Top-K",
+        MetricFamily.ROI: "ROI",
+        MetricFamily.ROI_TOPK: "ROI + Top-K",
+    }
+
     def _trigger_browse_folder_button(self, _checked: bool = False) -> None:
         """Open the dataset-folder chooser from the Data-page button."""
 
@@ -271,6 +292,46 @@ class DataPageMixin:
         load_button.clicked.connect(self._trigger_scan_folder_button)
         command_layout.addWidget(load_button)
 
+        scan_metric_label = qtw.QLabel("Scan Metrics", command_bar)
+        scan_metric_label.setObjectName("SectionTitle")
+        command_layout.addWidget(scan_metric_label)
+
+        self.scan_metric_preset_combo = qtw.QComboBox(command_bar)
+        self.scan_metric_preset_combo.setObjectName("ScanMetricPresetCombo")
+        for preset, label in self.SCAN_METRIC_PRESET_LABELS:
+            self.scan_metric_preset_combo.addItem(label, preset.value)
+        self.scan_metric_preset_combo.setToolTip(
+            "Choose which metric families should be computed at scan time.",
+        )
+        self.scan_metric_preset_combo.currentIndexChanged.connect(
+            self._on_scan_metric_preset_changed,
+        )
+        command_layout.addWidget(self.scan_metric_preset_combo)
+
+        self.scan_metric_custom_button = qtw.QToolButton(command_bar)
+        self.scan_metric_custom_button.setObjectName("ScanMetricCustomButton")
+        self.scan_metric_custom_button.setText("Families")
+        self.scan_metric_custom_button.setToolTip(
+            "Select metric families for the Custom scan setup.",
+        )
+        self.scan_metric_custom_button.setPopupMode(qtw.QToolButton.InstantPopup)
+        custom_menu = qtw.QMenu(self.scan_metric_custom_button)
+        self._scan_metric_family_actions = {}
+        for family in SCAN_METRIC_OPTIONAL_FAMILIES:
+            action = custom_menu.addAction(self.SCAN_METRIC_FAMILY_LABELS[family])
+            action.setCheckable(True)
+            action.toggled.connect(
+                lambda checked, metric_family=family: (
+                    self._on_scan_metric_family_action_toggled(
+                        metric_family,
+                        checked,
+                    )
+                ),
+            )
+            self._scan_metric_family_actions[family.value] = action
+        self.scan_metric_custom_button.setMenu(custom_menu)
+        command_layout.addWidget(self.scan_metric_custom_button)
+
         self.data_load_progress = qtw.QProgressBar()
         self.data_load_progress.setMinimum(0)
         self.data_load_progress.setMaximum(100)
@@ -311,6 +372,7 @@ class DataPageMixin:
 
         self._data_summary_strip = build_summary_strip()
         layout.addWidget(self._data_summary_strip)
+        self._refresh_scan_metric_setup_ui()
 
         advanced_container = qtw.QWidget()
         self._data_advanced_container = advanced_container
@@ -577,6 +639,95 @@ class DataPageMixin:
         if hasattr(self, "_active_density_tokens"):
             self._apply_data_page_density(self._active_density_tokens)
         return page
+
+    def _scan_metric_preset_label(self) -> str:
+        """Return the visible label for the selected scan metric preset."""
+
+        preset = self.metrics_state.scan_metric_preset
+        for candidate, label in self.SCAN_METRIC_PRESET_LABELS:
+            if candidate == preset:
+                return label
+        return "Minimal"
+
+    def _scan_metric_family_summary(self) -> str:
+        """Return a compact label for the selected scan metric families."""
+
+        families = [
+            family for family in self.metrics_state.scan_metric_families()
+            if family != MetricFamily.STATIC_SCAN
+        ]
+        if not families:
+            return "Static only"
+        labels = [
+            self.SCAN_METRIC_FAMILY_LABELS.get(family, str(family.value))
+            for family in families
+        ]
+        return ", ".join(labels)
+
+    def _refresh_scan_metric_setup_ui(self) -> None:
+        """Sync Data-page scan setup controls from controller state."""
+
+        combo = getattr(self, "scan_metric_preset_combo", None)
+        if combo is not None:
+            blocker = QSignalBlocker(combo)
+            index = combo.findData(self.metrics_state.scan_metric_preset.value)
+            combo.setCurrentIndex(max(0, index))
+            del blocker
+
+        selected_families = {
+            family.value for family in self.metrics_state.scan_metric_families()
+        }
+        for family_value, action in getattr(
+            self,
+            "_scan_metric_family_actions",
+            {},
+        ).items():
+            blocker = QSignalBlocker(action)
+            action.setChecked(family_value in selected_families)
+            del blocker
+
+        custom_button = getattr(self, "scan_metric_custom_button", None)
+        if custom_button is not None:
+            custom_enabled = (
+                self.metrics_state.scan_metric_preset == ScanMetricPreset.CUSTOM
+            )
+            custom_button.setEnabled(custom_enabled)
+            custom_button.setToolTip(
+                "Select metric families for the Custom scan setup."
+                if custom_enabled
+                else "Choose Custom to edit scan metric families."
+            )
+        if hasattr(self, "_refresh_data_header_state"):
+            self._refresh_data_header_state()
+
+    def _on_scan_metric_preset_changed(self, index: int) -> None:
+        """Apply the selected Data-page scan metric preset."""
+
+        combo = getattr(self, "scan_metric_preset_combo", None)
+        if combo is None or index < 0:
+            return
+        preset = combo.itemData(index)
+        self.metrics_state.set_scan_metric_preset(str(preset or "minimal"))
+        self._refresh_scan_metric_setup_ui()
+        if hasattr(self, "_refresh_workspace_document_dirty_state"):
+            self._refresh_workspace_document_dirty_state()
+
+    def _on_scan_metric_family_action_toggled(
+        self,
+        family: MetricFamily,
+        checked: bool,
+    ) -> None:
+        """Update the Custom scan metric family set."""
+
+        selected = set(self.metrics_state.scan_metric_families())
+        if checked:
+            selected.add(family)
+        else:
+            selected.discard(family)
+        self.metrics_state.set_custom_scan_metric_families(tuple(selected))
+        self._refresh_scan_metric_setup_ui()
+        if hasattr(self, "_refresh_workspace_document_dirty_state"):
+            self._refresh_workspace_document_dirty_state()
 
     def _open_skip_rules_dialog(self) -> None:
         """Show skip-rule editor dialog, creating it on first use."""
@@ -862,6 +1013,16 @@ class DataPageMixin:
                 level="success" if has_loaded else "neutral",
             ),
             ChipSpec(
+                f"Scan: {self._scan_metric_preset_label()}",
+                level=(
+                    "neutral"
+                    if self.metrics_state.scan_metric_preset
+                    == ScanMetricPreset.MINIMAL
+                    else "info"
+                ),
+                tooltip=self._scan_metric_family_summary(),
+            ),
+            ChipSpec(
                 "JSON metadata available" if datacard_present else "Path-only metadata",
                 level="info" if datacard_present else "warning",
             ),
@@ -955,6 +1116,17 @@ class DataPageMixin:
                     "Skip Rules",
                     str(len(self.skip_patterns)),
                     level="warning" if self.skip_patterns else "neutral",
+                ),
+                SummaryItem(
+                    "Scan Metrics",
+                    self._scan_metric_preset_label(),
+                    level=(
+                        "neutral"
+                        if self.metrics_state.scan_metric_preset
+                        == ScanMetricPreset.MINIMAL
+                        else "info"
+                    ),
+                    tooltip=self._scan_metric_family_summary(),
                 ),
             ]
         )

@@ -9,6 +9,29 @@ from typing import Any
 
 
 _SCHEMA_VERSION = 1
+_SCAN_PRESETS = {
+    "minimal",
+    "threshold_review",
+    "topk_study",
+    "roi_study",
+    "custom",
+}
+_SCAN_METRIC_FAMILIES = {
+    "static_scan",
+    "saturation",
+    "low_signal",
+    "topk",
+    "roi",
+    "roi_topk",
+}
+_SCAN_METRIC_FAMILY_ORDER = (
+    "static_scan",
+    "saturation",
+    "low_signal",
+    "topk",
+    "roi",
+    "roi_topk",
+)
 
 
 def _clean_text(value: object | None) -> str | None:
@@ -65,6 +88,23 @@ def _parse_string_list(value: object) -> list[str]:
         seen.add(text)
         parsed.append(text)
     return parsed
+
+
+def _parse_scan_preset(value: object) -> str:
+    preset = str(value or "").strip().lower()
+    return preset if preset in _SCAN_PRESETS else "minimal"
+
+
+def _parse_scan_metric_families(value: object) -> list[str]:
+    selected = {"static_scan"}
+    for family in _parse_string_list(value):
+        key = str(family).strip().lower()
+        if key in _SCAN_METRIC_FAMILIES:
+            selected.add(key)
+    return [
+        family for family in _SCAN_METRIC_FAMILY_ORDER
+        if family in selected
+    ]
 
 
 def _parse_bool_map(value: object) -> dict[str, bool]:
@@ -129,6 +169,16 @@ class WorkspaceDocumentDatasetState:
 
 
 @dataclass(slots=True)
+class WorkspaceDocumentScanState:
+    """Data-page scan metric setup persisted in one workspace document."""
+
+    metric_preset: str = "minimal"
+    metric_families: list[str] = field(
+        default_factory=lambda: ["static_scan"],
+    )
+
+
+@dataclass(slots=True)
 class WorkspaceDocumentMeasureState:
     """Measure-page runtime state persisted in one workspace document."""
 
@@ -179,6 +229,9 @@ class WorkspaceDocumentSnapshot:
     dataset: WorkspaceDocumentDatasetState = field(
         default_factory=WorkspaceDocumentDatasetState,
     )
+    scan: WorkspaceDocumentScanState = field(
+        default_factory=WorkspaceDocumentScanState,
+    )
     measure: WorkspaceDocumentMeasureState = field(
         default_factory=WorkspaceDocumentMeasureState,
     )
@@ -203,6 +256,12 @@ class WorkspaceDocumentSnapshot:
                 "scan_root": self.dataset.scan_root,
                 "selected_image_path": self.dataset.selected_image_path,
                 "skip_patterns": list(self.dataset.skip_patterns),
+            },
+            "scan": {
+                "metric_preset": _parse_scan_preset(self.scan.metric_preset),
+                "metric_families": _parse_scan_metric_families(
+                    self.scan.metric_families,
+                ),
             },
             "measure": {
                 "average_mode": self.measure.average_mode,
@@ -257,6 +316,7 @@ class WorkspaceDocumentSnapshot:
 
         workflow = _section(payload, "workflow")
         dataset = _section(payload, "dataset")
+        scan = _section(payload, "scan")
         measure = _section(payload, "measure")
         background = _section(payload, "background")
         ui = _section(payload, "ui")
@@ -316,6 +376,12 @@ class WorkspaceDocumentSnapshot:
                 scan_root=_clean_text(dataset.get("scan_root")),
                 selected_image_path=_clean_text(dataset.get("selected_image_path")),
                 skip_patterns=_parse_string_list(dataset.get("skip_patterns")),
+            ),
+            scan=WorkspaceDocumentScanState(
+                metric_preset=_parse_scan_preset(scan.get("metric_preset")),
+                metric_families=_parse_scan_metric_families(
+                    scan.get("metric_families"),
+                ),
             ),
             measure=WorkspaceDocumentMeasureState(
                 average_mode=average_mode,

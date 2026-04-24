@@ -23,6 +23,16 @@ class MetricFamily(str, Enum):
     BACKGROUND_APPLIED = "background_applied"
 
 
+class ScanMetricPreset(str, Enum):
+    """Named scan-time metric setup presets."""
+
+    MINIMAL = "minimal"
+    THRESHOLD_REVIEW = "threshold_review"
+    TOPK_STUDY = "topk_study"
+    ROI_STUDY = "roi_study"
+    CUSTOM = "custom"
+
+
 class MetricFamilyState(str, Enum):
     """Readiness state for one metric family."""
 
@@ -40,6 +50,37 @@ class MetricFamilyStatus:
 
     state: MetricFamilyState
     message: str = ""
+
+
+SCAN_METRIC_FAMILY_ORDER = (
+    MetricFamily.STATIC_SCAN,
+    MetricFamily.SATURATION,
+    MetricFamily.LOW_SIGNAL,
+    MetricFamily.TOPK,
+    MetricFamily.ROI,
+    MetricFamily.ROI_TOPK,
+)
+SCAN_METRIC_OPTIONAL_FAMILIES = tuple(
+    family for family in SCAN_METRIC_FAMILY_ORDER
+    if family is not MetricFamily.STATIC_SCAN
+)
+SCAN_METRIC_PRESET_FAMILIES = {
+    ScanMetricPreset.MINIMAL: (MetricFamily.STATIC_SCAN,),
+    ScanMetricPreset.THRESHOLD_REVIEW: (
+        MetricFamily.STATIC_SCAN,
+        MetricFamily.SATURATION,
+        MetricFamily.LOW_SIGNAL,
+    ),
+    ScanMetricPreset.TOPK_STUDY: (
+        MetricFamily.STATIC_SCAN,
+        MetricFamily.SATURATION,
+        MetricFamily.TOPK,
+    ),
+    ScanMetricPreset.ROI_STUDY: (
+        MetricFamily.STATIC_SCAN,
+        MetricFamily.ROI,
+    ),
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -112,6 +153,8 @@ class MetricsPipelineController:
         self.pending_threshold_value = self.threshold_value
         self.pending_low_signal_threshold_value = self.low_signal_threshold_value
         self.pending_avg_count_value = self.avg_count_value
+        self.scan_metric_preset = ScanMetricPreset.MINIMAL
+        self.custom_scan_metric_families = (MetricFamily.STATIC_SCAN,)
         self.metric_family_statuses = {
             family.value: MetricFamilyStatus(MetricFamilyState.NOT_REQUESTED)
             for family in MetricFamily
@@ -177,6 +220,87 @@ class MetricsPipelineController:
                 family,
                 MetricFamilyState.NOT_REQUESTED,
             )
+
+    @staticmethod
+    def _scan_metric_preset(preset: ScanMetricPreset | str) -> ScanMetricPreset:
+        if isinstance(preset, ScanMetricPreset):
+            return preset
+        try:
+            return ScanMetricPreset(str(preset))
+        except ValueError:
+            return ScanMetricPreset.MINIMAL
+
+    @staticmethod
+    def _normalize_scan_metric_families(
+        families: list[MetricFamily | str] | tuple[MetricFamily | str, ...] | None,
+    ) -> tuple[MetricFamily, ...]:
+        selected: set[MetricFamily] = {MetricFamily.STATIC_SCAN}
+        for family in families or ():
+            try:
+                normalized = (
+                    family
+                    if isinstance(family, MetricFamily)
+                    else MetricFamily(str(family))
+                )
+            except ValueError:
+                continue
+            if normalized in SCAN_METRIC_FAMILY_ORDER:
+                selected.add(normalized)
+        return tuple(
+            family for family in SCAN_METRIC_FAMILY_ORDER
+            if family in selected
+        )
+
+    def set_scan_metric_preset(self, preset: ScanMetricPreset | str) -> None:
+        """Select one scan-time metric preset."""
+
+        current_families = self.scan_metric_families()
+        selected_preset = self._scan_metric_preset(preset)
+        if (
+            selected_preset == ScanMetricPreset.CUSTOM
+            and self.scan_metric_preset != ScanMetricPreset.CUSTOM
+        ):
+            self.custom_scan_metric_families = current_families
+        self.scan_metric_preset = selected_preset
+
+    def set_custom_scan_metric_families(
+        self,
+        families: list[MetricFamily | str] | tuple[MetricFamily | str, ...] | None,
+    ) -> None:
+        """Store the family set used by the Custom scan preset."""
+
+        self.custom_scan_metric_families = self._normalize_scan_metric_families(
+            families,
+        )
+        self.scan_metric_preset = ScanMetricPreset.CUSTOM
+
+    def restore_scan_metric_setup(
+        self,
+        *,
+        preset: ScanMetricPreset | str,
+        families: list[MetricFamily | str] | tuple[MetricFamily | str, ...] | None,
+    ) -> None:
+        """Restore scan setup from persisted workspace state."""
+
+        self.scan_metric_preset = self._scan_metric_preset(preset)
+        self.custom_scan_metric_families = self._normalize_scan_metric_families(
+            families,
+        )
+
+    def scan_metric_families(self) -> tuple[MetricFamily, ...]:
+        """Return the selected scan-time metric families."""
+
+        if self.scan_metric_preset == ScanMetricPreset.CUSTOM:
+            return self.custom_scan_metric_families
+        return SCAN_METRIC_PRESET_FAMILIES.get(
+            self.scan_metric_preset,
+            SCAN_METRIC_PRESET_FAMILIES[ScanMetricPreset.MINIMAL],
+        )
+
+    def scan_metric_family_values(self) -> list[str]:
+        """Return selected scan-time metric family ids for persistence."""
+
+        return [family.value for family in self.scan_metric_families()]
 
     def threshold_inputs_pending(self) -> bool:
         """Return whether saturation threshold UI differs from applied state."""

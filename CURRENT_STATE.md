@@ -24,7 +24,7 @@ This is a compact snapshot of the current implementation. Prefer canonical docs 
 
 - Persistent UI preferences live in `config/preferences.ini`.
 - Reopenable session state is saved to explicit `.framelab` workspace files.
-- Workspace documents currently restore workflow context, dataset scope, selected image, skip rules, Measure settings, ROI, background settings, active page/plugin, preview visibility, panel state, and splitter sizes.
+- Workspace documents currently restore workflow context, dataset scope, selected image, skip rules, Data scan metric setup, Measure settings, ROI, background settings, active page/plugin, preview visibility, panel state, and splitter sizes.
 - The Select Workflow dialog can also open a saved `.framelab` workspace document, and recent workspace-document paths are remembered globally for quick reopen.
 - Unless a `.framelab` file is opened, the app should behave like a fresh session except for persistent preferences and recent workspace-document history.
 - Legacy `ui_state.ini` is retained only as a limited migration source for preferences when `preferences.ini` is missing.
@@ -48,7 +48,7 @@ This is a compact snapshot of the current implementation. Prefer canonical docs 
 ## Measurement And Analysis
 
 - Measure workflows cover thresholding, Top-K mean/std/SEM, ROI max/sum/mean/std/SEM, ROI + Top-K mean/std/SEM, normalization, background correction, exposure-normalized quantities such as `DN/ms`, and elapsed-time display for timestamped acquisition filenames.
-- Dataset scans populate the loaded paths, resolved metadata, elapsed-time metadata, and static quick-look metrics such as max pixel and minimum non-zero. Threshold counts, Top-K metrics, ROI dataset-wide metrics, and background-derived dataset metrics are downstream work and are not started automatically when a scan completes.
+- Dataset scans populate the loaded paths, resolved metadata, elapsed-time metadata, and static quick-look metrics such as max pixel and minimum non-zero by default. The Data tab exposes scan-time metric presets; fresh sessions use the Minimal preset, while explicit non-minimal presets can request threshold, Top-K, or ROI-family work after scan without involving plugins.
 - Metric readiness is tracked by explicit families such as static scan, saturation, low signal, Top-K, ROI, ROI Top-K, and background-applied state. Measure controls keep pending UI values separate from applied compute inputs; threshold, low-signal, and Top-K changes do not recompute until their Apply actions run.
 - Dataset-wide metric work is coordinated through worker objects and applied back on the UI thread.
 - Analyze workflows consume an `AnalysisContext` built from dataset metadata, metric state, normalization state, and background state.

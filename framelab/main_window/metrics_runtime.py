@@ -147,17 +147,21 @@ class MetricsRuntimeMixin:
             background_payload=self._background_signature_payload(),
         )
 
-    def _roi_metric_signature_hash(self) -> str | None:
+    def _roi_metric_signature_hash(
+        self,
+        mode_override: str | None = None,
+    ) -> str | None:
         """Return cache signature for the current ROI settings."""
 
         roi_rect = self.metrics_state.roi_rect
         if roi_rect is None:
             return None
+        mode = mode_override or self._current_average_mode()
         return roi_metric_signature_hash(
             roi_rect=roi_rect,
             topk_count=(
                 self.metrics_state.avg_count_value
-                if self._current_average_mode() == "roi_topk"
+                if mode == "roi_topk"
                 else None
             ),
             background_payload=self._background_signature_payload(),
@@ -555,6 +559,7 @@ class MetricsRuntimeMixin:
         *,
         update_kind: str = "full",
         refresh_analysis: bool = True,
+        mode_override: str | None = None,
     ) -> None:
         """Start asynchronous dynamic metric computation for the dataset."""
         if not self._has_loaded_data():
@@ -567,7 +572,7 @@ class MetricsRuntimeMixin:
             refresh_analysis=refresh_analysis,
         )
         mode = self._dynamic_stats_mode_for_average_mode(
-            self._current_average_mode(),
+            mode_override or self._current_average_mode(),
         )
         if update_kind == "full" and mode == "topk":
             metrics.set_metric_family_state(
@@ -690,6 +695,7 @@ class MetricsRuntimeMixin:
         if job_id != metrics.stats_job_id:
             return
         update_kind = metrics.stats_update_kind
+        mode = str((self._dynamic_cache_pending or {}).get("mode", "none"))
         self._dynamic_cache_pending = None
         metrics.finish_stats_job()
         metrics.set_metric_family_state(
@@ -703,7 +709,7 @@ class MetricsRuntimeMixin:
                 MetricFamilyState.FAILED,
                 message or "Unknown error",
             )
-            if self._current_average_mode() == "topk":
+            if mode == "topk":
                 metrics.set_metric_family_state(
                     MetricFamily.TOPK,
                     MetricFamilyState.FAILED,
@@ -762,10 +768,10 @@ class MetricsRuntimeMixin:
         self.roi_apply_progress.setVisible(False)
         self._update_average_controls()
 
-    def _start_roi_apply_job(self) -> None:
+    def _start_roi_apply_job(self, mode_override: str | None = None) -> None:
         """Start asynchronous ROI application across the full dataset."""
         metrics = self.metrics_state
-        mode = self._current_average_mode()
+        mode = mode_override or self._current_average_mode()
         if (
             not self._has_loaded_data()
             or metrics.roi_rect is None
@@ -796,11 +802,11 @@ class MetricsRuntimeMixin:
                     else MetricFamilyState.NOT_REQUESTED
                 ),
             )
-        signature_hash = self._roi_metric_signature_hash()
+        signature_hash = self._roi_metric_signature_hash(mode_override=mode)
         if signature_hash is None:
             return
         identities, cached_payloads = self._cached_roi_payloads(signature_hash)
-        include_topk = self._current_average_mode() == "roi_topk"
+        include_topk = mode == "roi_topk"
         (
             existing_maxs,
             existing_sums,
@@ -878,6 +884,7 @@ class MetricsRuntimeMixin:
             "signature_hash": signature_hash,
             "identities": identities,
             "source_indices": missing_indices,
+            "mode": mode,
         }
         self.roi_apply_progress.setRange(0, max(1, metrics.roi_apply_total))
         self.roi_apply_progress.setValue(0)
@@ -943,6 +950,7 @@ class MetricsRuntimeMixin:
         """Handle ROI apply worker failure."""
         if job_id != self.metrics_state.roi_apply_job_id:
             return
+        mode = str((self._roi_cache_pending or {}).get("mode", "none"))
         self._roi_cache_pending = None
         self._finish_roi_apply_ui()
         self.metrics_state.set_metric_family_state(
@@ -950,7 +958,7 @@ class MetricsRuntimeMixin:
             MetricFamilyState.FAILED,
             message or "Unknown error",
         )
-        if self._current_average_mode() == "roi_topk":
+        if mode == "roi_topk":
             self.metrics_state.set_metric_family_state(
                 MetricFamily.ROI_TOPK,
                 MetricFamilyState.FAILED,
@@ -1022,6 +1030,81 @@ class MetricsRuntimeMixin:
         self._update_average_controls()
         self._refresh_workspace_document_dirty_state()
         self._set_status()
+
+    def _apply_scan_metric_setup_after_scan(self) -> None:
+        """Run metric jobs requested by the Data-page scan setup."""
+
+        if not self._has_loaded_data():
+            return
+
+        metrics = self.metrics_state
+        families = set(metrics.scan_metric_families())
+        path_count = self.dataset_state.path_count()
+        started_job = False
+
+        if MetricFamily.TOPK in families:
+            metrics.prepare_for_live_update(path_count=path_count, mode="topk")
+            self._refresh_table(update_analysis=False)
+            self._start_dynamic_stats_job(
+                update_kind="full",
+                refresh_analysis=True,
+                mode_override="topk",
+            )
+            started_job = True
+        elif MetricFamily.SATURATION in families:
+            self._start_dynamic_stats_job(
+                update_kind="threshold_only",
+                refresh_analysis=True,
+                mode_override="none",
+            )
+            started_job = True
+
+        if MetricFamily.LOW_SIGNAL in families:
+            if metrics.low_signal_inputs_pending():
+                metrics.set_metric_family_state(
+                    MetricFamily.LOW_SIGNAL,
+                    MetricFamilyState.PENDING_INPUTS,
+                )
+            else:
+                metrics.set_metric_family_state(
+                    MetricFamily.LOW_SIGNAL,
+                    (
+                        MetricFamilyState.READY
+                        if metrics.low_signal_threshold_value > 0.0
+                        else MetricFamilyState.NOT_REQUESTED
+                    ),
+                )
+            self._refresh_table(update_analysis=False)
+
+        roi_requested = (
+            MetricFamily.ROI in families or MetricFamily.ROI_TOPK in families
+        )
+        if roi_requested:
+            if metrics.roi_rect is None:
+                metrics.set_metric_family_state(
+                    MetricFamily.ROI,
+                    MetricFamilyState.PENDING_INPUTS,
+                    "Select an ROI before scan-time ROI metrics can run.",
+                )
+                if MetricFamily.ROI_TOPK in families:
+                    metrics.set_metric_family_state(
+                        MetricFamily.ROI_TOPK,
+                        MetricFamilyState.PENDING_INPUTS,
+                        "Select an ROI before scan-time ROI Top-K metrics can run.",
+                    )
+            else:
+                self._start_roi_apply_job(
+                    mode_override=(
+                        "roi_topk"
+                        if MetricFamily.ROI_TOPK in families
+                        else "roi"
+                    ),
+                )
+                started_job = True
+
+        if not started_job:
+            self._update_average_controls()
+            self._set_status()
 
     def _apply_topk_update(self) -> None:
         """Apply the pending Top-K count and recompute only Top-K dependents."""

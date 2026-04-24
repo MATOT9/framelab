@@ -1193,6 +1193,11 @@ class DatasetLoadingMixin:
             self._update_average_controls()
             self._refresh_workspace_document_dirty_state()
             self._set_status()
+            if not (
+                getattr(self, "_workspace_document_restore_active", None)
+                and self._workspace_document_restore_active()
+            ):
+                self._apply_scan_metric_setup_after_scan()
 
         self._run_dataset_load_callbacks(summary)
         if workflow_notice:

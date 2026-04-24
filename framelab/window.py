@@ -68,6 +68,7 @@ from .workspace_document import (
     WorkspaceDocumentBackgroundState,
     WorkspaceDocumentDatasetState,
     WorkspaceDocumentMeasureState,
+    WorkspaceDocumentScanState,
     WorkspaceDocumentSnapshot,
     WorkspaceDocumentStore,
     WorkspaceDocumentUiState,
@@ -2228,6 +2229,10 @@ class FrameLabWindow(
                 selected_image_path=selected_image_path,
                 skip_patterns=[str(pattern) for pattern in self.skip_patterns],
             ),
+            scan=WorkspaceDocumentScanState(
+                metric_preset=str(metrics.scan_metric_preset.value),
+                metric_families=metrics.scan_metric_family_values(),
+            ),
             measure=WorkspaceDocumentMeasureState(
                 average_mode=self._current_average_mode(),
                 threshold_value=float(metrics.threshold_value),
@@ -2491,7 +2496,7 @@ class FrameLabWindow(
             if hasattr(self, "_sync_measure_display_menu_state"):
                 self._sync_measure_display_menu_state()
             if self._has_loaded_data():
-                self._apply_live_update()
+                self._refresh_table(update_analysis=False)
 
             roi_rect = measure_state.roi_rect
             if roi_rect is not None:
@@ -2517,6 +2522,9 @@ class FrameLabWindow(
                 and metrics.roi_applied_to_all
             ):
                 self._start_roi_apply_job()
+
+            if self._has_loaded_data():
+                self._apply_scan_metric_setup_after_scan()
 
             self.show_image_preview = bool(snapshot.ui.show_image_preview)
             self.show_histogram_preview = bool(snapshot.ui.show_histogram_preview)
@@ -2594,6 +2602,12 @@ class FrameLabWindow(
                 for key, value in snapshot.ui.splitter_sizes.items()
                 if str(key).strip() and value
             }
+            self.metrics_state.restore_scan_metric_setup(
+                preset=snapshot.scan.metric_preset,
+                families=snapshot.scan.metric_families,
+            )
+            if hasattr(self, "_refresh_scan_metric_setup_ui"):
+                self._refresh_scan_metric_setup_ui()
             self._set_skip_patterns(snapshot.dataset.skip_patterns, persist=False)
 
             workflow_state = snapshot.workflow

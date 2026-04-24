@@ -10,11 +10,13 @@ import pytest
 from tifffile import imwrite
 
 import framelab.window as window_module
+from framelab.metrics_state import MetricFamily, ScanMetricPreset
 from framelab.ui_settings import UiStateStore
 from framelab.workspace_document import (
     WorkspaceDocumentBackgroundState,
     WorkspaceDocumentDatasetState,
     WorkspaceDocumentMeasureState,
+    WorkspaceDocumentScanState,
     WorkspaceDocumentSnapshot,
     WorkspaceDocumentStore,
     WorkspaceDocumentUiState,
@@ -120,6 +122,10 @@ def test_workspace_document_store_round_trip(tmp_path: Path) -> None:
             selected_image_path="/tmp/workspace/session/frame.tiff",
             skip_patterns=["*.bak", "notes"],
         ),
+        scan=WorkspaceDocumentScanState(
+            metric_preset="custom",
+            metric_families=["topk", "roi", "background_applied"],
+        ),
         measure=WorkspaceDocumentMeasureState(
             average_mode="roi_topk",
             threshold_value=1234.0,
@@ -166,7 +172,16 @@ def test_workspace_document_store_round_trip(tmp_path: Path) -> None:
     assert loaded.measure.low_signal_threshold_value == pytest.approx(111.0)
     assert loaded.background.source_path == "/tmp/background.tiff"
     assert loaded.dataset.skip_patterns == ["*.bak", "notes"]
+    assert loaded.scan.metric_preset == "custom"
+    assert loaded.scan.metric_families == ["static_scan", "topk", "roi"]
     assert loaded.ui.splitter_sizes["measure.main_splitter"] == [300, 700]
+
+
+def test_workspace_document_scan_section_defaults_when_missing() -> None:
+    snapshot = WorkspaceDocumentSnapshot.from_payload({"schema_version": 1})
+
+    assert snapshot.scan.metric_preset == "minimal"
+    assert snapshot.scan.metric_families == ["static_scan"]
 
 
 def test_workspace_document_dirty_state_tracks_saved_session(
@@ -236,6 +251,10 @@ def test_window_actions_restore_workspace_document_session(
     window._set_rounding_mode("std")
     window.show_histogram_preview = True
     window._on_preview_visibility_changed()
+    window.metrics_state.set_custom_scan_metric_families(
+        (MetricFamily.STATIC_SCAN, MetricFamily.LOW_SIGNAL),
+    )
+    window._refresh_scan_metric_setup_ui()
     window._on_background_enabled_toggled(True)
     assert window._load_background_reference(
         source_text=str(background_path),
@@ -296,6 +315,11 @@ def test_window_actions_restore_workspace_document_session(
     assert restored.metrics_state.normalize_intensity_values is True
     assert restored.metrics_state.rounding_mode == "std"
     assert restored.metrics_state.roi_rect == (0, 0, 2, 2)
+    assert restored.metrics_state.scan_metric_preset == ScanMetricPreset.CUSTOM
+    assert restored.metrics_state.scan_metric_families() == (
+        MetricFamily.STATIC_SCAN,
+        MetricFamily.LOW_SIGNAL,
+    )
     assert restored.metrics_state.background_config.enabled is True
     assert restored.metrics_state.background_source_text == str(background_path)
     assert restored.metrics_state.background_library.global_ref is not None

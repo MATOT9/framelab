@@ -11,6 +11,7 @@ import pytest
 from tifffile import imwrite
 
 import framelab.workers as workers_module
+from framelab.metrics_state import MetricFamily, MetricFamilyState, ScanMetricPreset
 
 
 pytestmark = [pytest.mark.ui, pytest.mark.core]
@@ -40,6 +41,116 @@ def _thread_is_running(thread) -> bool:
         return bool(thread is not None and thread.isRunning())
     except RuntimeError:
         return False
+
+
+def test_default_scan_metric_setup_keeps_scan_static_only(
+    tmp_path: Path,
+    framelab_window_factory,
+    monkeypatch,
+    wait_for_dataset_load,
+) -> None:
+    dataset_root = _write_dataset(tmp_path / "minimal-scan", 2)
+    window = framelab_window_factory(enabled_plugin_ids=())
+    dynamic_calls: list[dict[str, object]] = []
+    monkeypatch.setattr(
+        window,
+        "_start_dynamic_stats_job",
+        lambda **kwargs: dynamic_calls.append(dict(kwargs)),
+    )
+
+    window.folder_edit.setText(str(dataset_root))
+    window.load_folder()
+    wait_for_dataset_load(window)
+
+    assert dynamic_calls == []
+    assert window.metrics_state.sat_counts is None
+    assert window.metrics_state.avg_maxs is None
+
+
+def test_threshold_review_scan_preset_starts_threshold_job(
+    tmp_path: Path,
+    framelab_window_factory,
+    monkeypatch,
+    wait_for_dataset_load,
+) -> None:
+    dataset_root = _write_dataset(tmp_path / "threshold-scan", 2)
+    window = framelab_window_factory(enabled_plugin_ids=())
+    window.metrics_state.set_scan_metric_preset(ScanMetricPreset.THRESHOLD_REVIEW)
+    dynamic_calls: list[dict[str, object]] = []
+    monkeypatch.setattr(
+        window,
+        "_start_dynamic_stats_job",
+        lambda **kwargs: dynamic_calls.append(dict(kwargs)),
+    )
+
+    window.folder_edit.setText(str(dataset_root))
+    window.load_folder()
+    wait_for_dataset_load(window)
+
+    assert dynamic_calls == [
+        {
+            "update_kind": "threshold_only",
+            "refresh_analysis": True,
+            "mode_override": "none",
+        },
+    ]
+
+
+def test_topk_scan_preset_starts_topk_job_without_changing_measure_mode(
+    tmp_path: Path,
+    framelab_window_factory,
+    monkeypatch,
+    wait_for_dataset_load,
+) -> None:
+    dataset_root = _write_dataset(tmp_path / "topk-scan", 2)
+    window = framelab_window_factory(enabled_plugin_ids=())
+    window.metrics_state.set_scan_metric_preset(ScanMetricPreset.TOPK_STUDY)
+    dynamic_calls: list[dict[str, object]] = []
+    monkeypatch.setattr(
+        window,
+        "_start_dynamic_stats_job",
+        lambda **kwargs: dynamic_calls.append(dict(kwargs)),
+    )
+
+    window.folder_edit.setText(str(dataset_root))
+    window.load_folder()
+    wait_for_dataset_load(window)
+
+    assert window._current_average_mode() == "none"
+    assert dynamic_calls == [
+        {
+            "update_kind": "full",
+            "refresh_analysis": True,
+            "mode_override": "topk",
+        },
+    ]
+
+
+def test_roi_scan_preset_without_roi_marks_roi_pending(
+    tmp_path: Path,
+    framelab_window_factory,
+    monkeypatch,
+    wait_for_dataset_load,
+) -> None:
+    dataset_root = _write_dataset(tmp_path / "roi-scan", 2)
+    window = framelab_window_factory(enabled_plugin_ids=())
+    window.metrics_state.set_scan_metric_preset(ScanMetricPreset.ROI_STUDY)
+    roi_calls: list[dict[str, object]] = []
+    monkeypatch.setattr(
+        window,
+        "_start_roi_apply_job",
+        lambda **kwargs: roi_calls.append(dict(kwargs)),
+    )
+
+    window.folder_edit.setText(str(dataset_root))
+    window.load_folder()
+    wait_for_dataset_load(window)
+
+    assert roi_calls == []
+    assert (
+        window.metrics_state.metric_family_state(MetricFamily.ROI)
+        == MetricFamilyState.PENDING_INPUTS
+    )
 
 
 def test_load_folder_runs_async_and_streams_rows_progressively(

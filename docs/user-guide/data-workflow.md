@@ -50,8 +50,26 @@ The dataset input controls define the root path used for TIFF discovery.
 | **Dataset / Scope Folder** | Holds the folder path that will be scanned recursively. | Review it to confirm the active workflow scope. |
 | **Browse Scope Folder...** or **Open Folder...** | Opens the system folder picker and updates the current scope path. | Use when you intentionally want to override or choose a different folder context. |
 | **Scan Selected Scope** or **Scan Folder** | Starts recursive TIFF discovery, skip-rule filtering, metadata extraction, and table refresh. | Use after changing the scope or skip rules. |
+| **Scan Metrics** | Chooses which metric families should be computed as part of scan setup. | Keep **Minimal** for scalable intake; choose a study preset only when you intentionally want extra scan-time metrics. |
 
 Exact button text may differ slightly depending on whether you are in workflow mode or ordinary folder mode.
+
+## Scan metric setup
+
+Fresh sessions use **Minimal**, which computes only static scan values and metadata-derived fields. This is the scalable default:
+
+- max pixel
+- minimum non-zero pixel
+- elapsed time from filename UTC timestamps when available
+
+Other presets are explicit requests for additional work after scan:
+
+- **Threshold Review** computes saturation counts and enables low-signal review from the applied thresholds.
+- **Top-K Study** computes saturation counts and Top-K metrics using the applied Top-K count.
+- **ROI Study** computes ROI metrics only when an ROI rectangle already exists, such as from a restored workspace; otherwise ROI work is left pending.
+- **Custom** lets you choose a compact set of scan-time families without turning the page into a large checkbox matrix.
+
+The selected scan setup is saved in `.framelab` workspace files. It is not a global preference.
 
 ## What scanning actually does
 
@@ -67,7 +85,7 @@ A scan is not only file listing. It is the dataset intake pass used by the rest 
 - rebuilds metadata for every loaded row using the active metadata-source mode
 - refreshes the Data table, Measure state, and downstream analysis context using only already available scan-time data
 
-Treat a scan as a dataset-state reset, not as a cosmetic refresh. Deeper measurement work such as saturation counts, Top-K values, ROI dataset-wide metrics, and background-derived dataset metrics is started from the Measure controls when you explicitly apply those settings.
+Treat a scan as a dataset-state reset, not as a cosmetic refresh. Deeper measurement work such as saturation counts, Top-K values, and ROI dataset-wide metrics is either requested by the Data tab scan setup or started from the Measure controls when you explicitly apply those settings. Plugins remain consumers of available data; they do not silently expand scan-time work.
 
 ## Skip rules
 
