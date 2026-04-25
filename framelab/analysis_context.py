@@ -8,8 +8,13 @@ from pathlib import Path
 import numpy as np
 
 from .dataset_state import DatasetStateController, _normalize_path_metadata_payload
-from .metrics_state import MetricsPipelineController
-from .plugins.analysis import AnalysisContext, AnalysisRecord, AnalysisScopeNode
+from .metrics_state import MetricFamily, MetricsPipelineController
+from .plugins.analysis import (
+    AnalysisContext,
+    AnalysisMetricFamilyStatus,
+    AnalysisRecord,
+    AnalysisScopeNode,
+)
 
 
 class AnalysisContextController:
@@ -198,4 +203,12 @@ class AnalysisContextController:
                 )
                 for node in dataset.scope_snapshot.ancestor_chain
             ),
+            metric_family_statuses={
+                family.value: AnalysisMetricFamilyStatus(
+                    family=family.value,
+                    state=metrics.metric_family_state(family).value,
+                    message=metrics.metric_family_status(family).message,
+                )
+                for family in MetricFamily
+            },
         )

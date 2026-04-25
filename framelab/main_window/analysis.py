@@ -10,7 +10,11 @@ from PySide6.QtCore import Qt, QSignalBlocker
 
 from ..analysis_context import AnalysisContextController
 from ..dataset_state import DatasetStateController
-from ..metrics_state import MetricsPipelineController
+from ..metrics_state import (
+    MetricFamily,
+    MetricFamilyState,
+    MetricsPipelineController,
+)
 from ..plugins import PluginUiCapabilities
 from ..plugins.analysis import (
     AnalysisContext,
@@ -164,6 +168,26 @@ class AnalysisPageMixin:
             lambda _checked=False: self._update_analysis_context(force_push=True),
         )
         selector_actions.addWidget(refresh_button)
+        self.analysis_requirements_label = qtw.QLabel("")
+        self.analysis_requirements_label.setObjectName("MutedLabel")
+        self.analysis_requirements_label.setWordWrap(True)
+        selector_actions.addWidget(self.analysis_requirements_label)
+        self.analysis_run_button = qtw.QPushButton("Run Analysis")
+        self.analysis_run_button.setSizePolicy(
+            qtw.QSizePolicy.Expanding,
+            qtw.QSizePolicy.Fixed,
+        )
+        self.analysis_run_button.setToolTip(
+            "Run the active plugin's explicit analysis action.",
+        )
+        self.analysis_run_button.clicked.connect(
+            lambda _checked=False: self._run_current_analysis_plugin(),
+        )
+        selector_actions.addWidget(self.analysis_run_button)
+        self.analysis_run_progress = qtw.QProgressBar()
+        self.analysis_run_progress.setTextVisible(True)
+        self.analysis_run_progress.setVisible(False)
+        selector_actions.addWidget(self.analysis_run_progress)
         selector_layout.addLayout(selector_actions)
         side_layout.addWidget(selector_panel)
 
@@ -235,6 +259,7 @@ class AnalysisPageMixin:
         """Instantiate analysis plugins and add them to the UI stack."""
         self._analysis_plugins = []
         self._analysis_host_controls_available: list[bool] = []
+        self._pending_analysis_plugin_run_id: str | None = None
         self.analysis_profile_combo.clear()
         for stack_name in ("analysis_controls_stack", "analysis_workspace_stack"):
             stack = getattr(self, stack_name, None)
@@ -404,6 +429,350 @@ class AnalysisPageMixin:
         label.setWordWrap(True)
         label.setAlignment(Qt.AlignTop | Qt.AlignLeft)
         return label
+
+    @staticmethod
+    def _analysis_metric_family_label(family: MetricFamily) -> str:
+        """Return a user-facing metric-family label."""
+
+        return {
+            MetricFamily.STATIC_SCAN: "Static scan",
+            MetricFamily.SATURATION: "Saturation",
+            MetricFamily.LOW_SIGNAL: "Low signal",
+            MetricFamily.TOPK: "Top-K",
+            MetricFamily.ROI: "ROI",
+            MetricFamily.ROI_TOPK: "ROI Top-K",
+            MetricFamily.BACKGROUND_APPLIED: "Background-applied",
+        }.get(family, family.value)
+
+    def _analysis_plugin_metric_families(
+        self,
+        plugin: AnalysisPlugin,
+        attr_name: str,
+    ) -> tuple[MetricFamily, ...]:
+        """Return normalized metric families declared by a plugin."""
+
+        metrics = getattr(self, "metrics_state", None)
+        raw = getattr(plugin, attr_name, ())
+        if metrics is None:
+            return MetricsPipelineController.normalize_metric_families(raw)
+        return metrics.normalize_metric_families(raw)
+
+    def _analysis_required_metric_families(
+        self,
+        plugin: AnalysisPlugin,
+    ) -> tuple[MetricFamily, ...]:
+        """Return required metric families for one plugin."""
+
+        return self._analysis_plugin_metric_families(
+            plugin,
+            "required_metric_families",
+        )
+
+    def _analysis_optional_metric_families(
+        self,
+        plugin: AnalysisPlugin,
+    ) -> tuple[MetricFamily, ...]:
+        """Return optional metric families for one plugin."""
+
+        return self._analysis_plugin_metric_families(
+            plugin,
+            "optional_metric_families",
+        )
+
+    def _analysis_metric_family_is_ready(self, family: MetricFamily) -> bool:
+        """Return whether one metric family is ready for plugin use."""
+
+        metrics = getattr(self, "metrics_state", None)
+        if metrics is None:
+            return False
+        return metrics.metric_family_state(family) == MetricFamilyState.READY
+
+    def _analysis_missing_required_metric_families(
+        self,
+        plugin: AnalysisPlugin,
+    ) -> tuple[MetricFamily, ...]:
+        """Return required families that are not ready."""
+
+        return tuple(
+            family
+            for family in self._analysis_required_metric_families(plugin)
+            if not self._analysis_metric_family_is_ready(family)
+        )
+
+    def _analysis_metric_family_state_text(self, family: MetricFamily) -> str:
+        """Return compact status text for a metric family."""
+
+        metrics = getattr(self, "metrics_state", None)
+        if metrics is None:
+            return "not requested"
+        status = metrics.metric_family_status(family)
+        label = status.state.value.replace("_", " ")
+        if status.message:
+            return f"{label}: {status.message}"
+        return label
+
+    def _analysis_family_request_blockers(
+        self,
+        families: tuple[MetricFamily, ...],
+    ) -> list[str]:
+        """Return human-readable blockers for an explicit plugin request."""
+
+        metrics = getattr(self, "metrics_state", None)
+        if metrics is None:
+            return ["Metric state is not available."]
+        blockers: list[str] = []
+        for family in families:
+            state = metrics.metric_family_state(family)
+            label = self._analysis_metric_family_label(family)
+            if family == MetricFamily.STATIC_SCAN:
+                blockers.append(f"{label}: scan a dataset first.")
+            elif state == MetricFamilyState.PENDING_INPUTS:
+                blockers.append(f"{label}: apply pending Measure inputs first.")
+            elif family in {MetricFamily.ROI, MetricFamily.ROI_TOPK}:
+                if metrics.roi_rect is None:
+                    blockers.append(f"{label}: draw or restore an ROI first.")
+        return blockers
+
+    def _analysis_requestable_families(
+        self,
+        families: tuple[MetricFamily, ...],
+    ) -> tuple[MetricFamily, ...]:
+        """Return missing families that can be explicitly requested now."""
+
+        metrics = getattr(self, "metrics_state", None)
+        if metrics is None:
+            return ()
+        requestable_states = {
+            MetricFamilyState.NOT_REQUESTED,
+            MetricFamilyState.STALE,
+            MetricFamilyState.FAILED,
+        }
+        requestable: list[MetricFamily] = []
+        supported = {
+            MetricFamily.SATURATION,
+            MetricFamily.TOPK,
+            MetricFamily.ROI,
+            MetricFamily.ROI_TOPK,
+            MetricFamily.BACKGROUND_APPLIED,
+        }
+        for family in families:
+            if family not in supported:
+                continue
+            if metrics.metric_family_state(family) not in requestable_states:
+                continue
+            if family in {MetricFamily.ROI, MetricFamily.ROI_TOPK}:
+                if metrics.roi_rect is None:
+                    continue
+            requestable.append(family)
+        return tuple(requestable)
+
+    def _begin_analysis_plugin_progress(self, text: str) -> None:
+        """Show the host-owned plugin action progress indicator."""
+
+        progress = getattr(self, "analysis_run_progress", None)
+        if progress is None:
+            return
+        progress.setRange(0, 0)
+        progress.setFormat(text)
+        progress.setVisible(True)
+
+    def _complete_analysis_plugin_progress(self, text: str) -> None:
+        """Show completion/error state for the plugin action progress bar."""
+
+        progress = getattr(self, "analysis_run_progress", None)
+        if progress is None:
+            return
+        progress.setRange(0, 1)
+        progress.setValue(1)
+        progress.setFormat(text)
+        progress.setVisible(True)
+
+    def _request_analysis_metric_families(
+        self,
+        families: tuple[MetricFamily, ...],
+    ) -> bool:
+        """Explicitly request missing metric families for plugin execution."""
+
+        if not families or not self._has_loaded_data():
+            return False
+        metrics = self.metrics_state
+        dynamic_families = tuple(
+            family
+            for family in families
+            if family
+            in {
+                MetricFamily.SATURATION,
+                MetricFamily.TOPK,
+                MetricFamily.BACKGROUND_APPLIED,
+            }
+        )
+        roi_families = tuple(
+            family
+            for family in families
+            if family in {MetricFamily.ROI, MetricFamily.ROI_TOPK}
+        )
+        requested = False
+        if dynamic_families:
+            prepare_mode = (
+                "topk"
+                if MetricFamily.TOPK in dynamic_families
+                else self._current_average_mode()
+            )
+            metrics.prepare_for_live_update(
+                path_count=self.dataset_state.path_count(),
+                mode=prepare_mode,
+            )
+            self._start_dynamic_stats_job(
+                update_kind="full",
+                refresh_analysis=True,
+                mode_override=prepare_mode,
+                requested_families=dynamic_families,
+            )
+            requested = True
+        if roi_families:
+            roi_mode = (
+                "roi_topk"
+                if MetricFamily.ROI_TOPK in roi_families
+                else "roi"
+            )
+            self._start_roi_apply_job(mode_override=roi_mode)
+            requested = True
+        return requested
+
+    def _run_current_analysis_plugin(self) -> None:
+        """Run the active plugin through the explicit host action."""
+
+        plugin = self._current_analysis_plugin()
+        if plugin is None:
+            return
+        context = self._ensure_analysis_context_current(
+            force_push=True,
+            force_rebuild=True,
+        )
+        if context is None:
+            return
+
+        missing = self._analysis_missing_required_metric_families(plugin)
+        if missing:
+            self._pending_analysis_plugin_run_id = plugin.plugin_id
+            requestable = self._analysis_requestable_families(missing)
+            blockers = self._analysis_family_request_blockers(missing)
+            if requestable:
+                self._begin_analysis_plugin_progress("Computing requirements...")
+                self._request_analysis_metric_families(requestable)
+            elif any(
+                self.metrics_state.metric_family_state(family)
+                == MetricFamilyState.COMPUTING
+                for family in missing
+            ):
+                self._begin_analysis_plugin_progress("Computing requirements...")
+            else:
+                self._pending_analysis_plugin_run_id = None
+                self._complete_analysis_plugin_progress("Requirements missing")
+                if blockers and hasattr(self, "_set_status"):
+                    self._set_status(blockers[0])
+            self._refresh_analysis_plugin_requirements_ui()
+            return
+
+        self._execute_analysis_plugin_action(plugin, context)
+
+    def _execute_analysis_plugin_action(
+        self,
+        plugin: AnalysisPlugin,
+        context: AnalysisContext,
+    ) -> None:
+        """Run one plugin action and update host progress state."""
+
+        self._begin_analysis_plugin_progress("Running analysis...")
+        try:
+            plugin.run_analysis(context)
+        except Exception as exc:
+            self._pending_analysis_plugin_run_id = None
+            self._complete_analysis_plugin_progress("Analysis failed")
+            if hasattr(self, "_show_error"):
+                self._show_error(
+                    "Analysis failed",
+                    str(exc) or "The plugin action failed.",
+                )
+            return
+        self._pending_analysis_plugin_run_id = None
+        self._complete_analysis_plugin_progress("Analysis complete")
+        self._refresh_analysis_plugin_requirements_ui()
+
+    def _maybe_finish_pending_analysis_plugin_run(
+        self,
+        context: AnalysisContext,
+    ) -> None:
+        """Resume an explicit plugin run after requested requirements finish."""
+
+        plugin = self._current_analysis_plugin()
+        pending_id = getattr(self, "_pending_analysis_plugin_run_id", None)
+        if plugin is None or pending_id != plugin.plugin_id:
+            return
+        missing = self._analysis_missing_required_metric_families(plugin)
+        if not missing:
+            self._execute_analysis_plugin_action(plugin, context)
+            return
+        if any(
+            self.metrics_state.metric_family_state(family)
+            == MetricFamilyState.COMPUTING
+            for family in missing
+        ):
+            self._begin_analysis_plugin_progress("Computing requirements...")
+            return
+        self._pending_analysis_plugin_run_id = None
+        self._complete_analysis_plugin_progress("Requirements missing")
+
+    def _refresh_analysis_plugin_requirements_ui(self) -> None:
+        """Refresh host-owned analysis plugin requirement controls."""
+
+        if not hasattr(self, "analysis_run_button"):
+            return
+        plugin = self._current_analysis_plugin()
+        if plugin is None:
+            self.analysis_run_button.setText("Run Analysis")
+            self.analysis_run_button.setEnabled(False)
+            if hasattr(self, "analysis_requirements_label"):
+                self.analysis_requirements_label.setText("No analysis plugin selected.")
+            return
+
+        action_label = str(getattr(plugin, "run_action_label", "") or "Run Analysis")
+        self.analysis_run_button.setText(action_label)
+        analysis_available = self._analysis_unavailable_reason() is None
+        self.analysis_run_button.setEnabled(bool(analysis_available))
+
+        required = self._analysis_required_metric_families(plugin)
+        missing_required = self._analysis_missing_required_metric_families(plugin)
+        optional_missing = tuple(
+            family
+            for family in self._analysis_optional_metric_families(plugin)
+            if not self._analysis_metric_family_is_ready(family)
+        )
+        if not required:
+            parts = ["No required metric families."]
+        elif missing_required:
+            families = ", ".join(
+                f"{self._analysis_metric_family_label(family)} "
+                f"({self._analysis_metric_family_state_text(family)})"
+                for family in missing_required
+            )
+            parts = [f"Missing requirements: {families}."]
+            blockers = self._analysis_family_request_blockers(missing_required)
+            if blockers:
+                parts.extend(blockers)
+            elif self._analysis_requestable_families(missing_required):
+                parts.append(f"Click {action_label} to compute missing metrics.")
+        else:
+            parts = ["Requirements ready."]
+        if optional_missing:
+            optional = ", ".join(
+                f"{self._analysis_metric_family_label(family)} "
+                f"({self._analysis_metric_family_state_text(family)})"
+                for family in optional_missing
+            )
+            parts.append(f"Optional not ready: {optional}.")
+        if hasattr(self, "analysis_requirements_label"):
+            self.analysis_requirements_label.setText(" ".join(parts))
 
     @staticmethod
     def _analysis_main_splitter_key() -> str:
@@ -745,6 +1114,7 @@ class AnalysisPageMixin:
                     self._analysis_context_delivered_generation_by_plugin[
                         plugin.plugin_id
                     ] = self._analysis_context_generation
+            self._maybe_finish_pending_analysis_plugin_run(context)
 
         self._refresh_analysis_summary()
         return context
@@ -877,3 +1247,4 @@ class AnalysisPageMixin:
                 ),
             ],
         )
+        self._refresh_analysis_plugin_requirements_ui()

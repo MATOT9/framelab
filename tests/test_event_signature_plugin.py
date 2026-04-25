@@ -75,11 +75,13 @@ def test_event_signature_plugin_populates_requested_plot_modes(
 ) -> None:
     plugin, host = _plugin(qapp)
     try:
-        plugin.on_context_changed(_context(elapsed=True))
+        context = _context(elapsed=True)
+        plugin.on_context_changed(context)
         assert plugin._x_axis_combo is not None
         assert plugin._y_axis_combo is not None
         _set_combo(plugin._x_axis_combo, x_mode)
         _set_combo(plugin._y_axis_combo, y_mode)
+        plugin.run_analysis(context)
         qapp.processEvents()
 
         assert plugin._plot_points == pytest.approx(expected)
@@ -94,12 +96,28 @@ def test_event_signature_plugin_populates_requested_plot_modes(
 def test_event_signature_elapsed_axis_requires_elapsed_metadata(qapp) -> None:
     plugin, host = _plugin(qapp)
     try:
-        plugin.on_context_changed(_context(elapsed=False))
+        context = _context(elapsed=False)
+        plugin.on_context_changed(context)
+        plugin.run_analysis(context)
         assert plugin._x_axis_combo is not None
 
         assert plugin._x_axis_combo.findData("elapsed_time_s") < 0
         assert plugin._x_axis_combo.currentData() == "frame_index"
         assert plugin._plot_points == pytest.approx([(0.0, 10.0), (1.0, 12.0)])
+    finally:
+        host.close()
+        host.deleteLater()
+
+
+def test_event_signature_context_refresh_is_passive(qapp) -> None:
+    plugin, host = _plugin(qapp)
+    try:
+        context = _context(elapsed=True)
+        plugin.on_context_changed(context)
+
+        assert plugin._context is context
+        assert plugin._plot_points == []
+        assert plugin._analysis_dirty
     finally:
         host.close()
         host.deleteLater()

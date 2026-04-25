@@ -325,7 +325,7 @@ class IrisGainUiMixin:
 
     def populate_menu(self, menu: qtw.QMenu) -> None:
         """Add plugin-specific menu actions to the host Plugins menu."""
-        update_action = menu.addAction("Update Results")
+        update_action = menu.addAction(self.run_action_label)
         update_action.triggered.connect(
             lambda _checked=False: self._run_analysis(),
         )
@@ -366,10 +366,17 @@ class IrisGainUiMixin:
         )
 
     def on_context_changed(self, context: AnalysisContext) -> None:
-        """Refresh data context and rerun analysis."""
+        """Store host context without running plugin analysis."""
+        self._context = context
+        self._update_control_state()
+        self._analysis_dirty = True
+
+    def run_analysis(self, context: AnalysisContext) -> None:
+        """Run the explicit trend computation action."""
         self._context = context
         self._update_control_state()
         self._run_analysis()
+        self._analysis_dirty = False
 
     def _on_x_axis_changed(self, _index: int) -> None:
         """Handle X-axis change and keep Y-axis choices valid."""
@@ -377,9 +384,9 @@ class IrisGainUiMixin:
         self._on_controls_changed()
 
     def _on_controls_changed(self, _index: int | None = None) -> None:
-        """Refresh control state and rerun the plugin analysis."""
+        """Mark local controls dirty until the next explicit run."""
         self._update_control_state()
-        self._run_analysis()
+        self._analysis_dirty = True
 
     def _allowed_y_axis_options(
         self,

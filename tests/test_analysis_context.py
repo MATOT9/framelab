@@ -5,7 +5,11 @@ import pytest
 
 from framelab.analysis_context import AnalysisContextController
 from framelab.dataset_state import DatasetScopeNode, DatasetStateController
-from framelab.metrics_state import MetricsPipelineController
+from framelab.metrics_state import (
+    MetricFamily,
+    MetricFamilyState,
+    MetricsPipelineController,
+)
 
 
 pytestmark = [pytest.mark.analysis, pytest.mark.core]
@@ -217,3 +221,31 @@ def test_build_context_exposes_workflow_scope_and_effective_metadata() -> None:
         "camera_settings.exposure_us": "node_inherited",
     }
     assert [node.type_id for node in context.ancestor_chain] == ["root", "session"]
+
+
+def test_build_context_exposes_metric_family_readiness() -> None:
+    dataset = DatasetStateController()
+    dataset.set_loaded_dataset(None, ["/tmp/a.tif"])
+    metrics = MetricsPipelineController()
+    metrics.set_metric_family_state(MetricFamily.STATIC_SCAN, MetricFamilyState.READY)
+    metrics.set_metric_family_state(
+        MetricFamily.TOPK,
+        MetricFamilyState.FAILED,
+        "worker failed",
+    )
+
+    controller = AnalysisContextController(
+        dataset,
+        metrics,
+        background_reference_label_resolver=lambda path: f"ref:{path}",
+    )
+    context = controller.build_context(
+        mode="none",
+        normalization_scale=1.0,
+    )
+
+    assert context.metric_family_status("static_scan").ready
+    topk_status = context.metric_family_status("topk")
+    assert topk_status.state == "failed"
+    assert topk_status.message == "worker failed"
+    assert context.metric_family_status("roi_topk").state == "not_requested"

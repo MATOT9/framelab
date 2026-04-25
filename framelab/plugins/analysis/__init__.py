@@ -1,6 +1,12 @@
 """Analysis plugin interfaces and registry."""
 
-from ._base import AnalysisContext, AnalysisPlugin, AnalysisRecord, AnalysisScopeNode
+from ._base import (
+    AnalysisContext,
+    AnalysisMetricFamilyStatus,
+    AnalysisPlugin,
+    AnalysisRecord,
+    AnalysisScopeNode,
+)
 from ._registry import (
     load_analysis_plugins,
     load_enabled_analysis_plugins,
@@ -9,6 +15,7 @@ from ._registry import (
 
 __all__ = [
     "AnalysisContext",
+    "AnalysisMetricFamilyStatus",
     "AnalysisPlugin",
     "AnalysisRecord",
     "AnalysisScopeNode",

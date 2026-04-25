@@ -29,6 +29,9 @@ class IrisGainAnalysisPlugin(
     plugin_id = "iris_gain_vs_exposure"
     display_name = "Intensity Trend Explorer"
     dependencies: tuple[str, ...] = ()
+    required_metric_families = ("static_scan",)
+    optional_metric_families = ("topk", "roi", "roi_topk")
+    run_action_label = "Compute Trend"
     ui_capabilities = PluginUiCapabilities(
         reveal_data_columns=(
             "iris_pos",
@@ -133,6 +136,7 @@ class IrisGainAnalysisPlugin(
         ] = None
         self._plot_export_dpi = 200
         self._plot_export_last_path: Optional[str] = None
+        self._analysis_dirty = True
 
     @classmethod
     def _plot_x_label_for_mode(cls, x_mode: str) -> str:

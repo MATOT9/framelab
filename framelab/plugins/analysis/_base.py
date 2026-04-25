@@ -34,6 +34,21 @@ class AnalysisScopeNode:
 
 
 @dataclass(frozen=True)
+class AnalysisMetricFamilyStatus:
+    """Read-only metric-family readiness status for analysis plugins."""
+
+    family: str
+    state: str
+    message: str = ""
+
+    @property
+    def ready(self) -> bool:
+        """Return whether the family is ready for plugin consumption."""
+
+        return self.state == "ready"
+
+
+@dataclass(frozen=True)
 class AnalysisContext:
     """Context bundle passed to every analysis plugin."""
 
@@ -57,6 +72,21 @@ class AnalysisContext:
     effective_metadata: Mapping[str, object] = field(default_factory=dict)
     metadata_sources: Mapping[str, str] = field(default_factory=dict)
     ancestor_chain: tuple[AnalysisScopeNode, ...] = ()
+    metric_family_statuses: Mapping[str, AnalysisMetricFamilyStatus] = field(
+        default_factory=dict,
+    )
+
+    def metric_family_status(
+        self,
+        family: str,
+    ) -> AnalysisMetricFamilyStatus:
+        """Return readiness status for one metric family."""
+
+        key = str(family)
+        return self.metric_family_statuses.get(
+            key,
+            AnalysisMetricFamilyStatus(key, "not_requested"),
+        )
 
 
 class AnalysisPlugin(ABC):
@@ -68,6 +98,9 @@ class AnalysisPlugin(ABC):
     target_page: str = "analysis"
     dependencies: tuple[str, ...] = ()
     ui_capabilities: PluginUiCapabilities = PluginUiCapabilities()
+    required_metric_families: tuple[str, ...] = ()
+    optional_metric_families: tuple[str, ...] = ()
+    run_action_label: str = "Run Analysis"
 
     @abstractmethod
     def create_widget(self, parent: qtw.QWidget) -> qtw.QWidget:
@@ -94,6 +127,16 @@ class AnalysisPlugin(ABC):
     @abstractmethod
     def on_context_changed(self, context: AnalysisContext) -> None:
         """Handle dataset/metric updates from the host app."""
+
+    def run_analysis(self, context: AnalysisContext) -> None:
+        """Run the plugin's explicit analysis action.
+
+        The default keeps older plugins functional. New or migrated plugins should
+        keep ``on_context_changed`` passive and put table/plot work behind this
+        explicit hook.
+        """
+
+        self.on_context_changed(context)
 
     def set_theme(self, mode: str) -> None:
         """Update theme-dependent rendering state.

@@ -60,6 +60,9 @@ class EventSignatureAnalysisPlugin(AnalysisPlugin):
     plugin_id = "event_signature"
     display_name = "Event Signature"
     dependencies: tuple[str, ...] = ()
+    required_metric_families = ("static_scan",)
+    optional_metric_families = ("roi_topk",)
+    run_action_label = "Build Signature"
     description = (
         "Plot max-pixel or ROI Top-K values against frame index or elapsed time."
     )
@@ -95,6 +98,7 @@ class EventSignatureAnalysisPlugin(AnalysisPlugin):
         self._fallback_plot_label: Optional[qtw.QLabel] = None
         self._theme_mode = "dark"
         self._plot_points: list[tuple[float, float]] = []
+        self._analysis_dirty = True
 
     def create_widget(self, parent: qtw.QWidget) -> qtw.QWidget:
         """Create a compact fallback widget for legacy host layouts."""
@@ -210,11 +214,19 @@ class EventSignatureAnalysisPlugin(AnalysisPlugin):
         return workspace
 
     def on_context_changed(self, context: AnalysisContext) -> None:
-        """Refresh plugin data from the host-provided analysis context."""
+        """Store host context without running plugin analysis."""
+
+        self._context = context
+        self._sync_x_axis_options()
+        self._analysis_dirty = True
+
+    def run_analysis(self, context: AnalysisContext) -> None:
+        """Build the explicit event-signature table and plot."""
 
         self._context = context
         self._sync_x_axis_options()
         self._refresh()
+        self._analysis_dirty = False
 
     def set_theme(self, mode: str) -> None:
         """Update plot colors for the host theme."""
@@ -295,7 +307,7 @@ class EventSignatureAnalysisPlugin(AnalysisPlugin):
 
     def _on_controls_changed(self, _index: int | None = None) -> None:
         self._sync_x_axis_options()
-        self._refresh()
+        self._analysis_dirty = True
 
     def _x_value_for_record(
         self,

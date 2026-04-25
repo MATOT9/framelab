@@ -11,6 +11,7 @@ from PySide6 import QtWidgets as qtw
 from tifffile import imwrite
 
 import framelab.plugins.analysis.iris_gain._plotting as plotting_module
+from framelab.metrics_state import MetricFamily
 from framelab.plugins.analysis.iris_gain._shared import _CurveSeries
 from framelab.ui_settings import DensityMode
 from framelab.window import FrameLabWindow
@@ -438,6 +439,110 @@ def test_visible_analysis_page_scan_refresh_does_not_start_dynamic_metrics(
     assert dynamic_calls == []
     assert not analysis_window.metrics_state.is_stats_running
     assert analysis_window.metrics_state.sat_counts is None
+
+
+def test_analysis_host_shows_plugin_requirements(
+    analysis_window: FrameLabWindow,
+    process_events,
+    tmp_path: Path,
+    wait_for_dataset_load,
+) -> None:
+    _show_analysis_page(analysis_window, process_events)
+    plugin = analysis_window._current_analysis_plugin()
+
+    assert plugin is not None
+    assert analysis_window.analysis_run_button.text() == "Compute Trend"
+    assert "Missing requirements" in analysis_window.analysis_requirements_label.text()
+    assert "Static scan" in analysis_window.analysis_requirements_label.text()
+
+    folder = tmp_path / "analysis-requirements"
+    folder.mkdir()
+    imwrite(folder / "frame_0001.tiff", np.full((4, 4), 12, dtype=np.uint16))
+    analysis_window.folder_edit.setText(str(folder))
+    analysis_window.load_folder()
+    wait_for_dataset_load(analysis_window)
+    process_events()
+    analysis_window._refresh_analysis_summary()
+
+    label_text = analysis_window.analysis_requirements_label.text()
+    assert "Requirements ready" in label_text
+    assert "Optional not ready" in label_text
+    assert "Top-K" in label_text
+
+
+def test_analysis_plugin_run_button_executes_explicit_action(
+    analysis_window: FrameLabWindow,
+    process_events,
+    monkeypatch,
+    tmp_path: Path,
+    wait_for_dataset_load,
+) -> None:
+    folder = tmp_path / "analysis-explicit-run"
+    folder.mkdir()
+    imwrite(folder / "frame_0001.tiff", np.full((4, 4), 12, dtype=np.uint16))
+    analysis_window.folder_edit.setText(str(folder))
+    analysis_window.load_folder()
+    wait_for_dataset_load(analysis_window)
+    _show_analysis_page(analysis_window, process_events)
+    plugin = analysis_window._current_analysis_plugin()
+
+    assert plugin is not None
+    calls: list[object] = []
+    monkeypatch.setattr(
+        plugin,
+        "run_analysis",
+        lambda context: calls.append(context),
+    )
+
+    analysis_window.analysis_run_button.click()
+    process_events()
+
+    assert len(calls) == 1
+    assert calls[0].metric_family_status("static_scan").ready
+    assert analysis_window.analysis_run_progress.isVisible()
+    assert analysis_window.analysis_run_progress.format() == "Analysis complete"
+
+
+def test_analysis_plugin_action_requests_missing_required_metrics(
+    analysis_window: FrameLabWindow,
+    process_events,
+    monkeypatch,
+    tmp_path: Path,
+    wait_for_dataset_load,
+) -> None:
+    folder = tmp_path / "analysis-plugin-request"
+    folder.mkdir()
+    imwrite(folder / "frame_0001.tiff", np.full((4, 4), 12, dtype=np.uint16))
+    analysis_window.folder_edit.setText(str(folder))
+    analysis_window.load_folder()
+    wait_for_dataset_load(analysis_window)
+    _show_analysis_page(analysis_window, process_events)
+    plugin = analysis_window._current_analysis_plugin()
+
+    assert plugin is not None
+    plugin.required_metric_families = ("topk",)
+    plugin.optional_metric_families = ()
+    calls: list[object] = []
+    dynamic_calls: list[dict[str, object]] = []
+    monkeypatch.setattr(
+        plugin,
+        "run_analysis",
+        lambda context: calls.append(context),
+    )
+    monkeypatch.setattr(
+        analysis_window,
+        "_start_dynamic_stats_job",
+        lambda **kwargs: dynamic_calls.append(dict(kwargs)),
+    )
+
+    analysis_window._run_current_analysis_plugin()
+
+    assert calls == []
+    assert dynamic_calls
+    assert dynamic_calls[0]["requested_families"] == (MetricFamily.TOPK,)
+    assert analysis_window._pending_analysis_plugin_run_id == plugin.plugin_id
+    assert analysis_window.analysis_run_progress.isVisible()
+    assert analysis_window.analysis_run_progress.format() == "Computing requirements..."
 
 
 def test_custom_workflow_disables_analysis_context_delivery(

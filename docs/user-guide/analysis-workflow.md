@@ -17,7 +17,7 @@ Use the Analyze tab to convert per-image measurement results into higher-level c
 - gain relative to a reference condition
 - aggregated trends with uncertainty bars
 
-Analysis plugins do not create new raw measurements. They reorganize, aggregate, and visualize quantities that already exist in the measurement stage.
+Analysis plugins do not silently create new raw measurements during scan or context refresh. They reorganize, aggregate, and visualize measurement-stage quantities, and their explicit action may request missing metric families when the plugin declares them as requirements.
 
 ## Normal workflow
 
@@ -27,8 +27,10 @@ Analysis plugins do not create new raw measurements. They reorganize, aggregate,
 4. Configure the required measurement mode in **Measure**.
 5. Open **Analyze**.
 6. Select the desired **analysis plugin** from the page-level plugin selector.
-7. Configure the plugin-specific controls.
-8. Interpret the result table and plot together.
+7. Review the plugin requirement message. If a required metric is missing, use the plugin action button to request it explicitly or return to **Measure** to apply the needed settings first.
+8. Configure the plugin-specific controls.
+9. Click the plugin action button, such as **Compute Trend** or **Build Signature**.
+10. Interpret the result table and plot together.
 
 If no analysis plugin was enabled at startup, the **Analyze** tab is hidden.
 
@@ -37,7 +39,7 @@ If no analysis plugin was enabled at startup, the **Analyze** tab is hidden.
 The exact controls depend on the active analysis plugin, but the Analyze tab generally contains:
 
 - a top summary band with the active plugin and current dataset context
-- a left rail with the **Analysis Plugin** selector and plugin-specific controls
+- a left rail with the **Analysis Plugin** selector, plugin requirement status, explicit plugin action, and plugin-specific controls
 - a right-side workspace with the result table and plot
 - plugin-specific runtime actions in the **Plugins** menu
 
@@ -76,6 +78,8 @@ Analysis plugins consume a prepared `AnalysisContext`, not raw TIFF files. That 
 
 Because of that, analysis results are downstream of the Data and Measure choices. Changing metadata source, normalization, or background handling changes what the plugin receives.
 
+Context refresh is intentionally passive. Opening Analyze, switching plugins, or clicking **Refresh Context** updates the data snapshot delivered to the plugin, but it does not run the plugin's table/plot computation or add new metric work to the Data scan setup. Plugin computation starts from the plugin action button in the Analyze rail or an equivalent plugin menu action.
+
 ## Working with analysis plugins
 
 A good operating sequence is:
@@ -84,8 +88,9 @@ A good operating sequence is:
 2. confirm that the required measurement quantities exist
 3. select the plugin in the Analyze-page selector
 4. configure plugin-specific controls
-5. compare the plot against the result table
-6. use plugin runtime actions when needed
+5. click the plugin action button to compute or refresh the result
+6. compare the plot against the result table
+7. use plugin runtime actions when needed
 
 In practice, the table and the plot should be read together:
 
@@ -129,12 +134,27 @@ Action:
 - return to **Data** and **Measure** first
 - verify the upstream state before trusting the analysis result
 
+### Requirement message lists a missing metric
+
+Cause:
+
+- the dataset has not been scanned yet
+- or a required metric family was not requested
+- or Measure has pending inputs that need to be applied first
+
+Action:
+
+- scan the dataset if **Static scan** is missing
+- click the plugin action button when the message says the missing metrics can be computed
+- return to **Measure** and apply pending threshold, Top-K, or ROI settings when the message says inputs are pending
+
 ## What to verify before trusting an analysis result
 
 - the plugin was enabled intentionally
 - the selected dataset is correct
 - the metadata source is correct
 - the active measurement mode produced the metric the plugin needs
+- the plugin requirement message shows required metrics are ready
 - normalization and background state are the intended ones
 - the plotted result is consistent with the plugin's result table
 
