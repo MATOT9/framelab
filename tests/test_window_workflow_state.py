@@ -833,6 +833,63 @@ def test_workflow_tab_changes_coalesce_visibility_refresh_until_settled(
     wait_until(lambda: refresh_calls == [1], timeout_ms=1000)
 
 
+def test_workflow_tab_changes_do_not_start_compute_or_invalidate(
+    framelab_window_factory,
+    monkeypatch,
+    wait_until,
+) -> None:
+    window = framelab_window_factory(enabled_plugin_ids=())
+    calls: list[str] = []
+
+    monkeypatch.setattr(window, "load_folder", lambda *args, **kwargs: calls.append("load"))
+    monkeypatch.setattr(
+        window,
+        "_start_dynamic_stats_job",
+        lambda **kwargs: calls.append("dynamic"),
+    )
+    monkeypatch.setattr(window, "_clear_image_cache", lambda: calls.append("cache"))
+    monkeypatch.setattr(
+        window,
+        "_invalidate_analysis_context",
+        lambda **kwargs: calls.append("analysis"),
+    )
+
+    window.workflow_tabs.setCurrentIndex(1)
+
+    wait_until(lambda: not window._workflow_tab_settle_timer.isActive(), timeout_ms=1000)
+    assert calls == []
+
+
+def test_same_workflow_scope_revisit_does_not_invalidate_analysis_context(
+    tmp_path: Path,
+    framelab_window_factory,
+    monkeypatch,
+    wait_until,
+) -> None:
+    workspace_root, _session_root, _first, _second, _session_node_id, acq_node_id = (
+        _make_calibration_workspace_with_frames(tmp_path)
+    )
+    window = framelab_window_factory(enabled_plugin_ids=())
+    window.set_workflow_context(
+        str(workspace_root),
+        "calibration",
+        active_node_id=acq_node_id,
+    )
+    wait_until(lambda: not window._workflow_scope_refresh_timer.isActive(), timeout_ms=1000)
+
+    invalidations: list[dict[str, object]] = []
+    monkeypatch.setattr(
+        window,
+        "_invalidate_analysis_context",
+        lambda **kwargs: invalidations.append(dict(kwargs)),
+    )
+
+    window.set_active_workflow_node(acq_node_id)
+
+    wait_until(lambda: not window._workflow_scope_refresh_timer.isActive(), timeout_ms=1000)
+    assert invalidations == []
+
+
 def test_window_can_rename_acquisition_from_workflow_structure_tools(
     tmp_path: Path,
     framelab_window_factory,

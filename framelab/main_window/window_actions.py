@@ -465,6 +465,12 @@ class WindowActionsMixin:
                 msg += " | Loading dataset..."
         if metrics.is_stats_running:
             msg += " | Updating metrics..."
+        task_summary = ""
+        runtime_tasks = getattr(self, "runtime_tasks", None)
+        if runtime_tasks is not None:
+            task_summary = runtime_tasks.summary_text()
+        if task_summary:
+            msg += f" | Task: {task_summary}"
         failure_count = self._processing_failure_count()
         if failure_count > 0:
             msg += f" | Issues={failure_count}"

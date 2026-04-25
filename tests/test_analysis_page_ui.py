@@ -13,6 +13,7 @@ from tifffile import imwrite
 import framelab.plugins.analysis.iris_gain._plotting as plotting_module
 from framelab.metrics_state import MetricFamily
 from framelab.plugins.analysis.iris_gain._shared import _CurveSeries
+from framelab.runtime_tasks import RuntimeTaskState
 from framelab.ui_settings import DensityMode
 from framelab.window import FrameLabWindow
 
@@ -412,6 +413,32 @@ def test_visible_analysis_page_coalesces_multiple_context_invalidations(
     assert not analysis_window._analysis_context_dirty
 
 
+def test_analysis_tab_revisit_reuses_clean_context_cache(
+    analysis_window: FrameLabWindow,
+    process_events,
+    monkeypatch,
+) -> None:
+    _show_analysis_page(analysis_window, process_events)
+    analysis_window._update_analysis_context(force_push=True)
+    assert not analysis_window._analysis_context_dirty
+
+    build_calls = 0
+    original = analysis_window._build_analysis_context
+
+    def _wrapped():
+        nonlocal build_calls
+        build_calls += 1
+        return original()
+
+    monkeypatch.setattr(analysis_window, "_build_analysis_context", _wrapped)
+
+    analysis_window.workflow_tabs.setCurrentIndex(0)
+    process_events()
+    _show_analysis_page(analysis_window, process_events)
+
+    assert build_calls == 0
+
+
 def test_visible_analysis_page_scan_refresh_does_not_start_dynamic_metrics(
     analysis_window: FrameLabWindow,
     process_events,
@@ -501,6 +528,11 @@ def test_analysis_plugin_run_button_executes_explicit_action(
     assert calls[0].metric_family_status("static_scan").ready
     assert analysis_window.analysis_run_progress.isVisible()
     assert analysis_window.analysis_run_progress.format() == "Analysis complete"
+    latest = analysis_window.runtime_tasks.latest_task()
+    assert latest is not None
+    assert latest.task_id.startswith("analysis_plugin:")
+    assert latest.state == RuntimeTaskState.SUCCEEDED
+    assert latest.status == "Analysis complete"
 
 
 def test_analysis_plugin_action_requests_missing_required_metrics(
@@ -543,6 +575,11 @@ def test_analysis_plugin_action_requests_missing_required_metrics(
     assert analysis_window._pending_analysis_plugin_run_id == plugin.plugin_id
     assert analysis_window.analysis_run_progress.isVisible()
     assert analysis_window.analysis_run_progress.format() == "Computing requirements..."
+    latest = analysis_window.runtime_tasks.latest_task()
+    assert latest is not None
+    assert latest.task_id == f"analysis_plugin:{plugin.plugin_id}"
+    assert latest.state == RuntimeTaskState.RUNNING
+    assert latest.status == "Computing requirements"
 
 
 def test_custom_workflow_disables_analysis_context_delivery(

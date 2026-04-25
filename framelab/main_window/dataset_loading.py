@@ -39,6 +39,7 @@ from ..processing_failures import (
     failure_reason_from_exception,
     make_processing_failure,
 )
+from ..runtime_tasks import RuntimeTaskState
 from ..native import backend as native_backend
 from ..raw_decode import (
     RawDecodeResolverContext,
@@ -59,6 +60,12 @@ from ..workers import (
 
 class DatasetLoadingMixin:
     """Dataset lifecycle helpers for dataset discovery and image access."""
+
+    @staticmethod
+    def _dataset_load_task_id(job_id: int) -> str:
+        """Return the runtime-task id for one dataset load job."""
+
+        return f"dataset_load:{int(job_id)}"
 
     @staticmethod
     def _qthread_is_running(thread: QThread | None) -> bool:
@@ -687,6 +694,12 @@ class DatasetLoadingMixin:
                 pass
         if not thread_running:
             self._dispose_dataset_load_thread_objects(thread, worker)
+        if hasattr(self, "_finish_runtime_task"):
+            self._finish_runtime_task(
+                self._dataset_load_task_id(job_id),
+                state=RuntimeTaskState.CANCELLED,
+                status="Cancelled",
+            )
         self._update_dataset_load_ui(
             active=False,
             processed=0,
@@ -872,6 +885,15 @@ class DatasetLoadingMixin:
         )
         if after_load is not None:
             self._register_dataset_load_callback(job_id, after_load)
+        if hasattr(self, "_begin_runtime_task"):
+            self._begin_runtime_task(
+                self._dataset_load_task_id(job_id),
+                "Dataset load",
+                target=str(folder.name or folder),
+                status="Discovering image files",
+                progress_done=0,
+                progress_total=None,
+            )
 
         metadata_boundary_root = (
             self.dataset_state.scope_snapshot.root
@@ -972,6 +994,13 @@ class DatasetLoadingMixin:
             batch.min_non_zero,
             batch.max_pixels,
         )
+        if hasattr(self, "_update_runtime_task"):
+            self._update_runtime_task(
+                self._dataset_load_task_id(batch.job_id),
+                status="Loading images",
+                progress_done=batch.processed,
+                progress_total=batch.total,
+            )
         if hasattr(self, "_record_processing_failures") and batch.failures:
             self._record_processing_failures(
                 list(batch.failures),
@@ -992,6 +1021,13 @@ class DatasetLoadingMixin:
             return
         if int(progress.job_id) != int(getattr(self, "_dataset_load_job_id", -1)):
             return
+        if hasattr(self, "_update_runtime_task"):
+            self._update_runtime_task(
+                self._dataset_load_task_id(progress.job_id),
+                status=progress.message,
+                progress_done=progress.processed,
+                progress_total=progress.total,
+            )
         self._update_dataset_load_ui(
             active=True,
             processed=progress.processed,
@@ -1100,6 +1136,12 @@ class DatasetLoadingMixin:
             )
 
         if summary.no_files:
+            if hasattr(self, "_finish_runtime_task"):
+                self._finish_runtime_task(
+                    self._dataset_load_task_id(summary.job_id),
+                    state=RuntimeTaskState.FAILED,
+                    status="No supported images",
+                )
             self.dataset_state.clear_loaded_dataset()
             self.metrics_state.clear_dataset_state()
             self._refresh_table(update_analysis=False)
@@ -1127,6 +1169,12 @@ class DatasetLoadingMixin:
         self._apply_dataset_load_summary_payload(folder, summary)
 
         if summary.loaded_count <= 0 or not self.dataset_state.has_loaded_data():
+            if hasattr(self, "_finish_runtime_task"):
+                self._finish_runtime_task(
+                    self._dataset_load_task_id(summary.job_id),
+                    state=RuntimeTaskState.FAILED,
+                    status="Load failed",
+                )
             self.dataset_state.clear_loaded_dataset()
             self.metrics_state.clear_dataset_state()
             self._refresh_table(update_analysis=False)
@@ -1200,6 +1248,20 @@ class DatasetLoadingMixin:
             ):
                 self._apply_scan_metric_setup_after_scan()
 
+        if hasattr(self, "_finish_runtime_task"):
+            self._finish_runtime_task(
+                self._dataset_load_task_id(summary.job_id),
+                state=(
+                    RuntimeTaskState.CANCELLED
+                    if summary.was_cancelled
+                    else RuntimeTaskState.SUCCEEDED
+                ),
+                status=(
+                    "Cancelled"
+                    if summary.was_cancelled
+                    else f"Loaded {summary.loaded_count} images"
+                ),
+            )
         self._run_dataset_load_callbacks(summary)
         if workflow_notice:
             self.statusBar().showMessage(str(workflow_notice), 5000)
@@ -1210,6 +1272,12 @@ class DatasetLoadingMixin:
 
         if int(job_id) != int(getattr(self, "_dataset_load_job_id", -1)):
             return
+        if hasattr(self, "_finish_runtime_task"):
+            self._finish_runtime_task(
+                self._dataset_load_task_id(job_id),
+                state=RuntimeTaskState.FAILED,
+                status=message or "Load failed",
+            )
         self._cancel_pending_dataset_load_refresh()
         summary = DatasetLoadSummary(
             job_id=int(job_id),

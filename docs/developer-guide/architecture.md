@@ -202,6 +202,8 @@ These results are stored through `MetricsPipelineController`. Metric computation
 
 Metric readiness is tracked by named families rather than inferred only from array presence. Current families include static scan, saturation, low signal, Top-K, ROI, ROI Top-K, and background-applied status, with states such as not requested, pending inputs, computing, ready, stale, and failed. The scan setup stores which of those families are allowed to run at scan time, while Measure-page controls store pending UI values separately from the last applied compute inputs. Changing threshold, low-signal threshold, Top-K count, or Average Mode is a view/input edit until the relevant Apply action runs.
 
+Runtime jobs are also tracked separately from metric readiness. Dataset load, threshold update, Top-K/background metric compute, ROI apply, and explicit analysis/plugin actions publish compact task state with a label, state, optional progress, target, and short status. The main window owns that task state and shows it in the status bar; it is a visibility layer over existing worker lifecycles, not a second source of metric truth.
+
 ### Stage 4: analysis context build
 
 The Analyze workflow does not re-measure images. It packages the current dataset and metric controller state into an `AnalysisContext` through `framelab/analysis_context.py`. That context is built from:
@@ -214,6 +216,8 @@ The Analyze workflow does not re-measure images. It packages the current dataset
 
 The analysis plugin interface should be treated as a consumer of this prebuilt context, not as a place to reach back into raw host state ad hoc.
 
+Main workflow tab changes are treated as view events. Switching between Data, Measure, and Analyze can update layout, hints, and visible plugin context delivery when the context is already dirty, but it must not start scans, metric jobs, cache flushes, or new analysis invalidation by itself. Scope refreshes compare the effective scope context before invalidating analysis so revisiting the same scope remains cheap.
+
 ## State ownership
 
 A maintainer should treat state ownership as a first-class architectural rule.
@@ -225,6 +229,7 @@ The host window owns UI-shell and runtime-integration state, including:
 - image and corrected-image caches
 - active worker and thread references
 - plugin instances and currently enabled plugin ids
+- compact runtime task state for dataset, metric, ROI, and plugin jobs
 - column-visibility overrides and theme state
 - processing-failure banners and status text
 

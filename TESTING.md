@@ -96,6 +96,7 @@ Use the smoke build as a toolchain check, not as proof that the full app package
 
 - `scripts/tests.py` sets `QT_QPA_PLATFORM=offscreen` by default.
 - UI tests can still be slower or more fragile than pure state tests.
+- `tests/test_analysis_page_ui.py::test_analysis_plot_export_uses_shared_save_dialog_helper` currently may time out in the offscreen Qt environment; isolate it when validating Analysis-page changes.
 - Prefer state/controller tests for behavior that does not need real widget interaction.
 
 ## Choosing A Validation Set

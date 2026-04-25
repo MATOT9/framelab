@@ -27,6 +27,7 @@ from ..metadata_inspector_dock import MetadataInspectorDock
 from ..native import backend as native_backend
 from ..preferences_dialog import PreferencesDialog
 from ..plugins import PAGE_IDS, enabled_plugin_manifests, load_enabled_plugins
+from ..runtime_tasks import RuntimeTaskState
 from ..ui_settings import UiPreferences
 from ..workflow_explorer_dock import WorkflowExplorerDock
 from ..workflow_selection_dialog import WorkflowSelectionDialog
@@ -674,7 +675,130 @@ class WindowChromeMixin:
 
     def _build_status_bar(self) -> None:
         status = qtw.QStatusBar(self)
+        self.runtime_task_status_label = qtw.QLabel("", status)
+        self.runtime_task_status_label.setObjectName("MutedLabel")
+        self.runtime_task_status_label.setMinimumWidth(180)
+        self.runtime_task_status_label.setToolTip("Current background task.")
+        self.runtime_task_progress = qtw.QProgressBar(status)
+        self.runtime_task_progress.setTextVisible(False)
+        self.runtime_task_progress.setFixedWidth(110)
+        self.runtime_task_progress.setFixedHeight(12)
+        self.runtime_task_progress.setVisible(False)
+        status.addPermanentWidget(self.runtime_task_status_label, 0)
+        status.addPermanentWidget(self.runtime_task_progress, 0)
         self.setStatusBar(status)
+        self._refresh_runtime_task_status(update_status=False)
+
+    def _runtime_task_target_text(self, target: str) -> str:
+        """Return a compact target label for task status surfaces."""
+
+        text = " ".join(str(target or "").split())
+        if len(text) <= 42:
+            return text
+        return f"...{text[-39:]}"
+
+    def _refresh_runtime_task_status(self, *, update_status: bool = True) -> None:
+        """Refresh compact task widgets in the status bar."""
+
+        controller = getattr(self, "runtime_tasks", None)
+        label = getattr(self, "runtime_task_status_label", None)
+        progress = getattr(self, "runtime_task_progress", None)
+        if controller is None or label is None or progress is None:
+            return
+
+        active = controller.active_tasks()
+        task = active[0] if active else controller.latest_task()
+        if task is None:
+            label.setText("")
+            label.setToolTip("No background task.")
+            progress.setVisible(False)
+        else:
+            task_text = controller.task_text(task)
+            if active and len(active) > 1:
+                task_text = f"{task_text} (+{len(active) - 1})"
+            elif task.state not in {
+                RuntimeTaskState.QUEUED,
+                RuntimeTaskState.RUNNING,
+            }:
+                task_text = f"{task.label}: {task.state.value}"
+                if task.status:
+                    task_text = f"{task_text} - {task.status}"
+            label.setText(self._runtime_task_target_text(task_text))
+            label.setToolTip(task_text)
+            has_progress = (
+                task.state in {RuntimeTaskState.QUEUED, RuntimeTaskState.RUNNING}
+                and task.progress_done is not None
+                and task.progress_total is not None
+                and task.progress_total > 0
+            )
+            progress.setVisible(has_progress)
+            if has_progress:
+                progress.setRange(0, max(1, int(task.progress_total or 1)))
+                progress.setValue(min(int(task.progress_done or 0), progress.maximum()))
+
+        if update_status and hasattr(self, "_set_status"):
+            self._set_status()
+
+    def _begin_runtime_task(
+        self,
+        task_id: str,
+        label: str,
+        *,
+        target: str = "",
+        status: str = "",
+        progress_done: int | None = None,
+        progress_total: int | None = None,
+    ) -> None:
+        """Begin one host-owned runtime task and refresh status surfaces."""
+
+        controller = getattr(self, "runtime_tasks", None)
+        if controller is None:
+            return
+        controller.begin(
+            task_id,
+            label,
+            target=target,
+            status=status,
+            progress_done=progress_done,
+            progress_total=progress_total,
+        )
+        self._refresh_runtime_task_status()
+
+    def _update_runtime_task(
+        self,
+        task_id: str,
+        *,
+        status: str | None = None,
+        progress_done: int | None = None,
+        progress_total: int | None = None,
+    ) -> None:
+        """Update one host-owned runtime task and refresh status surfaces."""
+
+        controller = getattr(self, "runtime_tasks", None)
+        if controller is None:
+            return
+        controller.update(
+            task_id,
+            status=status,
+            progress_done=progress_done,
+            progress_total=progress_total,
+        )
+        self._refresh_runtime_task_status()
+
+    def _finish_runtime_task(
+        self,
+        task_id: str,
+        *,
+        state: RuntimeTaskState | str = RuntimeTaskState.SUCCEEDED,
+        status: str = "",
+    ) -> None:
+        """Finish one host-owned runtime task and refresh status surfaces."""
+
+        controller = getattr(self, "runtime_tasks", None)
+        if controller is None:
+            return
+        controller.finish(task_id, state=state, status=status)
+        self._refresh_runtime_task_status()
 
     def _build_workflow_explorer_dock(self) -> None:
         """Create the persistent left workflow explorer dock."""

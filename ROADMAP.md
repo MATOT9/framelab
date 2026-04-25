@@ -20,7 +20,7 @@ This roadmap is grounded in current repo docs, `TODO`, and inspected implementat
 
 ## Measurement And Analysis
 
-- Continue the staged-pipeline rollout with clearer task/status UX and cache cleanup now that broad dynamic metric refreshes have been narrowed into targeted metric-family jobs and analysis plugins have explicit requirement/run contracts.
+- Continue the staged-pipeline rollout by profiling remaining UI/rendering latency now that runtime jobs are visible and tab/scope revisits avoid hidden recompute or analysis invalidation unless applied inputs changed.
 - Add computer last boot time calculation where it belongs in metadata or runtime context.
 - Extend analysis and plugin coverage for dead pixel detection and spectral responsivity assessment.
 

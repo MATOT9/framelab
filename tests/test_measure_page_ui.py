@@ -12,6 +12,7 @@ from tifffile import imwrite
 
 import framelab.main_window.inspect_page as inspect_page_module
 from framelab.metrics_state import MetricFamily, MetricFamilyState, ScanMetricPreset
+from framelab.runtime_tasks import RuntimeTaskState
 from framelab.ui_primitives import StatusChip
 from framelab.ui_density import VisibilityPolicy
 from framelab.ui_settings import DensityMode
@@ -254,6 +255,52 @@ def test_measure_control_changes_are_pending_until_apply(
     assert measure_window.metrics_state.avg_count_value == 7
     assert measure_window.metrics_state.threshold_value == pytest.approx(65520.0)
     assert measure_window.metrics_state.low_signal_threshold_value == pytest.approx(0.0)
+
+
+def test_threshold_apply_updates_runtime_task_state(
+    tmp_path: Path,
+    measure_window: FrameLabWindow,
+    wait_for_dataset_load,
+    wait_until,
+) -> None:
+    dataset_root = _write_measure_dataset(tmp_path)
+    measure_window.folder_edit.setText(str(dataset_root))
+    measure_window.load_folder()
+    wait_for_dataset_load(measure_window)
+
+    measure_window.threshold_spin.setValue(100)
+    measure_window._apply_threshold_update()
+
+    wait_until(lambda: not measure_window.metrics_state.is_stats_running, timeout_ms=5000)
+    latest = measure_window.runtime_tasks.latest_task()
+    assert latest is not None
+    assert latest.task_id.startswith("dynamic_stats:")
+    assert latest.label == "Threshold update"
+    assert latest.state == RuntimeTaskState.SUCCEEDED
+
+
+def test_roi_apply_updates_runtime_task_state(
+    tmp_path: Path,
+    measure_window: FrameLabWindow,
+    wait_for_dataset_load,
+    wait_until,
+) -> None:
+    dataset_root = _write_measure_dataset(tmp_path)
+    measure_window.folder_edit.setText(str(dataset_root))
+    measure_window.load_folder()
+    wait_for_dataset_load(measure_window)
+    measure_window.avg_mode_combo.setCurrentIndex(
+        measure_window.avg_mode_combo.findData("roi"),
+    )
+    measure_window.metrics_state.roi_rect = (0, 0, 2, 2)
+    measure_window._start_roi_apply_job()
+
+    wait_until(lambda: not measure_window.metrics_state.is_roi_applying, timeout_ms=5000)
+    latest = measure_window.runtime_tasks.latest_task()
+    assert latest is not None
+    assert latest.task_id.startswith("roi_apply:")
+    assert latest.label == "ROI apply"
+    assert latest.state == RuntimeTaskState.SUCCEEDED
 
 
 def test_low_signal_threshold_does_not_add_preview_pixel_overlay(

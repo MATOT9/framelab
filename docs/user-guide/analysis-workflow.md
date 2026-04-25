@@ -80,6 +80,8 @@ Because of that, analysis results are downstream of the Data and Measure choices
 
 Context refresh is intentionally passive. Opening Analyze, switching plugins, or clicking **Refresh Context** updates the data snapshot delivered to the plugin, but it does not run the plugin's table/plot computation or add new metric work to the Data scan setup. Plugin computation starts from the plugin action button in the Analyze rail or an equivalent plugin menu action.
 
+Switching between Data, Measure, and Analyze is a view change. It does not rescan data, flush metric caches, or recompute metric families by itself. When an explicit plugin action needs missing requirements, the status bar shows that requirement compute and the plugin action as visible runtime tasks.
+
 ## Working with analysis plugins
 
 A good operating sequence is:

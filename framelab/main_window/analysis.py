@@ -20,6 +20,7 @@ from ..plugins.analysis import (
     AnalysisContext,
     AnalysisPlugin,
 )
+from ..runtime_tasks import RuntimeTaskState
 from ..ui_primitives import (
     ChipSpec,
     SummaryItem,
@@ -31,6 +32,12 @@ from ..widgets import install_large_splitter_handle_cursors
 
 class AnalysisPageMixin:
     """Analysis-page construction and active plugin coordination."""
+
+    @staticmethod
+    def _analysis_plugin_task_id(plugin_id: str) -> str:
+        """Return the runtime-task id for one analysis plugin action."""
+
+        return f"analysis_plugin:{plugin_id}"
 
     def _analysis_page_is_active(self) -> bool:
         """Return whether the Analyze tab is currently selected."""
@@ -658,6 +665,13 @@ class AnalysisPageMixin:
             requestable = self._analysis_requestable_families(missing)
             blockers = self._analysis_family_request_blockers(missing)
             if requestable:
+                if hasattr(self, "_begin_runtime_task"):
+                    self._begin_runtime_task(
+                        self._analysis_plugin_task_id(plugin.plugin_id),
+                        "Plugin compute",
+                        target=plugin.display_name,
+                        status="Computing requirements",
+                    )
                 self._begin_analysis_plugin_progress("Computing requirements...")
                 self._request_analysis_metric_families(requestable)
             elif any(
@@ -665,9 +679,22 @@ class AnalysisPageMixin:
                 == MetricFamilyState.COMPUTING
                 for family in missing
             ):
+                if hasattr(self, "_begin_runtime_task"):
+                    self._begin_runtime_task(
+                        self._analysis_plugin_task_id(plugin.plugin_id),
+                        "Plugin compute",
+                        target=plugin.display_name,
+                        status="Waiting for requirements",
+                    )
                 self._begin_analysis_plugin_progress("Computing requirements...")
             else:
                 self._pending_analysis_plugin_run_id = None
+                if hasattr(self, "_finish_runtime_task"):
+                    self._finish_runtime_task(
+                        self._analysis_plugin_task_id(plugin.plugin_id),
+                        state=RuntimeTaskState.FAILED,
+                        status="Requirements missing",
+                    )
                 self._complete_analysis_plugin_progress("Requirements missing")
                 if blockers and hasattr(self, "_set_status"):
                     self._set_status(blockers[0])
@@ -683,11 +710,24 @@ class AnalysisPageMixin:
     ) -> None:
         """Run one plugin action and update host progress state."""
 
+        if hasattr(self, "_begin_runtime_task"):
+            self._begin_runtime_task(
+                self._analysis_plugin_task_id(plugin.plugin_id),
+                "Plugin compute",
+                target=plugin.display_name,
+                status="Running analysis",
+            )
         self._begin_analysis_plugin_progress("Running analysis...")
         try:
             plugin.run_analysis(context)
         except Exception as exc:
             self._pending_analysis_plugin_run_id = None
+            if hasattr(self, "_finish_runtime_task"):
+                self._finish_runtime_task(
+                    self._analysis_plugin_task_id(plugin.plugin_id),
+                    state=RuntimeTaskState.FAILED,
+                    status=str(exc) or "Analysis failed",
+                )
             self._complete_analysis_plugin_progress("Analysis failed")
             if hasattr(self, "_show_error"):
                 self._show_error(
@@ -696,6 +736,12 @@ class AnalysisPageMixin:
                 )
             return
         self._pending_analysis_plugin_run_id = None
+        if hasattr(self, "_finish_runtime_task"):
+            self._finish_runtime_task(
+                self._analysis_plugin_task_id(plugin.plugin_id),
+                state=RuntimeTaskState.SUCCEEDED,
+                status="Analysis complete",
+            )
         self._complete_analysis_plugin_progress("Analysis complete")
         self._refresh_analysis_plugin_requirements_ui()
 
@@ -721,6 +767,12 @@ class AnalysisPageMixin:
             self._begin_analysis_plugin_progress("Computing requirements...")
             return
         self._pending_analysis_plugin_run_id = None
+        if hasattr(self, "_finish_runtime_task"):
+            self._finish_runtime_task(
+                self._analysis_plugin_task_id(plugin.plugin_id),
+                state=RuntimeTaskState.FAILED,
+                status="Requirements missing",
+            )
         self._complete_analysis_plugin_progress("Requirements missing")
 
     def _refresh_analysis_plugin_requirements_ui(self) -> None:

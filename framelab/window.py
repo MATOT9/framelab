@@ -57,6 +57,7 @@ from .plugins import (
     resolve_enabled_plugin_ids,
 )
 from .plugins.analysis import AnalysisPlugin
+from .runtime_tasks import RuntimeTaskController
 from .ui_density import AdaptiveUiContext, UiDensityResolver
 from .ui_settings import (
     RecentWorkflowEntry,
@@ -209,6 +210,7 @@ class FrameLabWindow(
 
         self.dataset_state = DatasetStateController()
         self.metrics_state = MetricsPipelineController()
+        self.runtime_tasks = RuntimeTaskController()
         self.analysis_context_controller = AnalysisContextController(
             self.dataset_state,
             self.metrics_state,
@@ -336,6 +338,7 @@ class FrameLabWindow(
             self._flush_pending_workflow_scope_refresh,
         )
         self._pending_workflow_scope_refresh_origin: str | None = None
+        self._pending_workflow_scope_refresh_invalidate_analysis = False
         self._scan_selected_scope_timer = QTimer(self)
         self._scan_selected_scope_timer.setSingleShot(True)
         self._scan_selected_scope_timer.setInterval(25)
@@ -466,14 +469,21 @@ class FrameLabWindow(
         *,
         update_folder_edit: bool,
         unload_mismatched_dataset: bool,
-    ) -> None:
+    ) -> bool:
         """Mirror the active workflow node into dataset-scope state."""
 
+        before_scope = self.dataset_state.scope_snapshot
+        before_metadata = dict(self.dataset_state.scope_effective_metadata)
+        before_sources = dict(self.dataset_state.scope_metadata_sources)
         active_node = self.workflow_state_controller.active_node()
         if active_node is None:
             if not getattr(self.workflow_state_controller, "profile_id", None):
                 self.dataset_state.clear_scope()
-            return
+            return (
+                before_scope != self.dataset_state.scope_snapshot
+                or before_metadata != self.dataset_state.scope_effective_metadata
+                or before_sources != self.dataset_state.scope_metadata_sources
+            )
 
         metadata_snapshot = self.metadata_state_controller.resolve_active_node_metadata()
         ancestry = self.workflow_state_controller.ancestry_for(active_node.node_id)
@@ -527,6 +537,11 @@ class FrameLabWindow(
             and hasattr(self, "unload_folder")
         ):
             self.unload_folder(clear_folder_edit=False)
+        return (
+            before_scope != self.dataset_state.scope_snapshot
+            or before_metadata != self.dataset_state.scope_effective_metadata
+            or before_sources != self.dataset_state.scope_metadata_sources
+        )
 
     def _refresh_manager_dialogs(
         self,
@@ -572,17 +587,26 @@ class FrameLabWindow(
         self,
         *,
         origin: str | None = None,
+        invalidate_analysis: bool = True,
     ) -> None:
         """Coalesce expensive scope-change refreshes onto the next event-loop turn."""
 
         self._pending_workflow_scope_refresh_origin = origin
+        self._pending_workflow_scope_refresh_invalidate_analysis = (
+            bool(self._pending_workflow_scope_refresh_invalidate_analysis)
+            or bool(invalidate_analysis)
+        )
         self._workflow_scope_refresh_timer.start()
 
     def _flush_pending_workflow_scope_refresh(self) -> None:
         """Apply deferred scope-change fanout after the UI selection settles."""
 
         origin = self._pending_workflow_scope_refresh_origin
+        invalidate_analysis = bool(
+            self._pending_workflow_scope_refresh_invalidate_analysis,
+        )
         self._pending_workflow_scope_refresh_origin = None
+        self._pending_workflow_scope_refresh_invalidate_analysis = False
 
         if hasattr(self, "_refresh_data_header_state"):
             self._refresh_data_header_state()
@@ -590,7 +614,7 @@ class FrameLabWindow(
             self._refresh_measure_header_state()
         if hasattr(self, "_refresh_analysis_summary"):
             self._refresh_analysis_summary()
-        if hasattr(self, "_invalidate_analysis_context"):
+        if invalidate_analysis and hasattr(self, "_invalidate_analysis_context"):
             self._invalidate_analysis_context(refresh_visible_plugin=True)
         elif hasattr(self, "_refresh_analysis_summary"):
             self._refresh_analysis_summary()
@@ -604,6 +628,7 @@ class FrameLabWindow(
         self,
         *,
         origin: str | None = None,
+        invalidate_analysis: bool = True,
     ) -> None:
         """Refresh cheap scope UI immediately, then defer heavier fanout."""
 
@@ -616,7 +641,10 @@ class FrameLabWindow(
                 refresh()
             except Exception:
                 pass
-        self._schedule_workflow_scope_refresh(origin=origin)
+        self._schedule_workflow_scope_refresh(
+            origin=origin,
+            invalidate_analysis=invalidate_analysis,
+        )
 
     def _request_scan_selected_scope(self) -> None:
         """Switch to Data, then start scanning after scope activation settles."""
@@ -856,13 +884,25 @@ class FrameLabWindow(
             extra_top_level=dict(existing_card.extra_top_level),
         )
 
-    def _set_manual_dataset_scope(self, folder: Path | None) -> None:
+    def _set_manual_dataset_scope(self, folder: Path | None) -> bool:
         """Store a manual folder-driven scope when workflow resolution is not used."""
 
+        before_scope = self.dataset_state.scope_snapshot
+        before_metadata = dict(self.dataset_state.scope_effective_metadata)
+        before_sources = dict(self.dataset_state.scope_metadata_sources)
         if folder is None:
             self.dataset_state.clear_scope()
-            return
+            return (
+                before_scope != self.dataset_state.scope_snapshot
+                or before_metadata != self.dataset_state.scope_effective_metadata
+                or before_sources != self.dataset_state.scope_metadata_sources
+            )
         self.dataset_state.set_manual_scope(folder)
+        return (
+            before_scope != self.dataset_state.scope_snapshot
+            or before_metadata != self.dataset_state.scope_effective_metadata
+            or before_sources != self.dataset_state.scope_metadata_sources
+        )
 
     def _try_switch_custom_workflow_context(
         self,
@@ -1101,8 +1141,10 @@ class FrameLabWindow(
                 if hasattr(self, "folder_edit") and self.folder_edit.text().strip()
                 else None
             )
-            self._set_manual_dataset_scope(current_folder)
-            self._notify_workflow_scope_changed()
+            scope_changed = self._set_manual_dataset_scope(current_folder)
+            self._notify_workflow_scope_changed(
+                invalidate_analysis=scope_changed,
+            )
             self._schedule_workspace_document_dirty_state_refresh()
             return None
 
@@ -1124,11 +1166,13 @@ class FrameLabWindow(
             load_result.active_node_id,
         )
         if hasattr(self, "folder_edit"):
-            self._sync_dataset_scope_to_workflow(
+            scope_changed = self._sync_dataset_scope_to_workflow(
                 update_folder_edit=True,
                 unload_mismatched_dataset=unload_mismatched_dataset,
             )
-        self._notify_workflow_scope_changed()
+        else:
+            scope_changed = False
+        self._notify_workflow_scope_changed(invalidate_analysis=scope_changed)
         self._schedule_workspace_document_dirty_state_refresh()
         return load_result.active_node_id
 
@@ -1154,12 +1198,16 @@ class FrameLabWindow(
                 self.workflow_state_controller.anchor_type_id,
                 self.ui_state_snapshot.workflow_active_node_id,
             )
+        scope_changed = False
         if sync_scope and hasattr(self, "folder_edit"):
-            self._sync_dataset_scope_to_workflow(
+            scope_changed = self._sync_dataset_scope_to_workflow(
                 update_folder_edit=True,
                 unload_mismatched_dataset=unload_mismatched_dataset,
             )
-        self._notify_workflow_scope_changed(origin=notify_origin)
+        self._notify_workflow_scope_changed(
+            origin=notify_origin,
+            invalidate_analysis=scope_changed,
+        )
         self._schedule_workspace_document_dirty_state_refresh()
         return self.ui_state_snapshot.workflow_active_node_id
 

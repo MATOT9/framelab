@@ -33,6 +33,8 @@ A reliable operating sequence is:
 
 The Data tab can precompute selected metric families through its **Scan Metrics** presets. Those presets do not change the active Average Mode or pending Measure controls; they only make the requested metric arrays available sooner. Measure remains the place where threshold, Top-K, ROI, background, normalization, and display decisions are reviewed and applied intentionally. Applying a Measure control starts only the family it needs, such as saturation for threshold, Top-K arrays for Top-K, and ROI or ROI + Top-K arrays for ROI apply.
 
+Longer-running Measure work is visible in the window status bar. Dataset loads, threshold updates, Top-K/background metric jobs, and ROI apply jobs report a compact task label, short status, and progress when available.
+
 ## Metrics Setup
 
 The **Metrics Setup** group determines how the app computes per-image values.

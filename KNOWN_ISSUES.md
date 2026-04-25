@@ -5,8 +5,9 @@ This file is the compact registry of known bugs, fragile zones, and incomplete a
 ## Active Bugs And Fragile Areas
 
 - The pytest suite needs refactoring to avoid stalls and very long runners.
+- `tests/test_analysis_page_ui.py::test_analysis_plot_export_uses_shared_save_dialog_helper` can time out under the current offscreen Qt test environment.
 - The Trials workflow profile folder structure and "create new" behavior are not yet reliable.
-- The app can still lag when changing workflow tabs under heavy preview or analysis work.
+- Workflow tab changes are view-only now, but the app can still lag under heavy preview or analysis rendering and needs profiling before broader UI-performance refactors.
 - Some badges or chips may disappear after changing active workflow scope.
 - The standalone build path has had permission errors when deleting `.pyd` files.
 - Workspace/preferences persistence was recently reshaped; keep verifying that session-like UI state is restored only from `.framelab` files while preferences remain in `config/preferences.ini`.
@@ -32,7 +33,7 @@ This file is the compact registry of known bugs, fragile zones, and incomplete a
 - Native backend SIMD support is planned.
 - Native backend LTO support is planned.
 - Native backend PGO support is planned.
-- UI tab-switch performance needs profiling before broad refactors.
+- UI tab-switch performance still needs profiling for rendering/layout costs now that tab switches no longer start hidden compute or analysis invalidation by themselves.
 
 ## Documentation Risks
 

@@ -12,6 +12,7 @@ from tifffile import imwrite
 
 import framelab.workers as workers_module
 from framelab.metrics_state import MetricFamily, MetricFamilyState, ScanMetricPreset
+from framelab.runtime_tasks import RuntimeTaskState
 
 
 pytestmark = [pytest.mark.ui, pytest.mark.core]
@@ -65,6 +66,32 @@ def test_default_scan_metric_setup_keeps_scan_static_only(
     assert dynamic_calls == []
     assert window.metrics_state.sat_counts is None
     assert window.metrics_state.avg_maxs is None
+
+
+def test_dataset_load_updates_runtime_task_state(
+    tmp_path: Path,
+    framelab_window_factory,
+    wait_for_dataset_load,
+) -> None:
+    dataset_root = _write_dataset(tmp_path / "runtime-task-load", 3)
+    window = framelab_window_factory(enabled_plugin_ids=())
+
+    window.folder_edit.setText(str(dataset_root))
+    window.load_folder()
+    started = window.runtime_tasks.latest_task()
+
+    assert started is not None
+    assert started.task_id.startswith("dataset_load:")
+    assert started.state == RuntimeTaskState.RUNNING
+
+    wait_for_dataset_load(window)
+
+    latest = window.runtime_tasks.latest_task()
+    assert latest is not None
+    assert latest.task_id == started.task_id
+    assert latest.state == RuntimeTaskState.SUCCEEDED
+    assert latest.status == "Loaded 3 images"
+    assert window.runtime_tasks.active_tasks() == ()
 
 
 def test_threshold_review_scan_preset_starts_threshold_job(

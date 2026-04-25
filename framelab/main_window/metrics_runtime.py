@@ -27,6 +27,7 @@ from ..metrics_state import (
 )
 from ..native import backend as native_backend
 from ..processing_failures import make_processing_failure
+from ..runtime_tasks import RuntimeTaskState
 from ..workers import DynamicStatsWorker, MetricComputeRequest, RoiApplyWorker
 
 
@@ -46,6 +47,32 @@ class MetricsRuntimeMixin:
         """Return whether one average mode depends on the selected ROI."""
 
         return mode in {"roi", "roi_topk"}
+
+    @staticmethod
+    def _dynamic_stats_task_id(job_id: int) -> str:
+        """Return the runtime-task id for one dynamic metric job."""
+
+        return f"dynamic_stats:{int(job_id)}"
+
+    @staticmethod
+    def _roi_apply_task_id(job_id: int) -> str:
+        """Return the runtime-task id for one ROI apply job."""
+
+        return f"roi_apply:{int(job_id)}"
+
+    @staticmethod
+    def _dynamic_task_label(requested: tuple[MetricFamily, ...]) -> str:
+        """Return a compact label for requested dynamic metric families."""
+
+        if requested == (MetricFamily.SATURATION,):
+            return "Threshold update"
+        if requested == (MetricFamily.TOPK,):
+            return "Top-K compute"
+        if MetricFamily.TOPK in requested:
+            return "Top-K compute"
+        if MetricFamily.BACKGROUND_APPLIED in requested:
+            return "Metric compute"
+        return "Metric compute"
 
     @staticmethod
     def _build_preview_rgb(
@@ -541,9 +568,16 @@ class MetricsRuntimeMixin:
         metrics = self.metrics_state
         thread = self._stats_thread
         worker = self._stats_worker
+        job_id = metrics.stats_job_id
         self._dynamic_cache_pending = None
         metrics.cancel_stats_job()
         self._stop_threshold_summary_animation()
+        if hasattr(self, "_finish_runtime_task"):
+            self._finish_runtime_task(
+                self._dynamic_stats_task_id(job_id),
+                state=RuntimeTaskState.CANCELLED,
+                status="Cancelled",
+            )
         if thread is None:
             return
         if worker is not None:
@@ -621,6 +655,15 @@ class MetricsRuntimeMixin:
             refresh_analysis=refresh_analysis,
             requested_families=requested,
         )
+        if hasattr(self, "_begin_runtime_task"):
+            self._begin_runtime_task(
+                self._dynamic_stats_task_id(job_id),
+                self._dynamic_task_label(requested),
+                target=f"{self.dataset_state.path_count()} images",
+                status="Checking cache",
+                progress_done=None,
+                progress_total=None,
+            )
         dataset = self.dataset_state
         identities, cached_payloads, signatures = self._cached_dynamic_payloads(
             requested,
@@ -641,6 +684,11 @@ class MetricsRuntimeMixin:
 
         if not missing_indices:
             self._dynamic_cache_pending = None
+            if hasattr(self, "_update_runtime_task"):
+                self._update_runtime_task(
+                    self._dynamic_stats_task_id(job_id),
+                    status="Loaded from cache",
+                )
             self._on_dynamic_stats_finished(
                 DynamicStatsResult(
                     job_id=job_id,
@@ -704,6 +752,11 @@ class MetricsRuntimeMixin:
             self._start_threshold_summary_animation()
         else:
             self._stop_threshold_summary_animation()
+        if hasattr(self, "_update_runtime_task"):
+            self._update_runtime_task(
+                self._dynamic_stats_task_id(job_id),
+                status=f"Computing {len(missing_indices)} missing",
+            )
         thread.start()
 
     def _on_dynamic_stats_finished(self, result: object) -> None:
@@ -725,6 +778,12 @@ class MetricsRuntimeMixin:
             )
         self._store_cached_dynamic_metrics(result)
         metrics.finish_stats_job()
+        if hasattr(self, "_finish_runtime_task"):
+            self._finish_runtime_task(
+                self._dynamic_stats_task_id(result.job_id),
+                state=RuntimeTaskState.SUCCEEDED,
+                status="Complete",
+            )
         self._stop_threshold_summary_animation()
         self._refresh_table(
             update_analysis=metrics.stats_refresh_analysis,
@@ -743,6 +802,12 @@ class MetricsRuntimeMixin:
         )
         self._dynamic_cache_pending = None
         metrics.finish_stats_job()
+        if hasattr(self, "_finish_runtime_task"):
+            self._finish_runtime_task(
+                self._dynamic_stats_task_id(job_id),
+                state=RuntimeTaskState.FAILED,
+                status=message or "Metric computation failed",
+            )
         if not requested:
             requested = (MetricFamily.SATURATION,)
         for family in requested:
@@ -776,7 +841,14 @@ class MetricsRuntimeMixin:
         thread = self._roi_apply_thread
         if thread is None:
             return
+        job_id = metrics.roi_apply_job_id
         metrics.cancel_roi_apply()
+        if hasattr(self, "_finish_runtime_task"):
+            self._finish_runtime_task(
+                self._roi_apply_task_id(job_id),
+                state=RuntimeTaskState.CANCELLED,
+                status="Cancelled",
+            )
         self._finish_roi_apply_ui()
         if thread.isRunning():
             thread.requestInterruption()
@@ -832,6 +904,15 @@ class MetricsRuntimeMixin:
             dataset.path_count(),
             requested_families=requested_roi_families,
         )
+        if hasattr(self, "_begin_runtime_task"):
+            self._begin_runtime_task(
+                self._roi_apply_task_id(job_id),
+                "ROI apply",
+                target=f"{dataset.path_count()} images",
+                status="Checking cache",
+                progress_done=0,
+                progress_total=dataset.path_count(),
+            )
         metrics.set_metric_family_state(MetricFamily.ROI, MetricFamilyState.COMPUTING)
         if include_topk:
             metrics.set_metric_family_state(
@@ -849,6 +930,13 @@ class MetricsRuntimeMixin:
             )
         signature_hash = self._roi_metric_signature_hash(mode_override=mode)
         if signature_hash is None:
+            if hasattr(self, "_finish_runtime_task"):
+                self._finish_runtime_task(
+                    self._roi_apply_task_id(job_id),
+                    state=RuntimeTaskState.FAILED,
+                    status="Missing ROI",
+                )
+            self._finish_roi_apply_ui()
             return
         identities, cached_payloads = self._cached_roi_payloads(signature_hash)
         (
@@ -869,6 +957,13 @@ class MetricsRuntimeMixin:
         )
         if not missing_indices:
             self._roi_cache_pending = None
+            if hasattr(self, "_update_runtime_task"):
+                self._update_runtime_task(
+                    self._roi_apply_task_id(job_id),
+                    status="Loaded from cache",
+                    progress_done=dataset.path_count(),
+                    progress_total=dataset.path_count(),
+                )
             self._on_roi_apply_finished(
                 RoiApplyResult(
                     job_id=job_id,
@@ -939,6 +1034,13 @@ class MetricsRuntimeMixin:
         self.roi_apply_progress.setVisible(True)
         self._update_average_controls()
         self._set_status("Applying ROI to all images...")
+        if hasattr(self, "_update_runtime_task"):
+            self._update_runtime_task(
+                self._roi_apply_task_id(job_id),
+                status=f"Computing {len(missing_indices)} missing",
+                progress_done=0,
+                progress_total=dataset.path_count(),
+            )
         thread.start()
 
     def _on_roi_apply_progress(self, done: int, total: int) -> None:
@@ -947,6 +1049,13 @@ class MetricsRuntimeMixin:
         if not metrics.is_roi_applying:
             return
         metrics.update_roi_apply_progress(done, total)
+        if hasattr(self, "_update_runtime_task"):
+            self._update_runtime_task(
+                self._roi_apply_task_id(metrics.roi_apply_job_id),
+                status="Applying ROI",
+                progress_done=metrics.roi_apply_done,
+                progress_total=metrics.roi_apply_total,
+            )
         self.roi_apply_progress.setRange(0, max(1, metrics.roi_apply_total))
         self.roi_apply_progress.setValue(
             min(metrics.roi_apply_done, metrics.roi_apply_total),
@@ -973,6 +1082,12 @@ class MetricsRuntimeMixin:
 
         means = np.asarray(result.means, dtype=np.float64)
         if result.valid_count <= 0 or not np.any(np.isfinite(means)):
+            if hasattr(self, "_finish_runtime_task"):
+                self._finish_runtime_task(
+                    self._roi_apply_task_id(result.job_id),
+                    state=RuntimeTaskState.FAILED,
+                    status="Invalid ROI",
+                )
             self._show_error(
                 "Invalid ROI",
                 "Draw a valid ROI before applying.",
@@ -981,6 +1096,12 @@ class MetricsRuntimeMixin:
             return
 
         self.metrics_state.apply_roi_result(result)
+        if hasattr(self, "_finish_runtime_task"):
+            self._finish_runtime_task(
+                self._roi_apply_task_id(result.job_id),
+                state=RuntimeTaskState.SUCCEEDED,
+                status="Complete",
+            )
         self._refresh_table()
         self._refresh_workspace_document_dirty_state()
         self._set_status("ROI applied to all images")
@@ -991,6 +1112,12 @@ class MetricsRuntimeMixin:
             return
         self._roi_cache_pending = None
         self._finish_roi_apply_ui()
+        if hasattr(self, "_finish_runtime_task"):
+            self._finish_runtime_task(
+                self._roi_apply_task_id(job_id),
+                state=RuntimeTaskState.CANCELLED,
+                status="Cancelled",
+            )
         self._set_status("ROI apply cancelled")
 
     def _on_roi_apply_failed(self, job_id: int, message: str) -> None:
@@ -1000,6 +1127,12 @@ class MetricsRuntimeMixin:
         mode = str((self._roi_cache_pending or {}).get("mode", "none"))
         self._roi_cache_pending = None
         self._finish_roi_apply_ui()
+        if hasattr(self, "_finish_runtime_task"):
+            self._finish_runtime_task(
+                self._roi_apply_task_id(job_id),
+                state=RuntimeTaskState.FAILED,
+                status=message or "ROI apply failed",
+            )
         self.metrics_state.set_metric_family_state(
             MetricFamily.ROI,
             MetricFamilyState.FAILED,
