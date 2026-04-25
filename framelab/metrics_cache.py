@@ -17,6 +17,9 @@ from .background import BackgroundConfig, BackgroundLibrary
 CACHE_SCHEMA_VERSION = 1
 STATIC_METRIC_KIND = "static_v1"
 DYNAMIC_METRIC_KIND = "dynamic_v1"
+SATURATION_METRIC_KIND = "saturation_v1"
+TOPK_METRIC_KIND = "topk_v1"
+BACKGROUND_METRIC_KIND = "background_v1"
 ROI_METRIC_KIND = "roi_v2"
 
 
@@ -248,6 +251,55 @@ def dynamic_metric_signature_hash(
             "mode": str(mode),
             "threshold_value": float(threshold_value),
             "avg_count_value": int(avg_count_value) if str(mode) == "topk" else None,
+            "background": background_payload,
+        },
+    )
+
+
+def saturation_metric_signature_hash(
+    *,
+    threshold_value: float,
+    background_payload: dict[str, Any],
+) -> str:
+    """Return the versioned signature for saturated-pixel counts."""
+
+    return _stable_hash(
+        {
+            "metric_kind": SATURATION_METRIC_KIND,
+            "cache_schema_version": CACHE_SCHEMA_VERSION,
+            "threshold_value": float(threshold_value),
+            "background": background_payload,
+        },
+    )
+
+
+def topk_metric_signature_hash(
+    *,
+    avg_count_value: int,
+    background_payload: dict[str, Any],
+) -> str:
+    """Return the versioned signature for global Top-K row metrics."""
+
+    return _stable_hash(
+        {
+            "metric_kind": TOPK_METRIC_KIND,
+            "cache_schema_version": CACHE_SCHEMA_VERSION,
+            "avg_count_value": int(avg_count_value),
+            "background": background_payload,
+        },
+    )
+
+
+def background_metric_signature_hash(
+    *,
+    background_payload: dict[str, Any],
+) -> str:
+    """Return the versioned signature for background-sensitive max/min state."""
+
+    return _stable_hash(
+        {
+            "metric_kind": BACKGROUND_METRIC_KIND,
+            "cache_schema_version": CACHE_SCHEMA_VERSION,
             "background": background_payload,
         },
     )

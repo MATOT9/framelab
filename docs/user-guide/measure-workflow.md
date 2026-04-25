@@ -31,7 +31,7 @@ A reliable operating sequence is:
 7. Decide intentionally whether normalization should be on or off.
 8. Review the table, preview, and histogram together before moving to **Analyze**.
 
-The Data tab can precompute selected metric families through its **Scan Metrics** presets. Those presets do not change the active Average Mode or pending Measure controls; they only make the requested metric arrays available sooner. Measure remains the place where threshold, Top-K, ROI, background, normalization, and display decisions are reviewed and applied intentionally.
+The Data tab can precompute selected metric families through its **Scan Metrics** presets. Those presets do not change the active Average Mode or pending Measure controls; they only make the requested metric arrays available sooner. Measure remains the place where threshold, Top-K, ROI, background, normalization, and display decisions are reviewed and applied intentionally. Applying a Measure control starts only the family it needs, such as saturation for threshold, Top-K arrays for Top-K, and ROI or ROI + Top-K arrays for ROI apply.
 
 ## Metrics Setup
 

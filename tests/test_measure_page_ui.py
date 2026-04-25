@@ -244,7 +244,13 @@ def test_measure_control_changes_are_pending_until_apply(
 
     measure_window._apply_topk_update()
 
-    assert dynamic_calls == [{"update_kind": "full", "refresh_analysis": True}]
+    assert dynamic_calls == [
+        {
+            "update_kind": "full",
+            "refresh_analysis": True,
+            "requested_families": (MetricFamily.TOPK,),
+        },
+    ]
     assert measure_window.metrics_state.avg_count_value == 7
     assert measure_window.metrics_state.threshold_value == pytest.approx(65520.0)
     assert measure_window.metrics_state.low_signal_threshold_value == pytest.approx(0.0)

@@ -9,7 +9,7 @@ import tifffile
 
 import framelab.workers as workers_module
 from framelab.background import BackgroundConfig, BackgroundLibrary
-from framelab.metrics_state import DynamicStatsResult, RoiApplyResult
+from framelab.metrics_state import DynamicStatsResult, MetricFamily, RoiApplyResult
 from framelab.raw_decode import RawDecodeSpec
 from framelab.workers import (
     DynamicStatsWorker,
@@ -134,7 +134,31 @@ def test_dynamic_worker_handles_k_equals_one_and_k_larger_than_pixel_count(
     assert tuple(result_big_k.failures) == ()
 
 
-def test_dynamic_worker_threshold_only_reuses_existing_static_and_topk_outputs(
+def test_dynamic_worker_topk_request_does_not_return_saturation_or_background(
+    qapp,
+    write_tiff,
+) -> None:
+    path = write_tiff("img.tif", np.array([[1, 2], [3, 4]], dtype=np.uint16))
+    worker = DynamicStatsWorker(
+        job_id=29,
+        paths=[path],
+        threshold_value=4,
+        mode="topk",
+        avg_count_value=2,
+        requested_families=(MetricFamily.TOPK,),
+    )
+
+    result = _run_dynamic_worker(worker)
+
+    assert result.sat_counts is None
+    assert result.max_pixels is None
+    assert result.min_non_zero is None
+    assert result.bg_applied_mask is None
+    assert result.requested_families == (MetricFamily.TOPK,)
+    np.testing.assert_allclose(result.avg_topk, np.array([3.5]))
+
+
+def test_dynamic_worker_threshold_only_returns_only_saturation_family(
     qapp,
     write_tiff,
 ) -> None:
@@ -156,12 +180,13 @@ def test_dynamic_worker_threshold_only_reuses_existing_static_and_topk_outputs(
     result = _run_dynamic_worker(worker)
 
     np.testing.assert_array_equal(result.sat_counts, np.array([2], dtype=np.int64))
-    np.testing.assert_allclose(result.avg_topk, np.array([12.5]))
-    np.testing.assert_allclose(result.avg_topk_std, np.array([1.25]))
-    np.testing.assert_allclose(result.avg_topk_sem, np.array([0.625]))
-    np.testing.assert_array_equal(result.max_pixels, np.array([99], dtype=np.int64))
-    np.testing.assert_array_equal(result.min_non_zero, np.array([7], dtype=np.int64))
-    np.testing.assert_array_equal(result.bg_applied_mask, np.array([True]))
+    assert result.avg_topk is None
+    assert result.avg_topk_std is None
+    assert result.avg_topk_sem is None
+    assert result.max_pixels is None
+    assert result.min_non_zero is None
+    assert result.bg_applied_mask is None
+    assert result.requested_families == (MetricFamily.SATURATION,)
     assert tuple(result.failures) == ()
 
 
@@ -332,7 +357,7 @@ def test_scan_single_static_image_marks_raw_source_kind_and_uses_shared_resolver
     assert compute_calls[0]["spec"].pixel_format == "mono8"
 
 
-def test_dynamic_worker_uses_backend_wrapper(
+def test_dynamic_worker_uses_targeted_reducers_without_dynamic_backend(
     qapp,
     write_tiff,
     monkeypatch,
@@ -342,14 +367,7 @@ def test_dynamic_worker_uses_backend_wrapper(
 
     def _fake_compute(image, **kwargs):
         calls.append(dict(kwargs))
-        return {
-            "sat_count": 13,
-            "min_non_zero": 5,
-            "max_pixel": 42,
-            "avg_topk": 11.5,
-            "avg_topk_std": 1.25,
-            "avg_topk_sem": 0.625,
-        }
+        raise AssertionError("broad dynamic backend should not be used")
 
     monkeypatch.setattr(
         workers_module.native_backend,
@@ -366,15 +384,13 @@ def test_dynamic_worker_uses_backend_wrapper(
     )
     result = _run_dynamic_worker(worker)
 
-    assert len(calls) == 1
-    assert calls[0]["source_kind"] == "tiff"
-    assert calls[0]["threshold_only"] is False
-    np.testing.assert_array_equal(result.sat_counts, np.array([13], dtype=np.int64))
-    np.testing.assert_array_equal(result.min_non_zero, np.array([5], dtype=np.int64))
-    np.testing.assert_array_equal(result.max_pixels, np.array([42], dtype=np.int64))
-    np.testing.assert_allclose(result.avg_topk, np.array([11.5]))
-    np.testing.assert_allclose(result.avg_topk_std, np.array([1.25]))
-    np.testing.assert_allclose(result.avg_topk_sem, np.array([0.625]))
+    assert calls == []
+    np.testing.assert_array_equal(result.sat_counts, np.array([1], dtype=np.int64))
+    np.testing.assert_array_equal(result.min_non_zero, np.array([1], dtype=np.int64))
+    np.testing.assert_array_equal(result.max_pixels, np.array([4], dtype=np.int64))
+    np.testing.assert_allclose(result.avg_topk, np.array([3.5]))
+    np.testing.assert_allclose(result.avg_topk_std, np.array([0.5]))
+    np.testing.assert_allclose(result.avg_topk_sem, np.array([0.5 / math.sqrt(2.0)]))
 
 
 def test_dynamic_worker_marks_raw_source_kind_and_uses_shared_resolver(
@@ -430,11 +446,8 @@ def test_dynamic_worker_marks_raw_source_kind_and_uses_shared_resolver(
     result = _run_dynamic_worker(worker)
 
     assert resolver_calls == [{"path": str(path), "context": None}]
-    assert len(compute_calls) == 1
-    assert compute_calls[0]["path"] == str(path)
-    assert compute_calls[0]["spec"].pixel_format == "mono8"
-    assert compute_calls[0]["mode"] == "topk"
-    np.testing.assert_array_equal(result.max_pixels, np.array([40], dtype=np.int64))
+    assert compute_calls == []
+    np.testing.assert_array_equal(result.max_pixels, np.array([0], dtype=np.int64))
 
 
 def test_roi_worker_computes_mean_std_and_sem(qapp, write_tiff) -> None:

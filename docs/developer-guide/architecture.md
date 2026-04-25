@@ -198,7 +198,7 @@ The Measure workflow can then explicitly compute per-image metrics such as:
 - elapsed time from filename UTC timestamps when present
 - background-match status
 
-These results are stored through `MetricsPipelineController`. Dynamic metric computation is delegated to worker classes in `framelab/workers.py` and orchestrated by `MetricsRuntimeMixin`, which applies worker results back into controller-owned state. Global Top-K uses the dynamic metrics path, while ROI-derived modes, including ROI + Top-K, use `RoiApplyWorker` so the Top-K population is selected inside the ROI.
+These results are stored through `MetricsPipelineController`. Metric computation is delegated to targeted worker requests in `framelab/workers.py` and orchestrated by `MetricsRuntimeMixin`, which applies only the requested result families back into controller-owned state. Saturation, global Top-K, and background-applied max/min state use explicit dynamic metric-family requests. ROI-derived modes, including ROI + Top-K, use `RoiApplyWorker` with explicit ROI family requests so the Top-K population is selected inside the ROI.
 
 Metric readiness is tracked by named families rather than inferred only from array presence. Current families include static scan, saturation, low signal, Top-K, ROI, ROI Top-K, and background-applied status, with states such as not requested, pending inputs, computing, ready, stale, and failed. The scan setup stores which of those families are allowed to run at scan time, while Measure-page controls store pending UI values separately from the last applied compute inputs. Changing threshold, low-signal threshold, Top-K count, or Average Mode is a view/input edit until the relevant Apply action runs.
 
@@ -314,8 +314,8 @@ This repo already uses worker threads for expensive per-dataset operations.
 
 ### Current asynchronous jobs
 
-- dynamic metric computation via `DynamicStatsWorker`
-- dataset-wide ROI and ROI + Top-K application via `RoiApplyWorker`
+- targeted saturation, Top-K, and background-sensitive metric computation via `DynamicStatsWorker` requests
+- dataset-wide ROI and ROI + Top-K application via explicit `RoiApplyWorker` requests
 
 ### Architectural rule
 

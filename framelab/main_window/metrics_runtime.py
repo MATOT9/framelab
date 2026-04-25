@@ -8,12 +8,16 @@ import numpy as np
 from PySide6.QtCore import QThread
 
 from ..metrics_cache import (
-    DYNAMIC_METRIC_KIND,
+    BACKGROUND_METRIC_KIND,
     ROI_METRIC_KIND,
+    SATURATION_METRIC_KIND,
+    TOPK_METRIC_KIND,
     MetricCacheWrite,
+    background_metric_signature_hash,
     background_signature_payload,
-    dynamic_metric_signature_hash,
     roi_metric_signature_hash,
+    saturation_metric_signature_hash,
+    topk_metric_signature_hash,
 )
 from ..metrics_state import (
     DynamicStatsResult,
@@ -23,7 +27,7 @@ from ..metrics_state import (
 )
 from ..native import backend as native_backend
 from ..processing_failures import make_processing_failure
-from ..workers import DynamicStatsWorker, RoiApplyWorker
+from ..workers import DynamicStatsWorker, MetricComputeRequest, RoiApplyWorker
 
 
 class MetricsRuntimeMixin:
@@ -135,17 +139,37 @@ class MetricsRuntimeMixin:
             workspace_root=getattr(workflow, "workspace_root", None),
         )
 
-    def _dynamic_metric_signature_hash(self, mode: str) -> str:
-        """Return cache signature for the current dynamic row-metric settings."""
+    def _dynamic_metric_family_signature_hash(self, family: MetricFamily) -> str:
+        """Return cache signature for one targeted dynamic metric family."""
 
         metrics = self.metrics_state
-        normalized_mode = self._dynamic_stats_mode_for_average_mode(mode)
-        return dynamic_metric_signature_hash(
-            mode=normalized_mode,
-            threshold_value=metrics.threshold_value,
-            avg_count_value=metrics.avg_count_value,
-            background_payload=self._background_signature_payload(),
-        )
+        background_payload = self._background_signature_payload()
+        if family == MetricFamily.SATURATION:
+            return saturation_metric_signature_hash(
+                threshold_value=metrics.threshold_value,
+                background_payload=background_payload,
+            )
+        if family == MetricFamily.TOPK:
+            return topk_metric_signature_hash(
+                avg_count_value=metrics.avg_count_value,
+                background_payload=background_payload,
+            )
+        if family == MetricFamily.BACKGROUND_APPLIED:
+            return background_metric_signature_hash(
+                background_payload=background_payload,
+            )
+        raise ValueError(f"Unsupported dynamic metric family: {family!r}")
+
+    def _dynamic_metric_family_kind(self, family: MetricFamily) -> str:
+        """Return cache metric kind for one targeted dynamic metric family."""
+
+        if family == MetricFamily.SATURATION:
+            return SATURATION_METRIC_KIND
+        if family == MetricFamily.TOPK:
+            return TOPK_METRIC_KIND
+        if family == MetricFamily.BACKGROUND_APPLIED:
+            return BACKGROUND_METRIC_KIND
+        raise ValueError(f"Unsupported dynamic metric family: {family!r}")
 
     def _roi_metric_signature_hash(
         self,
@@ -169,9 +193,13 @@ class MetricsRuntimeMixin:
 
     def _cached_dynamic_payloads(
         self,
-        signature_hash: str,
-    ) -> tuple[dict[str, object], dict[str, dict[str, object]]]:
-        """Load cached dynamic metric payloads for the current dataset."""
+        requested_families: tuple[MetricFamily, ...],
+    ) -> tuple[
+        dict[str, object],
+        dict[MetricFamily, dict[str, dict[str, object]]],
+        dict[MetricFamily, str],
+    ]:
+        """Load cached payloads for targeted dynamic metric families."""
 
         cache = getattr(self, "metrics_cache", None)
         dataset = self.dataset_state
@@ -179,14 +207,20 @@ class MetricsRuntimeMixin:
             [Path(path) for path in dataset.paths],
             dataset_root=dataset.dataset_root,
         )
+        signatures = {
+            family: self._dynamic_metric_family_signature_hash(family)
+            for family in requested_families
+        }
         if cache is None or not identities:
-            return (identities, {})
-        cached = cache.fetch_entries(
-            identities.values(),
-            metric_kind=DYNAMIC_METRIC_KIND,
-            signature_hash=signature_hash,
-        )
-        return (identities, cached)
+            return (identities, {}, signatures)
+        cached_by_family: dict[MetricFamily, dict[str, dict[str, object]]] = {}
+        for family, signature_hash in signatures.items():
+            cached_by_family[family] = cache.fetch_entries(
+                identities.values(),
+                metric_kind=self._dynamic_metric_family_kind(family),
+                signature_hash=signature_hash,
+            )
+        return (identities, cached_by_family, signatures)
 
     def _cached_roi_payloads(
         self,
@@ -212,123 +246,99 @@ class MetricsRuntimeMixin:
     def _prefill_dynamic_metric_arrays(
         self,
         *,
-        mode: str,
-        update_kind: str,
-        cached_payloads: dict[str, dict[str, object]],
+        requested_families: tuple[MetricFamily, ...],
+        cached_payloads: dict[MetricFamily, dict[str, dict[str, object]]],
     ) -> tuple[
-        np.ndarray,
         np.ndarray | None,
         np.ndarray | None,
         np.ndarray | None,
-        np.ndarray,
-        np.ndarray,
-        np.ndarray,
+        np.ndarray | None,
+        np.ndarray | None,
+        np.ndarray | None,
+        np.ndarray | None,
         list[int],
     ]:
-        """Build partially cached dynamic metric arrays and return miss indices."""
+        """Build partially cached targeted metric arrays and return miss indices."""
 
         dataset = self.dataset_state
         metrics = self.metrics_state
         n = dataset.path_count()
-        cached_sat_counts = np.zeros(n, dtype=np.int64)
-        cached_max_pixels = np.zeros(n, dtype=np.int64)
-        cached_min_non_zero = np.zeros(n, dtype=np.int64)
-        cached_bg_applied = np.zeros(n, dtype=bool)
-        cached_avg_topk = (
-            np.full(n, np.nan, dtype=np.float64)
-            if mode == "topk"
-            else None
-        )
-        cached_avg_topk_std = (
-            np.full(n, np.nan, dtype=np.float64)
-            if mode == "topk"
-            else None
-        )
-        cached_avg_topk_sem = (
-            np.full(n, np.nan, dtype=np.float64)
-            if mode == "topk"
-            else None
-        )
-        hit_indices: set[int] = set()
+        requested = set(requested_families)
+        missing_indices: set[int] = set()
+
+        sat_counts = (
+            np.asarray(metrics.sat_counts, dtype=np.int64).copy()
+            if metrics.sat_counts is not None and len(metrics.sat_counts) == n
+            else np.zeros(n, dtype=np.int64)
+        ) if MetricFamily.SATURATION in requested else None
+        avg_topk = (
+            np.asarray(metrics.avg_maxs, dtype=np.float64).copy()
+            if metrics.avg_maxs is not None and len(metrics.avg_maxs) == n
+            else np.full(n, np.nan, dtype=np.float64)
+        ) if MetricFamily.TOPK in requested else None
+        avg_topk_std = (
+            np.asarray(metrics.avg_maxs_std, dtype=np.float64).copy()
+            if metrics.avg_maxs_std is not None and len(metrics.avg_maxs_std) == n
+            else np.full(n, np.nan, dtype=np.float64)
+        ) if MetricFamily.TOPK in requested else None
+        avg_topk_sem = (
+            np.asarray(metrics.avg_maxs_sem, dtype=np.float64).copy()
+            if metrics.avg_maxs_sem is not None and len(metrics.avg_maxs_sem) == n
+            else np.full(n, np.nan, dtype=np.float64)
+        ) if MetricFamily.TOPK in requested else None
+        max_pixels = (
+            np.asarray(metrics.maxs, dtype=np.int64).copy()
+            if metrics.maxs is not None and len(metrics.maxs) == n
+            else np.zeros(n, dtype=np.int64)
+        ) if MetricFamily.BACKGROUND_APPLIED in requested else None
+        min_non_zero = (
+            np.asarray(metrics.min_non_zero, dtype=np.int64).copy()
+            if metrics.min_non_zero is not None and len(metrics.min_non_zero) == n
+            else np.zeros(n, dtype=np.int64)
+        ) if MetricFamily.BACKGROUND_APPLIED in requested else None
+        bg_applied = (
+            np.asarray(metrics.bg_applied_mask, dtype=bool).copy()
+            if metrics.bg_applied_mask is not None and len(metrics.bg_applied_mask) == n
+            else np.zeros(n, dtype=bool)
+        ) if MetricFamily.BACKGROUND_APPLIED in requested else None
+
         for index, path in enumerate(dataset.paths):
-            payload = cached_payloads.get(path)
-            if payload is None:
-                continue
-            hit_indices.add(index)
-            cached_sat_counts[index] = int(payload.get("sat_count", 0))
-            cached_max_pixels[index] = int(payload.get("max_pixel", 0))
-            cached_min_non_zero[index] = int(payload.get("min_non_zero", 0))
-            cached_bg_applied[index] = bool(payload.get("bg_applied", False))
-            if mode == "topk" and cached_avg_topk is not None:
-                cached_avg_topk[index] = float(payload.get("avg_topk", np.nan))
-                if cached_avg_topk_std is not None:
-                    cached_avg_topk_std[index] = float(
-                        payload.get("avg_topk_std", np.nan),
-                    )
-                if cached_avg_topk_sem is not None:
-                    cached_avg_topk_sem[index] = float(
-                        payload.get("avg_topk_sem", np.nan),
-                    )
+            for family in requested_families:
+                payload = cached_payloads.get(family, {}).get(path)
+                if payload is None:
+                    missing_indices.add(index)
+                    continue
+                if family == MetricFamily.SATURATION and sat_counts is not None:
+                    sat_counts[index] = int(payload.get("sat_count", 0))
+                elif family == MetricFamily.TOPK and avg_topk is not None:
+                    avg_topk[index] = float(payload.get("avg_topk", np.nan))
+                    if avg_topk_std is not None:
+                        avg_topk_std[index] = float(
+                            payload.get("avg_topk_std", np.nan),
+                        )
+                    if avg_topk_sem is not None:
+                        avg_topk_sem[index] = float(
+                            payload.get("avg_topk_sem", np.nan),
+                        )
+                elif (
+                    family == MetricFamily.BACKGROUND_APPLIED
+                    and max_pixels is not None
+                    and min_non_zero is not None
+                    and bg_applied is not None
+                ):
+                    max_pixels[index] = int(payload.get("max_pixel", 0))
+                    min_non_zero[index] = int(payload.get("min_non_zero", 0))
+                    bg_applied[index] = bool(payload.get("bg_applied", False))
 
-        if update_kind == "threshold_only":
-            existing_max_pixels = (
-                np.asarray(metrics.maxs, dtype=np.int64)
-                if metrics.maxs is not None and len(metrics.maxs) == n
-                else cached_max_pixels
-            )
-            existing_min_non_zero = (
-                np.asarray(metrics.min_non_zero, dtype=np.int64)
-                if metrics.min_non_zero is not None and len(metrics.min_non_zero) == n
-                else cached_min_non_zero
-            )
-            existing_bg_applied = (
-                np.asarray(metrics.bg_applied_mask, dtype=bool)
-                if metrics.bg_applied_mask is not None and len(metrics.bg_applied_mask) == n
-                else cached_bg_applied
-            )
-            existing_avg_topk = (
-                np.asarray(metrics.avg_maxs, dtype=np.float64)
-                if mode == "topk"
-                and metrics.avg_maxs is not None
-                and len(metrics.avg_maxs) == n
-                else cached_avg_topk
-            )
-            existing_avg_topk_std = (
-                np.asarray(metrics.avg_maxs_std, dtype=np.float64)
-                if mode == "topk"
-                and metrics.avg_maxs_std is not None
-                and len(metrics.avg_maxs_std) == n
-                else cached_avg_topk_std
-            )
-            existing_avg_topk_sem = (
-                np.asarray(metrics.avg_maxs_sem, dtype=np.float64)
-                if mode == "topk"
-                and metrics.avg_maxs_sem is not None
-                and len(metrics.avg_maxs_sem) == n
-                else cached_avg_topk_sem
-            )
-        else:
-            existing_max_pixels = cached_max_pixels
-            existing_min_non_zero = cached_min_non_zero
-            existing_bg_applied = cached_bg_applied
-            existing_avg_topk = cached_avg_topk
-            existing_avg_topk_std = cached_avg_topk_std
-            existing_avg_topk_sem = cached_avg_topk_sem
-
-        missing_indices = [
-            index
-            for index in range(n)
-            if index not in hit_indices
-        ]
         return (
-            cached_sat_counts,
-            existing_avg_topk,
-            existing_avg_topk_std,
-            existing_avg_topk_sem,
-            existing_max_pixels,
-            existing_min_non_zero,
-            existing_bg_applied,
-            missing_indices,
+            sat_counts,
+            avg_topk,
+            avg_topk_std,
+            avg_topk_sem,
+            max_pixels,
+            min_non_zero,
+            bg_applied,
+            sorted(missing_indices),
         )
 
     def _store_cached_dynamic_metrics(
@@ -346,31 +356,42 @@ class MetricsRuntimeMixin:
             return
         identities = pending["identities"]
         source_indices = pending["source_indices"]
-        mode = pending["mode"]
-        writes: list[MetricCacheWrite] = []
-        for index in source_indices:
-            path = self.dataset_state.paths[index]
-            identity = identities.get(path)
-            if identity is None:
-                continue
-            payload = {
-                "sat_count": int(result.sat_counts[index]),
-                "max_pixel": int(result.max_pixels[index]),
-                "min_non_zero": int(result.min_non_zero[index]),
-                "bg_applied": bool(result.bg_applied_mask[index]),
-            }
-            if mode == "topk" and result.avg_topk is not None:
-                payload["avg_topk"] = float(result.avg_topk[index])
-                if result.avg_topk_std is not None:
-                    payload["avg_topk_std"] = float(result.avg_topk_std[index])
-                if result.avg_topk_sem is not None:
-                    payload["avg_topk_sem"] = float(result.avg_topk_sem[index])
-            writes.append(MetricCacheWrite(identity=identity, payload=payload))
-        cache.store_entries(
-            writes,
-            metric_kind=DYNAMIC_METRIC_KIND,
-            signature_hash=str(pending["signature_hash"]),
-        )
+        signatures = pending["signatures"]
+        requested_families = tuple(pending["requested_families"])
+        for family in requested_families:
+            writes: list[MetricCacheWrite] = []
+            for index in source_indices:
+                path = self.dataset_state.paths[index]
+                identity = identities.get(path)
+                if identity is None:
+                    continue
+                if family == MetricFamily.SATURATION and result.sat_counts is not None:
+                    payload = {"sat_count": int(result.sat_counts[index])}
+                elif family == MetricFamily.TOPK and result.avg_topk is not None:
+                    payload = {"avg_topk": float(result.avg_topk[index])}
+                    if result.avg_topk_std is not None:
+                        payload["avg_topk_std"] = float(result.avg_topk_std[index])
+                    if result.avg_topk_sem is not None:
+                        payload["avg_topk_sem"] = float(result.avg_topk_sem[index])
+                elif (
+                    family == MetricFamily.BACKGROUND_APPLIED
+                    and result.max_pixels is not None
+                    and result.min_non_zero is not None
+                    and result.bg_applied_mask is not None
+                ):
+                    payload = {
+                        "max_pixel": int(result.max_pixels[index]),
+                        "min_non_zero": int(result.min_non_zero[index]),
+                        "bg_applied": bool(result.bg_applied_mask[index]),
+                    }
+                else:
+                    continue
+                writes.append(MetricCacheWrite(identity=identity, payload=payload))
+            cache.store_entries(
+                writes,
+                metric_kind=self._dynamic_metric_family_kind(family),
+                signature_hash=str(signatures[family]),
+            )
 
     def _prefill_roi_metric_arrays(
         self,
@@ -560,6 +581,7 @@ class MetricsRuntimeMixin:
         update_kind: str = "full",
         refresh_analysis: bool = True,
         mode_override: str | None = None,
+        requested_families: tuple[MetricFamily | str, ...] | None = None,
     ) -> None:
         """Start asynchronous dynamic metric computation for the dataset."""
         if not self._has_loaded_data():
@@ -567,21 +589,42 @@ class MetricsRuntimeMixin:
 
         metrics = self.metrics_state
         self._cancel_stats_job()
-        job_id = metrics.begin_stats_job(
-            update_kind=update_kind,
-            refresh_analysis=refresh_analysis,
-        )
         mode = self._dynamic_stats_mode_for_average_mode(
             mode_override or self._current_average_mode(),
         )
-        if update_kind == "full" and mode == "topk":
-            metrics.set_metric_family_state(
+        if requested_families is None:
+            if update_kind == "threshold_only":
+                requested = (MetricFamily.SATURATION,)
+            elif mode == "topk":
+                requested = (
+                    MetricFamily.SATURATION,
+                    MetricFamily.TOPK,
+                    MetricFamily.BACKGROUND_APPLIED,
+                )
+            else:
+                requested = (MetricFamily.SATURATION, MetricFamily.BACKGROUND_APPLIED)
+        else:
+            requested = metrics.normalize_metric_families(requested_families)
+        requested = tuple(
+            family
+            for family in requested
+            if family in {
+                MetricFamily.SATURATION,
                 MetricFamily.TOPK,
-                MetricFamilyState.COMPUTING,
-            )
+                MetricFamily.BACKGROUND_APPLIED,
+            }
+        )
+        if not requested:
+            return
+        job_id = metrics.begin_stats_job(
+            update_kind=update_kind,
+            refresh_analysis=refresh_analysis,
+            requested_families=requested,
+        )
         dataset = self.dataset_state
-        signature_hash = self._dynamic_metric_signature_hash(mode)
-        identities, cached_payloads = self._cached_dynamic_payloads(signature_hash)
+        identities, cached_payloads, signatures = self._cached_dynamic_payloads(
+            requested,
+        )
         (
             existing_sat_counts,
             existing_avg_topk,
@@ -592,8 +635,7 @@ class MetricsRuntimeMixin:
             existing_bg_applied,
             missing_indices,
         ) = self._prefill_dynamic_metric_arrays(
-            mode=mode,
-            update_kind=update_kind,
+            requested_families=requested,
             cached_payloads=cached_payloads,
         )
 
@@ -609,20 +651,20 @@ class MetricsRuntimeMixin:
                     max_pixels=existing_max_pixels,
                     min_non_zero=existing_min_non_zero,
                     bg_applied_mask=existing_bg_applied,
+                    requested_families=requested,
                 ),
             )
             return
 
         thread = QThread(self)
-        worker = DynamicStatsWorker(
+        request = MetricComputeRequest(
             job_id=job_id,
-            paths=[dataset.paths[index] for index in missing_indices],
-            source_indices=missing_indices,
+            paths=tuple(dataset.paths[index] for index in missing_indices),
+            source_indices=tuple(missing_indices),
             result_length=dataset.path_count(),
+            requested_families=requested,
             threshold_value=metrics.threshold_value,
-            mode=mode,
             avg_count_value=metrics.avg_count_value,
-            update_kind=update_kind,
             background_config=self._background_config_snapshot(),
             background_library=self._background_library_snapshot(),
             path_metadata=dict(dataset.path_metadata),
@@ -636,7 +678,9 @@ class MetricsRuntimeMixin:
             existing_max_pixels=existing_max_pixels,
             existing_min_non_zero=existing_min_non_zero,
             existing_bg_applied_mask=existing_bg_applied,
+            family_signatures={family.value: signatures[family] for family in requested},
         )
+        worker = DynamicStatsWorker.from_request(request)
         worker.moveToThread(thread)
 
         thread.started.connect(worker.run)
@@ -651,12 +695,12 @@ class MetricsRuntimeMixin:
         self._stats_thread = thread
         self._stats_worker = worker
         self._dynamic_cache_pending = {
-            "signature_hash": signature_hash,
             "identities": identities,
             "source_indices": missing_indices,
-            "mode": mode,
+            "requested_families": requested,
+            "signatures": signatures,
         }
-        if metrics.stats_update_kind == "threshold_only":
+        if requested == (MetricFamily.SATURATION,):
             self._start_threshold_summary_animation()
         else:
             self._stop_threshold_summary_animation()
@@ -694,27 +738,19 @@ class MetricsRuntimeMixin:
         metrics = self.metrics_state
         if job_id != metrics.stats_job_id:
             return
-        update_kind = metrics.stats_update_kind
-        mode = str((self._dynamic_cache_pending or {}).get("mode", "none"))
+        requested = tuple(
+            (self._dynamic_cache_pending or {}).get("requested_families", ()),
+        )
         self._dynamic_cache_pending = None
         metrics.finish_stats_job()
-        metrics.set_metric_family_state(
-            MetricFamily.SATURATION,
-            MetricFamilyState.FAILED,
-            message or "Unknown error",
-        )
-        if update_kind == "full":
+        if not requested:
+            requested = (MetricFamily.SATURATION,)
+        for family in requested:
             metrics.set_metric_family_state(
-                MetricFamily.BACKGROUND_APPLIED,
+                family,
                 MetricFamilyState.FAILED,
                 message or "Unknown error",
             )
-            if mode == "topk":
-                metrics.set_metric_family_state(
-                    MetricFamily.TOPK,
-                    MetricFamilyState.FAILED,
-                    message or "Unknown error",
-                )
         self._stop_threshold_summary_animation()
         self._update_background_status_label()
         self._set_status("Metric computation failed")
@@ -786,9 +822,18 @@ class MetricsRuntimeMixin:
             return
 
         dataset = self.dataset_state
-        job_id = metrics.begin_roi_apply(dataset.path_count())
+        include_topk = mode == "roi_topk"
+        requested_roi_families = (
+            (MetricFamily.ROI, MetricFamily.ROI_TOPK)
+            if include_topk
+            else (MetricFamily.ROI,)
+        )
+        job_id = metrics.begin_roi_apply(
+            dataset.path_count(),
+            requested_families=requested_roi_families,
+        )
         metrics.set_metric_family_state(MetricFamily.ROI, MetricFamilyState.COMPUTING)
-        if mode == "roi_topk":
+        if include_topk:
             metrics.set_metric_family_state(
                 MetricFamily.ROI_TOPK,
                 MetricFamilyState.COMPUTING,
@@ -806,7 +851,6 @@ class MetricsRuntimeMixin:
         if signature_hash is None:
             return
         identities, cached_payloads = self._cached_roi_payloads(signature_hash)
-        include_topk = mode == "roi_topk"
         (
             existing_maxs,
             existing_sums,
@@ -837,6 +881,7 @@ class MetricsRuntimeMixin:
                     topk_means=existing_topk_means,
                     topk_stds=existing_topk_stds,
                     topk_sems=existing_topk_sems,
+                    requested_families=requested_roi_families,
                 ),
             )
             return
@@ -855,6 +900,7 @@ class MetricsRuntimeMixin:
                 path_metadata_by_path=dict(dataset.path_metadata),
             ),
             topk_count=metrics.avg_count_value if include_topk else None,
+            requested_families=requested_roi_families,
             existing_maxs=existing_maxs,
             existing_sums=existing_sums,
             existing_means=existing_means,
@@ -885,6 +931,7 @@ class MetricsRuntimeMixin:
             "identities": identities,
             "source_indices": missing_indices,
             "mode": mode,
+            "requested_families": requested_roi_families,
         }
         self.roi_apply_progress.setRange(0, max(1, metrics.roi_apply_total))
         self.roi_apply_progress.setValue(0)
@@ -1006,7 +1053,7 @@ class MetricsRuntimeMixin:
         self._sync_column_menu_actions()
 
     def _apply_live_update(self) -> None:
-        """Refresh dynamic metrics using already-applied metric settings."""
+        """Refresh only background-sensitive metric families already in use."""
         if self._is_dataset_load_running():
             self._update_average_controls()
             self._set_status("Dataset load in progress")
@@ -1023,10 +1070,27 @@ class MetricsRuntimeMixin:
         metrics.prepare_for_live_update(path_count=count, mode=mode)
 
         self._refresh_table(update_analysis=False)
+        requested = [MetricFamily.BACKGROUND_APPLIED]
+        if (
+            metrics.sat_counts is not None
+            or metrics.metric_family_state(MetricFamily.SATURATION)
+            in {MetricFamilyState.READY, MetricFamilyState.STALE}
+        ):
+            requested.append(MetricFamily.SATURATION)
+        if (
+            metrics.avg_maxs is not None
+            or metrics.metric_family_state(MetricFamily.TOPK)
+            in {MetricFamilyState.READY, MetricFamilyState.STALE}
+        ):
+            requested.append(MetricFamily.TOPK)
         self._start_dynamic_stats_job(
             update_kind="full",
             refresh_analysis=True,
+            requested_families=tuple(requested),
         )
+        if metrics.roi_applied_to_all and metrics.roi_rect is not None:
+            roi_mode = "roi_topk" if metrics.roi_topk_means is not None else "roi"
+            self._start_roi_apply_job(mode_override=roi_mode)
         self._update_average_controls()
         self._refresh_workspace_document_dirty_state()
         self._set_status()
@@ -1049,6 +1113,10 @@ class MetricsRuntimeMixin:
                 update_kind="full",
                 refresh_analysis=True,
                 mode_override="topk",
+                requested_families=(
+                    MetricFamily.SATURATION,
+                    MetricFamily.TOPK,
+                ),
             )
             started_job = True
         elif MetricFamily.SATURATION in families:
@@ -1056,6 +1124,7 @@ class MetricsRuntimeMixin:
                 update_kind="threshold_only",
                 refresh_analysis=True,
                 mode_override="none",
+                requested_families=(MetricFamily.SATURATION,),
             )
             started_job = True
 
@@ -1132,6 +1201,7 @@ class MetricsRuntimeMixin:
             self._start_dynamic_stats_job(
                 update_kind="full",
                 refresh_analysis=True,
+                requested_families=(MetricFamily.TOPK,),
             )
             self._set_status("Updating Top-K metrics")
         elif mode == "roi_topk" and metrics.roi_rect is not None:
@@ -1181,6 +1251,7 @@ class MetricsRuntimeMixin:
         self._start_dynamic_stats_job(
             update_kind="threshold_only",
             refresh_analysis=False,
+            requested_families=(MetricFamily.SATURATION,),
         )
         self._update_average_controls()
         if (

@@ -15,6 +15,7 @@ from PySide6.QtCore import QObject, QThread, Signal
 from .background import (
     BackgroundConfig,
     BackgroundLibrary,
+    apply_background,
     select_reference,
     validate_reference_shape,
 )
@@ -27,7 +28,12 @@ from .metrics_cache import (
     STATIC_METRIC_KIND,
     static_metric_signature_hash,
 )
-from .metrics_state import DynamicStatsResult, RoiApplyResult
+from .metric_reducers import (
+    compute_min_non_zero_and_max,
+    compute_topk_stats_inplace,
+    count_at_or_above_threshold,
+)
+from .metrics_state import DynamicStatsResult, MetricFamily, RoiApplyResult
 from .processing_failures import (
     ProcessingFailure,
     failure_reason_from_exception,
@@ -283,8 +289,63 @@ def scan_single_static_image(
     return ((str(source_path), min_non_zero, max_pixel), ())
 
 
+@dataclass(frozen=True, slots=True)
+class MetricComputeRequest:
+    """Explicit targeted metric-compute request for one worker run."""
+
+    job_id: int
+    paths: tuple[str, ...]
+    source_indices: tuple[int, ...]
+    result_length: int
+    requested_families: tuple[MetricFamily, ...]
+    threshold_value: float
+    avg_count_value: int
+    background_config: BackgroundConfig | None = None
+    background_library: BackgroundLibrary | None = None
+    path_metadata: dict[str, dict[str, object]] = field(default_factory=dict)
+    raw_resolver_context: RawDecodeResolverContext | None = None
+    family_signatures: dict[str, str] = field(default_factory=dict)
+    existing_sat_counts: np.ndarray | None = None
+    existing_avg_topk: np.ndarray | None = None
+    existing_avg_topk_std: np.ndarray | None = None
+    existing_avg_topk_sem: np.ndarray | None = None
+    existing_max_pixels: np.ndarray | None = None
+    existing_min_non_zero: np.ndarray | None = None
+    existing_bg_applied_mask: np.ndarray | None = None
+
+
+def _normalize_metric_families(
+    families: tuple[MetricFamily | str, ...] | list[MetricFamily | str] | None,
+) -> tuple[MetricFamily, ...]:
+    selected: set[MetricFamily] = set()
+    for family in families or ():
+        try:
+            selected.add(
+                family
+                if isinstance(family, MetricFamily)
+                else MetricFamily(str(family))
+            )
+        except ValueError:
+            continue
+    return tuple(family for family in MetricFamily if family in selected)
+
+
+def _existing_or_default(
+    values: np.ndarray | None,
+    *,
+    length: int,
+    dtype: np.dtype,
+    fill_value: object,
+) -> np.ndarray:
+    if values is not None and len(values) == length:
+        return np.asarray(values, dtype=dtype).copy()
+    result = np.empty(length, dtype=dtype)
+    result.fill(fill_value)
+    return result
+
+
 class DynamicStatsWorker(QObject):
-    """Background worker that computes threshold and top-k statistics."""
+    """Background worker that computes requested metric families only."""
 
     finished = Signal(object)
     failed = Signal(int, str)
@@ -292,6 +353,7 @@ class DynamicStatsWorker(QObject):
     def __init__(
         self,
         *,
+        request: MetricComputeRequest | None = None,
         job_id: int,
         paths: list[str],
         source_indices: list[int] | None = None,
@@ -300,6 +362,8 @@ class DynamicStatsWorker(QObject):
         mode: str,
         avg_count_value: int,
         update_kind: str = "full",
+        requested_families: tuple[MetricFamily | str, ...] | None = None,
+        family_signatures: dict[str, str] | None = None,
         background_config: Optional[BackgroundConfig] = None,
         background_library: Optional[BackgroundLibrary] = None,
         path_metadata: Optional[dict[str, dict[str, object]]] = None,
@@ -313,31 +377,73 @@ class DynamicStatsWorker(QObject):
         existing_bg_applied_mask: Optional[np.ndarray] = None,
     ) -> None:
         super().__init__()
-        self._job_id = job_id
-        self._paths = paths
-        self._source_indices = list(source_indices or range(len(paths)))
-        self._result_length = (
-            int(result_length)
-            if result_length is not None
-            else len(self._source_indices)
+        if request is None:
+            source_index_tuple = tuple(source_indices or range(len(paths)))
+            result_len = (
+                int(result_length)
+                if result_length is not None
+                else len(source_index_tuple)
+            )
+            if requested_families is None:
+                if update_kind == "threshold_only":
+                    requested_families = (MetricFamily.SATURATION,)
+                elif mode == "topk":
+                    requested_families = (
+                        MetricFamily.SATURATION,
+                        MetricFamily.TOPK,
+                        MetricFamily.BACKGROUND_APPLIED,
+                    )
+                else:
+                    requested_families = (
+                        MetricFamily.SATURATION,
+                        MetricFamily.BACKGROUND_APPLIED,
+                    )
+            request = MetricComputeRequest(
+                job_id=job_id,
+                paths=tuple(paths),
+                source_indices=source_index_tuple,
+                result_length=result_len,
+                requested_families=_normalize_metric_families(requested_families),
+                threshold_value=float(threshold_value),
+                avg_count_value=int(avg_count_value),
+                background_config=background_config,
+                background_library=background_library,
+                path_metadata=dict(path_metadata or {}),
+                raw_resolver_context=raw_resolver_context,
+                family_signatures=dict(family_signatures or {}),
+                existing_sat_counts=existing_sat_counts,
+                existing_avg_topk=existing_avg_topk,
+                existing_avg_topk_std=existing_avg_topk_std,
+                existing_avg_topk_sem=existing_avg_topk_sem,
+                existing_max_pixels=existing_max_pixels,
+                existing_min_non_zero=existing_min_non_zero,
+                existing_bg_applied_mask=existing_bg_applied_mask,
+            )
+        self._request = request
+        self._job_id = int(request.job_id)
+        self._paths = list(request.paths)
+        self._source_indices = list(request.source_indices)
+        self._result_length = int(request.result_length)
+        self._requested_families = tuple(request.requested_families)
+        self._threshold_value = float(request.threshold_value)
+        self._avg_count_value = int(request.avg_count_value)
+        self._background_config = request.background_config
+        self._background_library = request.background_library
+        self._path_metadata = request.path_metadata
+        self._raw_resolver_context = request.raw_resolver_context
+
+    @classmethod
+    def from_request(cls, request: MetricComputeRequest) -> DynamicStatsWorker:
+        """Construct a worker from an explicit request payload."""
+
+        return cls(
+            request=request,
+            job_id=request.job_id,
+            paths=list(request.paths),
+            threshold_value=request.threshold_value,
+            mode="topk" if MetricFamily.TOPK in request.requested_families else "none",
+            avg_count_value=request.avg_count_value,
         )
-        self._threshold_value = threshold_value
-        self._mode = mode
-        self._avg_count_value = avg_count_value
-        self._update_kind = (
-            update_kind if update_kind in {"full", "threshold_only"} else "full"
-        )
-        self._background_config = background_config
-        self._background_library = background_library
-        self._path_metadata = path_metadata or {}
-        self._raw_resolver_context = raw_resolver_context
-        self._existing_sat_counts = existing_sat_counts
-        self._existing_avg_topk = existing_avg_topk
-        self._existing_avg_topk_std = existing_avg_topk_std
-        self._existing_avg_topk_sem = existing_avg_topk_sem
-        self._existing_max_pixels = existing_max_pixels
-        self._existing_min_non_zero = existing_min_non_zero
-        self._existing_bg_applied_mask = existing_bg_applied_mask
 
     def _reference_for_path(self, path: str) -> Optional[np.ndarray]:
         config = self._background_config
@@ -380,158 +486,126 @@ class DynamicStatsWorker(QObject):
         return (reference, True)
 
     def run(self) -> None:
-        """Compute dynamic per-image stats (threshold/top-k/static)."""
+        """Compute requested per-image metric families."""
         n = max(0, self._result_length)
         failures = []
-        threshold_only = self._update_kind == "threshold_only"
-
-        existing_sat_counts = (
-            np.asarray(self._existing_sat_counts, dtype=np.int64)
-            if self._existing_sat_counts is not None
-            else None
-        )
-        existing_max_pixels = (
-            np.asarray(self._existing_max_pixels, dtype=np.int64)
-            if self._existing_max_pixels is not None
-            else None
-        )
-        existing_min_non_zero = (
-            np.asarray(self._existing_min_non_zero, dtype=np.int64)
-            if self._existing_min_non_zero is not None
-            else None
-        )
-        existing_bg_applied_mask = (
-            np.asarray(self._existing_bg_applied_mask, dtype=bool)
-            if self._existing_bg_applied_mask is not None
-            else None
-        )
-        existing_avg_topk = (
-            np.asarray(self._existing_avg_topk, dtype=np.float64)
-            if self._existing_avg_topk is not None
-            else None
-        )
-        existing_avg_topk_std = (
-            np.asarray(self._existing_avg_topk_std, dtype=np.float64)
-            if self._existing_avg_topk_std is not None
-            else None
-        )
-        existing_avg_topk_sem = (
-            np.asarray(self._existing_avg_topk_sem, dtype=np.float64)
-            if self._existing_avg_topk_sem is not None
-            else None
-        )
-
-        if threshold_only:
-            static_ready = (
-                existing_max_pixels is not None
-                and len(existing_max_pixels) == n
-                and existing_min_non_zero is not None
-                and len(existing_min_non_zero) == n
-                and existing_bg_applied_mask is not None
-                and len(existing_bg_applied_mask) == n
-            )
-            topk_ready = (
-                self._mode != "topk"
-                or (
-                    existing_avg_topk is not None
-                    and len(existing_avg_topk) == n
-                    and existing_avg_topk_std is not None
-                    and len(existing_avg_topk_std) == n
-                    and existing_avg_topk_sem is not None
-                    and len(existing_avg_topk_sem) == n
-                )
-            )
-            threshold_only = static_ready and topk_ready
+        requested = set(self._requested_families)
+        request = self._request
 
         sat_counts = (
-            existing_sat_counts.copy()
-            if existing_sat_counts is not None and len(existing_sat_counts) == n
-            else np.zeros(n, dtype=np.int64)
+            _existing_or_default(
+                request.existing_sat_counts,
+                length=n,
+                dtype=np.int64,
+                fill_value=0,
+            )
+            if MetricFamily.SATURATION in requested
+            else None
         )
         max_pixels = (
-            existing_max_pixels.copy()
-            if existing_max_pixels is not None and len(existing_max_pixels) == n
-            else np.zeros(n, dtype=np.int64)
+            _existing_or_default(
+                request.existing_max_pixels,
+                length=n,
+                dtype=np.int64,
+                fill_value=0,
+            )
+            if MetricFamily.BACKGROUND_APPLIED in requested
+            else None
         )
         min_non_zero = (
-            existing_min_non_zero.copy()
-            if existing_min_non_zero is not None and len(existing_min_non_zero) == n
-            else np.zeros(n, dtype=np.int64)
+            _existing_or_default(
+                request.existing_min_non_zero,
+                length=n,
+                dtype=np.int64,
+                fill_value=0,
+            )
+            if MetricFamily.BACKGROUND_APPLIED in requested
+            else None
         )
         bg_applied_mask = (
-            existing_bg_applied_mask.copy()
-            if existing_bg_applied_mask is not None and len(existing_bg_applied_mask) == n
-            else np.zeros(n, dtype=bool)
+            _existing_or_default(
+                request.existing_bg_applied_mask,
+                length=n,
+                dtype=bool,
+                fill_value=False,
+            )
+            if MetricFamily.BACKGROUND_APPLIED in requested
+            else None
         )
-        avg_topk = None
-        avg_topk_std = None
-        avg_topk_sem = None
-        if self._mode == "topk":
-            if existing_avg_topk is not None and len(existing_avg_topk) == n:
-                avg_topk = existing_avg_topk.copy()
-                avg_topk_std = (
-                    existing_avg_topk_std.copy()
-                    if existing_avg_topk_std is not None
-                    and len(existing_avg_topk_std) == n
-                    else np.full(n, np.nan, dtype=np.float64)
-                )
-                avg_topk_sem = (
-                    existing_avg_topk_sem.copy()
-                    if existing_avg_topk_sem is not None
-                    and len(existing_avg_topk_sem) == n
-                    else np.full(n, np.nan, dtype=np.float64)
-                )
-            else:
-                avg_topk = np.full(n, np.nan, dtype=np.float64)
-                avg_topk_std = np.full(n, np.nan, dtype=np.float64)
-                avg_topk_sem = np.full(n, np.nan, dtype=np.float64)
+        avg_topk = (
+            _existing_or_default(
+                request.existing_avg_topk,
+                length=n,
+                dtype=np.float64,
+                fill_value=np.nan,
+            )
+            if MetricFamily.TOPK in requested
+            else None
+        )
+        avg_topk_std = (
+            _existing_or_default(
+                request.existing_avg_topk_std,
+                length=n,
+                dtype=np.float64,
+                fill_value=np.nan,
+            )
+            if MetricFamily.TOPK in requested
+            else None
+        )
+        avg_topk_sem = (
+            _existing_or_default(
+                request.existing_avg_topk_sem,
+                length=n,
+                dtype=np.float64,
+                fill_value=np.nan,
+            )
+            if MetricFamily.TOPK in requested
+            else None
+        )
         thread = QThread.currentThread()
         try:
             for source_index, path in zip(self._source_indices, self._paths):
                 if thread.isInterruptionRequested():
                     return
-                source_kind = source_kind_for_path(path)
                 try:
+                    img = read_2d_image(
+                        path,
+                        raw_spec_resolver=resolve_raw_decode_spec,
+                        raw_resolver_context=self._raw_resolver_context,
+                    )
+                    background_img, bg_applied = self._metric_background(path, img)
                     clip_negative = (
                         True
                         if self._background_config is None
                         else self._background_config.clip_negative
                     )
-                    if source_kind == "raw":
-                        spec = resolve_raw_decode_spec(
-                            path,
-                            context=self._raw_resolver_context,
+                    metric_img = (
+                        apply_background(img, background_img, clip_negative)
+                        if background_img is not None
+                        else img
+                    )
+                    if max_pixels is not None and min_non_zero is not None:
+                        min_value, max_value = compute_min_non_zero_and_max(metric_img)
+                        min_non_zero[source_index] = int(min_value)
+                        max_pixels[source_index] = int(max_value)
+                    if bg_applied_mask is not None:
+                        bg_applied_mask[source_index] = bool(bg_applied)
+                    if sat_counts is not None:
+                        sat_count, _scratch = count_at_or_above_threshold(
+                            metric_img,
+                            self._threshold_value,
                         )
-                        background_img, bg_applied = self._metric_background_for_shape(
-                            path,
-                            (spec.height, spec.width),
+                        sat_counts[source_index] = int(sat_count)
+                    if avg_topk is not None:
+                        mean, std, sem = compute_topk_stats_inplace(
+                            np.array(metric_img, copy=True, order="C"),
+                            self._avg_count_value,
                         )
-                        metric_result = native_backend.compute_raw_dynamic_metrics(
-                            path,
-                            spec=spec,
-                            threshold_value=self._threshold_value,
-                            mode="none" if threshold_only else self._mode,
-                            avg_count_value=self._avg_count_value,
-                            background=background_img,
-                            clip_negative=clip_negative,
-                        )
-                    else:
-                        img = read_2d_image(
-                            path,
-                            raw_spec_resolver=resolve_raw_decode_spec,
-                            raw_resolver_context=self._raw_resolver_context,
-                        )
-                        background_img, bg_applied = self._metric_background(path, img)
-                        metric_result = native_backend.compute_dynamic_metrics(
-                            img,
-                            threshold_value=self._threshold_value,
-                            mode=self._mode,
-                            avg_count_value=self._avg_count_value,
-                            background=background_img,
-                            clip_negative=clip_negative,
-                            threshold_only=threshold_only,
-                            source_kind=source_kind,
-                        )
+                        avg_topk[source_index] = float(mean)
+                        if avg_topk_std is not None:
+                            avg_topk_std[source_index] = float(std)
+                        if avg_topk_sem is not None:
+                            avg_topk_sem[source_index] = float(sem)
                 except Exception as exc:
                     failures.append(
                         make_processing_failure(
@@ -544,19 +618,6 @@ class DynamicStatsWorker(QObject):
                         ),
                     )
                     continue
-                if not threshold_only:
-                    bg_applied_mask[source_index] = bool(bg_applied)
-                    min_non_zero[source_index] = int(metric_result["min_non_zero"])
-                    max_pixels[source_index] = int(metric_result["max_pixel"])
-                sat_counts[source_index] = int(metric_result["sat_count"])
-
-                if threshold_only or avg_topk is None:
-                    continue
-                avg_topk[source_index] = float(metric_result["avg_topk"])
-                if avg_topk_std is not None:
-                    avg_topk_std[source_index] = float(metric_result["avg_topk_std"])
-                if avg_topk_sem is not None:
-                    avg_topk_sem[source_index] = float(metric_result["avg_topk_sem"])
         except Exception as exc:
             self.failed.emit(self._job_id, str(exc))
             return
@@ -571,6 +632,7 @@ class DynamicStatsWorker(QObject):
                 max_pixels=max_pixels,
                 min_non_zero=min_non_zero,
                 bg_applied_mask=bg_applied_mask,
+                requested_families=tuple(self._requested_families),
                 failures=tuple(failures),
             ),
         )
@@ -597,6 +659,7 @@ class RoiApplyWorker(QObject):
         path_metadata: Optional[dict[str, dict[str, object]]] = None,
         raw_resolver_context: RawDecodeResolverContext | None = None,
         topk_count: int | None = None,
+        requested_families: tuple[MetricFamily | str, ...] | None = None,
         existing_maxs: Optional[np.ndarray] = None,
         existing_sums: Optional[np.ndarray] = None,
         existing_means: Optional[np.ndarray] = None,
@@ -621,6 +684,14 @@ class RoiApplyWorker(QObject):
         self._path_metadata = path_metadata or {}
         self._raw_resolver_context = raw_resolver_context
         self._topk_count = None if topk_count is None else max(1, int(topk_count))
+        self._requested_families = _normalize_metric_families(
+            requested_families
+            or (
+                (MetricFamily.ROI, MetricFamily.ROI_TOPK)
+                if self._topk_count is not None
+                else (MetricFamily.ROI,)
+            ),
+        )
         self._existing_maxs = existing_maxs
         self._existing_sums = existing_sums
         self._existing_means = existing_means
@@ -820,6 +891,7 @@ class RoiApplyWorker(QObject):
                 topk_means=topk_means,
                 topk_stds=topk_stds,
                 topk_sems=topk_sems,
+                requested_families=tuple(self._requested_families),
                 failures=tuple(failures),
             ),
         )

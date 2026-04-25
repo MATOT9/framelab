@@ -10,10 +10,13 @@ from framelab.metrics_cache import (
     STATIC_METRIC_KIND,
     MetricCacheWrite,
     MetricsCache,
+    background_metric_signature_hash,
     background_signature_payload,
     build_file_metric_identity,
     dynamic_metric_signature_hash,
+    saturation_metric_signature_hash,
     static_metric_signature_hash,
+    topk_metric_signature_hash,
 )
 
 
@@ -143,3 +146,36 @@ def test_dynamic_metric_signature_changes_with_background_inputs(
 
     assert changed_config_hash != first_hash
     assert changed_file_hash != first_hash
+
+
+def test_targeted_metric_signatures_invalidate_only_relevant_inputs(
+    tmp_path: Path,
+) -> None:
+    payload = background_signature_payload(
+        BackgroundLibrary(),
+        BackgroundConfig(),
+        dataset_root=tmp_path,
+    )
+
+    saturation_a = saturation_metric_signature_hash(
+        threshold_value=10.0,
+        background_payload=payload,
+    )
+    saturation_b = saturation_metric_signature_hash(
+        threshold_value=11.0,
+        background_payload=payload,
+    )
+    topk_a = topk_metric_signature_hash(
+        avg_count_value=8,
+        background_payload=payload,
+    )
+    topk_b = topk_metric_signature_hash(
+        avg_count_value=9,
+        background_payload=payload,
+    )
+    background_a = background_metric_signature_hash(background_payload=payload)
+
+    assert saturation_a != saturation_b
+    assert topk_a != topk_b
+    assert saturation_a != topk_a
+    assert background_a not in {saturation_a, topk_a}

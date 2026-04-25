@@ -457,6 +457,7 @@ class DatasetLoadingMixin:
             for family in (
                 MetricFamily.BACKGROUND_APPLIED,
                 MetricFamily.SATURATION,
+                MetricFamily.LOW_SIGNAL,
                 MetricFamily.TOPK,
                 MetricFamily.ROI,
                 MetricFamily.ROI_TOPK,

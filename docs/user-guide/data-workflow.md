@@ -62,7 +62,7 @@ Fresh sessions use **Minimal**, which computes only static scan values and metad
 - minimum non-zero pixel
 - elapsed time from filename UTC timestamps when available
 
-Other presets are explicit requests for additional work after scan:
+Other presets are explicit requests for targeted additional work after scan:
 
 - **Threshold Review** computes saturation counts and enables low-signal review from the applied thresholds.
 - **Top-K Study** computes saturation counts and Top-K metrics using the applied Top-K count.
@@ -85,7 +85,7 @@ A scan is not only file listing. It is the dataset intake pass used by the rest 
 - rebuilds metadata for every loaded row using the active metadata-source mode
 - refreshes the Data table, Measure state, and downstream analysis context using only already available scan-time data
 
-Treat a scan as a dataset-state reset, not as a cosmetic refresh. Deeper measurement work such as saturation counts, Top-K values, and ROI dataset-wide metrics is either requested by the Data tab scan setup or started from the Measure controls when you explicitly apply those settings. Plugins remain consumers of available data; they do not silently expand scan-time work.
+Treat a scan as a dataset-state reset, not as a cosmetic refresh. Deeper measurement work such as saturation counts, Top-K values, and ROI dataset-wide metrics is either requested by the Data tab scan setup or started from the Measure controls when you explicitly apply those settings. Those requests are family-specific rather than broad dynamic refreshes. Plugins remain consumers of available data; they do not silently expand scan-time work.
 
 ## Skip rules
 

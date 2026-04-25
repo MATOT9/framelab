@@ -188,6 +188,33 @@ def test_apply_dynamic_stats_result_updates_latest_metric_snapshot(
     assert state.bg_unmatched_count == 1
 
 
+def test_apply_dynamic_stats_result_updates_only_requested_families(
+    state: MetricsPipelineController,
+) -> None:
+    state.sat_counts = np.array([9, 9], dtype=np.int64)
+    state.maxs = np.array([4, 5], dtype=np.int64)
+    state.min_non_zero = np.array([1, 1], dtype=np.int64)
+
+    result = DynamicStatsResult(
+        job_id=8,
+        avg_topk=np.array([3.5, 4.5]),
+        avg_topk_std=np.array([0.5, 0.25]),
+        avg_topk_sem=np.array([0.35, 0.18]),
+        requested_families=(MetricFamily.TOPK,),
+    )
+
+    state.apply_dynamic_stats_result(result, path_count=2)
+
+    np.testing.assert_array_equal(state.sat_counts, np.array([9, 9]))
+    np.testing.assert_array_equal(state.maxs, np.array([4, 5]))
+    np.testing.assert_allclose(state.avg_maxs, np.array([3.5, 4.5]))
+    assert state.metric_family_state(MetricFamily.TOPK) == MetricFamilyState.READY
+    assert (
+        state.metric_family_state(MetricFamily.SATURATION)
+        == MetricFamilyState.NOT_REQUESTED
+    )
+
+
 def test_apply_roi_result_updates_roi_arrays(state: MetricsPipelineController) -> None:
     result = RoiApplyResult(
         job_id=9,
@@ -228,6 +255,14 @@ def test_job_state_helpers_track_stats_and_roi_lifecycle(
     assert state.is_stats_running
     assert state.stats_update_kind == "threshold_only"
     assert not state.stats_refresh_analysis
+    assert (
+        state.metric_family_state(MetricFamily.SATURATION)
+        == MetricFamilyState.COMPUTING
+    )
+    assert (
+        state.metric_family_state(MetricFamily.BACKGROUND_APPLIED)
+        == MetricFamilyState.NOT_REQUESTED
+    )
 
     state.finish_stats_job()
     assert not state.is_stats_running
@@ -238,11 +273,19 @@ def test_job_state_helpers_track_stats_and_roi_lifecycle(
     assert not state.is_stats_running
     assert state.stats_update_kind == "idle"
 
-    roi_job_id = state.begin_roi_apply(13)
+    roi_job_id = state.begin_roi_apply(
+        13,
+        requested_families=(MetricFamily.ROI,),
+    )
     assert roi_job_id == 1
     assert state.is_roi_applying
     assert state.roi_apply_total == 13
     assert state.roi_apply_done == 0
+    assert state.metric_family_state(MetricFamily.ROI) == MetricFamilyState.COMPUTING
+    assert (
+        state.metric_family_state(MetricFamily.ROI_TOPK)
+        == MetricFamilyState.NOT_REQUESTED
+    )
 
     state.update_roi_apply_progress(4, 13)
     assert state.roi_apply_done == 4

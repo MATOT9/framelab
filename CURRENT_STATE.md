@@ -50,7 +50,7 @@ This is a compact snapshot of the current implementation. Prefer canonical docs 
 - Measure workflows cover thresholding, Top-K mean/std/SEM, ROI max/sum/mean/std/SEM, ROI + Top-K mean/std/SEM, normalization, background correction, exposure-normalized quantities such as `DN/ms`, and elapsed-time display for timestamped acquisition filenames.
 - Dataset scans populate the loaded paths, resolved metadata, elapsed-time metadata, and static quick-look metrics such as max pixel and minimum non-zero by default. The Data tab exposes scan-time metric presets; fresh sessions use the Minimal preset, while explicit non-minimal presets can request threshold, Top-K, or ROI-family work after scan without involving plugins.
 - Metric readiness is tracked by explicit families such as static scan, saturation, low signal, Top-K, ROI, ROI Top-K, and background-applied state. Measure controls keep pending UI values separate from applied compute inputs; threshold, low-signal, and Top-K changes do not recompute until their Apply actions run.
-- Dataset-wide metric work is coordinated through worker objects and applied back on the UI thread.
+- Dataset-wide metric work is coordinated through targeted worker requests and applied back on the UI thread. Threshold apply requests only saturation counts, Top-K apply requests only Top-K arrays, ROI apply requests only ROI or ROI + Top-K arrays, and background changes recompute only background-sensitive families already in use.
 - Analyze workflows consume an `AnalysisContext` built from dataset metadata, metric state, normalization state, and background state.
 - Analysis plugins should consume that context rather than reaching back into raw host state.
 

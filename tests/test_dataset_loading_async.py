@@ -92,6 +92,7 @@ def test_threshold_review_scan_preset_starts_threshold_job(
             "update_kind": "threshold_only",
             "refresh_analysis": True,
             "mode_override": "none",
+            "requested_families": (MetricFamily.SATURATION,),
         },
     ]
 
@@ -122,6 +123,7 @@ def test_topk_scan_preset_starts_topk_job_without_changing_measure_mode(
             "update_kind": "full",
             "refresh_analysis": True,
             "mode_override": "topk",
+            "requested_families": (MetricFamily.SATURATION, MetricFamily.TOPK),
         },
     ]
 

@@ -85,16 +85,17 @@ SCAN_METRIC_PRESET_FAMILIES = {
 
 @dataclass(frozen=True, slots=True)
 class DynamicStatsResult:
-    """Structured worker result for dynamic threshold/top-k statistics."""
+    """Structured worker result for targeted dynamic metric families."""
 
     job_id: int
-    sat_counts: np.ndarray
-    avg_topk: np.ndarray | None
-    avg_topk_std: np.ndarray | None
-    avg_topk_sem: np.ndarray | None
-    max_pixels: np.ndarray
-    min_non_zero: np.ndarray
-    bg_applied_mask: np.ndarray
+    sat_counts: np.ndarray | None = None
+    avg_topk: np.ndarray | None = None
+    avg_topk_std: np.ndarray | None = None
+    avg_topk_sem: np.ndarray | None = None
+    max_pixels: np.ndarray | None = None
+    min_non_zero: np.ndarray | None = None
+    bg_applied_mask: np.ndarray | None = None
+    requested_families: tuple[MetricFamily, ...] = ()
     failures: tuple[ProcessingFailure, ...] = ()
 
 
@@ -112,6 +113,7 @@ class RoiApplyResult:
     topk_means: np.ndarray | None = None
     topk_stds: np.ndarray | None = None
     topk_sems: np.ndarray | None = None
+    requested_families: tuple[MetricFamily, ...] = ()
     failures: tuple[ProcessingFailure, ...] = ()
 
 
@@ -220,6 +222,24 @@ class MetricsPipelineController:
                 family,
                 MetricFamilyState.NOT_REQUESTED,
             )
+
+    @staticmethod
+    def normalize_metric_families(
+        families: list[MetricFamily | str] | tuple[MetricFamily | str, ...] | None,
+    ) -> tuple[MetricFamily, ...]:
+        """Return known metric families with duplicates removed in enum order."""
+
+        selected: set[MetricFamily] = set()
+        for family in families or ():
+            try:
+                selected.add(
+                    family
+                    if isinstance(family, MetricFamily)
+                    else MetricFamily(str(family))
+                )
+            except ValueError:
+                continue
+        return tuple(family for family in MetricFamily if family in selected)
 
     @staticmethod
     def _scan_metric_preset(preset: ScanMetricPreset | str) -> ScanMetricPreset:
@@ -824,47 +844,76 @@ class MetricsPipelineController:
         path_count: int,
     ) -> None:
         """Store one structured dynamic-stats worker result."""
+        requested = self.normalize_metric_families(result.requested_families)
+        if not requested:
+            inferred: list[MetricFamily] = []
+            if result.sat_counts is not None:
+                inferred.append(MetricFamily.SATURATION)
+            if result.avg_topk is not None:
+                inferred.append(MetricFamily.TOPK)
+            if result.max_pixels is not None or result.bg_applied_mask is not None:
+                inferred.append(MetricFamily.BACKGROUND_APPLIED)
+            requested = self.normalize_metric_families(tuple(inferred))
+
         self._clear_loaded_dataset_buffer_state()
-        self.sat_counts = np.asarray(result.sat_counts, dtype=np.int64)
-        self.avg_maxs = (
-            np.asarray(result.avg_topk, dtype=np.float64)
-            if result.avg_topk is not None
-            else None
-        )
-        self.avg_maxs_std = (
-            np.asarray(result.avg_topk_std, dtype=np.float64)
-            if result.avg_topk_std is not None
-            else None
-        )
-        self.avg_maxs_sem = (
-            np.asarray(result.avg_topk_sem, dtype=np.float64)
-            if result.avg_topk_sem is not None
-            else None
-        )
-        self.maxs = np.asarray(result.max_pixels, dtype=np.int64)
-        self.min_non_zero = np.asarray(result.min_non_zero, dtype=np.int64)
-        self.bg_applied_mask = np.asarray(result.bg_applied_mask, dtype=bool)
-        self.bg_total_count = max(0, int(path_count))
-        self.bg_unmatched_count = int(
-            self.bg_total_count - np.count_nonzero(self.bg_applied_mask),
-        )
+        if MetricFamily.SATURATION in requested and result.sat_counts is not None:
+            self.sat_counts = np.asarray(result.sat_counts, dtype=np.int64)
+        if MetricFamily.TOPK in requested and result.avg_topk is not None:
+            self.avg_maxs = np.asarray(result.avg_topk, dtype=np.float64)
+            self.avg_maxs_std = (
+                np.asarray(result.avg_topk_std, dtype=np.float64)
+                if result.avg_topk_std is not None
+                else np.full(max(0, int(path_count)), np.nan, dtype=np.float64)
+            )
+            self.avg_maxs_sem = (
+                np.asarray(result.avg_topk_sem, dtype=np.float64)
+                if result.avg_topk_sem is not None
+                else np.full(max(0, int(path_count)), np.nan, dtype=np.float64)
+            )
+        if (
+            MetricFamily.BACKGROUND_APPLIED in requested
+            and result.max_pixels is not None
+            and result.min_non_zero is not None
+            and result.bg_applied_mask is not None
+        ):
+            self.maxs = np.asarray(result.max_pixels, dtype=np.int64)
+            self.min_non_zero = np.asarray(result.min_non_zero, dtype=np.int64)
+            self.bg_applied_mask = np.asarray(result.bg_applied_mask, dtype=bool)
+            self.bg_total_count = max(0, int(path_count))
+            self.bg_unmatched_count = int(
+                self.bg_total_count - np.count_nonzero(self.bg_applied_mask),
+            )
         self.set_metric_family_state(
             MetricFamily.STATIC_SCAN,
             MetricFamilyState.READY,
         )
-        self.set_metric_family_state(
-            MetricFamily.SATURATION,
-            (
-                MetricFamilyState.PENDING_INPUTS
-                if self.threshold_inputs_pending()
-                else MetricFamilyState.READY
-            ),
-        )
-        self.set_metric_family_state(
-            MetricFamily.BACKGROUND_APPLIED,
-            MetricFamilyState.READY,
-        )
-        if self.avg_maxs is not None:
+        if MetricFamily.SATURATION in requested:
+            self.set_metric_family_state(
+                MetricFamily.SATURATION,
+                (
+                    MetricFamilyState.PENDING_INPUTS
+                    if self.threshold_inputs_pending()
+                    else MetricFamilyState.READY
+                ),
+            )
+        if MetricFamily.BACKGROUND_APPLIED in requested:
+            self.set_metric_family_state(
+                MetricFamily.BACKGROUND_APPLIED,
+                MetricFamilyState.READY,
+            )
+            self.set_metric_family_state(
+                MetricFamily.LOW_SIGNAL,
+                (
+                    MetricFamilyState.PENDING_INPUTS
+                    if self.low_signal_inputs_pending()
+                    else (
+                        MetricFamilyState.READY
+                        if self.low_signal_threshold_value > 0.0
+                        else MetricFamilyState.NOT_REQUESTED
+                    )
+                ),
+            )
+        if MetricFamily.TOPK in requested:
             self.set_metric_family_state(
                 MetricFamily.TOPK,
                 (
@@ -876,6 +925,13 @@ class MetricsPipelineController:
 
     def apply_roi_result(self, result: RoiApplyResult) -> None:
         """Store one structured ROI-apply worker result."""
+        requested = self.normalize_metric_families(result.requested_families)
+        if not requested:
+            requested = (
+                (MetricFamily.ROI, MetricFamily.ROI_TOPK)
+                if result.topk_means is not None
+                else (MetricFamily.ROI,)
+            )
         self._clear_loaded_dataset_buffer_state()
         self.roi_applied_to_all = True
         self.roi_maxs = np.asarray(result.maxs, dtype=np.float64)
@@ -898,22 +954,29 @@ class MetricsPipelineController:
             if result.topk_sems is not None
             else None
         )
-        self.set_metric_family_state(
-            MetricFamily.ROI,
-            MetricFamilyState.READY,
-        )
-        self.set_metric_family_state(
-            MetricFamily.ROI_TOPK,
-            (
-                MetricFamilyState.PENDING_INPUTS
-                if self.topk_inputs_pending()
-                else (
-                    MetricFamilyState.READY
-                    if self.roi_topk_means is not None
+        if MetricFamily.ROI in requested:
+            self.set_metric_family_state(
+                MetricFamily.ROI,
+                MetricFamilyState.READY,
+            )
+        if MetricFamily.ROI_TOPK in requested:
+            self.set_metric_family_state(
+                MetricFamily.ROI_TOPK,
+                (
+                    MetricFamilyState.PENDING_INPUTS
+                    if self.topk_inputs_pending()
+                    else MetricFamilyState.READY
+                ),
+            )
+        elif self.metric_family_state(MetricFamily.ROI_TOPK) == MetricFamilyState.COMPUTING:
+            self.set_metric_family_state(
+                MetricFamily.ROI_TOPK,
+                (
+                    MetricFamilyState.PENDING_INPUTS
+                    if self.topk_inputs_pending()
                     else MetricFamilyState.NOT_REQUESTED
-                )
-            ),
-        )
+                ),
+            )
 
     def low_signal_mask(
         self,
@@ -947,6 +1010,7 @@ class MetricsPipelineController:
         *,
         update_kind: str,
         refresh_analysis: bool,
+        requested_families: tuple[MetricFamily | str, ...] | None = None,
     ) -> int:
         """Advance and record one in-flight dynamic-stats job."""
         self.stats_job_id += 1
@@ -955,13 +1019,17 @@ class MetricsPipelineController:
         )
         self.stats_refresh_analysis = bool(refresh_analysis)
         self.is_stats_running = True
-        self.set_metric_family_state(
-            MetricFamily.SATURATION,
-            MetricFamilyState.COMPUTING,
+        requested = self.normalize_metric_families(
+            requested_families
+            or (
+                (MetricFamily.SATURATION,)
+                if self.stats_update_kind == "threshold_only"
+                else (MetricFamily.SATURATION, MetricFamily.BACKGROUND_APPLIED)
+            ),
         )
-        if self.stats_update_kind == "full":
+        for family in requested:
             self.set_metric_family_state(
-                MetricFamily.BACKGROUND_APPLIED,
+                family,
                 MetricFamilyState.COMPUTING,
             )
         return self.stats_job_id
@@ -979,16 +1047,23 @@ class MetricsPipelineController:
         self.finish_stats_job()
         return self.stats_job_id
 
-    def begin_roi_apply(self, total: int) -> int:
+    def begin_roi_apply(
+        self,
+        total: int,
+        *,
+        requested_families: tuple[MetricFamily | str, ...] | None = None,
+    ) -> int:
         """Advance and record one in-flight dataset-wide ROI apply job."""
         self.roi_apply_job_id += 1
         self.is_roi_applying = True
         self.roi_apply_done = 0
         self.roi_apply_total = max(0, int(total))
-        self.set_metric_family_state(MetricFamily.ROI, MetricFamilyState.COMPUTING)
-        if self.roi_rect is not None:
+        requested = self.normalize_metric_families(
+            requested_families or (MetricFamily.ROI,),
+        )
+        for family in requested:
             self.set_metric_family_state(
-                MetricFamily.ROI_TOPK,
+                family,
                 MetricFamilyState.COMPUTING,
             )
         return self.roi_apply_job_id
