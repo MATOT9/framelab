@@ -20,7 +20,7 @@ This roadmap is grounded in current repo docs, `TODO`, and inspected implementat
 
 ## Measurement And Analysis
 
-- Continue the staged-pipeline rollout by profiling remaining UI/rendering latency now that runtime jobs are visible and tab/scope revisits avoid hidden scan, metadata rebuild, recompute, or analysis invalidation unless applied inputs changed.
+- Continue the staged-pipeline rollout by profiling remaining UI/rendering latency now that runtime jobs are visible and tab/scope revisits avoid hidden scan, metadata rebuild, recompute, or analysis invalidation unless applied inputs changed, and Event Signature presentation-only reruns reuse prepared records.
 - Add computer last boot time calculation where it belongs in metadata or runtime context.
 - Extend analysis and plugin coverage for dead pixel detection and spectral responsivity assessment.
 

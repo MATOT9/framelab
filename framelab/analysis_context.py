@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+import hashlib
+import json
+import math
 from pathlib import Path
 
 import numpy as np
@@ -15,6 +18,41 @@ from .plugins.analysis import (
     AnalysisRecord,
     AnalysisScopeNode,
 )
+
+
+def _signature_payload(value: object) -> object:
+    """Return a JSON-stable representation for analysis signatures."""
+
+    if isinstance(value, dict):
+        return {
+            str(key): _signature_payload(payload)
+            for key, payload in sorted(value.items(), key=lambda item: str(item[0]))
+        }
+    if isinstance(value, (list, tuple)):
+        return [_signature_payload(item) for item in value]
+    if isinstance(value, np.generic):
+        return _signature_payload(value.item())
+    if isinstance(value, float):
+        if math.isnan(value):
+            return {"__float__": "nan"}
+        if math.isinf(value):
+            return {"__float__": "inf" if value > 0 else "-inf"}
+        return float(value)
+    if isinstance(value, (str, int, bool)) or value is None:
+        return value
+    return str(value)
+
+
+def _stable_signature(payload: object) -> str:
+    """Return a compact stable hash for one analysis payload."""
+
+    serialized = json.dumps(
+        _signature_payload(payload),
+        ensure_ascii=True,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.blake2b(serialized.encode("utf-8"), digest_size=16).hexdigest()
 
 
 class AnalysisContextController:
@@ -162,12 +200,72 @@ class AnalysisContextController:
                 )
             )
 
+        context_payload = {
+            "mode": mode,
+            "records": [
+                {
+                    "path": record.path,
+                    "metadata": dict(record.metadata),
+                    "mean": record.mean,
+                    "std": record.std,
+                    "sem": record.sem,
+                }
+                for record in records
+            ],
+            "metadata_fields": tuple(sorted(metadata_fields)),
+            "normalization_enabled": normalize_intensity,
+            "normalization_scale": scale,
+            "workflow_profile_id": dataset.scope_snapshot.workflow_profile_id,
+            "workflow_anchor_type_id": dataset.scope_snapshot.workflow_anchor_type_id,
+            "workflow_anchor_label": dataset.scope_snapshot.workflow_anchor_label,
+            "workflow_anchor_path": (
+                str(dataset.scope_snapshot.workflow_anchor_path)
+                if dataset.scope_snapshot.workflow_anchor_path is not None
+                else None
+            ),
+            "workflow_is_partial": dataset.scope_snapshot.workflow_is_partial,
+            "active_node_id": dataset.scope_snapshot.active_node_id,
+            "active_node_type": dataset.scope_snapshot.active_node_type,
+            "active_node_path": (
+                str(dataset.scope_snapshot.active_node_path)
+                if dataset.scope_snapshot.active_node_path is not None
+                else None
+            ),
+            "active_scope_kind": dataset.scope_snapshot.kind,
+            "active_scope_label": dataset.scope_snapshot.label,
+            "dataset_scope_root": (
+                str(dataset.scope_snapshot.root)
+                if dataset.scope_snapshot.root is not None
+                else None
+            ),
+            "dataset_scope_source": dataset.scope_snapshot.source,
+            "effective_metadata": dict(dataset.scope_effective_metadata),
+            "metadata_sources": dict(dataset.scope_metadata_sources),
+            "ancestor_chain": [
+                {
+                    "node_id": node.node_id,
+                    "type_id": node.type_id,
+                    "display_name": node.display_name,
+                    "folder_path": str(Path(node.folder_path)),
+                }
+                for node in dataset.scope_snapshot.ancestor_chain
+            ],
+            "metric_family_statuses": {
+                family.value: {
+                    "state": metrics.metric_family_state(family).value,
+                    "message": metrics.metric_family_status(family).message,
+                }
+                for family in MetricFamily
+            },
+        }
+
         return AnalysisContext(
             mode=mode,
             records=tuple(records),
             metadata_fields=tuple(sorted(metadata_fields)),
             normalization_enabled=normalize_intensity,
             normalization_scale=scale,
+            data_signature=_stable_signature(context_payload),
             workflow_profile_id=dataset.scope_snapshot.workflow_profile_id,
             workflow_anchor_type_id=dataset.scope_snapshot.workflow_anchor_type_id,
             workflow_anchor_label=dataset.scope_snapshot.workflow_anchor_label,

@@ -151,6 +151,8 @@ Analysis plugins currently have the clearest formal interface in `framelab/plugi
 Analysis plugins may also implement:
 
 - `run_analysis(context)`
+- `prepare_analysis(context)`
+- `apply_prepared_analysis(prepared)`
 - `set_theme(mode)`
 - `populate_menu(menu)`
 
@@ -167,6 +169,8 @@ Analysis plugins are explicit metric consumers. They may declare:
 Metric family names are the string values from `MetricFamily`, such as `static_scan`, `topk`, `roi`, and `roi_topk`. The host displays required-family readiness, shows optional families that are not ready, and may request missing computable required families only when the user clicks the plugin run action. The plugin requirement contract does not modify Data-page scan metric scope.
 
 `on_context_changed(context)` should stay cheap and passive. The context includes `metric_family_statuses`, so plugins can inspect readiness without reaching back into host-owned metric state. Migrated plugins should put table/plot computation behind `run_analysis(context)`. The base implementation delegates `run_analysis` to `on_context_changed` only as a compatibility fallback for older plugins.
+
+Plugins with expensive plugin-local preparation may return an `AnalysisPreparationJob` from `prepare_analysis(context)`. The host runs that callable on a worker thread, then calls `apply_prepared_analysis(prepared)` on the UI thread after validating the job identity. The callable must use immutable snapshots only and must not touch widgets or mutable host/controller state.
 
 ## UI capability contract
 
@@ -262,7 +266,7 @@ The shipped plugin set is a useful guide to intended plugin patterns.
 ### Analysis-page plugins
 
 - **iris_gain** / **Intensity Trend Explorer** — embedded analysis view with explicit `AnalysisContext` consumption, static-scan requirement, optional Top-K/ROI families, and UI-capability hints
-- **event_signature** / **Event Signature** — embedded per-frame signature plot using existing max-pixel, optional ROI Top-K, frame-index, and elapsed-time context fields
+- **event_signature** / **Event Signature** — embedded per-frame signature plot using existing max-pixel, optional ROI Top-K, frame-index, and elapsed-time context fields; caches plugin-ready records so axis-only reruns rebuild only the projection
 
 These examples show that the plugin system must support both:
 - dialog-style runtime tools exposed from the **Plugins** menu

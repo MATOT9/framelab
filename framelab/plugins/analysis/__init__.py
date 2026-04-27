@@ -4,6 +4,7 @@ from ._base import (
     AnalysisContext,
     AnalysisMetricFamilyStatus,
     AnalysisPlugin,
+    AnalysisPreparationJob,
     AnalysisRecord,
     AnalysisScopeNode,
 )
@@ -17,6 +18,7 @@ __all__ = [
     "AnalysisContext",
     "AnalysisMetricFamilyStatus",
     "AnalysisPlugin",
+    "AnalysisPreparationJob",
     "AnalysisRecord",
     "AnalysisScopeNode",
     "load_analysis_plugins",

@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+import hashlib
+import json
+import math
 from pathlib import Path
 from typing import Optional
 
@@ -11,7 +15,12 @@ from PySide6.QtCore import QSignalBlocker, Qt
 
 from ....mpl_canvas import FigureCanvasQTAgg
 from ....mpl_config import ensure_matplotlib_config_dir
-from .._base import AnalysisContext, AnalysisPlugin, AnalysisRecord
+from .._base import (
+    AnalysisContext,
+    AnalysisPlugin,
+    AnalysisPreparationJob,
+    AnalysisRecord,
+)
 from .._registry import register_analysis_plugin
 
 ensure_matplotlib_config_dir()
@@ -51,6 +60,61 @@ class _SortableItem(qtw.QTableWidgetItem):
         if left is not None and right is not None:
             return str(left).lower() < str(right).lower()
         return super().__lt__(other)
+
+
+@dataclass(frozen=True, slots=True)
+class _PreparedEventRecord:
+    """Plugin-ready row data independent of presentation controls."""
+
+    ordinal: int
+    image_name: str
+    frame_index: float
+    elapsed_time: float | None
+    max_pixel: float | None
+    roi_topk_mean: float | None
+
+
+@dataclass(frozen=True, slots=True)
+class _PreparedEventSignature:
+    """Prepared Event Signature data keyed by scientific inputs."""
+
+    data_signature: str
+    records: tuple[_PreparedEventRecord, ...]
+
+
+def _signature_payload(value: object) -> object:
+    """Return a JSON-stable representation for Event Signature cache keys."""
+
+    if isinstance(value, dict):
+        return {
+            str(key): _signature_payload(payload)
+            for key, payload in sorted(value.items(), key=lambda item: str(item[0]))
+        }
+    if isinstance(value, (list, tuple)):
+        return [_signature_payload(item) for item in value]
+    if isinstance(value, np.generic):
+        return _signature_payload(value.item())
+    if isinstance(value, float):
+        if math.isnan(value):
+            return {"__float__": "nan"}
+        if math.isinf(value):
+            return {"__float__": "inf" if value > 0 else "-inf"}
+        return float(value)
+    if isinstance(value, (str, int, bool)) or value is None:
+        return value
+    return str(value)
+
+
+def _stable_signature(payload: object) -> str:
+    """Return one stable cache signature for Event Signature inputs."""
+
+    serialized = json.dumps(
+        _signature_payload(payload),
+        ensure_ascii=True,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.blake2b(serialized.encode("utf-8"), digest_size=16).hexdigest()
 
 
 @register_analysis_plugin
@@ -98,6 +162,10 @@ class EventSignatureAnalysisPlugin(AnalysisPlugin):
         self._fallback_plot_label: Optional[qtw.QLabel] = None
         self._theme_mode = "dark"
         self._plot_points: list[tuple[float, float]] = []
+        self._prepared_cache: dict[str, _PreparedEventSignature] = {}
+        self._prepared_records: tuple[_PreparedEventRecord, ...] = ()
+        self._prepared_data_signature: str | None = None
+        self._last_presentation_signature: tuple[str, str, int, int] | None = None
         self._analysis_dirty = True
 
     def create_widget(self, parent: qtw.QWidget) -> qtw.QWidget:
@@ -225,6 +293,42 @@ class EventSignatureAnalysisPlugin(AnalysisPlugin):
 
         self._context = context
         self._sync_x_axis_options()
+        data_signature = self._event_signature_data_signature(context)
+        prepared = self._prepared_cache.get(data_signature)
+        if prepared is None:
+            prepared = self._prepare_from_snapshot(
+                data_signature,
+                self._snapshot_context_records(context),
+            )
+            self._prepared_cache[data_signature] = prepared
+        self._use_prepared_signature(prepared)
+        self._refresh()
+        self._analysis_dirty = False
+
+    def prepare_analysis(
+        self,
+        context: AnalysisContext,
+    ) -> AnalysisPreparationJob | None:
+        """Return background preparation when plugin-ready data is not cached."""
+
+        self._context = context
+        self._sync_x_axis_options()
+        data_signature = self._event_signature_data_signature(context)
+        if data_signature in self._prepared_cache:
+            return None
+        snapshot = self._snapshot_context_records(context)
+        return AnalysisPreparationJob(
+            label="Preparing Event Signature",
+            prepare=lambda: self._prepare_from_snapshot(data_signature, snapshot),
+        )
+
+    def apply_prepared_analysis(self, prepared: object) -> None:
+        """Apply prepared Event Signature records on the UI thread."""
+
+        if not isinstance(prepared, _PreparedEventSignature):
+            raise TypeError("Unexpected Event Signature preparation result.")
+        self._prepared_cache[prepared.data_signature] = prepared
+        self._use_prepared_signature(prepared)
         self._refresh()
         self._analysis_dirty = False
 
@@ -309,24 +413,102 @@ class EventSignatureAnalysisPlugin(AnalysisPlugin):
         self._sync_x_axis_options()
         self._analysis_dirty = True
 
+    @classmethod
+    def _snapshot_context_records(
+        cls,
+        context: AnalysisContext,
+    ) -> tuple[tuple[int, str, float, float | None, float | None, float | None], ...]:
+        """Return immutable consumed fields from the analysis context."""
+
+        rows: list[tuple[int, str, float, float | None, float | None, float | None]] = []
+        for row, record in enumerate(context.records):
+            frame_index = cls._frame_index_for_record(record, row)
+            rows.append(
+                (
+                    row + 1,
+                    Path(record.path).name,
+                    frame_index,
+                    cls._finite_float(record.metadata.get("elapsed_time_s")),
+                    cls._finite_float(record.metadata.get("max_pixel")),
+                    cls._finite_float(record.metadata.get("roi_topk_mean")),
+                ),
+            )
+        return tuple(rows)
+
+    @classmethod
+    def _event_signature_data_signature(cls, context: AnalysisContext) -> str:
+        """Return a signature for only the data consumed by this plugin."""
+
+        statuses = {
+            family: {
+                "state": context.metric_family_status(family).state,
+                "message": context.metric_family_status(family).message,
+            }
+            for family in ("static_scan", "roi_topk")
+        }
+        return _stable_signature(
+            {
+                "records": cls._snapshot_context_records(context),
+                "metric_family_statuses": statuses,
+            },
+        )
+
+    @staticmethod
+    def _prepare_from_snapshot(
+        data_signature: str,
+        snapshot: tuple[
+            tuple[int, str, float, float | None, float | None, float | None],
+            ...,
+        ],
+    ) -> _PreparedEventSignature:
+        """Build plugin-ready records from an immutable context snapshot."""
+
+        records = tuple(
+            _PreparedEventRecord(
+                ordinal=ordinal,
+                image_name=image_name,
+                frame_index=frame_index,
+                elapsed_time=elapsed_time,
+                max_pixel=max_pixel,
+                roi_topk_mean=roi_topk_mean,
+            )
+            for (
+                ordinal,
+                image_name,
+                frame_index,
+                elapsed_time,
+                max_pixel,
+                roi_topk_mean,
+            ) in snapshot
+        )
+        return _PreparedEventSignature(
+            data_signature=data_signature,
+            records=records,
+        )
+
+    def _use_prepared_signature(self, prepared: _PreparedEventSignature) -> None:
+        """Install prepared records for the next projection refresh."""
+
+        self._prepared_records = prepared.records
+        self._prepared_data_signature = prepared.data_signature
+
     def _x_value_for_record(
         self,
-        record: AnalysisRecord,
-        row: int,
+        record: _PreparedEventRecord,
         x_mode: str,
     ) -> float | None:
         if x_mode == "elapsed_time_s":
-            return self._finite_float(record.metadata.get("elapsed_time_s"))
-        return self._frame_index_for_record(record, row)
+            return record.elapsed_time
+        return record.frame_index
 
     def _y_value_for_record(
         self,
-        record: AnalysisRecord,
+        record: _PreparedEventRecord,
         y_mode: str,
     ) -> float | None:
         if y_mode == "roi_topk_mean":
-            return self._finite_float(record.metadata.get("roi_topk_mean"))
-        return self._finite_float(record.metadata.get("max_pixel"))
+            return record.roi_topk_mean
+        return record.max_pixel
 
     @staticmethod
     def _format_value(value: float | None, *, precision: int = 6) -> str:
@@ -335,25 +517,22 @@ class EventSignatureAnalysisPlugin(AnalysisPlugin):
         return f"{float(value):.{precision}g}"
 
     def _build_rows(self) -> list[tuple[int, str, float, float | None, float, float]]:
-        context = self._context
-        if context is None:
+        if not self._prepared_records:
             return []
         x_mode = self._current_data(self._x_axis_combo, "frame_index")
         y_mode = self._current_data(self._y_axis_combo, "max_pixel")
         rows: list[tuple[int, str, float, float | None, float, float]] = []
-        for row, record in enumerate(context.records):
-            x_value = self._x_value_for_record(record, row, x_mode)
+        for record in self._prepared_records:
+            x_value = self._x_value_for_record(record, x_mode)
             y_value = self._y_value_for_record(record, y_mode)
             if x_value is None or y_value is None:
                 continue
-            frame_index = self._frame_index_for_record(record, row)
-            elapsed_time = self._finite_float(record.metadata.get("elapsed_time_s"))
             rows.append(
                 (
-                    row + 1,
-                    Path(record.path).name,
-                    frame_index,
-                    elapsed_time,
+                    record.ordinal,
+                    record.image_name,
+                    record.frame_index,
+                    record.elapsed_time,
                     x_value,
                     y_value,
                 ),
@@ -361,10 +540,36 @@ class EventSignatureAnalysisPlugin(AnalysisPlugin):
         return rows
 
     def _refresh(self) -> None:
+        self._last_presentation_signature = self._presentation_signature()
         rows = self._build_rows()
         self._plot_points = [(row[4], row[5]) for row in rows]
         self._populate_table(rows)
         self._draw_plot()
+
+    def _presentation_signature(self) -> tuple[str, str, int, int]:
+        """Return the current presentation-only signature."""
+
+        if self._last_presentation_signature is None:
+            return (
+                self._current_data(self._x_axis_combo, "frame_index"),
+                self._current_data(self._y_axis_combo, "max_pixel"),
+                0,
+                int(Qt.AscendingOrder.value),
+            )
+        sort_column = 0
+        sort_order = int(Qt.AscendingOrder.value)
+        if self._table is not None:
+            header = self._table.horizontalHeader()
+            sort_column = int(header.sortIndicatorSection())
+            if sort_column < 0:
+                sort_column = 0
+            sort_order = int(header.sortIndicatorOrder().value)
+        return (
+            self._current_data(self._x_axis_combo, "frame_index"),
+            self._current_data(self._y_axis_combo, "max_pixel"),
+            sort_column,
+            sort_order,
+        )
 
     def _populate_table(
         self,
@@ -373,6 +578,11 @@ class EventSignatureAnalysisPlugin(AnalysisPlugin):
         if self._table is None:
             return
         table = self._table
+        sort_column = 0
+        sort_order = Qt.AscendingOrder
+        if self._last_presentation_signature is not None:
+            sort_column = self._last_presentation_signature[2]
+            sort_order = Qt.SortOrder(self._last_presentation_signature[3])
         table.setSortingEnabled(False)
         table.setRowCount(len(rows))
         for row_idx, (ordinal, image_name, frame_index, elapsed_time, _x, y) in enumerate(rows):
@@ -391,7 +601,7 @@ class EventSignatureAnalysisPlugin(AnalysisPlugin):
                 )
                 table.setItem(row_idx, col_idx, item)
         table.setSortingEnabled(True)
-        table.sortByColumn(0, Qt.AscendingOrder)
+        table.sortByColumn(sort_column, sort_order)
 
     def _draw_plot(self) -> None:
         if self._figure is None or self._axes is None or self._canvas is None:

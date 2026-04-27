@@ -4,6 +4,8 @@
 
 The plugin does not remeasure images. It uses values already prepared by **Data** and **Measure**.
 
+The first build may take longer on large acquisitions because the plugin prepares the per-frame record set. After that, changing the X or Y axis reuses the prepared records when the underlying data has not changed and updates only the table/plot projection.
+
 ## Before using this plugin
 
 Confirm the following first:
@@ -44,6 +46,8 @@ Elapsed time uses the first valid timestamp in the loaded scope as `0.000 s`. Th
 | **ROI Top-K** | Uses the existing ROI Top-K mean values computed by the Measure stage. |
 
 If ROI Top-K has not been computed, the plugin remains available but the ROI Top-K plot has no points.
+
+Changing axis controls is a presentation change. Click **Build Signature** again to refresh the projection; this does not rebuild the scientific data context unless the loaded dataset, required metrics, or consumed computed columns changed.
 
 ## Reading the output
 

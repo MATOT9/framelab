@@ -214,7 +214,11 @@ The Analyze workflow does not re-measure images. It packages the current dataset
 - ROI Top-K values and elapsed-time metadata when available
 - background state flags and reference labels
 
+Each context includes a stable data signature for the scientific inputs exposed through the context. Plugin presentation choices such as axes, table sorting, plot theme, and splitter state are intentionally outside that signature.
+
 The analysis plugin interface should be treated as a consumer of this prebuilt context, not as a place to reach back into raw host state ad hoc.
+
+Plugins may optionally request a lightweight background preparation job for expensive plugin-local record preparation. The job receives immutable inputs and returns a prepared payload; the host applies the final result on the UI thread after job id validation.
 
 Main workflow tab changes are treated as view events. Switching between Data, Measure, and Analyze can update layout, hints, column visibility, and visible plugin context delivery when the context is already dirty, but it must not start scans, rebuild cached Data-table metadata content, start metric jobs, flush caches, or create new analysis invalidation by itself. Scope refreshes compare the effective scope context before invalidating analysis so revisiting the same scope remains cheap.
 

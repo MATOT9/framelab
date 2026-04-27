@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Mapping
+from typing import Any, Mapping
 
 import numpy as np
 from PySide6 import QtWidgets as qtw
@@ -57,6 +58,7 @@ class AnalysisContext:
     metadata_fields: tuple[str, ...]
     normalization_enabled: bool
     normalization_scale: float
+    data_signature: str = ""
     workflow_profile_id: str | None = None
     workflow_anchor_type_id: str | None = None
     workflow_anchor_label: str | None = None
@@ -87,6 +89,14 @@ class AnalysisContext:
             key,
             AnalysisMetricFamilyStatus(key, "not_requested"),
         )
+
+
+@dataclass(frozen=True)
+class AnalysisPreparationJob:
+    """Optional background preparation requested by an analysis plugin."""
+
+    label: str
+    prepare: Callable[[], Any]
 
 
 class AnalysisPlugin(ABC):
@@ -137,6 +147,25 @@ class AnalysisPlugin(ABC):
         """
 
         self.on_context_changed(context)
+
+    def prepare_analysis(
+        self,
+        context: AnalysisContext,
+    ) -> AnalysisPreparationJob | None:
+        """Return optional background work needed before applying analysis.
+
+        Plugins that return a job must keep the callable independent of Qt
+        widgets and mutable host state. The host runs it on a worker thread and
+        passes the result to ``apply_prepared_analysis`` on the UI thread.
+        """
+
+        _ = context
+        return None
+
+    def apply_prepared_analysis(self, prepared: Any) -> None:
+        """Apply one prepared background result on the UI thread."""
+
+        _ = prepared
 
     def set_theme(self, mode: str) -> None:
         """Update theme-dependent rendering state.

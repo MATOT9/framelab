@@ -121,3 +121,49 @@ def test_event_signature_context_refresh_is_passive(qapp) -> None:
     finally:
         host.close()
         host.deleteLater()
+
+
+def test_event_signature_axis_rerun_reuses_prepared_records(qapp) -> None:
+    plugin, host = _plugin(qapp)
+    try:
+        context = _context(elapsed=True)
+        plugin.run_analysis(context)
+        assert plugin._x_axis_combo is not None
+        assert plugin._y_axis_combo is not None
+        prepared_records = plugin._prepared_records
+        data_signature = plugin._prepared_data_signature
+        first_presentation = plugin._last_presentation_signature
+
+        _set_combo(plugin._x_axis_combo, "elapsed_time_s")
+        _set_combo(plugin._y_axis_combo, "roi_topk_mean")
+
+        assert plugin.prepare_analysis(context) is None
+        plugin.run_analysis(context)
+
+        assert plugin._prepared_records is prepared_records
+        assert plugin._prepared_data_signature == data_signature
+        assert plugin._last_presentation_signature != first_presentation
+        assert plugin._plot_points == pytest.approx([(0.0, 5.0), (1.25, 7.0)])
+    finally:
+        host.close()
+        host.deleteLater()
+
+
+def test_event_signature_preparation_job_populates_cache(qapp) -> None:
+    plugin, host = _plugin(qapp)
+    try:
+        context = _context(elapsed=True)
+        job = plugin.prepare_analysis(context)
+
+        assert job is not None
+        prepared = job.prepare()
+        plugin.apply_prepared_analysis(prepared)
+
+        assert plugin._prepared_data_signature is not None
+        assert plugin.prepare_analysis(context) is None
+        assert plugin._table is not None
+        assert plugin._table.rowCount() == 2
+        assert plugin._plot_points == pytest.approx([(0.0, 10.0), (1.0, 12.0)])
+    finally:
+        host.close()
+        host.deleteLater()

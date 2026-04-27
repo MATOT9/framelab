@@ -77,7 +77,12 @@ from .workspace_document import (
 )
 from .window_drag import apply_secondary_window_geometry
 from .workflow import WorkflowStateController, workflow_profile_by_id
-from .workers import DynamicStatsWorker, RoiApplyWorker, DatasetLoadWorker
+from .workers import (
+    AnalysisPreparationWorker,
+    DatasetLoadWorker,
+    DynamicStatsWorker,
+    RoiApplyWorker,
+)
 from .native import backend as native_backend
 
 
@@ -234,6 +239,10 @@ class FrameLabWindow(
         )
         self._pending_workflow_tab_index: int | None = None
         self._analysis_plugins: list[AnalysisPlugin] = []
+        self._analysis_plugin_thread: Optional[QThread] = None
+        self._analysis_plugin_worker: Optional[AnalysisPreparationWorker] = None
+        self._analysis_plugin_job_id = 0
+        self._analysis_plugin_job_plugin_id: str | None = None
         self.metrics_cache = MetricsCache()
         self._dynamic_cache_pending: dict[str, object] | None = None
         self._roi_cache_pending: dict[str, object] | None = None

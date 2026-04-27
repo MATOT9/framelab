@@ -54,8 +54,9 @@ This is a compact snapshot of the current implementation. Prefer canonical docs 
 - Runtime jobs such as dataset load, metric compute, ROI apply, and plugin compute are tracked through explicit task state and surfaced compactly in the status bar.
 - Main workflow tab changes are view transitions. They update layout, hints, column visibility, and visible analysis delivery when needed, but they do not start scans, rebuild cached metadata-table content, run metric recompute, flush caches, or invalidate analysis by themselves.
 - Workflow scope selection is cheap when the selected scope is already active. Workflow structure operations such as empty-scope creation, rename, and renumber refresh the tree and remap already loaded paths when possible instead of entering scan/load paths.
-- Analyze workflows consume an `AnalysisContext` built from dataset metadata, metric state, metric-family readiness, normalization state, and background state.
-- Analysis plugin context refresh is passive: enabled plugins receive cheap context updates, declare required/optional metric families and a run label, and compute through an explicit Analyze-page action. The host shows missing requirements and may explicitly request missing metric families from that action without adding plugin-driven work to Data-page scope scans.
+- Analyze workflows consume an `AnalysisContext` built from dataset metadata, metric state, metric-family readiness, normalization state, and background state. Contexts carry a data signature for scientific inputs so presentation-only plugin choices do not force context rebuilds.
+- Analysis plugin context refresh is passive: enabled plugins receive cheap context updates, declare required/optional metric families and a run label, and compute through an explicit Analyze-page action. The host shows missing requirements, may explicitly request missing metric families from that action without adding plugin-driven work to Data-page scope scans, and can run plugin-declared preparation on a lightweight worker.
+- Event Signature caches plugin-ready per-frame records by the consumed data signature. Changing X/Y presentation choices reuses those records and rebuilds only the table/plot projection.
 
 ## Docs And Packaging
 

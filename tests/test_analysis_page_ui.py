@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from pathlib import Path
+import threading
 
 import numpy as np
 import pytest
@@ -12,6 +13,7 @@ from tifffile import imwrite
 
 import framelab.plugins.analysis.iris_gain._plotting as plotting_module
 from framelab.metrics_state import MetricFamily
+from framelab.plugins.analysis import AnalysisPreparationJob
 from framelab.plugins.analysis.iris_gain._shared import _CurveSeries
 from framelab.runtime_tasks import RuntimeTaskState
 from framelab.ui_settings import DensityMode
@@ -533,6 +535,96 @@ def test_analysis_plugin_run_button_executes_explicit_action(
     assert latest.task_id.startswith("analysis_plugin:")
     assert latest.state == RuntimeTaskState.SUCCEEDED
     assert latest.status == "Analysis complete"
+
+
+def test_analysis_plugin_run_reuses_clean_context_cache(
+    analysis_window: FrameLabWindow,
+    process_events,
+    monkeypatch,
+    tmp_path: Path,
+    wait_for_dataset_load,
+) -> None:
+    folder = tmp_path / "analysis-run-cache"
+    folder.mkdir()
+    imwrite(folder / "frame_0001.tiff", np.full((4, 4), 12, dtype=np.uint16))
+    analysis_window.folder_edit.setText(str(folder))
+    analysis_window.load_folder()
+    wait_for_dataset_load(analysis_window)
+    _show_analysis_page(analysis_window, process_events)
+    analysis_window._update_analysis_context(force_push=True)
+    plugin = analysis_window._current_analysis_plugin()
+
+    assert plugin is not None
+    build_calls = 0
+    original = analysis_window._build_analysis_context
+
+    def _wrapped():
+        nonlocal build_calls
+        build_calls += 1
+        return original()
+
+    monkeypatch.setattr(analysis_window, "_build_analysis_context", _wrapped)
+    monkeypatch.setattr(plugin, "run_analysis", lambda context: None)
+
+    analysis_window.analysis_run_button.click()
+    process_events()
+
+    assert build_calls == 0
+    assert analysis_window.analysis_run_progress.format() == "Analysis complete"
+
+
+def test_async_analysis_preparation_disables_run_until_complete(
+    analysis_window: FrameLabWindow,
+    process_events,
+    monkeypatch,
+    tmp_path: Path,
+    wait_for_dataset_load,
+    wait_until,
+) -> None:
+    folder = tmp_path / "analysis-async-run"
+    folder.mkdir()
+    imwrite(folder / "frame_0001.tiff", np.full((4, 4), 12, dtype=np.uint16))
+    analysis_window.folder_edit.setText(str(folder))
+    analysis_window.load_folder()
+    wait_for_dataset_load(analysis_window)
+    _show_analysis_page(analysis_window, process_events)
+    plugin = analysis_window._current_analysis_plugin()
+
+    assert plugin is not None
+    started = threading.Event()
+    release = threading.Event()
+    applied: list[object] = []
+
+    def _prepare() -> object:
+        started.set()
+        release.wait(timeout=2.0)
+        return {"prepared": True}
+
+    monkeypatch.setattr(
+        plugin,
+        "prepare_analysis",
+        lambda context: AnalysisPreparationJob("Preparing test plugin", _prepare),
+    )
+    monkeypatch.setattr(plugin, "apply_prepared_analysis", lambda result: applied.append(result))
+
+    analysis_window.analysis_run_button.click()
+    wait_until(started.is_set, timeout_ms=1000)
+
+    assert not analysis_window.analysis_run_button.isEnabled()
+    latest = analysis_window.runtime_tasks.latest_task()
+    assert latest is not None
+    assert latest.state == RuntimeTaskState.RUNNING
+    assert latest.status == "Preparing test plugin"
+
+    release.set()
+    wait_until(lambda: applied == [{"prepared": True}], timeout_ms=3000)
+    wait_until(lambda: analysis_window.analysis_run_button.isEnabled(), timeout_ms=3000)
+
+    latest = analysis_window.runtime_tasks.latest_task()
+    assert latest is not None
+    assert latest.state == RuntimeTaskState.SUCCEEDED
+    assert latest.status == "Analysis complete"
+    assert analysis_window.analysis_run_progress.format() == "Analysis complete"
 
 
 def test_analysis_plugin_action_requests_missing_required_metrics(

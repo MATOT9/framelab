@@ -6,7 +6,7 @@ import math
 from typing import Optional
 
 from PySide6 import QtWidgets as qtw
-from PySide6.QtCore import Qt, QSignalBlocker
+from PySide6.QtCore import Qt, QSignalBlocker, QThread
 
 from ..analysis_context import AnalysisContextController
 from ..dataset_state import DatasetStateController
@@ -28,6 +28,7 @@ from ..ui_primitives import (
     build_summary_strip,
 )
 from ..widgets import install_large_splitter_handle_cursors
+from ..workers import AnalysisPreparationWorker
 
 
 class AnalysisPageMixin:
@@ -594,6 +595,19 @@ class AnalysisPageMixin:
         progress.setFormat(text)
         progress.setVisible(True)
 
+    def _analysis_plugin_action_is_active(self) -> bool:
+        """Return whether a background plugin action is currently active."""
+
+        return getattr(self, "_analysis_plugin_worker", None) is not None
+
+    def _analysis_plugin_by_id(self, plugin_id: str) -> AnalysisPlugin | None:
+        """Return one loaded analysis plugin by id."""
+
+        for plugin in getattr(self, "_analysis_plugins", ()):
+            if plugin.plugin_id == plugin_id:
+                return plugin
+        return None
+
     def _request_analysis_metric_families(
         self,
         families: tuple[MetricFamily, ...],
@@ -652,9 +666,12 @@ class AnalysisPageMixin:
         plugin = self._current_analysis_plugin()
         if plugin is None:
             return
+        if self._analysis_plugin_action_is_active():
+            if hasattr(self, "_set_status"):
+                self._set_status("Analysis already running")
+            return
         context = self._ensure_analysis_context_current(
             force_push=True,
-            force_rebuild=True,
         )
         if context is None:
             return
@@ -703,6 +720,26 @@ class AnalysisPageMixin:
 
         self._execute_analysis_plugin_action(plugin, context)
 
+    def _finish_analysis_plugin_action(
+        self,
+        plugin: AnalysisPlugin,
+        *,
+        state: RuntimeTaskState | str,
+        status: str,
+        progress_text: str,
+    ) -> None:
+        """Finish one plugin action across host-owned status surfaces."""
+
+        self._pending_analysis_plugin_run_id = None
+        if hasattr(self, "_finish_runtime_task"):
+            self._finish_runtime_task(
+                self._analysis_plugin_task_id(plugin.plugin_id),
+                state=state,
+                status=status,
+            )
+        self._complete_analysis_plugin_progress(progress_text)
+        self._refresh_analysis_plugin_requirements_ui()
+
     def _execute_analysis_plugin_action(
         self,
         plugin: AnalysisPlugin,
@@ -710,6 +747,10 @@ class AnalysisPageMixin:
     ) -> None:
         """Run one plugin action and update host progress state."""
 
+        if self._analysis_plugin_action_is_active():
+            if hasattr(self, "_set_status"):
+                self._set_status("Analysis already running")
+            return
         if hasattr(self, "_begin_runtime_task"):
             self._begin_runtime_task(
                 self._analysis_plugin_task_id(plugin.plugin_id),
@@ -718,31 +759,170 @@ class AnalysisPageMixin:
                 status="Running analysis",
             )
         self._begin_analysis_plugin_progress("Running analysis...")
+        self._refresh_analysis_plugin_requirements_ui()
+        try:
+            preparation_job = plugin.prepare_analysis(context)
+        except Exception as exc:
+            self._finish_analysis_plugin_action(
+                plugin,
+                state=RuntimeTaskState.FAILED,
+                status=str(exc) or "Analysis preparation failed",
+                progress_text="Analysis failed",
+            )
+            if hasattr(self, "_show_error"):
+                self._show_error(
+                    "Analysis failed",
+                    str(exc) or "The plugin preparation step failed.",
+                )
+            return
+        if preparation_job is not None:
+            self._start_analysis_preparation_job(
+                plugin,
+                preparation_job.label,
+                preparation_job.prepare,
+            )
+            return
         try:
             plugin.run_analysis(context)
         except Exception as exc:
-            self._pending_analysis_plugin_run_id = None
-            if hasattr(self, "_finish_runtime_task"):
-                self._finish_runtime_task(
-                    self._analysis_plugin_task_id(plugin.plugin_id),
-                    state=RuntimeTaskState.FAILED,
-                    status=str(exc) or "Analysis failed",
-                )
-            self._complete_analysis_plugin_progress("Analysis failed")
+            self._finish_analysis_plugin_action(
+                plugin,
+                state=RuntimeTaskState.FAILED,
+                status=str(exc) or "Analysis failed",
+                progress_text="Analysis failed",
+            )
             if hasattr(self, "_show_error"):
                 self._show_error(
                     "Analysis failed",
                     str(exc) or "The plugin action failed.",
                 )
             return
-        self._pending_analysis_plugin_run_id = None
-        if hasattr(self, "_finish_runtime_task"):
-            self._finish_runtime_task(
+        self._finish_analysis_plugin_action(
+            plugin,
+            state=RuntimeTaskState.SUCCEEDED,
+            status="Analysis complete",
+            progress_text="Analysis complete",
+        )
+
+    def _start_analysis_preparation_job(
+        self,
+        plugin: AnalysisPlugin,
+        label: str,
+        prepare,
+    ) -> None:
+        """Run plugin preparation on a worker thread."""
+
+        self._analysis_plugin_job_id = int(
+            getattr(self, "_analysis_plugin_job_id", 0),
+        ) + 1
+        job_id = self._analysis_plugin_job_id
+        self._analysis_plugin_job_plugin_id = plugin.plugin_id
+        worker = AnalysisPreparationWorker(
+            job_id=job_id,
+            plugin_id=plugin.plugin_id,
+            prepare=prepare,
+        )
+        thread = QThread(self)
+        worker.moveToThread(thread)
+        thread.started.connect(worker.run)
+        worker.finished.connect(self._on_analysis_preparation_finished)
+        worker.failed.connect(self._on_analysis_preparation_failed)
+        worker.finished.connect(thread.quit)
+        worker.failed.connect(thread.quit)
+        thread.finished.connect(
+            lambda t=thread, w=worker: self._on_analysis_preparation_thread_finished(t, w),
+        )
+        self._analysis_plugin_thread = thread
+        self._analysis_plugin_worker = worker
+        if hasattr(self, "_update_runtime_task"):
+            self._update_runtime_task(
                 self._analysis_plugin_task_id(plugin.plugin_id),
-                state=RuntimeTaskState.SUCCEEDED,
-                status="Analysis complete",
+                status=str(label or "Preparing analysis"),
             )
-        self._complete_analysis_plugin_progress("Analysis complete")
+        self._begin_analysis_plugin_progress(str(label or "Preparing analysis") + "...")
+        self._refresh_analysis_plugin_requirements_ui()
+        thread.start()
+
+    def _on_analysis_preparation_finished(
+        self,
+        job_id: int,
+        plugin_id: str,
+        prepared,
+    ) -> None:
+        """Apply one prepared plugin result on the UI thread."""
+
+        if (
+            int(job_id) != int(getattr(self, "_analysis_plugin_job_id", 0))
+            or str(plugin_id) != str(getattr(self, "_analysis_plugin_job_plugin_id", ""))
+        ):
+            return
+        plugin = self._analysis_plugin_by_id(plugin_id)
+        if plugin is None:
+            return
+        try:
+            plugin.apply_prepared_analysis(prepared)
+        except Exception as exc:
+            self._finish_analysis_plugin_action(
+                plugin,
+                state=RuntimeTaskState.FAILED,
+                status=str(exc) or "Analysis apply failed",
+                progress_text="Analysis failed",
+            )
+            if hasattr(self, "_show_error"):
+                self._show_error(
+                    "Analysis failed",
+                    str(exc) or "The plugin result could not be applied.",
+                )
+            return
+        self._finish_analysis_plugin_action(
+            plugin,
+            state=RuntimeTaskState.SUCCEEDED,
+            status="Analysis complete",
+            progress_text="Analysis complete",
+        )
+
+    def _on_analysis_preparation_failed(
+        self,
+        job_id: int,
+        plugin_id: str,
+        message: str,
+    ) -> None:
+        """Handle a failed background plugin preparation."""
+
+        if (
+            int(job_id) != int(getattr(self, "_analysis_plugin_job_id", 0))
+            or str(plugin_id) != str(getattr(self, "_analysis_plugin_job_plugin_id", ""))
+        ):
+            return
+        plugin = self._analysis_plugin_by_id(plugin_id)
+        if plugin is None:
+            return
+        self._finish_analysis_plugin_action(
+            plugin,
+            state=RuntimeTaskState.FAILED,
+            status=str(message or "Analysis preparation failed"),
+            progress_text="Analysis failed",
+        )
+        if hasattr(self, "_show_error"):
+            self._show_error(
+                "Analysis failed",
+                str(message or "The plugin preparation step failed."),
+            )
+
+    def _on_analysis_preparation_thread_finished(
+        self,
+        thread: QThread,
+        worker: AnalysisPreparationWorker,
+    ) -> None:
+        """Release completed analysis-preparation thread objects."""
+
+        if getattr(self, "_analysis_plugin_worker", None) is worker:
+            self._analysis_plugin_worker = None
+            self._analysis_plugin_job_plugin_id = None
+        if getattr(self, "_analysis_plugin_thread", None) is thread:
+            self._analysis_plugin_thread = None
+        worker.deleteLater()
+        thread.deleteLater()
         self._refresh_analysis_plugin_requirements_ui()
 
     def _maybe_finish_pending_analysis_plugin_run(
@@ -791,7 +971,10 @@ class AnalysisPageMixin:
         action_label = str(getattr(plugin, "run_action_label", "") or "Run Analysis")
         self.analysis_run_button.setText(action_label)
         analysis_available = self._analysis_unavailable_reason() is None
-        self.analysis_run_button.setEnabled(bool(analysis_available))
+        self.analysis_run_button.setEnabled(
+            bool(analysis_available)
+            and not self._analysis_plugin_action_is_active()
+        )
 
         required = self._analysis_required_metric_families(plugin)
         missing_required = self._analysis_missing_required_metric_families(plugin)

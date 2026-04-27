@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from fnmatch import fnmatch
 import os
 from pathlib import Path
-from typing import Optional
+from typing import Any, Callable, Optional
 
 import numpy as np
 from PySide6.QtCore import QObject, QThread, Signal
@@ -46,6 +46,35 @@ from .raw_decode import (
     resolve_raw_decode_spec,
 )
 from .roi_utils import normalize_roi_rect_like_numpy
+
+
+class AnalysisPreparationWorker(QObject):
+    """Background worker for plugin-owned immutable preparation."""
+
+    finished = Signal(int, str, object)
+    failed = Signal(int, str, str)
+
+    def __init__(
+        self,
+        *,
+        job_id: int,
+        plugin_id: str,
+        prepare: Callable[[], Any],
+    ) -> None:
+        super().__init__()
+        self._job_id = int(job_id)
+        self._plugin_id = str(plugin_id)
+        self._prepare = prepare
+
+    def run(self) -> None:
+        """Run plugin preparation and emit the prepared payload."""
+
+        try:
+            result = self._prepare()
+        except Exception as exc:
+            self.failed.emit(self._job_id, self._plugin_id, str(exc))
+            return
+        self.finished.emit(self._job_id, self._plugin_id, result)
 
 
 @dataclass(frozen=True, slots=True)

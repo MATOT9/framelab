@@ -249,3 +249,51 @@ def test_build_context_exposes_metric_family_readiness() -> None:
     assert topk_status.state == "failed"
     assert topk_status.message == "worker failed"
     assert context.metric_family_status("roi_topk").state == "not_requested"
+
+
+def test_context_data_signature_is_stable_for_same_scientific_inputs() -> None:
+    dataset = DatasetStateController()
+    dataset.set_loaded_dataset(None, ["/tmp/a.tif"])
+    dataset.set_path_metadata(
+        {
+            "/tmp/a.tif": {
+                "frame_index": 1,
+                "exposure_ms": 12.0,
+            },
+        },
+    )
+    metrics = MetricsPipelineController()
+    metrics.maxs = np.array([100], dtype=np.int64)
+    metrics.set_metric_family_state(MetricFamily.STATIC_SCAN, MetricFamilyState.READY)
+
+    controller = AnalysisContextController(
+        dataset,
+        metrics,
+        background_reference_label_resolver=lambda path: f"ref:{path}",
+    )
+
+    first = controller.build_context(mode="none", normalization_scale=1.0)
+    second = controller.build_context(mode="none", normalization_scale=1.0)
+
+    assert first.data_signature
+    assert first.data_signature == second.data_signature
+
+
+def test_context_data_signature_changes_when_exposed_data_changes() -> None:
+    dataset = DatasetStateController()
+    dataset.set_loaded_dataset(None, ["/tmp/a.tif"])
+    dataset.set_path_metadata({"/tmp/a.tif": {"frame_index": 1}})
+    metrics = MetricsPipelineController()
+    metrics.maxs = np.array([100], dtype=np.int64)
+
+    controller = AnalysisContextController(
+        dataset,
+        metrics,
+        background_reference_label_resolver=lambda path: f"ref:{path}",
+    )
+
+    before = controller.build_context(mode="none", normalization_scale=1.0)
+    metrics.maxs = np.array([101], dtype=np.int64)
+    after = controller.build_context(mode="none", normalization_scale=1.0)
+
+    assert before.data_signature != after.data_signature
