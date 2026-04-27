@@ -87,6 +87,8 @@ A scan is not only file listing. It is the dataset intake pass used by the rest 
 
 Treat a scan as a dataset-state reset, not as a cosmetic refresh. Deeper measurement work such as saturation counts, Top-K values, and ROI dataset-wide metrics is either requested by the Data tab scan setup or started from the Measure controls when you explicitly apply those settings. Those requests are family-specific rather than broad dynamic refreshes. Plugins remain consumers of available data; they do not silently expand scan-time work.
 
+Returning to the Data tab, changing column visibility, or selecting the same workflow scope again reuses the loaded dataset state. Those actions can repaint the table view, but they do not rescan the folder or rebuild cached per-row metadata unless a scan, metadata-source change, metadata edit, or loaded-path remap actually changes the metadata dependencies.
+
 ## Skip rules
 
 Skip rules exclude files or folders from dataset intake. Use them to keep temporary exports, cache folders, thumbnails, or unrelated TIFFs out of the working dataset.
@@ -171,6 +173,8 @@ Grouping clusters rows by one selected field for table organization and operator
 - non-empty values are sorted and assigned group ids starting at `1`
 
 Grouping is useful for visually checking sweep structure before measurement or analysis. It does not change row metadata.
+
+Quick Filter and Group Rows By are view operations over the loaded metadata table. They update visible rows and group numbers from cached row content rather than re-reading image metadata.
 
 ## Structure work versus data verification
 

@@ -309,7 +309,7 @@ class DataPageMixin:
         command_layout.addWidget(self.scan_metric_preset_combo)
 
         self.scan_metric_custom_button = qtw.QToolButton(command_bar)
-        self.scan_metric_custom_button.setObjectName("ScanMetricCustomButton")
+        self.scan_metric_custom_button.setObjectName("DockActionButton")
         self.scan_metric_custom_button.setText("Families")
         self.scan_metric_custom_button.setToolTip(
             "Select metric families for the Custom scan setup.",
@@ -466,7 +466,7 @@ class DataPageMixin:
         for label, value in self.BASE_METADATA_GROUP_FIELDS:
             self.metadata_group_combo.addItem(label, value)
         self.metadata_group_combo.currentIndexChanged.connect(
-            lambda _index: self._refresh_metadata_table(),
+            lambda _index: self._refresh_metadata_table_view_only(),
         )
         self.metadata_group_combo.setToolTip(
             "Assign group numbers using the selected metadata field.",
@@ -485,7 +485,7 @@ class DataPageMixin:
             "Filter visible metadata rows by any displayed text.",
         )
         self.metadata_filter_edit.textChanged.connect(
-            lambda _text: self._refresh_metadata_table(),
+            lambda _text: self._refresh_metadata_table_view_only(),
         )
         metadata_row.addWidget(self.metadata_filter_edit, 1)
 
@@ -630,6 +630,8 @@ class DataPageMixin:
         )
         table_layout.addWidget(self.metadata_table, 1)
         layout.addWidget(table_panel, 1)
+        self._mark_metadata_table_structure_dirty()
+        self._mark_metadata_table_content_dirty()
         self._apply_data_table_visibility()
         self._refresh_data_header_state()
         if hasattr(self, "_policy_for_page"):
@@ -1240,9 +1242,49 @@ class DataPageMixin:
         for key, column in self.DATA_COLUMN_INDEX.items():
             self.metadata_table.setColumnHidden(column, key not in visible)
 
+    def _ensure_metadata_table_refresh_state(self) -> None:
+        """Initialize metadata-table dirty flags and cached row content."""
+
+        if hasattr(self, "_metadata_table_content_cache"):
+            return
+        self._metadata_table_structure_dirty = True
+        self._metadata_table_content_dirty = True
+        self._metadata_table_view_dirty = True
+        self._metadata_table_content_cache: list[dict[str, object]] = []
+
+    def _mark_metadata_table_structure_dirty(self) -> None:
+        """Mark metadata-table structure policy for refresh."""
+
+        self._ensure_metadata_table_refresh_state()
+        self._metadata_table_structure_dirty = True
+
+    def _mark_metadata_table_content_dirty(self) -> None:
+        """Mark cached metadata-table row content for rebuild."""
+
+        self._ensure_metadata_table_refresh_state()
+        self._metadata_table_content_dirty = True
+        self._metadata_table_view_dirty = True
+
+    def _mark_metadata_table_view_dirty(self) -> None:
+        """Mark metadata-table filter/group/sort presentation for refresh."""
+
+        self._ensure_metadata_table_refresh_state()
+        self._metadata_table_view_dirty = True
+
     def _apply_grouping_field_visibility(self) -> None:
         """Expose metadata grouping fields according to active plugin hints."""
+        self._mark_metadata_table_structure_dirty()
+        self._refresh_metadata_table_structure()
+        if getattr(self, "_metadata_table_view_dirty", False):
+            self._refresh_metadata_table_view()
+
+    def _refresh_metadata_table_structure(self) -> None:
+        """Refresh grouping-field availability and column visibility only."""
+
         if not hasattr(self, "metadata_group_combo"):
+            return
+        self._ensure_metadata_table_refresh_state()
+        if not self._metadata_table_structure_dirty:
             return
         caps = self._active_plugin_capabilities()
         current = self.metadata_group_combo.currentData()
@@ -1278,8 +1320,18 @@ class DataPageMixin:
             blocker = QSignalBlocker(self.metadata_group_combo)
             self.metadata_group_combo.setCurrentIndex(selected_index)
             del blocker
-        if self.dataset_state.has_loaded_data():
-            self._refresh_metadata_table()
+        selected = self.metadata_group_combo.currentData()
+        if selected != current:
+            self._mark_metadata_table_view_dirty()
+        self._apply_data_table_visibility()
+        self._metadata_table_structure_dirty = False
+
+    def _refresh_metadata_table_view_only(self) -> None:
+        """Refresh metadata-table grouping/filtering from cached content."""
+
+        self._mark_metadata_table_view_dirty()
+        self._refresh_metadata_table_structure()
+        self._refresh_metadata_table_view()
 
     def _set_metadata_controls_expanded(self, expanded: bool) -> None:
         """Keep metadata controls visible inside the intake panel."""
@@ -1511,6 +1563,7 @@ class DataPageMixin:
             dataset.set_path_metadata(refreshed)
         else:
             dataset.update_path_metadata(refreshed)
+        self._mark_metadata_table_content_dirty()
         return target_paths
 
     def _refresh_ebus_config_status(self, folder: Path | None = None) -> None:
@@ -1603,44 +1656,81 @@ class DataPageMixin:
             f"{', '.join(preview)}{suffix}"
         )
 
-    def _refresh_metadata_table(self) -> None:
-        """Refresh metadata table with grouping/filtering controls."""
+    def _rebuild_metadata_table_content_cache(self) -> None:
+        """Rebuild cached metadata-table row display content from dataset state."""
+
+        self._ensure_metadata_table_refresh_state()
+        dataset = self.dataset_state
+        cached_rows: list[dict[str, object]] = []
+        for path in dataset.paths:
+            metadata = dict(dataset.metadata_for_path(path))
+            iris = metadata.get("iris_position", "-")
+            exp_ms = metadata.get("exposure_ms", "-")
+            try:
+                iris_text = "-" if iris == "-" else f"{float(iris):g}"
+            except Exception:
+                iris_text = "-"
+            try:
+                exp_text = "-" if exp_ms == "-" else f"{float(exp_ms):g}"
+            except Exception:
+                exp_text = "-"
+            cached_rows.append(
+                {
+                    "path": path,
+                    "metadata": metadata,
+                    "searchable": " ".join(
+                        [
+                            path.lower(),
+                            str(metadata.get("parent_folder", "")).lower(),
+                            str(metadata.get("grandparent_folder", "")).lower(),
+                            str(metadata.get("iris_position", "")).lower(),
+                            str(metadata.get("exposure_ms", "")).lower(),
+                            str(metadata.get("exposure_source", "")).lower(),
+                        ]
+                    ),
+                    "iris_text": iris_text,
+                    "exposure_text": exp_text,
+                }
+            )
+        self._metadata_table_content_cache = cached_rows
+        self._metadata_table_content_dirty = False
+        self._metadata_table_view_dirty = True
+
+    def _refresh_metadata_table_view(self) -> None:
+        """Apply current metadata-table grouping and filtering to cached content."""
+
         if not hasattr(self, "metadata_table"):
+            return
+        self._ensure_metadata_table_refresh_state()
+        if self._metadata_table_content_dirty:
+            self._rebuild_metadata_table_content_cache()
+        if not self._metadata_table_view_dirty:
             return
 
         group_field = self.metadata_group_combo.currentData()
         group_key = str(group_field) if group_field is not None else None
         filter_text = self.metadata_filter_edit.text().strip().lower()
         dataset = self.dataset_state
-        rows: list[tuple[str, str, dict[str, object]]] = []
-        for path in dataset.paths:
-            metadata = dataset.metadata_for_path(path)
-            searchable = " ".join(
-                [
-                    path.lower(),
-                    str(metadata.get("parent_folder", "")).lower(),
-                    str(metadata.get("grandparent_folder", "")).lower(),
-                    str(metadata.get("iris_position", "")).lower(),
-                    str(metadata.get("exposure_ms", "")).lower(),
-                    str(metadata.get("exposure_source", "")).lower(),
-                ]
-            )
-            if filter_text and filter_text not in searchable:
+        rows: list[tuple[str, str, dict[str, object], dict[str, object]]] = []
+        for cached_row in self._metadata_table_content_cache:
+            path = str(cached_row["path"])
+            metadata = dict(cached_row["metadata"])
+            if filter_text and filter_text not in str(cached_row["searchable"]):
                 continue
             group_value = (
                 str(metadata.get(group_key, ""))
                 if group_key is not None
                 else ""
             )
-            rows.append((group_value, path, metadata))
+            rows.append((group_value, path, metadata, cached_row))
 
         rows.sort(key=lambda row: (row[0].lower(), Path(row[1]).name.lower()))
         self.dataset_state.set_metadata_visible_paths(
-            [path for _grp, path, _md in rows],
+            [path for _grp, path, _md, _cached in rows],
         )
 
         group_tokens: list[str] = []
-        for group_value, _path, _metadata in rows:
+        for group_value, _path, _metadata, _cached in rows:
             if group_key is None:
                 group_tokens.append("__all__")
             else:
@@ -1657,17 +1747,7 @@ class DataPageMixin:
                 group_ids[""] = 0
 
         self.metadata_table.setRowCount(len(rows))
-        for row_idx, (group_value, path, metadata) in enumerate(rows):
-            iris = metadata.get("iris_position", "-")
-            exp_ms = metadata.get("exposure_ms", "-")
-            try:
-                iris_text = "-" if iris == "-" else f"{float(iris):g}"
-            except Exception:
-                iris_text = "-"
-            try:
-                exp_text = "-" if exp_ms == "-" else f"{float(exp_ms):g}"
-            except Exception:
-                exp_text = "-"
+        for row_idx, (group_value, path, metadata, cached_row) in enumerate(rows):
             if group_key is None:
                 group_token = "__all__"
             else:
@@ -1677,8 +1757,8 @@ class DataPageMixin:
                 path,
                 str(metadata.get("parent_folder", "")),
                 str(metadata.get("grandparent_folder", "")),
-                iris_text,
-                exp_text,
+                str(cached_row["iris_text"]),
+                str(cached_row["exposure_text"]),
                 str(metadata.get("exposure_source", "")).lower() or "-",
                 str(int(group_id)),
             ]
@@ -1706,6 +1786,18 @@ class DataPageMixin:
         )
         self._apply_data_table_visibility()
         self._refresh_data_header_state()
+        self._metadata_table_view_dirty = False
+
+    def _refresh_metadata_table(self) -> None:
+        """Refresh metadata table with narrow dirty-state invalidation."""
+
+        if not hasattr(self, "metadata_table"):
+            return
+        self._ensure_metadata_table_refresh_state()
+        self._refresh_metadata_table_structure()
+        if self._metadata_table_content_dirty:
+            self._rebuild_metadata_table_content_cache()
+        self._refresh_metadata_table_view()
 
     def _open_metadata_row_in_inspect(self, row: int, _col: int) -> None:
         """Open selected metadata row in Inspect page."""

@@ -1186,8 +1186,11 @@ class FrameLabWindow(
     ) -> str | None:
         """Update the active workflow node inside the loaded controller state."""
 
+        requested_node_id = str(node_id).strip() if node_id else None
+        if requested_node_id == self.workflow_state_controller.active_node_id:
+            return self.ui_state_snapshot.workflow_active_node_id
+
         node = self.workflow_state_controller.set_active_node(node_id)
-        self.metadata_state_controller.clear_cache()
         self.ui_state_snapshot.workflow_active_node_id = (
             node.node_id if node is not None else None
         )

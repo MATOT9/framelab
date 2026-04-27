@@ -151,6 +151,82 @@ def test_custom_scan_metric_family_menu_updates_custom_setup(
     assert data_window.scan_metric_custom_button.isEnabled()
 
 
+def test_scan_metric_family_button_uses_themed_dock_action_style(
+    data_window: FrameLabWindow,
+) -> None:
+    assert data_window.scan_metric_custom_button.objectName() == "DockActionButton"
+
+
+def test_metadata_filter_refreshes_cached_view_without_content_rebuild(
+    data_window: FrameLabWindow,
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    first = str(tmp_path / "dark.tiff")
+    second = str(tmp_path / "bright.tiff")
+    data_window.dataset_state.set_loaded_dataset(tmp_path, (first, second))
+    data_window.dataset_state.update_path_metadata(
+        {
+            first: {
+                "parent_folder": "frames",
+                "grandparent_folder": "acq-0011__dark",
+                "iris_position": 1,
+                "exposure_ms": 10,
+                "exposure_source": "path",
+            },
+            second: {
+                "parent_folder": "frames",
+                "grandparent_folder": "acq-0012__bright",
+                "iris_position": 2,
+                "exposure_ms": 20,
+                "exposure_source": "path",
+            },
+        },
+    )
+    data_window._mark_metadata_table_content_dirty()
+    data_window._refresh_metadata_table()
+    assert data_window.metadata_table.rowCount() == 2
+
+    rebuild_calls: list[str] = []
+    monkeypatch.setattr(
+        data_window,
+        "_rebuild_metadata_table_content_cache",
+        lambda: rebuild_calls.append("rebuild"),
+    )
+
+    data_window.metadata_filter_edit.setText("bright")
+
+    assert rebuild_calls == []
+    assert data_window.metadata_table.rowCount() == 1
+    assert data_window.dataset_state.metadata_visible_paths == [second]
+
+
+def test_workflow_tab_settle_does_not_rebuild_metadata_content(
+    framelab_window_factory,
+    monkeypatch,
+    wait_until,
+) -> None:
+    window = framelab_window_factory(
+        enabled_plugin_ids=("iris_gain_vs_exposure",),
+    )
+    window._refresh_metadata_table()
+    rebuild_calls: list[str] = []
+    monkeypatch.setattr(
+        window,
+        "_rebuild_metadata_table_content_cache",
+        lambda: rebuild_calls.append("rebuild"),
+    )
+
+    window.workflow_tabs.setCurrentIndex(1)
+    analysis_index = window.workflow_tabs.indexOf(window.analysis_page)
+    if analysis_index >= 0:
+        window.workflow_tabs.setCurrentIndex(analysis_index)
+    window.workflow_tabs.setCurrentIndex(0)
+
+    wait_until(lambda: not window._workflow_tab_settle_timer.isActive(), timeout_ms=1000)
+    assert rebuild_calls == []
+
+
 def test_edit_advanced_menu_always_exposes_core_ebus_tools(
     data_window: FrameLabWindow,
 ) -> None:

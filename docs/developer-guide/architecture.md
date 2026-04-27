@@ -216,7 +216,7 @@ The Analyze workflow does not re-measure images. It packages the current dataset
 
 The analysis plugin interface should be treated as a consumer of this prebuilt context, not as a place to reach back into raw host state ad hoc.
 
-Main workflow tab changes are treated as view events. Switching between Data, Measure, and Analyze can update layout, hints, and visible plugin context delivery when the context is already dirty, but it must not start scans, metric jobs, cache flushes, or new analysis invalidation by itself. Scope refreshes compare the effective scope context before invalidating analysis so revisiting the same scope remains cheap.
+Main workflow tab changes are treated as view events. Switching between Data, Measure, and Analyze can update layout, hints, column visibility, and visible plugin context delivery when the context is already dirty, but it must not start scans, rebuild cached Data-table metadata content, start metric jobs, flush caches, or create new analysis invalidation by itself. Scope refreshes compare the effective scope context before invalidating analysis so revisiting the same scope remains cheap.
 
 ## State ownership
 

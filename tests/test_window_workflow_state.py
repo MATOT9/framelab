@@ -878,6 +878,23 @@ def test_same_workflow_scope_revisit_does_not_invalidate_analysis_context(
     wait_until(lambda: not window._workflow_scope_refresh_timer.isActive(), timeout_ms=1000)
 
     invalidations: list[dict[str, object]] = []
+    calls: list[str] = []
+    monkeypatch.setattr(window, "load_folder", lambda *args, **kwargs: calls.append("load"))
+    monkeypatch.setattr(
+        window,
+        "_start_dynamic_stats_job",
+        lambda **kwargs: calls.append("dynamic"),
+    )
+    monkeypatch.setattr(
+        window,
+        "_refresh_metadata_cache",
+        lambda *args, **kwargs: calls.append("metadata_cache"),
+    )
+    monkeypatch.setattr(
+        window,
+        "_rebuild_metadata_table_content_cache",
+        lambda: calls.append("metadata_content"),
+    )
     monkeypatch.setattr(
         window,
         "_invalidate_analysis_context",
@@ -887,6 +904,7 @@ def test_same_workflow_scope_revisit_does_not_invalidate_analysis_context(
     window.set_active_workflow_node(acq_node_id)
 
     wait_until(lambda: not window._workflow_scope_refresh_timer.isActive(), timeout_ms=1000)
+    assert calls == []
     assert invalidations == []
 
 
@@ -1004,6 +1022,45 @@ def test_empty_acquisition_rename_does_not_scan_or_show_no_files(
 
     window._rename_workflow_acquisition(second_node_id)
 
+    assert load_calls == []
+    assert not any("No supported image files" in message for _title, message in info_messages)
+
+
+def test_create_empty_workflow_session_does_not_scan_or_show_no_files(
+    tmp_path: Path,
+    framelab_window_factory,
+    monkeypatch,
+) -> None:
+    workspace_root, _session_root, _first, _second, _session_node_id, _acq_node_id = (
+        _make_calibration_workspace_with_frames(tmp_path)
+    )
+    campaign_node_id = "calibration:campaign:camera-a/campaign-2026"
+    window = framelab_window_factory(enabled_plugin_ids=())
+    window.set_workflow_context(
+        str(workspace_root),
+        "calibration",
+        active_node_id=campaign_node_id,
+    )
+    load_calls: list[dict[str, object]] = []
+    info_messages: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        window,
+        "load_folder",
+        lambda *args, **kwargs: load_calls.append(dict(kwargs)),
+    )
+    monkeypatch.setattr(
+        window,
+        "_show_info",
+        lambda title, message: info_messages.append((str(title), str(message))),
+    )
+
+    created = window._create_workflow_session(
+        campaign_node_id,
+        "2026-03-06__empty",
+    )
+
+    assert created is not None
+    assert created.is_dir()
     assert load_calls == []
     assert not any("No supported image files" in message for _title, message in info_messages)
 

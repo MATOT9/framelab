@@ -9,7 +9,7 @@ This roadmap is grounded in current repo docs, `TODO`, and inspected implementat
 - Verify the workspace-document split: preferences persist globally, while session-like UI state restores only from explicit `.framelab` files.
 - Finish populating the Preferences UI with the settings that should remain global.
 - Fix Trials profile folder creation and structure behavior.
-- Fix known UI regressions around tab-switch lag, disappearing badges/chips, and preview-context menus.
+- Profile remaining UI rendering latency around tab switches, disappearing badges/chips, and preview-context menus.
 
 ## Workflow And Metadata
 
@@ -20,7 +20,7 @@ This roadmap is grounded in current repo docs, `TODO`, and inspected implementat
 
 ## Measurement And Analysis
 
-- Continue the staged-pipeline rollout by profiling remaining UI/rendering latency now that runtime jobs are visible and tab/scope revisits avoid hidden recompute or analysis invalidation unless applied inputs changed.
+- Continue the staged-pipeline rollout by profiling remaining UI/rendering latency now that runtime jobs are visible and tab/scope revisits avoid hidden scan, metadata rebuild, recompute, or analysis invalidation unless applied inputs changed.
 - Add computer last boot time calculation where it belongs in metadata or runtime context.
 - Extend analysis and plugin coverage for dead pixel detection and spectral responsivity assessment.
 

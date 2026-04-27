@@ -996,7 +996,14 @@ class AnalysisPageMixin:
             self._apply_density_policy()
         if hasattr(self, "_apply_visibility_policy"):
             self._apply_visibility_policy()
-        self._apply_grouping_field_visibility()
+        if hasattr(self, "_mark_metadata_table_structure_dirty"):
+            self._mark_metadata_table_structure_dirty()
+        if hasattr(self, "_refresh_metadata_table_structure"):
+            self._refresh_metadata_table_structure()
+            if getattr(self, "_metadata_table_view_dirty", False):
+                self._refresh_metadata_table_view()
+        else:
+            self._apply_grouping_field_visibility()
         self._update_metadata_controls_visibility()
         self._apply_data_table_visibility()
         self._apply_measure_table_visibility()

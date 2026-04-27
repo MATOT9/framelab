@@ -157,6 +157,8 @@ class DatasetLoadingMixin:
 
         self.dataset_state.set_loaded_dataset(folder, paths)
         self.dataset_state.update_path_metadata(metadata_by_path)
+        if hasattr(self, "_mark_metadata_table_content_dirty"):
+            self._mark_metadata_table_content_dirty()
         self.metrics_state.initialize_loaded_dataset(count)
         self.metrics_state.min_non_zero = mins
         self.metrics_state.maxs = maxs
@@ -174,6 +176,8 @@ class DatasetLoadingMixin:
         if hasattr(self, "_clear_processing_failures"):
             self._clear_processing_failures()
         dataset.clear_loaded_dataset()
+        if hasattr(self, "_mark_metadata_table_content_dirty"):
+            self._mark_metadata_table_content_dirty()
         metrics.clear_dataset_state()
         dataset.set_selected_index(None)
         self.base_status = "Select a folder."
@@ -863,6 +867,8 @@ class DatasetLoadingMixin:
         previous_thread = getattr(self, "_dataset_load_thread", None)
         self.unload_folder(clear_folder_edit=False)
         self.dataset_state.begin_loaded_dataset(folder)
+        if hasattr(self, "_mark_metadata_table_content_dirty"):
+            self._mark_metadata_table_content_dirty()
         self.metrics_state.initialize_loaded_dataset(0)
         self._clear_image_cache()
         if hasattr(self, "image_preview"):
@@ -989,6 +995,8 @@ class DatasetLoadingMixin:
 
         self.dataset_state.append_loaded_paths(batch.paths)
         self.dataset_state.update_path_metadata(batch.metadata_by_path)
+        if hasattr(self, "_mark_metadata_table_content_dirty"):
+            self._mark_metadata_table_content_dirty()
         self.metrics_state.reserve_loaded_dataset(max(0, int(batch.total)))
         self.metrics_state.append_loaded_batch(
             batch.min_non_zero,
@@ -1143,6 +1151,8 @@ class DatasetLoadingMixin:
                     status="No supported images",
                 )
             self.dataset_state.clear_loaded_dataset()
+            if hasattr(self, "_mark_metadata_table_content_dirty"):
+                self._mark_metadata_table_content_dirty()
             self.metrics_state.clear_dataset_state()
             self._refresh_table(update_analysis=False)
             self._update_metadata_source_options(False)
@@ -1176,6 +1186,8 @@ class DatasetLoadingMixin:
                     status="Load failed",
                 )
             self.dataset_state.clear_loaded_dataset()
+            if hasattr(self, "_mark_metadata_table_content_dirty"):
+                self._mark_metadata_table_content_dirty()
             self.metrics_state.clear_dataset_state()
             self._refresh_table(update_analysis=False)
             self._update_metadata_source_options(False)
