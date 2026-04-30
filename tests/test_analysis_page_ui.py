@@ -15,6 +15,7 @@ import framelab.plugins.analysis.iris_gain._plotting as plotting_module
 from framelab.metrics_state import MetricFamily
 from framelab.plugins.analysis import AnalysisPreparationJob
 from framelab.plugins.analysis.iris_gain._shared import _CurveSeries
+from framelab.refresh_policy import RefreshReason
 from framelab.runtime_tasks import RuntimeTaskState
 from framelab.ui_settings import DensityMode
 from framelab.window import FrameLabWindow
@@ -427,10 +428,10 @@ def test_analysis_tab_revisit_reuses_clean_context_cache(
     build_calls = 0
     original = analysis_window._build_analysis_context
 
-    def _wrapped():
+    def _wrapped(**kwargs):
         nonlocal build_calls
         build_calls += 1
-        return original()
+        return original(**kwargs)
 
     monkeypatch.setattr(analysis_window, "_build_analysis_context", _wrapped)
 
@@ -558,10 +559,10 @@ def test_analysis_plugin_run_reuses_clean_context_cache(
     build_calls = 0
     original = analysis_window._build_analysis_context
 
-    def _wrapped():
+    def _wrapped(**kwargs):
         nonlocal build_calls
         build_calls += 1
-        return original()
+        return original(**kwargs)
 
     monkeypatch.setattr(analysis_window, "_build_analysis_context", _wrapped)
     monkeypatch.setattr(plugin, "run_analysis", lambda context: None)
@@ -664,6 +665,7 @@ def test_analysis_plugin_action_requests_missing_required_metrics(
     assert calls == []
     assert dynamic_calls
     assert dynamic_calls[0]["requested_families"] == (MetricFamily.TOPK,)
+    assert dynamic_calls[0]["reason"] == RefreshReason.PLUGIN_RUN
     assert analysis_window._pending_analysis_plugin_run_id == plugin.plugin_id
     assert analysis_window.analysis_run_progress.isVisible()
     assert analysis_window.analysis_run_progress.format() == "Computing requirements..."

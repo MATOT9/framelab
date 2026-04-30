@@ -20,6 +20,7 @@ from ..plugins.analysis import (
     AnalysisContext,
     AnalysisPlugin,
 )
+from ..refresh_policy import RefreshReason, log_refresh_event, timed_refresh_event
 from ..runtime_tasks import RuntimeTaskState
 from ..ui_primitives import (
     ChipSpec,
@@ -173,7 +174,10 @@ class AnalysisPageMixin:
             "Push latest metrics/metadata into the active plugin.",
         )
         refresh_button.clicked.connect(
-            lambda _checked=False: self._update_analysis_context(force_push=True),
+            lambda _checked=False: self._update_analysis_context(
+                force_push=True,
+                reason=RefreshReason.VIEW_REBIND,
+            ),
         )
         selector_actions.addWidget(refresh_button)
         self.analysis_requirements_label = qtw.QLabel("")
@@ -326,7 +330,10 @@ class AnalysisPageMixin:
         self._sync_analysis_tab_visibility()
         self._populate_plugins_menu_entries()
         self._analysis_context_delivered_generation_by_plugin.clear()
-        self._invalidate_analysis_context(refresh_visible_plugin=True)
+        self._invalidate_analysis_context(
+            refresh_visible_plugin=True,
+            reason=RefreshReason.VIEW_REBIND,
+        )
         self._apply_dynamic_visibility_policy()
         self._refresh_analysis_summary()
 
@@ -336,7 +343,7 @@ class AnalysisPageMixin:
             return
         self._sync_analysis_host_views(index)
         if self._analysis_page_is_active():
-            self._ensure_analysis_context_current()
+            self._ensure_analysis_context_current(reason=RefreshReason.VIEW_REBIND)
         self._populate_plugins_menu_entries()
         self._apply_dynamic_visibility_policy()
         self._refresh_analysis_summary()
@@ -648,6 +655,7 @@ class AnalysisPageMixin:
                 refresh_analysis=True,
                 mode_override=prepare_mode,
                 requested_families=dynamic_families,
+                reason=RefreshReason.PLUGIN_RUN,
             )
             requested = True
         if roi_families:
@@ -656,7 +664,10 @@ class AnalysisPageMixin:
                 if MetricFamily.ROI_TOPK in roi_families
                 else "roi"
             )
-            self._start_roi_apply_job(mode_override=roi_mode)
+            self._start_roi_apply_job_for_reason(
+                mode_override=roi_mode,
+                reason=RefreshReason.PLUGIN_RUN,
+            )
             requested = True
         return requested
 
@@ -672,6 +683,7 @@ class AnalysisPageMixin:
             return
         context = self._ensure_analysis_context_current(
             force_push=True,
+            reason=RefreshReason.PLUGIN_RUN,
         )
         if context is None:
             return
@@ -751,6 +763,12 @@ class AnalysisPageMixin:
             if hasattr(self, "_set_status"):
                 self._set_status("Analysis already running")
             return
+        log_refresh_event(
+            "analysis_plugin.run.start",
+            reason=RefreshReason.PLUGIN_RUN,
+            host=self,
+            plugin=plugin.plugin_id,
+        )
         if hasattr(self, "_begin_runtime_task"):
             self._begin_runtime_task(
                 self._analysis_plugin_task_id(plugin.plugin_id),
@@ -761,7 +779,13 @@ class AnalysisPageMixin:
         self._begin_analysis_plugin_progress("Running analysis...")
         self._refresh_analysis_plugin_requirements_ui()
         try:
-            preparation_job = plugin.prepare_analysis(context)
+            with timed_refresh_event(
+                "analysis_plugin.prepare",
+                reason=RefreshReason.PLUGIN_RUN,
+                host=self,
+                plugin=plugin.plugin_id,
+            ):
+                preparation_job = plugin.prepare_analysis(context)
         except Exception as exc:
             self._finish_analysis_plugin_action(
                 plugin,
@@ -774,6 +798,13 @@ class AnalysisPageMixin:
                     "Analysis failed",
                     str(exc) or "The plugin preparation step failed.",
                 )
+            log_refresh_event(
+                "analysis_plugin.run.end",
+                reason=RefreshReason.PLUGIN_RUN,
+                host=self,
+                plugin=plugin.plugin_id,
+                status="failed",
+            )
             return
         if preparation_job is not None:
             self._start_analysis_preparation_job(
@@ -783,7 +814,13 @@ class AnalysisPageMixin:
             )
             return
         try:
-            plugin.run_analysis(context)
+            with timed_refresh_event(
+                "analysis_plugin.run",
+                reason=RefreshReason.PLUGIN_RUN,
+                host=self,
+                plugin=plugin.plugin_id,
+            ):
+                plugin.run_analysis(context)
         except Exception as exc:
             self._finish_analysis_plugin_action(
                 plugin,
@@ -796,12 +833,26 @@ class AnalysisPageMixin:
                     "Analysis failed",
                     str(exc) or "The plugin action failed.",
                 )
+            log_refresh_event(
+                "analysis_plugin.run.end",
+                reason=RefreshReason.PLUGIN_RUN,
+                host=self,
+                plugin=plugin.plugin_id,
+                status="failed",
+            )
             return
         self._finish_analysis_plugin_action(
             plugin,
             state=RuntimeTaskState.SUCCEEDED,
             status="Analysis complete",
             progress_text="Analysis complete",
+        )
+        log_refresh_event(
+            "analysis_plugin.run.end",
+            reason=RefreshReason.PLUGIN_RUN,
+            host=self,
+            plugin=plugin.plugin_id,
+            status="succeeded",
         )
 
     def _start_analysis_preparation_job(
@@ -834,6 +885,13 @@ class AnalysisPageMixin:
         )
         self._analysis_plugin_thread = thread
         self._analysis_plugin_worker = worker
+        log_refresh_event(
+            "analysis_plugin.preparation_worker.start",
+            reason=RefreshReason.PLUGIN_RUN,
+            host=self,
+            plugin=plugin.plugin_id,
+            label=str(label or "Preparing analysis"),
+        )
         if hasattr(self, "_update_runtime_task"):
             self._update_runtime_task(
                 self._analysis_plugin_task_id(plugin.plugin_id),
@@ -880,6 +938,13 @@ class AnalysisPageMixin:
             status="Analysis complete",
             progress_text="Analysis complete",
         )
+        log_refresh_event(
+            "analysis_plugin.preparation_worker.end",
+            reason=RefreshReason.PLUGIN_RUN,
+            host=self,
+            plugin=plugin.plugin_id,
+            status="succeeded",
+        )
 
     def _on_analysis_preparation_failed(
         self,
@@ -908,6 +973,13 @@ class AnalysisPageMixin:
                 "Analysis failed",
                 str(message or "The plugin preparation step failed."),
             )
+        log_refresh_event(
+            "analysis_plugin.preparation_worker.end",
+            reason=RefreshReason.PLUGIN_RUN,
+            host=self,
+            plugin=plugin_id,
+            status="failed",
+        )
 
     def _on_analysis_preparation_thread_finished(
         self,
@@ -1238,7 +1310,11 @@ class AnalysisPageMixin:
         for key, column in self.MEASURE_COLUMN_INDEX.items():
             self.table.setColumnHidden(column, key not in visible)
 
-    def _build_analysis_context(self) -> AnalysisContext:
+    def _build_analysis_context(
+        self,
+        *,
+        reason: RefreshReason | str = RefreshReason.VIEW_REBIND,
+    ) -> AnalysisContext:
         """Build current dataset context for analysis plugins."""
         controller = getattr(self, "analysis_context_controller", None)
         if controller is None:
@@ -1281,40 +1357,53 @@ class AnalysisPageMixin:
                 background_reference_label_resolver=self._background_reference_label_for_path,
             )
 
-        return controller.build_context(
-            mode=self._current_average_mode(),
-            normalization_scale=self._normalization_scale(),
-        )
+        with timed_refresh_event("analysis_context_rebuild", reason=reason, host=self):
+            return controller.build_context(
+                mode=self._current_average_mode(),
+                normalization_scale=self._normalization_scale(),
+            )
 
     def _invalidate_analysis_context(
         self,
         *,
         refresh_visible_plugin: bool = True,
+        reason: RefreshReason | str = RefreshReason.VIEW_REBIND,
     ) -> None:
         """Mark analysis context dirty and refresh lazily when needed."""
 
         self._analysis_context_dirty = True
+        log_refresh_event(
+            "analysis_context.invalidate",
+            reason=reason,
+            host=self,
+            refresh_visible_plugin=bool(refresh_visible_plugin),
+        )
         if refresh_visible_plugin and self._analysis_page_is_active():
             timer = getattr(self, "_analysis_context_refresh_timer", None)
             if timer is not None:
                 timer.start()
             else:
-                self._ensure_analysis_context_current()
+                self._ensure_analysis_context_current(reason=reason)
             return
         self._refresh_analysis_summary()
 
-    def _flush_dirty_analysis_context_if_visible(self) -> None:
+    def _flush_dirty_analysis_context_if_visible(
+        self,
+        *,
+        reason: RefreshReason | str = RefreshReason.VIEW_REBIND,
+    ) -> None:
         """Rebuild analysis context only when the Analyze page is visible."""
 
         if not self._analysis_page_is_active():
             return
-        self._ensure_analysis_context_current()
+        self._ensure_analysis_context_current(reason=reason)
 
     def _ensure_analysis_context_current(
         self,
         *,
         force_push: bool = False,
         force_rebuild: bool = False,
+        reason: RefreshReason | str = RefreshReason.VIEW_REBIND,
     ) -> AnalysisContext | None:
         """Ensure the active analysis plugin has the latest prepared context."""
 
@@ -1331,7 +1420,7 @@ class AnalysisPageMixin:
             or self._analysis_context_dirty
             or self._analysis_context_cache is None
         ):
-            context = self._build_analysis_context()
+            context = self._build_analysis_context(reason=reason)
             self._analysis_context_cache = context
             self._analysis_context_dirty = False
             self._analysis_context_generation += 1
@@ -1366,6 +1455,7 @@ class AnalysisPageMixin:
         *,
         force_push: bool = False,
         force_rebuild: bool = False,
+        reason: RefreshReason | str = RefreshReason.VIEW_REBIND,
     ) -> None:
         """Compatibility wrapper for pushing context into the active plugin."""
 
@@ -1375,6 +1465,7 @@ class AnalysisPageMixin:
         self._ensure_analysis_context_current(
             force_push=force_push,
             force_rebuild=force_rebuild,
+            reason=reason,
         )
 
     def _refresh_analysis_summary(self) -> None:

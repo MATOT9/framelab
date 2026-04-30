@@ -12,6 +12,7 @@ from tifffile import imwrite
 
 import framelab.workers as workers_module
 from framelab.metrics_state import MetricFamily, MetricFamilyState, ScanMetricPreset
+from framelab.refresh_policy import RefreshReason
 from framelab.runtime_tasks import RuntimeTaskState
 
 
@@ -120,6 +121,7 @@ def test_threshold_review_scan_preset_starts_threshold_job(
             "refresh_analysis": True,
             "mode_override": "none",
             "requested_families": (MetricFamily.SATURATION,),
+            "reason": RefreshReason.SCAN_LOAD,
         },
     ]
 
@@ -151,6 +153,7 @@ def test_topk_scan_preset_starts_topk_job_without_changing_measure_mode(
             "refresh_analysis": True,
             "mode_override": "topk",
             "requested_families": (MetricFamily.SATURATION, MetricFamily.TOPK),
+            "reason": RefreshReason.SCAN_LOAD,
         },
     ]
 
@@ -490,6 +493,7 @@ def test_rescan_ignores_stale_dynamic_stats_from_previous_scope(
     stale_job_id = window.metrics_state.begin_stats_job(
         update_kind="full",
         refresh_analysis=True,
+        reason=RefreshReason.SCAN_LOAD,
     )
     assert window.metrics_state.is_stats_running
     stale_result = workers_module.DynamicStatsResult(

@@ -23,6 +23,7 @@ from ..processing_failures import (
     failure_reason_from_exception,
     make_processing_failure,
 )
+from ..refresh_policy import RefreshReason
 from ..ui_primitives import (
     ChipSpec,
     SummaryItem,
@@ -844,7 +845,10 @@ class InspectPageMixin:
             and 0 <= dataset.selected_index < dataset.path_count()
         ):
             self._display_image(dataset.selected_index)
-        self._invalidate_analysis_context(refresh_visible_plugin=True)
+        self._invalidate_analysis_context(
+            refresh_visible_plugin=True,
+            reason=RefreshReason.VIEW_REBIND,
+        )
         self._sync_measure_display_menu_state()
         self._refresh_workspace_document_dirty_state()
 
@@ -1044,7 +1048,10 @@ class InspectPageMixin:
             and 0 <= dataset.selected_index < dataset.path_count()
         ):
             self._display_image(dataset.selected_index)
-        self._invalidate_analysis_context(refresh_visible_plugin=True)
+        self._invalidate_analysis_context(
+            refresh_visible_plugin=True,
+            reason=RefreshReason.VIEW_REBIND,
+        )
         self._sync_measure_display_menu_state()
         self._refresh_measure_header_state()
         self._refresh_workspace_document_dirty_state()
@@ -1439,13 +1446,13 @@ class InspectPageMixin:
         metrics = self.metrics_state
         metrics.background_config.enabled = bool(enabled)
         self._update_background_controls_visibility()
-        self._invalidate_background_cache()
+        self._invalidate_background_cache(reason=RefreshReason.BACKGROUND_CHANGE)
         if not enabled:
             if self._has_loaded_data():
                 metrics.bg_applied_mask = np.zeros(dataset.path_count(), dtype=bool)
                 metrics.bg_total_count = dataset.path_count()
                 metrics.bg_unmatched_count = 0
-                self._apply_live_update()
+                self._apply_live_update(reason=RefreshReason.BACKGROUND_CHANGE)
             self._update_background_status_label()
             self._refresh_workspace_document_dirty_state()
             self._set_status()
@@ -1747,11 +1754,11 @@ class InspectPageMixin:
             self._update_background_status_label()
             return False
 
-        self._invalidate_background_cache()
+        self._invalidate_background_cache(reason=RefreshReason.BACKGROUND_CHANGE)
         if self._has_loaded_data():
             metrics.bg_total_count = dataset.path_count()
             if metrics.background_config.enabled:
-                self._apply_live_update()
+                self._apply_live_update(reason=RefreshReason.BACKGROUND_CHANGE)
             else:
                 self._update_background_status_label()
                 if dataset.selected_index is not None:
@@ -1767,7 +1774,7 @@ class InspectPageMixin:
         dataset = self.dataset_state
         metrics = self.metrics_state
         metrics.background_library.clear()
-        self._invalidate_background_cache()
+        self._invalidate_background_cache(reason=RefreshReason.BACKGROUND_CHANGE)
         if self._has_loaded_data():
             metrics.bg_total_count = dataset.path_count()
             metrics.bg_unmatched_count = (
@@ -1775,7 +1782,7 @@ class InspectPageMixin:
             )
             metrics.bg_applied_mask = np.zeros(dataset.path_count(), dtype=bool)
             if metrics.background_config.enabled:
-                self._apply_live_update()
+                self._apply_live_update(reason=RefreshReason.BACKGROUND_CHANGE)
             elif dataset.selected_index is not None:
                 self._display_image(dataset.selected_index)
         self._update_background_status_label("cleared")

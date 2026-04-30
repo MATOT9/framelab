@@ -27,6 +27,7 @@ from ..metrics_state import (
     ScanMetricPreset,
 )
 from ..node_metadata import NODECARD_DIR_NAME, NODECARD_FILE_NAME
+from ..refresh_policy import RefreshReason, timed_refresh_event
 from ..raw_decode import SUPPORTED_MONO_RAW_PIXEL_FORMATS, is_raw_image_path
 from ..ui_primitives import (
     ChipSpec,
@@ -1511,17 +1512,17 @@ class DataPageMixin:
             self._apply_dynamic_visibility_policy()
             return
 
-        self._refresh_metadata_cache()
-        self._refresh_metadata_table()
+        self._refresh_metadata_cache(reason=RefreshReason.METADATA_CHANGE)
+        self._refresh_metadata_table(reason=RefreshReason.METADATA_CHANGE)
         if (
             metrics.background_config.enabled
             and metrics.background_library.has_any_reference()
         ):
-            self._invalidate_background_cache()
-            self._apply_live_update()
+            self._invalidate_background_cache(reason=RefreshReason.METADATA_CHANGE)
+            self._apply_live_update(reason=RefreshReason.METADATA_CHANGE)
             return
 
-        self._refresh_table()
+        self._refresh_table(reason=RefreshReason.METADATA_CHANGE)
         self._apply_dynamic_visibility_policy()
         self._set_status()
 
@@ -1531,40 +1532,52 @@ class DataPageMixin:
         paths: list[str] | tuple[str, ...] | None = None,
         invalidate_roots: tuple[str | Path, ...] = (),
         clear_cache: bool = False,
+        reason: RefreshReason | str = RefreshReason.METADATA_CHANGE,
     ) -> list[str]:
         """Refresh cached metadata for all loaded paths or one subtree subset."""
 
-        dataset = self.dataset_state
-        target_paths = (
-            list(dataset.paths)
-            if paths is None
-            else [str(path) for path in paths if dataset.source_index_for_path(path) is not None]
-        )
-        if not target_paths:
-            return []
-        if clear_cache:
-            clear_metadata_cache()
-        elif invalidate_roots:
-            invalidate_metadata_cache(tuple(invalidate_roots))
-        boundary_root = (
-            dataset.scope_snapshot.root
-            if dataset.scope_snapshot.source == "workflow"
-            else None
-        )
-        refreshed = {
-            path: extract_path_metadata(
-                path,
-                metadata_source=dataset.metadata_source_mode,
-                metadata_boundary_root=boundary_root,
+        with timed_refresh_event(
+            "metadata_cache_refresh",
+            reason=reason,
+            host=self,
+            clear_cache=bool(clear_cache),
+            invalidate_roots=len(invalidate_roots),
+        ):
+            dataset = self.dataset_state
+            target_paths = (
+                list(dataset.paths)
+                if paths is None
+                else [
+                    str(path)
+                    for path in paths
+                    if dataset.source_index_for_path(path) is not None
+                ]
             )
-            for path in target_paths
-        }
-        if paths is None or len(target_paths) == dataset.path_count():
-            dataset.set_path_metadata(refreshed)
-        else:
-            dataset.update_path_metadata(refreshed)
-        self._mark_metadata_table_content_dirty()
-        return target_paths
+            if not target_paths:
+                return []
+            if clear_cache:
+                clear_metadata_cache()
+            elif invalidate_roots:
+                invalidate_metadata_cache(tuple(invalidate_roots))
+            boundary_root = (
+                dataset.scope_snapshot.root
+                if dataset.scope_snapshot.source == "workflow"
+                else None
+            )
+            refreshed = {
+                path: extract_path_metadata(
+                    path,
+                    metadata_source=dataset.metadata_source_mode,
+                    metadata_boundary_root=boundary_root,
+                )
+                for path in target_paths
+            }
+            if paths is None or len(target_paths) == dataset.path_count():
+                dataset.set_path_metadata(refreshed)
+            else:
+                dataset.update_path_metadata(refreshed)
+            self._mark_metadata_table_content_dirty()
+            return target_paths
 
     def _refresh_ebus_config_status(self, folder: Path | None = None) -> None:
         """Update compact status text for recursively discovered eBUS configs."""
@@ -1788,16 +1801,21 @@ class DataPageMixin:
         self._refresh_data_header_state()
         self._metadata_table_view_dirty = False
 
-    def _refresh_metadata_table(self) -> None:
+    def _refresh_metadata_table(
+        self,
+        *,
+        reason: RefreshReason | str = RefreshReason.VIEW_REBIND,
+    ) -> None:
         """Refresh metadata table with narrow dirty-state invalidation."""
 
         if not hasattr(self, "metadata_table"):
             return
-        self._ensure_metadata_table_refresh_state()
-        self._refresh_metadata_table_structure()
-        if self._metadata_table_content_dirty:
-            self._rebuild_metadata_table_content_cache()
-        self._refresh_metadata_table_view()
+        with timed_refresh_event("metadata_table_refresh", reason=reason, host=self):
+            self._ensure_metadata_table_refresh_state()
+            self._refresh_metadata_table_structure()
+            if self._metadata_table_content_dirty:
+                self._rebuild_metadata_table_content_cache()
+            self._refresh_metadata_table_view()
 
     def _open_metadata_row_in_inspect(self, row: int, _col: int) -> None:
         """Open selected metadata row in Inspect page."""

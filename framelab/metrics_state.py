@@ -9,6 +9,11 @@ import numpy as np
 
 from .background import BackgroundConfig, BackgroundLibrary
 from .processing_failures import ProcessingFailure
+from .refresh_policy import (
+    RefreshReason,
+    ensure_compute_reason,
+    log_refresh_event,
+)
 
 
 class MetricFamily(str, Enum):
@@ -164,9 +169,11 @@ class MetricsPipelineController:
         self.stats_job_id = 0
         self.stats_update_kind = "idle"
         self.stats_refresh_analysis = True
+        self.stats_refresh_reason = RefreshReason.VIEW_REBIND
         self.is_stats_running = False
         self.roi_apply_job_id = 0
         self.is_roi_applying = False
+        self.roi_apply_reason = RefreshReason.VIEW_REBIND
         self.roi_apply_done = 0
         self.roi_apply_total = 0
         self._clear_loaded_dataset_buffer_state()
@@ -206,11 +213,26 @@ class MetricsPipelineController:
         family: MetricFamily | str,
         state: MetricFamilyState | str,
         message: str = "",
+        *,
+        reason: RefreshReason | str | None = None,
     ) -> None:
         """Set the readiness state for one metric family."""
 
-        self.metric_family_statuses[self._family_key(family)] = MetricFamilyStatus(
-            self._family_state(state),
+        key = self._family_key(family)
+        normalized_state = self._family_state(state)
+        if normalized_state in {MetricFamilyState.COMPUTING, MetricFamilyState.STALE}:
+            normalized_reason = ensure_compute_reason(
+                reason,
+                operation=f"metric family {normalized_state.value}",
+            )
+            log_refresh_event(
+                "metric_family.transition",
+                reason=normalized_reason,
+                family=key,
+                state=normalized_state.value,
+            )
+        self.metric_family_statuses[key] = MetricFamilyStatus(
+            normalized_state,
             str(message or ""),
         )
 
@@ -1011,13 +1033,19 @@ class MetricsPipelineController:
         update_kind: str,
         refresh_analysis: bool,
         requested_families: tuple[MetricFamily | str, ...] | None = None,
+        reason: RefreshReason | str | None = None,
     ) -> int:
         """Advance and record one in-flight dynamic-stats job."""
+        normalized_reason = ensure_compute_reason(
+            reason,
+            operation="dynamic stats job",
+        )
         self.stats_job_id += 1
         self.stats_update_kind = (
             update_kind if update_kind in {"full", "threshold_only"} else "full"
         )
         self.stats_refresh_analysis = bool(refresh_analysis)
+        self.stats_refresh_reason = normalized_reason
         self.is_stats_running = True
         requested = self.normalize_metric_families(
             requested_families
@@ -1031,6 +1059,7 @@ class MetricsPipelineController:
             self.set_metric_family_state(
                 family,
                 MetricFamilyState.COMPUTING,
+                reason=normalized_reason,
             )
         return self.stats_job_id
 
@@ -1038,6 +1067,7 @@ class MetricsPipelineController:
         """Clear dynamic-stats running state after completion or failure."""
         self.is_stats_running = False
         self.stats_update_kind = "idle"
+        self.stats_refresh_reason = RefreshReason.VIEW_REBIND
         self._sync_pending_input_family_states()
 
     def cancel_stats_job(self) -> int:
@@ -1052,10 +1082,16 @@ class MetricsPipelineController:
         total: int,
         *,
         requested_families: tuple[MetricFamily | str, ...] | None = None,
+        reason: RefreshReason | str | None = None,
     ) -> int:
         """Advance and record one in-flight dataset-wide ROI apply job."""
+        normalized_reason = ensure_compute_reason(
+            reason,
+            operation="ROI apply job",
+        )
         self.roi_apply_job_id += 1
         self.is_roi_applying = True
+        self.roi_apply_reason = normalized_reason
         self.roi_apply_done = 0
         self.roi_apply_total = max(0, int(total))
         requested = self.normalize_metric_families(
@@ -1065,6 +1101,7 @@ class MetricsPipelineController:
             self.set_metric_family_state(
                 family,
                 MetricFamilyState.COMPUTING,
+                reason=normalized_reason,
             )
         return self.roi_apply_job_id
 
@@ -1076,6 +1113,7 @@ class MetricsPipelineController:
     def finish_roi_apply(self) -> None:
         """Clear ROI-apply running state after finish, cancel, or failure."""
         self.is_roi_applying = False
+        self.roi_apply_reason = RefreshReason.VIEW_REBIND
         self.roi_apply_done = 0
         self.roi_apply_total = 0
         self._sync_pending_input_family_states()

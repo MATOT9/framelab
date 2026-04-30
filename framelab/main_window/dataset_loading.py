@@ -39,6 +39,7 @@ from ..processing_failures import (
     failure_reason_from_exception,
     make_processing_failure,
 )
+from ..refresh_policy import RefreshReason, ensure_compute_reason
 from ..runtime_tasks import RuntimeTaskState
 from ..native import backend as native_backend
 from ..raw_decode import (
@@ -187,11 +188,11 @@ class DatasetLoadingMixin:
         if hasattr(self, "_refresh_ebus_config_status"):
             self._refresh_ebus_config_status()
         if hasattr(self, "_refresh_metadata_table"):
-            self._refresh_metadata_table()
+            self._refresh_metadata_table(reason=RefreshReason.SCAN_LOAD)
         if hasattr(self, "image_preview"):
             self.image_preview.set_roi_rect(None)
             self.image_preview.reset_view()
-        self._refresh_table()
+        self._refresh_table(reason=RefreshReason.SCAN_LOAD)
         self._refresh_workspace_document_dirty_state()
         self._set_status()
 
@@ -460,8 +461,16 @@ class DatasetLoadingMixin:
             identities[str(candidate.resolve())] = identity
         return identities
 
-    def _invalidate_background_cache(self) -> None:
+    def _invalidate_background_cache(
+        self,
+        *,
+        reason: RefreshReason | str | None,
+    ) -> None:
         """Invalidate corrected-image cache after background changes."""
+        normalized_reason = ensure_compute_reason(
+            reason,
+            operation="background cache invalidation",
+        )
         metrics = self.metrics_state
         metrics.background_signature += 1
         if getattr(self, "_has_loaded_data", None) and self._has_loaded_data():
@@ -474,7 +483,11 @@ class DatasetLoadingMixin:
                 MetricFamily.ROI_TOPK,
             ):
                 if metrics.metric_family_state(family) == MetricFamilyState.READY:
-                    metrics.set_metric_family_state(family, MetricFamilyState.STALE)
+                    metrics.set_metric_family_state(
+                        family,
+                        MetricFamilyState.STALE,
+                        reason=normalized_reason,
+                    )
         self._corrected_cache.clear()
 
     def _background_library_snapshot(self) -> BackgroundLibrary:
@@ -800,7 +813,10 @@ class DatasetLoadingMixin:
             return
         self._dataset_load_batch_applying = True
         try:
-            self._refresh_table(update_analysis=False)
+            self._refresh_table(
+                update_analysis=False,
+                reason=RefreshReason.SCAN_LOAD,
+            )
         finally:
             self._dataset_load_batch_applying = False
 
@@ -877,7 +893,7 @@ class DatasetLoadingMixin:
         if hasattr(self, "_clear_processing_failures"):
             self._clear_processing_failures()
         if hasattr(self, "_refresh_metadata_table"):
-            self._refresh_metadata_table()
+            self._refresh_metadata_table(reason=RefreshReason.SCAN_LOAD)
         self._last_scan_pruned_dirs = 0
         self._last_scan_skipped_files = 0
         self.base_status = f"Loading {folder.name or str(folder)}"
@@ -1154,7 +1170,10 @@ class DatasetLoadingMixin:
             if hasattr(self, "_mark_metadata_table_content_dirty"):
                 self._mark_metadata_table_content_dirty()
             self.metrics_state.clear_dataset_state()
-            self._refresh_table(update_analysis=False)
+            self._refresh_table(
+                update_analysis=False,
+                reason=RefreshReason.SCAN_LOAD,
+            )
             self._update_metadata_source_options(False)
             suffix_text = "/".join(supported_suffixes())
             msg = f"No supported image files ({suffix_text}) found."
@@ -1189,7 +1208,10 @@ class DatasetLoadingMixin:
             if hasattr(self, "_mark_metadata_table_content_dirty"):
                 self._mark_metadata_table_content_dirty()
             self.metrics_state.clear_dataset_state()
-            self._refresh_table(update_analysis=False)
+            self._refresh_table(
+                update_analysis=False,
+                reason=RefreshReason.SCAN_LOAD,
+            )
             self._update_metadata_source_options(False)
             self.base_status = "Load failed"
             self._clear_image_cache()
@@ -1220,7 +1242,7 @@ class DatasetLoadingMixin:
             or self._folder_has_json_metadata(folder)
         )
         self._update_metadata_source_options(has_json_metadata)
-        self._refresh_metadata_table()
+        self._refresh_metadata_table(reason=RefreshReason.SCAN_LOAD)
 
         skipped_parts: list[str] = []
         if summary.pruned_dirs > 0:
@@ -1243,12 +1265,21 @@ class DatasetLoadingMixin:
             "",
         )
         if auto_metrics:
-            self._refresh_table(update_analysis=False)
-            self._apply_live_update()
+            self._refresh_table(
+                update_analysis=False,
+                reason=RefreshReason.SCAN_LOAD,
+            )
+            self._apply_live_update(reason=RefreshReason.SCAN_LOAD)
         else:
-            self._refresh_table(update_analysis=False)
+            self._refresh_table(
+                update_analysis=False,
+                reason=RefreshReason.SCAN_LOAD,
+            )
             if hasattr(self, "_invalidate_analysis_context"):
-                self._invalidate_analysis_context(refresh_visible_plugin=True)
+                self._invalidate_analysis_context(
+                    refresh_visible_plugin=True,
+                    reason=RefreshReason.SCAN_LOAD,
+                )
             self._update_background_status_label()
             self._apply_dynamic_visibility_policy()
             self._update_average_controls()
@@ -1258,7 +1289,9 @@ class DatasetLoadingMixin:
                 getattr(self, "_workspace_document_restore_active", None)
                 and self._workspace_document_restore_active()
             ):
-                self._apply_scan_metric_setup_after_scan()
+                self._apply_scan_metric_setup_after_scan(
+                    reason=RefreshReason.SCAN_LOAD,
+                )
 
         if hasattr(self, "_finish_runtime_task"):
             self._finish_runtime_task(

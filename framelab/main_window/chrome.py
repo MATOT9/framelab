@@ -27,6 +27,7 @@ from ..metadata_inspector_dock import MetadataInspectorDock
 from ..native import backend as native_backend
 from ..preferences_dialog import PreferencesDialog
 from ..plugins import PAGE_IDS, enabled_plugin_manifests, load_enabled_plugins
+from ..refresh_policy import RefreshReason, timed_refresh_event
 from ..runtime_tasks import RuntimeTaskState
 from ..ui_settings import UiPreferences
 from ..workflow_explorer_dock import WorkflowExplorerDock
@@ -910,11 +911,19 @@ class WindowChromeMixin:
         if self._analysis_plugin_engaged != engaged:
             self._analysis_plugin_engaged = engaged
 
-        self._apply_dynamic_visibility_policy()
-        if engaged and hasattr(self, "_restore_visible_analysis_layout"):
-            self._restore_visible_analysis_layout()
-        if engaged and hasattr(self, "_flush_dirty_analysis_context_if_visible"):
-            self._flush_dirty_analysis_context_if_visible()
+        reason = RefreshReason.TAB_SWITCH
+        event_name = "data_tab_settle" if index == 0 else "workflow_tab_settle"
+        with timed_refresh_event(
+            event_name,
+            reason=reason,
+            host=self,
+            tab_index=index,
+        ):
+            self._apply_dynamic_visibility_policy()
+            if engaged and hasattr(self, "_restore_visible_analysis_layout"):
+                self._restore_visible_analysis_layout()
+            if engaged and hasattr(self, "_flush_dirty_analysis_context_if_visible"):
+                self._flush_dirty_analysis_context_if_visible(reason=reason)
 
     def _copy_table_selection(self) -> None:
         """Copy selected metrics-table cells to clipboard."""

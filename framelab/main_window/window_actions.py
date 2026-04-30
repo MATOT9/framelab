@@ -20,6 +20,7 @@ from ..processing_failures import (
     merge_processing_failures,
     summarize_processing_failures,
 )
+from ..refresh_policy import RefreshReason
 from ..window_drag import apply_secondary_window_geometry, configure_secondary_window
 
 
@@ -113,7 +114,7 @@ class WindowActionsMixin:
                 MetricFamilyState.PENDING_INPUTS,
             )
         self._update_average_controls()
-        self._refresh_table()
+        self._refresh_table(reason=RefreshReason.APPLY_ROI)
         self._refresh_workspace_document_dirty_state()
         self._set_status(status_message)
         return True
@@ -402,7 +403,7 @@ class WindowActionsMixin:
         self._reset_roi_metrics()
         self._update_average_controls()
         if self._has_loaded_data():
-            self._refresh_table()
+            self._refresh_table(reason=RefreshReason.APPLY_ROI)
         self._refresh_workspace_document_dirty_state()
         self._set_status("ROI cleared")
 

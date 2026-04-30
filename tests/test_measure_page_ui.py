@@ -12,6 +12,7 @@ from tifffile import imwrite
 
 import framelab.main_window.inspect_page as inspect_page_module
 from framelab.metrics_state import MetricFamily, MetricFamilyState, ScanMetricPreset
+from framelab.refresh_policy import RefreshReason
 from framelab.runtime_tasks import RuntimeTaskState
 from framelab.ui_primitives import StatusChip
 from framelab.ui_density import VisibilityPolicy
@@ -250,11 +251,48 @@ def test_measure_control_changes_are_pending_until_apply(
             "update_kind": "full",
             "refresh_analysis": True,
             "requested_families": (MetricFamily.TOPK,),
+            "reason": RefreshReason.APPLY_TOPK,
         },
     ]
     assert measure_window.metrics_state.avg_count_value == 7
     assert measure_window.metrics_state.threshold_value == pytest.approx(65520.0)
     assert measure_window.metrics_state.low_signal_threshold_value == pytest.approx(0.0)
+
+
+def test_background_invalidation_keeps_static_scan_ready(
+    tmp_path: Path,
+    measure_window: FrameLabWindow,
+    wait_for_dataset_load,
+) -> None:
+    dataset_root = _write_measure_dataset(tmp_path)
+    measure_window.folder_edit.setText(str(dataset_root))
+    measure_window.load_folder()
+    wait_for_dataset_load(measure_window)
+
+    metrics = measure_window.metrics_state
+    metrics.set_metric_family_state(MetricFamily.STATIC_SCAN, MetricFamilyState.READY)
+    metrics.set_metric_family_state(MetricFamily.TOPK, MetricFamilyState.READY)
+    metrics.set_metric_family_state(
+        MetricFamily.BACKGROUND_APPLIED,
+        MetricFamilyState.READY,
+    )
+    metrics.set_metric_family_state(
+        MetricFamily.SATURATION,
+        MetricFamilyState.NOT_REQUESTED,
+    )
+
+    measure_window._invalidate_background_cache(reason=RefreshReason.BACKGROUND_CHANGE)
+
+    assert metrics.metric_family_state(MetricFamily.STATIC_SCAN) == MetricFamilyState.READY
+    assert metrics.metric_family_state(MetricFamily.TOPK) == MetricFamilyState.STALE
+    assert (
+        metrics.metric_family_state(MetricFamily.BACKGROUND_APPLIED)
+        == MetricFamilyState.STALE
+    )
+    assert (
+        metrics.metric_family_state(MetricFamily.SATURATION)
+        == MetricFamilyState.NOT_REQUESTED
+    )
 
 
 def test_threshold_apply_updates_runtime_task_state(

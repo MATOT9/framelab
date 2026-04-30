@@ -11,6 +11,7 @@ from framelab.metrics_state import (
     RoiApplyResult,
     ScanMetricPreset,
 )
+from framelab.refresh_policy import RefreshReason
 
 
 pytestmark = [pytest.mark.fast, pytest.mark.core]
@@ -250,6 +251,7 @@ def test_job_state_helpers_track_stats_and_roi_lifecycle(
     stats_job_id = state.begin_stats_job(
         update_kind="threshold_only",
         refresh_analysis=False,
+        reason=RefreshReason.APPLY_THRESHOLD,
     )
     assert stats_job_id == 1
     assert state.is_stats_running
@@ -276,6 +278,7 @@ def test_job_state_helpers_track_stats_and_roi_lifecycle(
     roi_job_id = state.begin_roi_apply(
         13,
         requested_families=(MetricFamily.ROI,),
+        reason=RefreshReason.APPLY_ROI,
     )
     assert roi_job_id == 1
     assert state.is_roi_applying
@@ -296,6 +299,30 @@ def test_job_state_helpers_track_stats_and_roi_lifecycle(
     assert not state.is_roi_applying
     assert state.roi_apply_done == 0
     assert state.roi_apply_total == 0
+
+
+def test_compute_family_transitions_require_compute_safe_reason(
+    state: MetricsPipelineController,
+) -> None:
+    with pytest.raises(ValueError):
+        state.set_metric_family_state(
+            MetricFamily.TOPK,
+            MetricFamilyState.COMPUTING,
+        )
+
+    with pytest.raises(AssertionError):
+        state.set_metric_family_state(
+            MetricFamily.TOPK,
+            MetricFamilyState.COMPUTING,
+            reason=RefreshReason.TAB_SWITCH,
+        )
+
+    state.set_metric_family_state(
+        MetricFamily.TOPK,
+        MetricFamilyState.COMPUTING,
+        reason=RefreshReason.APPLY_TOPK,
+    )
+    assert state.metric_family_state(MetricFamily.TOPK) == MetricFamilyState.COMPUTING
 
 
 def test_low_signal_mask_and_count_follow_applied_threshold(

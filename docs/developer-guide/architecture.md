@@ -204,6 +204,8 @@ Metric readiness is tracked by named families rather than inferred only from arr
 
 Runtime jobs are also tracked separately from metric readiness. Dataset load, threshold update, Top-K/background metric compute, ROI apply, and explicit analysis/plugin actions publish compact task state with a label, state, optional progress, target, and short status. The main window owns that task state and shows it in the status bar; it is a visibility layer over existing worker lifecycles, not a second source of metric truth.
 
+Refresh and compute calls that can start expensive work carry an internal `RefreshReason`. The reason vocabulary lives in `framelab/refresh_policy.py` and covers scan load, Apply actions, plugin run, background change, view rebind, tab switch, workflow remap, workflow scope change, metadata change, and workspace restore. View-only reasons are allowed to repaint and deliver already available context, but `MetricsPipelineController` rejects them for metric-family transitions into `computing` or `stale`.
+
 ### Stage 4: analysis context build
 
 The Analyze workflow does not re-measure images. It packages the current dataset and metric controller state into an `AnalysisContext` through `framelab/analysis_context.py`. That context is built from:
@@ -221,6 +223,8 @@ The analysis plugin interface should be treated as a consumer of this prebuilt c
 Plugins may optionally request a lightweight background preparation job for expensive plugin-local record preparation. The job receives immutable inputs and returns a prepared payload; the host applies the final result on the UI thread after job id validation.
 
 Main workflow tab changes are treated as view events. Switching between Data, Measure, and Analyze can update layout, hints, column visibility, and visible plugin context delivery when the context is already dirty, but it must not start scans, rebuild cached Data-table metadata content, start metric jobs, flush caches, or create new analysis invalidation by itself. Scope refreshes compare the effective scope context before invalidating analysis so revisiting the same scope remains cheap.
+
+Lightweight DEBUG diagnostics use the `framelab.refresh` logger. They time Data-tab settle, metadata table/cache refreshes, analysis context rebuilds, plugin action/preparation paths, workflow remap side effects, and family transitions to `computing` or `stale`. Log payloads include the refresh reason plus dataset signature, scope path, family, or plugin when that context is available.
 
 ## State ownership
 

@@ -57,6 +57,12 @@ from .plugins import (
     resolve_enabled_plugin_ids,
 )
 from .plugins.analysis import AnalysisPlugin
+from .refresh_policy import (
+    RefreshReason,
+    log_refresh_event,
+    normalize_refresh_reason,
+    timed_refresh_event,
+)
 from .runtime_tasks import RuntimeTaskController
 from .ui_density import AdaptiveUiContext, UiDensityResolver
 from .ui_settings import (
@@ -348,6 +354,7 @@ class FrameLabWindow(
         )
         self._pending_workflow_scope_refresh_origin: str | None = None
         self._pending_workflow_scope_refresh_invalidate_analysis = False
+        self._pending_workflow_scope_refresh_reason = RefreshReason.WORKFLOW_SCOPE_CHANGE
         self._scan_selected_scope_timer = QTimer(self)
         self._scan_selected_scope_timer.setSingleShot(True)
         self._scan_selected_scope_timer.setInterval(25)
@@ -597,6 +604,7 @@ class FrameLabWindow(
         *,
         origin: str | None = None,
         invalidate_analysis: bool = True,
+        reason: RefreshReason | str = RefreshReason.WORKFLOW_SCOPE_CHANGE,
     ) -> None:
         """Coalesce expensive scope-change refreshes onto the next event-loop turn."""
 
@@ -605,6 +613,7 @@ class FrameLabWindow(
             bool(self._pending_workflow_scope_refresh_invalidate_analysis)
             or bool(invalidate_analysis)
         )
+        self._pending_workflow_scope_refresh_reason = normalize_refresh_reason(reason)
         self._workflow_scope_refresh_timer.start()
 
     def _flush_pending_workflow_scope_refresh(self) -> None:
@@ -614,8 +623,10 @@ class FrameLabWindow(
         invalidate_analysis = bool(
             self._pending_workflow_scope_refresh_invalidate_analysis,
         )
+        reason = self._pending_workflow_scope_refresh_reason
         self._pending_workflow_scope_refresh_origin = None
         self._pending_workflow_scope_refresh_invalidate_analysis = False
+        self._pending_workflow_scope_refresh_reason = RefreshReason.WORKFLOW_SCOPE_CHANGE
 
         if hasattr(self, "_refresh_data_header_state"):
             self._refresh_data_header_state()
@@ -624,7 +635,10 @@ class FrameLabWindow(
         if hasattr(self, "_refresh_analysis_summary"):
             self._refresh_analysis_summary()
         if invalidate_analysis and hasattr(self, "_invalidate_analysis_context"):
-            self._invalidate_analysis_context(refresh_visible_plugin=True)
+            self._invalidate_analysis_context(
+                refresh_visible_plugin=True,
+                reason=reason,
+            )
         elif hasattr(self, "_refresh_analysis_summary"):
             self._refresh_analysis_summary()
         if hasattr(self, "_apply_dynamic_visibility_policy"):
@@ -653,6 +667,7 @@ class FrameLabWindow(
         self._schedule_workflow_scope_refresh(
             origin=origin,
             invalidate_analysis=invalidate_analysis,
+            reason=RefreshReason.WORKFLOW_SCOPE_CHANGE,
         )
 
     def _request_scan_selected_scope(self) -> None:
@@ -703,11 +718,12 @@ class FrameLabWindow(
                 self._refresh_metadata_cache(
                     paths=affected_paths,
                     invalidate_roots=(),
+                    reason=RefreshReason.METADATA_CHANGE,
                 )
             if hasattr(self, "_refresh_metadata_table"):
-                self._refresh_metadata_table()
+                self._refresh_metadata_table(reason=RefreshReason.METADATA_CHANGE)
             if hasattr(self, "_refresh_table"):
-                self._refresh_table()
+                self._refresh_table(reason=RefreshReason.METADATA_CHANGE)
         self._notify_workflow_scope_changed()
 
     def _move_metadata_field_to_workflow_node_payload(
@@ -1432,19 +1448,33 @@ class FrameLabWindow(
     def _refresh_loaded_dataset_after_path_remap(self) -> None:
         """Refresh path-derived UI state after in-memory loaded-path rewrites."""
 
-        clear_metadata_cache()
-        if hasattr(self, "_refresh_metadata_cache"):
-            self._refresh_metadata_cache(clear_cache=True)
-        if hasattr(self, "_refresh_ebus_config_status"):
-            self._refresh_ebus_config_status(self.dataset_state.dataset_root)
-        if hasattr(self, "_refresh_metadata_table"):
-            self._refresh_metadata_table()
-        if hasattr(self, "_refresh_table"):
-            self._refresh_table(update_analysis=True)
-        elif hasattr(self, "_invalidate_analysis_context"):
-            self._invalidate_analysis_context(refresh_visible_plugin=True)
-        self._refresh_workspace_document_dirty_state()
-        self._set_status()
+        with timed_refresh_event(
+            "workflow_remap.side_effects",
+            reason=RefreshReason.WORKFLOW_REMAP,
+            host=self,
+        ):
+            clear_metadata_cache()
+            if hasattr(self, "_refresh_metadata_cache"):
+                self._refresh_metadata_cache(
+                    clear_cache=True,
+                    reason=RefreshReason.WORKFLOW_REMAP,
+                )
+            if hasattr(self, "_refresh_ebus_config_status"):
+                self._refresh_ebus_config_status(self.dataset_state.dataset_root)
+            if hasattr(self, "_refresh_metadata_table"):
+                self._refresh_metadata_table(reason=RefreshReason.WORKFLOW_REMAP)
+            if hasattr(self, "_refresh_table"):
+                self._refresh_table(
+                    update_analysis=True,
+                    reason=RefreshReason.WORKFLOW_REMAP,
+                )
+            elif hasattr(self, "_invalidate_analysis_context"):
+                self._invalidate_analysis_context(
+                    refresh_visible_plugin=True,
+                    reason=RefreshReason.WORKFLOW_REMAP,
+                )
+            self._refresh_workspace_document_dirty_state()
+            self._set_status()
 
     def _map_path_through_workflow_mutation(
         self,
@@ -1479,6 +1509,14 @@ class FrameLabWindow(
         remapped_loaded_dataset = self._apply_loaded_dataset_path_mutation(
             result,
             force_refresh_if_loaded=force_refresh_if_loaded,
+        )
+        log_refresh_event(
+            "workflow_structure_mutation",
+            reason=RefreshReason.WORKFLOW_REMAP,
+            host=self,
+            remapped_loaded_dataset=bool(remapped_loaded_dataset),
+            renamed_paths=len(tuple(getattr(result, "renamed_paths", ()))),
+            deleted_paths=len(tuple(getattr(result, "deleted_paths", ()))),
         )
         controller = self.workflow_state_controller
         if controller.workspace_root is None or controller.profile_id is None:
@@ -2473,7 +2511,7 @@ class FrameLabWindow(
             background_state = snapshot.background
             metrics = self.metrics_state
             metrics.background_library.clear()
-            self._invalidate_background_cache()
+            self._invalidate_background_cache(reason=RefreshReason.WORKSPACE_RESTORE)
             metrics.background_config.enabled = bool(background_state.enabled)
             metrics.background_config.source_mode = str(background_state.source_mode)
             metrics.background_config.clip_negative = bool(
@@ -2556,7 +2594,10 @@ class FrameLabWindow(
             if hasattr(self, "_sync_measure_display_menu_state"):
                 self._sync_measure_display_menu_state()
             if self._has_loaded_data():
-                self._refresh_table(update_analysis=False)
+                self._refresh_table(
+                    update_analysis=False,
+                    reason=RefreshReason.WORKSPACE_RESTORE,
+                )
 
             roi_rect = measure_state.roi_rect
             if roi_rect is not None:
@@ -2581,10 +2622,14 @@ class FrameLabWindow(
                 and metrics.roi_rect is not None
                 and metrics.roi_applied_to_all
             ):
-                self._start_roi_apply_job()
+                self._start_roi_apply_job_for_reason(
+                    reason=RefreshReason.WORKSPACE_RESTORE,
+                )
 
             if self._has_loaded_data():
-                self._apply_scan_metric_setup_after_scan()
+                self._apply_scan_metric_setup_after_scan(
+                    reason=RefreshReason.WORKSPACE_RESTORE,
+                )
 
             self.show_image_preview = bool(snapshot.ui.show_image_preview)
             self.show_histogram_preview = bool(snapshot.ui.show_histogram_preview)

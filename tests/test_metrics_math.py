@@ -157,7 +157,7 @@ class _RoiSelectionHarness(WindowActionsMixin, InspectPageMixin):
     def _update_average_controls(self) -> None:
         return
 
-    def _refresh_table(self, *, update_analysis: bool = True) -> None:
+    def _refresh_table(self, *, update_analysis: bool = True, reason=None) -> None:
         _iris_positions, exposure_ms = self._metadata_numeric_arrays()
         (
             self.metrics_state.dn_per_ms_values,

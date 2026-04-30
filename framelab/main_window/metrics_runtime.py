@@ -27,6 +27,11 @@ from ..metrics_state import (
 )
 from ..native import backend as native_backend
 from ..processing_failures import make_processing_failure
+from ..refresh_policy import (
+    RefreshReason,
+    ensure_compute_reason,
+    log_refresh_event,
+)
 from ..runtime_tasks import RuntimeTaskState
 from ..workers import DynamicStatsWorker, MetricComputeRequest, RoiApplyWorker
 
@@ -616,8 +621,13 @@ class MetricsRuntimeMixin:
         refresh_analysis: bool = True,
         mode_override: str | None = None,
         requested_families: tuple[MetricFamily | str, ...] | None = None,
+        reason: RefreshReason | str | None = None,
     ) -> None:
         """Start asynchronous dynamic metric computation for the dataset."""
+        normalized_reason = ensure_compute_reason(
+            reason,
+            operation="dynamic metric computation",
+        )
         if not self._has_loaded_data():
             return
 
@@ -654,6 +664,14 @@ class MetricsRuntimeMixin:
             update_kind=update_kind,
             refresh_analysis=refresh_analysis,
             requested_families=requested,
+            reason=normalized_reason,
+        )
+        log_refresh_event(
+            "dynamic_stats.start",
+            reason=normalized_reason,
+            host=self,
+            family=",".join(family.value for family in requested),
+            update_kind=update_kind,
         )
         if hasattr(self, "_begin_runtime_task"):
             self._begin_runtime_task(
@@ -767,6 +785,8 @@ class MetricsRuntimeMixin:
         if result.job_id != metrics.stats_job_id:
             return
 
+        refresh_reason = metrics.stats_refresh_reason
+        refresh_analysis = metrics.stats_refresh_analysis
         metrics.apply_dynamic_stats_result(
             result,
             path_count=self.dataset_state.path_count(),
@@ -785,9 +805,7 @@ class MetricsRuntimeMixin:
                 status="Complete",
             )
         self._stop_threshold_summary_animation()
-        self._refresh_table(
-            update_analysis=metrics.stats_refresh_analysis,
-        )
+        self._refresh_table(update_analysis=refresh_analysis, reason=refresh_reason)
         self._update_background_status_label()
         self._update_average_controls()
         self._set_status()
@@ -878,6 +896,22 @@ class MetricsRuntimeMixin:
 
     def _start_roi_apply_job(self, mode_override: str | None = None) -> None:
         """Start asynchronous ROI application across the full dataset."""
+        return self._start_roi_apply_job_for_reason(
+            mode_override=mode_override,
+            reason=RefreshReason.APPLY_ROI,
+        )
+
+    def _start_roi_apply_job_for_reason(
+        self,
+        mode_override: str | None = None,
+        *,
+        reason: RefreshReason | str | None,
+    ) -> None:
+        """Start asynchronous ROI application with an explicit compute reason."""
+        normalized_reason = ensure_compute_reason(
+            reason,
+            operation="ROI metric computation",
+        )
         metrics = self.metrics_state
         mode = mode_override or self._current_average_mode()
         if (
@@ -903,6 +937,14 @@ class MetricsRuntimeMixin:
         job_id = metrics.begin_roi_apply(
             dataset.path_count(),
             requested_families=requested_roi_families,
+            reason=normalized_reason,
+        )
+        log_refresh_event(
+            "roi_apply.start",
+            reason=normalized_reason,
+            host=self,
+            family=",".join(family.value for family in requested_roi_families),
+            mode=mode,
         )
         if hasattr(self, "_begin_runtime_task"):
             self._begin_runtime_task(
@@ -913,11 +955,16 @@ class MetricsRuntimeMixin:
                 progress_done=0,
                 progress_total=dataset.path_count(),
             )
-        metrics.set_metric_family_state(MetricFamily.ROI, MetricFamilyState.COMPUTING)
+        metrics.set_metric_family_state(
+            MetricFamily.ROI,
+            MetricFamilyState.COMPUTING,
+            reason=normalized_reason,
+        )
         if include_topk:
             metrics.set_metric_family_state(
                 MetricFamily.ROI_TOPK,
                 MetricFamilyState.COMPUTING,
+                reason=normalized_reason,
             )
         else:
             metrics.set_metric_family_state(
@@ -1072,6 +1119,7 @@ class MetricsRuntimeMixin:
             return
         if result.job_id != self.metrics_state.roi_apply_job_id:
             return
+        refresh_reason = self.metrics_state.roi_apply_reason
         self._finish_roi_apply_ui()
         if hasattr(self, "_record_processing_failures"):
             self._record_processing_failures(
@@ -1102,7 +1150,7 @@ class MetricsRuntimeMixin:
                 state=RuntimeTaskState.SUCCEEDED,
                 status="Complete",
             )
-        self._refresh_table()
+        self._refresh_table(reason=refresh_reason)
         self._refresh_workspace_document_dirty_state()
         self._set_status("ROI applied to all images")
 
@@ -1185,8 +1233,16 @@ class MetricsRuntimeMixin:
         self._apply_measure_table_visibility()
         self._sync_column_menu_actions()
 
-    def _apply_live_update(self) -> None:
+    def _apply_live_update(
+        self,
+        *,
+        reason: RefreshReason | str | None,
+    ) -> None:
         """Refresh only background-sensitive metric families already in use."""
+        normalized_reason = ensure_compute_reason(
+            reason,
+            operation="live metric update",
+        )
         if self._is_dataset_load_running():
             self._update_average_controls()
             self._set_status("Dataset load in progress")
@@ -1220,16 +1276,28 @@ class MetricsRuntimeMixin:
             update_kind="full",
             refresh_analysis=True,
             requested_families=tuple(requested),
+            reason=normalized_reason,
         )
         if metrics.roi_applied_to_all and metrics.roi_rect is not None:
             roi_mode = "roi_topk" if metrics.roi_topk_means is not None else "roi"
-            self._start_roi_apply_job(mode_override=roi_mode)
+            self._start_roi_apply_job_for_reason(
+                mode_override=roi_mode,
+                reason=normalized_reason,
+            )
         self._update_average_controls()
         self._refresh_workspace_document_dirty_state()
         self._set_status()
 
-    def _apply_scan_metric_setup_after_scan(self) -> None:
+    def _apply_scan_metric_setup_after_scan(
+        self,
+        *,
+        reason: RefreshReason | str = RefreshReason.SCAN_LOAD,
+    ) -> None:
         """Run metric jobs requested by the Data-page scan setup."""
+        normalized_reason = ensure_compute_reason(
+            reason,
+            operation="scan metric setup",
+        )
 
         if not self._has_loaded_data():
             return
@@ -1250,6 +1318,7 @@ class MetricsRuntimeMixin:
                     MetricFamily.SATURATION,
                     MetricFamily.TOPK,
                 ),
+                reason=normalized_reason,
             )
             started_job = True
         elif MetricFamily.SATURATION in families:
@@ -1258,6 +1327,7 @@ class MetricsRuntimeMixin:
                 refresh_analysis=True,
                 mode_override="none",
                 requested_families=(MetricFamily.SATURATION,),
+                reason=normalized_reason,
             )
             started_job = True
 
@@ -1295,12 +1365,13 @@ class MetricsRuntimeMixin:
                         "Select an ROI before scan-time ROI Top-K metrics can run.",
                     )
             else:
-                self._start_roi_apply_job(
+                self._start_roi_apply_job_for_reason(
                     mode_override=(
                         "roi_topk"
                         if MetricFamily.ROI_TOPK in families
                         else "roi"
                     ),
+                    reason=normalized_reason,
                 )
                 started_job = True
 
@@ -1335,11 +1406,14 @@ class MetricsRuntimeMixin:
                 update_kind="full",
                 refresh_analysis=True,
                 requested_families=(MetricFamily.TOPK,),
+                reason=RefreshReason.APPLY_TOPK,
             )
             self._set_status("Updating Top-K metrics")
         elif mode == "roi_topk" and metrics.roi_rect is not None:
             if metrics.roi_applied_to_all:
-                self._start_roi_apply_job()
+                self._start_roi_apply_job_for_reason(
+                    reason=RefreshReason.APPLY_TOPK,
+                )
             else:
                 self._apply_roi_rect_to_current_dataset(
                     metrics.roi_rect,
@@ -1385,6 +1459,7 @@ class MetricsRuntimeMixin:
             update_kind="threshold_only",
             refresh_analysis=False,
             requested_families=(MetricFamily.SATURATION,),
+            reason=RefreshReason.APPLY_THRESHOLD,
         )
         self._update_average_controls()
         if (
@@ -1453,7 +1528,12 @@ class MetricsRuntimeMixin:
         else:
             self._refresh_workspace_document_dirty_state()
 
-    def _refresh_table(self, *, update_analysis: bool = True) -> None:
+    def _refresh_table(
+        self,
+        *,
+        update_analysis: bool = True,
+        reason: RefreshReason | str = RefreshReason.VIEW_REBIND,
+    ) -> None:
         """Refresh the measure table and linked preview state."""
         if (
             not self._has_loaded_data()
@@ -1476,7 +1556,10 @@ class MetricsRuntimeMixin:
             metrics.bg_total_count = 0
             metrics.bg_unmatched_count = 0
             if update_analysis:
-                self._invalidate_analysis_context(refresh_visible_plugin=True)
+                self._invalidate_analysis_context(
+                    refresh_visible_plugin=True,
+                    reason=reason,
+                )
             self._update_background_status_label()
             self._apply_dynamic_visibility_policy()
             if hasattr(self, "_refresh_measure_header_state"):
@@ -1562,7 +1645,10 @@ class MetricsRuntimeMixin:
             self._pause_preview_updates = True
             self._clear_pending_preview_requests()
             if update_analysis:
-                self._invalidate_analysis_context(refresh_visible_plugin=True)
+                self._invalidate_analysis_context(
+                    refresh_visible_plugin=True,
+                    reason=reason,
+                )
             self._update_background_status_label()
             return
         self._pause_preview_updates = False
@@ -1574,7 +1660,10 @@ class MetricsRuntimeMixin:
         if should_refresh_preview:
             self._schedule_row_preview_refresh(target_index, debounce=True)
         if update_analysis:
-            self._invalidate_analysis_context(refresh_visible_plugin=True)
+            self._invalidate_analysis_context(
+                refresh_visible_plugin=True,
+                reason=reason,
+            )
         self._update_background_status_label()
         if hasattr(self, "_refresh_measure_header_state"):
             self._refresh_measure_header_state()
@@ -2024,4 +2113,4 @@ class MetricsRuntimeMixin:
             return
         if not self._average_mode_uses_roi(self._current_average_mode()):
             return
-        self._start_roi_apply_job()
+        self._start_roi_apply_job_for_reason(reason=RefreshReason.APPLY_ROI)
